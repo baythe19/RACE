@@ -63,7 +63,7 @@ module.exports = {
       ],
     ],
     extra: {
-      apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://34.93.103.86:3000',
+      apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://race-api-w361.onrender.com',
       googleMapsApiKey,
     },
   },
