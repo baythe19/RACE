@@ -65,9 +65,11 @@ api.interceptors.response.use(
     }
 
     const refreshToken = await getRefreshToken();
-    if (!refreshToken) {
-      await clearTokens();
-      notifyUnauthorized();
+    if (!refreshToken || refreshToken.startsWith('mock-')) {
+      if (!refreshToken) {
+        await clearTokens();
+        notifyUnauthorized();
+      }
       return Promise.reject(error);
     }
 
