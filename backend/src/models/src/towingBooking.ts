@@ -25,6 +25,7 @@ export interface ITowingBooking extends Document {
   customerId: Types.ObjectId;
   bookingNumber: string;
   vehicleId: Types.ObjectId;
+  towingMode?: 'instant' | 'scheduled' | 'emergency';
   pickup: ITowingBookingLocation;
   dropoff?: ITowingBookingLocation;
   distanceKm?: number;
@@ -115,6 +116,12 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     assignedFleetVehicleLabel: { type: String, trim: true },
     tripStartOtp: { type: String, trim: true },
     tripStartOtpVerified: { type: Boolean, default: false },
+    towingMode: {
+      type: String,
+      enum: ['instant', 'scheduled', 'emergency'],
+      default: 'instant',
+      index: true,
+    },
     scheduledAt: { type: Date },
     statusHistory: { type: [StatusHistorySchema], default: [] },
     cancelledAt: { type: Date },

@@ -14,6 +14,7 @@ export const createTowingBookingSchema = z
     vehicleId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid vehicle id'),
     pickup: locationSchema,
     dropoff: locationSchema,
+    towingMode: z.enum(['instant', 'scheduled', 'emergency']).optional(),
     scheduledAt: z.string().datetime().optional(),
   })
   .superRefine((data, ctx) => {
@@ -48,6 +49,7 @@ export interface TowingBookingResponseDto {
   vehicleId: string;
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
+  towingMode?: 'instant' | 'scheduled' | 'emergency';
   distanceKm?: number;
   estimatedFare: number;
   fareBreakdown?: TowingFareBreakdown;
