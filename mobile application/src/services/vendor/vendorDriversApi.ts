@@ -2,6 +2,8 @@ import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import { store } from '../../redux/store';
+import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import { MOCK_VENDOR_DRIVERS } from '../../data/mockPartnerData';
 
 /** @deprecated Prefer VendorDriver */
 export type FleetDriver = VendorDriver;
@@ -40,27 +42,75 @@ export type CreateVendorDriverInput = {
 };
 
 export async function listVendorDrivers(): Promise<VendorDriver[]> {
-  const { data } = await api.get<ApiSuccessResponse<VendorDriver[]>>(API_ENDPOINTS.vendorDrivers);
-  return data.data ?? [];
+  try {
+    const { data } = await api.get<ApiSuccessResponse<VendorDriver[]>>(API_ENDPOINTS.vendorDrivers);
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_DRIVERS;
+    }
+    throw error;
+  }
 }
 
 export async function createVendorDriver(payload: CreateVendorDriverInput): Promise<VendorDriver> {
-  const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
-    API_ENDPOINTS.vendorDrivers,
-    payload,
-  );
-  return data.data;
+  try {
+    const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
+      API_ENDPOINTS.vendorDrivers,
+      payload,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      const newDriver: VendorDriver = {
+        id: `mock-driver-${Date.now()}`,
+        name: payload.name,
+        phone: payload.phone,
+        email: payload.email,
+        driverType: payload.driverType,
+        licenseNo: payload.licenseNo,
+        city: payload.city || 'Bhubaneswar',
+        vehicleRegistration: payload.vehicleRegistration,
+        status: 'APPROVED',
+        isAvailable: true,
+        isBusy: false,
+        rating: 5.0,
+        vendorId: 'mock-vendor-001',
+        loginId: payload.loginId,
+        hasPasswordLogin: true,
+      };
+      MOCK_VENDOR_DRIVERS.unshift(newDriver);
+      return newDriver;
+    }
+    throw error;
+  }
 }
 
 export async function claimVendorDriver(phone: string): Promise<VendorDriver> {
-  const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(API_ENDPOINTS.vendorDriverClaim, {
-    phone,
-  });
-  return data.data;
+  try {
+    const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(API_ENDPOINTS.vendorDriverClaim, {
+      phone,
+    });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_DRIVERS[0]!;
+    }
+    throw error;
+  }
 }
 
 export async function removeVendorDriver(driverId: string): Promise<void> {
-  await api.delete(API_ENDPOINTS.vendorDriver(driverId));
+  try {
+    await api.delete(API_ENDPOINTS.vendorDriver(driverId));
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      const idx = MOCK_VENDOR_DRIVERS.findIndex(d => d.id === driverId);
+      if (idx !== -1) MOCK_VENDOR_DRIVERS.splice(idx, 1);
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function uploadVendorDriverDocument(
@@ -68,24 +118,31 @@ export async function uploadVendorDriverDocument(
   documentType: string,
   file: { uri: string; name: string; mimeType: string },
 ): Promise<VendorDriver> {
-  const formData = new FormData();
-  formData.append('documentType', documentType);
-  formData.append('file', {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType,
-  } as unknown as Blob);
+  try {
+    const formData = new FormData();
+    formData.append('documentType', documentType);
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
 
-  const token = store.getState().auth.accessToken;
-  const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
-    API_ENDPOINTS.vendorDriverUploadDocument(driverId),
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    const token = store.getState().auth.accessToken;
+    const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
+      API_ENDPOINTS.vendorDriverUploadDocument(driverId),
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
       },
-    },
-  );
-  return data.data;
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_DRIVERS[0]!;
+    }
+    throw error;
+  }
 }
