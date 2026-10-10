@@ -101,6 +101,10 @@ export interface IDriverProfile {
   reviewCount: number;
   status: DriverStatus;
   totalTrips: number;
+  experienceYears?: number;
+  languages?: string[];
+  availabilityWindow?: string;
+  policeVerificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   documents: Array<{
     type: string;
     url: string;
@@ -223,6 +227,14 @@ export const DriverProfileSchema = new Schema<IDriverProfile>(
       default: 'PENDING',
     },
     totalTrips: { type: Number, default: 0 },
+    experienceYears: { type: Number },
+    languages: [{ type: String }],
+    availabilityWindow: { type: String },
+    policeVerificationStatus: {
+      type: String,
+      enum: ['PENDING', 'VERIFIED', 'REJECTED'],
+      default: 'PENDING',
+    },
     documents: [
       {
         type: { type: String, required: true },

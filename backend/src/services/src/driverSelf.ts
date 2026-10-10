@@ -12,6 +12,26 @@ export const registerDriverSelfSchema = z.object({
   vehicleRegistration: z.string().min(4).max(20).optional(),
   city: z.string().min(2).max(100).optional(),
   vehicleType: z.string().max(50).optional(),
+  dateOfBirth: z.string().optional(),
+  emergencyContact: z
+    .object({
+      name: z.string().min(1).max(100),
+      mobileNumber: z.string().min(7).max(15),
+      relationship: z.string().max(50).optional(),
+    })
+    .optional(),
+  experienceYears: z.number().min(0).max(50).optional(),
+  languages: z.array(z.string().min(1).max(50)).optional(),
+  availabilityWindow: z.string().max(100).optional(),
+  documents: z
+    .array(
+      z.object({
+        type: z.string(),
+        url: z.string(),
+        status: z.enum(['PENDING', 'VERIFIED', 'REJECTED']).optional(),
+      }),
+    )
+    .optional(),
 });
 
 export type RegisterDriverSelfDto = z.infer<typeof registerDriverSelfSchema>;
@@ -27,14 +47,45 @@ export class DriverSelfService {
 
     const status = process.env.NODE_ENV === 'production' ? 'PENDING' : 'APPROVED';
 
+    const parsedDob = dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined;
+    const formattedDocs = (dto.documents ?? []).map((doc) => ({
+      type: doc.type,
+      url: doc.url,
+      status: (doc.status ?? 'PENDING') as 'PENDING' | 'VERIFIED' | 'REJECTED',
+      uploadedAt: new Date(),
+    }));
+
     if (user.role === 'driver' && user.driverProfile) {
       user.fullName = dto.fullName;
       if (dto.email) user.email = dto.email;
+      if (parsedDob && !isNaN(parsedDob.getTime())) user.dateOfBirth = parsedDob;
+      if (dto.emergencyContact) user.emergencyContact = dto.emergencyContact;
+      if (dto.address) {
+        user.address = {
+          line1: dto.address,
+          city: dto.city ?? user.address?.city ?? 'Bhubaneswar',
+          state: 'Odisha',
+          pincode: user.address?.pincode ?? '751001',
+          country: 'India',
+        };
+      }
       user.driverProfile.licenseNo = dto.licenseNo;
       user.driverProfile.driverType = dto.driverType;
       user.driverProfile.city = dto.city ?? user.driverProfile.city ?? 'Bhubaneswar';
       if (dto.vehicleRegistration) {
         user.driverProfile.vehicleRegistration = dto.vehicleRegistration;
+      }
+      if (dto.experienceYears !== undefined) {
+        user.driverProfile.experienceYears = dto.experienceYears;
+      }
+      if (dto.languages) {
+        user.driverProfile.languages = dto.languages;
+      }
+      if (dto.availabilityWindow) {
+        user.driverProfile.availabilityWindow = dto.availabilityWindow;
+      }
+      if (formattedDocs.length > 0) {
+        user.driverProfile.documents = formattedDocs;
       }
       user.driverProfile.status = status as 'PENDING' | 'APPROVED';
       user.isProfileCompleted = true;
@@ -63,6 +114,17 @@ export class DriverSelfService {
     user.role = 'driver';
     user.fullName = dto.fullName;
     if (dto.email) user.email = dto.email;
+    if (parsedDob && !isNaN(parsedDob.getTime())) user.dateOfBirth = parsedDob;
+    if (dto.emergencyContact) user.emergencyContact = dto.emergencyContact;
+    if (dto.address) {
+      user.address = {
+        line1: dto.address,
+        city: dto.city ?? 'Bhubaneswar',
+        state: 'Odisha',
+        pincode: '751001',
+        country: 'India',
+      };
+    }
     user.isVerified = true;
     user.isProfileCompleted = true;
     user.isAvailable = true;
@@ -78,11 +140,14 @@ export class DriverSelfService {
       city: dto.city ?? 'Bhubaneswar',
       state: 'Odisha',
       vehicleRegistration: dto.vehicleRegistration,
+      experienceYears: dto.experienceYears,
+      languages: dto.languages,
+      availabilityWindow: dto.availabilityWindow,
       status: status as 'PENDING' | 'APPROVED',
       rating: 0,
       reviewCount: 0,
       totalTrips: 0,
-      documents: [],
+      documents: formattedDocs,
       statusHistory: [{ status: status as 'PENDING' | 'APPROVED', changedAt: new Date() }],
     };
     await user.save();
