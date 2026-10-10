@@ -65,6 +65,8 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
 
   const vendorAddress = usePartnerRegistrationStore((s) => s.vendorAddress);
   const setVendorAddress = usePartnerRegistrationStore((s) => s.setVendorAddress);
+  const vendorBusiness = usePartnerRegistrationStore((s) => s.vendorBusiness);
+  const setVendorBusiness = usePartnerRegistrationStore((s) => s.setVendorBusiness);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showLocationPicker, setShowLocationPicker] = useState(false);
 
@@ -361,6 +363,55 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                   style={styles.input}
                 />
                 <ValidCheck visible={fieldValid.landmark} />
+              </View>
+
+              <View style={{ marginTop: px(spacing.xl) }}>
+                <Text style={[styles.formTitle, { fontSize: px(17) }]}>Bank details for payouts</Text>
+                <Text style={[styles.formSubtitle, { fontSize: px(13), marginTop: px(2) }]}>
+                  Direct deposit for completed service jobs
+                </Text>
+              </View>
+
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Account holder name <Text style={styles.optional}>(optional)</Text>
+              </Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  value={vendorBusiness.accountHolderName ?? ''}
+                  onChangeText={(accountHolderName) => setVendorBusiness({ accountHolderName })}
+                  placeholder="e.g. Ramesh Kumar Sahoo"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.input}
+                />
+              </View>
+
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Bank account number <Text style={styles.optional}>(optional)</Text>
+              </Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  value={vendorBusiness.accountNumber ?? ''}
+                  onChangeText={(accountNumber) => setVendorBusiness({ accountNumber: accountNumber.replace(/\D/g, '') })}
+                  keyboardType="number-pad"
+                  placeholder="Enter bank account number"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.input}
+                />
+              </View>
+
+              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                IFSC code <Text style={styles.optional}>(optional)</Text>
+              </Text>
+              <View style={styles.inputWrap}>
+                <TextInput
+                  value={vendorBusiness.ifsc ?? ''}
+                  onChangeText={(ifsc) => setVendorBusiness({ ifsc: ifsc.toUpperCase() })}
+                  autoCapitalize="characters"
+                  maxLength={11}
+                  placeholder="e.g. SBIN0001234"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.input}
+                />
               </View>
             </View>
 

@@ -18,6 +18,7 @@ import {
   ArrowRight,
   Building2,
   Check,
+  CreditCard,
   FileText,
   MapPin,
   Pencil,
@@ -105,6 +106,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
   const authUser = useAppSelector(state => state.auth.user);
   const { vendorBusiness, vendorAddress, vendorDocuments } = usePartnerRegistrationStore();
   const [submitting, setSubmitting] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const handleBack = () => partnerRegistrationGoBack(navigation, 'VendorReview', route.params);
 
@@ -133,6 +135,16 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         .filter(Boolean)
         .join(', ');
 
+      const bankDetails =
+        vendorBusiness.accountNumber && vendorBusiness.ifsc
+          ? {
+              accountHolderName:
+                vendorBusiness.accountHolderName || vendorBusiness.ownerName || 'Vendor',
+              accountNumber: vendorBusiness.accountNumber,
+              ifsc: vendorBusiness.ifsc.toUpperCase(),
+            }
+          : undefined;
+
       await registerVendor({
         vendorType: mapVendorTypeFromBusinessLabel(
           vendorBusiness.businessType || 'towing company',
@@ -142,6 +154,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         mobileNumber: vendorBusiness.mobileNumber || authUser?.mobileNumber || '',
         email: vendorBusiness.email || undefined,
         address: address || undefined,
+        bankDetails,
         acceptTerms: true as const,
       });
 
@@ -340,18 +353,46 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
               )}
             </SectionCard>
 
+            {vendorBusiness.accountNumber ? (
+              <SectionCard
+                title="Bank details"
+                Icon={CreditCard}
+                onEdit={() => navigation.navigate('VendorBusinessAddress', route.params)}>
+                <DetailRow
+                  label="Account holder"
+                  value={vendorBusiness.accountHolderName || vendorBusiness.ownerName}
+                />
+                <DetailRow label="Account number" value={vendorBusiness.accountNumber} />
+                <DetailRow label="IFSC code" value={vendorBusiness.ifsc || '—'} />
+              </SectionCard>
+            ) : null}
+
             <Pressable
-              disabled={submitting}
+              onPress={() => setTermsAccepted((v) => !v)}
+              style={styles.termsCheckboxRow}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: termsAccepted }}>
+              <View style={[styles.termsCheckbox, termsAccepted && styles.termsCheckboxChecked]}>
+                {termsAccepted ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
+              </View>
+              <Text style={styles.termsCheckboxText}>
+                I confirm that all provided details and documents are authentic, and I agree to the
+                RACE Partner Terms and Verification Policy.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              disabled={submitting || !termsAccepted}
               onPress={() => void submit()}
               style={({ pressed }) => [
                 styles.submitButton,
                 {
-                  marginTop: px(spacing.xl),
+                  marginTop: px(spacing.md),
                   minHeight: px(54),
                   borderRadius: px(14),
                 },
-                submitting && styles.submitDisabled,
-                pressed && !submitting && styles.pressed,
+                (submitting || !termsAccepted) && styles.submitDisabled,
+                pressed && !submitting && termsAccepted && styles.pressed,
               ]}>
               <Text style={[styles.submitLabel, { fontSize: px(16) }]}>
                 {submitting ? 'Submitting…' : 'Submit for review'}
@@ -596,4 +637,31 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   pressed: { opacity: 0.9 },
+  termsCheckboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingHorizontal: 2,
+  },
+  termsCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.border || '#888',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  termsCheckboxChecked: {
+    backgroundColor: SUCCESS_GREEN,
+    borderColor: SUCCESS_GREEN,
+  },
+  termsCheckboxText: {
+    flex: 1,
+    fontSize: typography.sizes.xs,
+    color: colors.dark,
+    lineHeight: 18,
+  },
 });
