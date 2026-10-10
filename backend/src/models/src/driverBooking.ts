@@ -25,6 +25,7 @@ export interface IDriverBooking extends Document {
   customerId: Types.ObjectId;
   bookingNumber: string;
   vehicleId?: Types.ObjectId;
+  driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   pickup: IDriverBookingLocation;
   dropoff?: IDriverBookingLocation;
   estimatedDurationHours?: number;
@@ -119,6 +120,12 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     assignedFleetVehicleLabel: { type: String, trim: true },
     tripStartOtp: { type: String, trim: true },
     tripStartOtpVerified: { type: Boolean, default: false },
+    driverServiceType: {
+      type: String,
+      enum: ['part_time', 'full_time', 'outstation', 'night'],
+      default: 'part_time',
+      index: true,
+    },
     scheduledAt: { type: Date },
     statusHistory: { type: [StatusHistorySchema], default: [] },
     cancelledAt: { type: Date },
