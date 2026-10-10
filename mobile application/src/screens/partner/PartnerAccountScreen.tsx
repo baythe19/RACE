@@ -9,15 +9,17 @@ import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import DocumentStatusChip from '../../components/vendor/DocumentStatusChip';
 import { getVendorConfig } from '../../data/vendorWizardConfig';
 import { useAuthActions } from '../../hooks/useAuth';
-import { useAppSelector } from '../../redux/hooks';
+import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { usePartnerOnboardingStore } from '../../store/partnerOnboardingStore';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
+import { switchMockRole } from '../../config/uiPreviewMode';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerAccountMain'>;
 
 export default function PartnerAccountScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
   const { logout } = useAuthActions();
   const [loggingOut, setLoggingOut] = useState(false);
   const user = useAppSelector(state => state.auth.user);
@@ -108,6 +110,11 @@ export default function PartnerAccountScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('VendorVerificationStatus')}
           />
         ) : null}
+        <PrimaryButton
+          label={isDriver ? '⚡ Switch to Vendor Preview' : '⚡ Switch to Driver Preview'}
+          variant="outline"
+          onPress={() => void switchMockRole(dispatch, isDriver ? 'vendor' : 'driver')}
+        />
         <PrimaryButton
           label={loggingOut ? 'Logging out...' : 'Log out'}
           disabled={loggingOut}

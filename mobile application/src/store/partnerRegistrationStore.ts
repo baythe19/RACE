@@ -16,12 +16,18 @@ export interface DriverPersonalInfo {
   email: string;
   dateOfBirth: string;
   address: string;
+  city?: string;
+  emergencyContactName?: string;
+  emergencyContactNumber?: string;
+  yearsOfExperience?: string;
+  languages?: string;
 }
 
 export interface DriverVehicleInfo {
   vehicleType: string;
   vehicleNumber: string;
   rcNumber: string;
+  licenseNumber: string;
   insuranceProvider: string;
   insurancePolicyNumber: string;
   vehicleModel: string;
@@ -33,6 +39,10 @@ export interface VendorBusinessInfo {
   mobileNumber: string;
   email: string;
   businessType: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  acceptTerms?: boolean;
 }
 
 export interface VendorBusinessAddress {
@@ -70,12 +80,18 @@ const emptyDriverPersonal: DriverPersonalInfo = {
   email: '',
   dateOfBirth: '',
   address: '',
+  city: 'Bhubaneswar',
+  emergencyContactName: '',
+  emergencyContactNumber: '',
+  yearsOfExperience: '',
+  languages: '',
 };
 
 const emptyDriverVehicle: DriverVehicleInfo = {
   vehicleType: '',
   vehicleNumber: '',
   rcNumber: '',
+  licenseNumber: '',
   insuranceProvider: '',
   insurancePolicyNumber: '',
   vehicleModel: '',
@@ -87,14 +103,18 @@ const emptyVendorBusiness: VendorBusinessInfo = {
   mobileNumber: '',
   email: '',
   businessType: '',
+  accountHolderName: '',
+  accountNumber: '',
+  ifsc: '',
+  acceptTerms: false,
 };
 
 const emptyVendorAddress: VendorBusinessAddress = {
   addressLine1: '',
   addressLine2: '',
-  city: '',
-  state: '',
-  pinCode: '',
+  city: 'Bhubaneswar',
+  state: 'Odisha',
+  pinCode: '751001',
   landmark: '',
 };
 

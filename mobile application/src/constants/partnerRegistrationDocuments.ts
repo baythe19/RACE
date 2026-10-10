@@ -57,6 +57,13 @@ export const VENDOR_DOCUMENTS: PartnerDocumentFieldConfig[] = [
     Icon: CreditCard,
   },
   {
+    id: 'msme',
+    label: 'MSME / Udyam Registration',
+    hint: 'Optional government business registration.',
+    required: false,
+    Icon: FileText,
+  },
+  {
     id: 'profile_photo',
     label: 'Profile Photo',
     hint: 'Your passport size photo.',
@@ -78,6 +85,20 @@ export const DRIVER_DOCUMENTS: PartnerDocumentFieldConfig[] = [
     label: 'Bank Details / Passbook',
     required: true,
     Icon: CreditCard,
+  },
+  {
+    id: 'police_verification',
+    label: 'Police Verification Certificate',
+    hint: 'Police clearance certificate (optional).',
+    required: false,
+    Icon: Shield,
+  },
+  {
+    id: 'medical_fitness',
+    label: 'Medical Fitness Certificate',
+    hint: 'Doctor fitness certificate (optional).',
+    required: false,
+    Icon: FileText,
   },
 ];
 
