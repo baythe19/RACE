@@ -3,49 +3,89 @@ import type { ApiSuccessResponse } from '../../types/auth';
 import type { VendorProfileResponse, VendorRegistrationRequest } from '../../types/vendor';
 import { apiClient } from '../api/apiClient';
 import { store } from '../../redux/store';
+import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import {
+  MOCK_VENDOR_DASHBOARD,
+  MOCK_VENDOR_STATUS,
+} from '../../data/mockPartnerData';
 
 export async function saveVendorDraft(
   payload: Partial<VendorRegistrationRequest> & { vendorType: VendorRegistrationRequest['vendorType'] },
 ): Promise<VendorProfileResponse> {
-  const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
-    `${API_ENDPOINTS.vendorDraft}`,
-    payload,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
+      `${API_ENDPOINTS.vendorDraft}`,
+      payload,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export async function registerVendor(
   payload: VendorRegistrationRequest,
 ): Promise<VendorProfileResponse> {
-  const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
-    API_ENDPOINTS.vendorRegister,
-    payload,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
+      API_ENDPOINTS.vendorRegister,
+      payload,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export async function updateVendor(
   payload: Partial<VendorRegistrationRequest>,
 ): Promise<VendorProfileResponse> {
-  const { data } = await apiClient.put<ApiSuccessResponse<VendorProfileResponse>>(
-    API_ENDPOINTS.vendorUpdate,
-    payload,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.put<ApiSuccessResponse<VendorProfileResponse>>(
+      API_ENDPOINTS.vendorUpdate,
+      payload,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export async function getVendorProfile(): Promise<VendorProfileResponse> {
-  const { data } = await apiClient.get<ApiSuccessResponse<VendorProfileResponse>>(
-    API_ENDPOINTS.vendorProfile,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<VendorProfileResponse>>(
+      API_ENDPOINTS.vendorProfile,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export async function getVendorStatus(): Promise<VendorProfileResponse> {
-  const { data } = await apiClient.get<ApiSuccessResponse<VendorProfileResponse>>(
-    API_ENDPOINTS.vendorStatus,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<VendorProfileResponse>>(
+      API_ENDPOINTS.vendorStatus,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export interface VendorDashboardStats {
@@ -55,10 +95,17 @@ export interface VendorDashboardStats {
 }
 
 export async function getVendorDashboard(): Promise<VendorDashboardStats> {
-  const { data } = await apiClient.get<ApiSuccessResponse<VendorDashboardStats>>(
-    API_ENDPOINTS.vendorDashboard,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<VendorDashboardStats>>(
+      API_ENDPOINTS.vendorDashboard,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_DASHBOARD;
+    }
+    throw error;
+  }
 }
 
 export interface UploadProgressHandler {
@@ -70,61 +117,77 @@ export async function uploadVendorDocument(
   file: { uri: string; name: string; mimeType: string },
   onProgress?: UploadProgressHandler,
 ): Promise<VendorProfileResponse> {
-  const formData = new FormData();
-  formData.append('documentType', documentType);
-  formData.append('file', {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType,
-  } as unknown as Blob);
+  try {
+    const formData = new FormData();
+    formData.append('documentType', documentType);
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
 
-  const token = store.getState().auth.accessToken;
+    const token = store.getState().auth.accessToken;
 
-  const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
-    API_ENDPOINTS.vendorUploadDocument,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
+      API_ENDPOINTS.vendorUploadDocument,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        onUploadProgress: (event) => {
+          if (!event.total || !onProgress) return;
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        },
       },
-      onUploadProgress: (event) => {
-        if (!event.total || !onProgress) return;
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      },
-    },
-  );
-  return data.data;
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      onProgress?.(100);
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export async function uploadVendorSelfie(
   file: { uri: string; name: string; mimeType: string },
   onProgress?: UploadProgressHandler,
 ): Promise<VendorProfileResponse> {
-  const formData = new FormData();
-  formData.append('file', {
-    uri: file.uri,
-    name: file.name,
-    type: file.mimeType,
-  } as unknown as Blob);
+  try {
+    const formData = new FormData();
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.mimeType,
+    } as unknown as Blob);
 
-  const token = store.getState().auth.accessToken;
+    const token = store.getState().auth.accessToken;
 
-  const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
-    API_ENDPOINTS.vendorSelfie,
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
+      API_ENDPOINTS.vendorSelfie,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        onUploadProgress: (event) => {
+          if (!event.total || !onProgress) return;
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        },
       },
-      onUploadProgress: (event) => {
-        if (!event.total || !onProgress) return;
-        onProgress(Math.round((event.loaded / event.total) * 100));
-      },
-    },
-  );
-  return data.data;
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      onProgress?.(100);
+      return MOCK_VENDOR_STATUS;
+    }
+    throw error;
+  }
 }
 
 export { API_CONFIG };
