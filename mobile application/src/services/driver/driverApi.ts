@@ -1,6 +1,13 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
+import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import {
+  MOCK_DRIVER_JOBS,
+  MOCK_JOB_OFFERS,
+  mockActiveJobState,
+  updateMockActiveJobStatus,
+} from '../../data/mockPartnerData';
 
 export type DriverJobBooking = {
   bookingType: 'towing' | 'driver';
@@ -32,50 +39,88 @@ export async function setDriverAvailability(isAvailable: boolean): Promise<{
   isAvailable: boolean;
   message: string;
 }> {
-  const { data } = await api.patch<
-    ApiSuccessResponse<{ isAvailable: boolean; message: string }>
-  >(API_ENDPOINTS.driverAvailability, { isAvailable });
-  return data.data;
+  try {
+    const { data } = await api.patch<
+      ApiSuccessResponse<{ isAvailable: boolean; message: string }>
+    >(API_ENDPOINTS.driverAvailability, { isAvailable });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return { isAvailable, message: `Status updated to ${isAvailable ? 'Online' : 'Offline'}` };
+    }
+    throw error;
+  }
 }
 
 export async function listDriverJobs(params?: {
   status?: string;
   type?: 'towing' | 'driver';
 }): Promise<DriverJobBooking[]> {
-  const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
-    API_ENDPOINTS.driverMyBookings,
-    { params },
-  );
-  return data.data ?? [];
+  try {
+    const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
+      API_ENDPOINTS.driverMyBookings,
+      { params },
+    );
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      if (params?.status === 'COMPLETED') {
+        return MOCK_DRIVER_JOBS.filter(j => j.status === 'COMPLETED');
+      }
+      return MOCK_DRIVER_JOBS;
+    }
+    throw error;
+  }
 }
 
 export async function listDriverJobOffers(): Promise<DriverJobBooking[]> {
-  const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
-    API_ENDPOINTS.driverBookingOffers,
-  );
-  return data.data ?? [];
+  try {
+    const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
+      API_ENDPOINTS.driverBookingOffers,
+    );
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_JOB_OFFERS;
+    }
+    throw error;
+  }
 }
 
 export async function getDriverActiveJob(): Promise<DriverJobBooking | null> {
-  const { data } = await api.get<
-    ApiSuccessResponse<{ active: boolean; booking?: DriverJobBooking } | DriverJobBooking | null>
-  >(API_ENDPOINTS.driverActiveBooking);
-  const payload = data.data;
-  if (!payload) return null;
-  if (typeof payload === 'object' && 'active' in payload) {
-    return payload.active && payload.booking ? payload.booking : null;
+  try {
+    const { data } = await api.get<
+      ApiSuccessResponse<{ active: boolean; booking?: DriverJobBooking } | DriverJobBooking | null>
+    >(API_ENDPOINTS.driverActiveBooking);
+    const payload = data.data;
+    if (!payload) return null;
+    if (typeof payload === 'object' && 'active' in payload) {
+      return payload.active && payload.booking ? payload.booking : null;
+    }
+    return payload as DriverJobBooking;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return mockActiveJobState;
+    }
+    throw error;
   }
-  return payload as DriverJobBooking;
 }
 
 export async function updateDriverLocation(
   latitude: number,
   longitude: number,
 ): Promise<{ location: { latitude: number; longitude: number }; updatedAt: string }> {
-  const { data } = await api.patch<
-    ApiSuccessResponse<{ location: { latitude: number; longitude: number }; updatedAt: string }>
-  >(API_ENDPOINTS.driverLocation, { latitude, longitude });
-  return data.data;
+  try {
+    const { data } = await api.patch<
+      ApiSuccessResponse<{ location: { latitude: number; longitude: number }; updatedAt: string }>
+    >(API_ENDPOINTS.driverLocation, { latitude, longitude });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return { location: { latitude, longitude }, updatedAt: new Date().toISOString() };
+    }
+    throw error;
+  }
 }
 
 export async function updateDriverBookingStatus(
@@ -84,26 +129,48 @@ export async function updateDriverBookingStatus(
   status: string,
   tripOtp?: string,
 ): Promise<unknown> {
-  const { data } = await api.patch(API_ENDPOINTS.driverBookingStatus(bookingId), {
-    bookingType,
-    status,
-    ...(tripOtp ? { tripOtp } : {}),
-  });
-  return data.data;
+  try {
+    const { data } = await api.patch(API_ENDPOINTS.driverBookingStatus(bookingId), {
+      bookingType,
+      status,
+      ...(tripOtp ? { tripOtp } : {}),
+    });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      updateMockActiveJobStatus(status);
+      return { success: true, status };
+    }
+    throw error;
+  }
 }
 
 export async function acceptDriverJob(
   bookingId: string,
   bookingType: 'towing' | 'driver',
 ): Promise<unknown> {
-  const { data } = await api.post(API_ENDPOINTS.driverBookingAccept(bookingId), { bookingType });
-  return data.data;
+  try {
+    const { data } = await api.post(API_ENDPOINTS.driverBookingAccept(bookingId), { bookingType });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return { success: true, message: 'Job accepted' };
+    }
+    throw error;
+  }
 }
 
 export async function rejectDriverJob(
   bookingId: string,
   bookingType: 'towing' | 'driver',
 ): Promise<unknown> {
-  const { data } = await api.post(API_ENDPOINTS.driverBookingReject(bookingId), { bookingType });
-  return data.data;
+  try {
+    const { data } = await api.post(API_ENDPOINTS.driverBookingReject(bookingId), { bookingType });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return { success: true, message: 'Job rejected' };
+    }
+    throw error;
+  }
 }
