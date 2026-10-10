@@ -145,6 +145,7 @@ export type CallStackParamList = {
   CallMain: undefined;
   QRScan: undefined;
   SOSEmergency: undefined;
+  VehicleQrEmergency: { vehicleId: string };
 };
 
 export type RootStackParamList = {

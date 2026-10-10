@@ -84,6 +84,7 @@ import BookingPaymentScreen from '../screens/booking/BookingPaymentScreen';
 import CallScreen from '../screens/CallScreen';
 import QRScanScreen from '../screens/call/QRScanScreen';
 import SOSEmergencyScreen from '../screens/call/SOSEmergencyScreen';
+import VehicleQrEmergencyScreen from '../screens/vehicles/VehicleQrEmergencyScreen';
 import ServiceComingSoonScreen from '../screens/ServiceComingSoonScreen';
 import SelectServiceScreen from '../screens/SelectServiceScreen';
 import ServiceListScreen from '../screens/ServiceListScreen';
@@ -458,6 +459,7 @@ function CallStackNavigator() {
       <CallStack.Screen name="CallMain" component={CallScreen} />
       <CallStack.Screen name="QRScan" component={QRScanScreen} />
       <CallStack.Screen name="SOSEmergency" component={SOSEmergencyScreen} />
+      <CallStack.Screen name="VehicleQrEmergency" component={VehicleQrEmergencyScreen} />
     </CallStack.Navigator>
   );
 }
