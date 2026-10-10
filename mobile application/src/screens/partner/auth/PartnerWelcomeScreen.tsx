@@ -16,12 +16,15 @@ import { images } from '../../../assets';
 import PartnerWelcomeTrustCard from '../../../components/partner/PartnerWelcomeTrustCard';
 import type { PartnerAuthStackParamList } from '../../../types/partnerNavigation';
 import { colors, layout, radius, spacing, typography } from '../../../theme';
+import { useAppDispatch } from '../../../redux/hooks';
+import { loginAsMockDriver, loginAsMockVendor } from '../../../config/uiPreviewMode';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerWelcome'>;
 
 const REF_W = 390;
 
 export default function PartnerWelcomeScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const scale = width / REF_W;
@@ -91,6 +94,26 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               ]}>
               <Text style={[styles.outlineButtonLabel, { fontSize: px(17) }]}>Login</Text>
             </Pressable>
+          </View>
+
+          {/* Instant Demo Preview Entry */}
+          <View style={[styles.demoCard, { marginTop: px(spacing.lg), padding: px(14), borderRadius: px(12) }]}>
+            <Text style={[styles.demoTitle, { fontSize: px(11) }]}>⚡ INSTANT FRONTEND PREVIEW</Text>
+            <Text style={[styles.demoSubtitle, { fontSize: px(12), marginTop: px(2) }]}>
+              Test full UI with mock data without backend:
+            </Text>
+            <View style={{ flexDirection: 'row', gap: px(8), marginTop: px(10) }}>
+              <Pressable
+                onPress={() => void loginAsMockDriver(dispatch)}
+                style={({ pressed }) => [styles.demoButton, pressed && styles.buttonPressed]}>
+                <Text style={styles.demoButtonText}>🚗 Driver View</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void loginAsMockVendor(dispatch)}
+                style={({ pressed }) => [styles.demoButton, pressed && styles.buttonPressed]}>
+                <Text style={styles.demoButtonText}>🏢 Vendor View</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
 
@@ -178,6 +201,32 @@ const styles = StyleSheet.create({
   outlineButtonLabel: {
     color: colors.primary,
     fontWeight: typography.weights.bold,
+  },
+  demoCard: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  demoTitle: {
+    color: colors.primaryDark,
+    fontWeight: typography.weights.bold,
+    letterSpacing: 0.8,
+  },
+  demoSubtitle: {
+    color: colors.grey,
+  },
+  demoButton: {
+    flex: 1,
+    paddingVertical: 10,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoButtonText: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: 13,
   },
   buttonPressed: {
     opacity: 0.92,

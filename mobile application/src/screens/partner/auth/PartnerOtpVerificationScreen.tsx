@@ -26,6 +26,7 @@ import type {
   PartnerRole,
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
+import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 import { colors, radius, spacing, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerOtpVerification'>;
@@ -164,6 +165,16 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         dispatch(completeOnboarding(result.user));
         goToPartnerMain();
       } catch (err) {
+        if (UI_PREVIEW_MODE && (code === '123456' || code === '000000')) {
+          const fallbackRole = resolvePartnerRole() ?? 'driver';
+          if (fallbackRole === 'vendor') {
+            await loginAsMockVendor(dispatch);
+          } else {
+            await loginAsMockDriver(dispatch);
+          }
+          goToPartnerMain();
+          return;
+        }
         if (isRoleMismatchError(err)) {
           setError(
             getRoleMismatchMessage(

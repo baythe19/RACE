@@ -44,6 +44,7 @@ import type {
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
 import { colors, layout, radius, shadows, spacing, typography } from '../../../theme';
+import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerLogin'>;
 
@@ -53,8 +54,8 @@ const LINK_BLUE = '#2563EB';
 const PAGE_BG = '#F7F7F5';
 const SUCCESS_GREEN = '#22C55E';
 
-/** TEMP: skip OTP UI — auto-verify with backend dev OTP. Re-enable OTP by flipping this off. */
-const SKIP_OTP_AUTH = true;
+/** Re-enabled OTP verification screen for real SMS delivery. Can be forced off via EXPO_PUBLIC_SKIP_OTP_AUTH=true */
+const SKIP_OTP_AUTH = process.env.EXPO_PUBLIC_SKIP_OTP_AUTH === 'true';
 
 function extractOtpFromMessage(message?: string): string | null {
   if (!message) return null;
@@ -210,6 +211,15 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             'This number belongs to another app role. Use the RACE Customer app or a different number.',
           ),
         );
+        return;
+      }
+      if (UI_PREVIEW_MODE && !SKIP_OTP_AUTH) {
+        navigation.navigate('PartnerOtpVerification', {
+          mobileNumber,
+          isExistingUser: false,
+          devOtp: '123456',
+          otpMessage: 'Dev mode: use OTP 123456',
+        });
         return;
       }
       setError(errMsg || (SKIP_OTP_AUTH ? 'Unable to sign in' : 'Unable to send OTP'));
@@ -426,6 +436,25 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                       : 'Send OTP'}
                 </Text>
               </Pressable>
+
+              {/* Instant Mock Preview Shortcuts */}
+              <View style={{ marginTop: px(spacing.md), padding: px(12), backgroundColor: '#F3F4F6', borderRadius: px(10) }}>
+                <Text style={{ fontSize: px(11), fontWeight: '700', color: colors.primaryDark, textAlign: 'center' }}>
+                  ⚡ QUICK DEMO MODE (NO BACKEND)
+                </Text>
+                <View style={{ flexDirection: 'row', gap: px(8), marginTop: px(8) }}>
+                  <Pressable
+                    onPress={() => void loginAsMockDriver(dispatch)}
+                    style={({ pressed }) => [styles.demoSmallButton, pressed && styles.pressed]}>
+                    <Text style={styles.demoSmallButtonText}>🚗 Demo Driver</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void loginAsMockVendor(dispatch)}
+                    style={({ pressed }) => [styles.demoSmallButton, pressed && styles.pressed]}>
+                    <Text style={styles.demoSmallButtonText}>🏢 Demo Vendor</Text>
+                  </Pressable>
+                </View>
+              </View>
 
               <Pressable
                 onPress={handleChangeRole}
@@ -689,4 +718,17 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   pressed: { opacity: 0.9 },
+  demoSmallButton: {
+    flex: 1,
+    paddingVertical: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  demoSmallButtonText: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: 12,
+  },
 });
