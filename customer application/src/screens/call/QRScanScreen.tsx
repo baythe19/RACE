@@ -34,6 +34,10 @@ export default function QRScanScreen({ navigation }: Props) {
   });
 
   const handleScan = () => {
+    navigation.navigate('VehicleQrEmergency', { vehicleId: 'demo_veh_101' });
+  };
+
+  const handleSos = () => {
     navigation.replace('SOSEmergency');
   };
 
@@ -113,13 +117,28 @@ export default function QRScanScreen({ navigation }: Props) {
             width: '100%',
             height: px(52),
             borderRadius: px(14),
+            backgroundColor: SOS_COLORS.gold,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: px(12),
+          }}>
+          <Text style={{ fontSize: px(16), fontWeight: typography.weights.bold, color: '#000000' }}>
+            🔍 Scan Demo Vehicle QR
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={handleSos}
+          style={{
+            width: '100%',
+            height: px(50),
+            borderRadius: px(14),
             backgroundColor: SOS_COLORS.red,
             alignItems: 'center',
             justifyContent: 'center',
             marginBottom: px(12),
           }}>
-          <Text style={{ fontSize: px(16), fontWeight: typography.weights.bold, color: SOS_COLORS.white }}>
-            Scan Demo QR
+          <Text style={{ fontSize: px(15), fontWeight: typography.weights.bold, color: SOS_COLORS.white }}>
+            🚨 Trigger Direct SOS Alert
           </Text>
         </Pressable>
         <Pressable onPress={() => navigation.goBack()} style={{ alignItems: 'center', paddingVertical: px(8) }}>

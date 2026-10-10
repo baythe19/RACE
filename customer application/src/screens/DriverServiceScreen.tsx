@@ -42,7 +42,7 @@ const DRIVER_OPTIONS = [
   {
     id: 'full_time' as DriverTypeId,
     title: 'Full-Time Driver',
-    price: 'From ₹999 / day',
+    price: 'From ₹999 / day · Enquiry',
     Icon: Calendar,
   },
   {
