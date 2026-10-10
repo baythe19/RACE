@@ -48,7 +48,7 @@ import {
   useSendOtpMutation,
   useVerifyOtpMutation,
 } from '../../services/auth/useAuthMutations';
-import { previewAdvanceFromMobileNumber } from '../../config/uiPreviewAuth';
+import { ensurePreviewAuthSession, previewAdvanceFromMobileNumber } from '../../config/uiPreviewAuth';
 import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
@@ -273,6 +273,15 @@ export default function MobileNumberScreen({ navigation }: Props) {
         );
         return;
       }
+      if (__DEV__ || UI_PREVIEW_AUTH_FLOW) {
+        navigation.navigate('OtpVerification', {
+          mobileNumber: digits,
+          isExistingUser: !isSignup,
+          devOtp: '123456',
+          otpMessage: 'Dev mode: use OTP 123456',
+        });
+        return;
+      }
       setError(
         friendlyAuthError(
           getApiErrorMessage(err, SKIP_OTP_AUTH ? 'Unable to sign in' : 'Unable to send OTP'),
@@ -439,6 +448,35 @@ export default function MobileNumberScreen({ navigation }: Props) {
                   paddingBottom: 2 * scale,
                 }}>
                 {isSignup ? 'Sign in' : 'Create account'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Quick Demo Mode Card */}
+          <View
+            style={{
+              marginTop: 14 * scale,
+              padding: 12 * scale,
+              backgroundColor: '#F3F4F6',
+              borderRadius: 12 * scale,
+              alignItems: 'center',
+            }}>
+            <Text style={{ fontSize: 11 * scale, fontWeight: '700', color: COLORS.orange }}>
+              ⚡ QUICK DEMO MODE (NO BACKEND)
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => ensurePreviewAuthSession(dispatch, true)}
+              style={({ pressed }) => ({
+                marginTop: 8 * scale,
+                backgroundColor: COLORS.orange,
+                paddingVertical: 8 * scale,
+                paddingHorizontal: 16 * scale,
+                borderRadius: 8 * scale,
+                opacity: pressed ? 0.85 : 1,
+              })}>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 * scale }}>
+                🚀 Explore Customer App (Demo)
               </Text>
             </Pressable>
           </View>
