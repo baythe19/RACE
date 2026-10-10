@@ -33,6 +33,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
     if (!driverVehicle.vehicleType) next.vehicleType = 'Select vehicle type';
     if (!driverVehicle.vehicleNumber.trim()) next.vehicleNumber = 'Vehicle number is required';
     if (!driverVehicle.rcNumber.trim()) next.rcNumber = 'RC number is required';
+    if (!driverVehicle.licenseNumber.trim()) next.licenseNumber = 'Driving License number is required';
     if (!driverVehicle.insuranceProvider) next.insuranceProvider = 'Select insurance provider';
     if (!driverVehicle.insurancePolicyNumber.trim()) {
       next.insurancePolicyNumber = 'Policy number is required';
@@ -96,10 +97,21 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
         label="RC Number"
         required
         Icon={FileText}
+        autoCapitalize="characters"
         value={driverVehicle.rcNumber}
-        onChangeText={(rcNumber) => setDriverVehicle({ rcNumber })}
+        onChangeText={(rcNumber) => setDriverVehicle({ rcNumber: rcNumber.toUpperCase() })}
         placeholder="Enter RC number"
         error={errors.rcNumber}
+      />
+      <FormField
+        label="Driving License Number"
+        required
+        Icon={CreditCard}
+        autoCapitalize="characters"
+        value={driverVehicle.licenseNumber}
+        onChangeText={(licenseNumber) => setDriverVehicle({ licenseNumber: licenseNumber.toUpperCase() })}
+        placeholder="Enter Driving License (DL) number"
+        error={errors.licenseNumber}
       />
       <FormField
         label="Insurance Provider"

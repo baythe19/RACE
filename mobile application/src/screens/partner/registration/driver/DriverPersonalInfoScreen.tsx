@@ -113,6 +113,54 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
         placeholder="Enter your address"
         error={errors.address}
       />
+      <FormField
+        label="City"
+        required
+        Icon={MapPin}
+        value={driverPersonal.city ?? 'Bhubaneswar'}
+        onChangeText={(city) => setDriverPersonal({ city })}
+        placeholder="Enter city (e.g. Bhubaneswar)"
+        error={errors.city}
+      />
+      <FormField
+        label="Emergency Contact Name"
+        optional
+        Icon={User}
+        value={driverPersonal.emergencyContactName ?? ''}
+        onChangeText={(emergencyContactName) => setDriverPersonal({ emergencyContactName })}
+        placeholder="Emergency contact person name"
+      />
+      <FormField
+        label="Emergency Contact Number"
+        optional
+        Icon={Phone}
+        keyboardType="number-pad"
+        maxLength={10}
+        value={driverPersonal.emergencyContactNumber ?? ''}
+        onChangeText={(emergencyContactNumber) =>
+          setDriverPersonal({ emergencyContactNumber: emergencyContactNumber.replace(/\D/g, '').slice(0, 10) })
+        }
+        placeholder="10-digit emergency contact number"
+        error={errors.emergencyContactNumber}
+      />
+      <FormField
+        label="Driving Experience (Years)"
+        optional
+        Icon={User}
+        keyboardType="number-pad"
+        maxLength={2}
+        value={driverPersonal.yearsOfExperience ?? ''}
+        onChangeText={(yearsOfExperience) => setDriverPersonal({ yearsOfExperience })}
+        placeholder="e.g. 5"
+      />
+      <FormField
+        label="Languages Known"
+        optional
+        Icon={User}
+        value={driverPersonal.languages ?? ''}
+        onChangeText={(languages) => setDriverPersonal({ languages })}
+        placeholder="e.g. Odia, Hindi, English"
+      />
 
       <PartnerSecurityNote text="Your information is safe with us. We never share your data with anyone." />
     </PartnerRegistrationLayout>

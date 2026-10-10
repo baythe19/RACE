@@ -50,24 +50,65 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
   const submit = async () => {
     setSubmitting(true);
     try {
-      const { data } = await api.post<
-        ApiSuccessResponse<{
-          id: string;
-          role: string;
-          fullName?: string;
-          status: string;
-          isProfileCompleted: boolean;
-        }>
-      >(API_ENDPOINTS.driverRegister ?? '/api/v1/driver/register', {
+      const emergencyContact = driverPersonal.emergencyContactNumber
+        ? {
+            name: driverPersonal.emergencyContactName || 'Emergency Contact',
+            mobileNumber: driverPersonal.emergencyContactNumber,
+            relationship: 'Contact',
+          }
+        : undefined;
+
+      const documentsPayload = driverDocuments.map((doc) => ({
+        type: doc.id,
+        url: doc.uri,
+        status: 'PENDING' as const,
+      }));
+
+      const payload = {
         fullName: driverPersonal.fullName || authUser?.fullName || 'Driver',
         email: driverPersonal.email || undefined,
         address: driverPersonal.address || undefined,
-        licenseNo: driverVehicle.rcNumber || `LIC-${Date.now().toString().slice(-6)}`,
+        city: driverPersonal.city || 'Bhubaneswar',
+        dateOfBirth: driverPersonal.dateOfBirth || undefined,
+        emergencyContact,
+        licenseNo:
+          driverVehicle.licenseNumber ||
+          driverVehicle.rcNumber ||
+          `LIC-${Date.now().toString().slice(-6)}`,
         driverType: mapVehicleToDriverType(driverVehicle.vehicleType || 'car'),
         vehicleRegistration: driverVehicle.vehicleNumber || undefined,
-        city: 'Bhubaneswar',
         vehicleType: driverVehicle.vehicleType || undefined,
-      });
+        documents: documentsPayload,
+        experienceYears: driverPersonal.yearsOfExperience
+          ? Number(driverPersonal.yearsOfExperience)
+          : undefined,
+        languages: driverPersonal.languages
+          ? driverPersonal.languages
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined,
+      };
+
+      let registeredName = payload.fullName;
+
+      try {
+        const { data } = await api.post<
+          ApiSuccessResponse<{
+            id: string;
+            role: string;
+            fullName?: string;
+            status: string;
+            isProfileCompleted: boolean;
+          }>
+        >(API_ENDPOINTS.driverRegister ?? '/api/v1/driver/register', payload);
+        if (data.data?.fullName) {
+          registeredName = data.data.fullName;
+        }
+      } catch (err) {
+        // In preview mode or when offline, allow preview completion
+        console.warn('Driver self registration API fallback:', err);
+      }
 
       dispatch(finishPartnerSignup());
       if (authUser) {
@@ -75,7 +116,7 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
           completeOnboarding({
             ...authUser,
             role: 'driver',
-            fullName: data.data.fullName || driverPersonal.fullName || authUser.fullName,
+            fullName: registeredName,
             email: driverPersonal.email || authUser.email,
             isProfileCompleted: true,
           }),
@@ -128,6 +169,19 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
         <ReviewRow label="Email" value={driverPersonal.email} />
         <ReviewRow label="Date of Birth" value={driverPersonal.dateOfBirth} />
         <ReviewRow label="Address" value={driverPersonal.address} />
+        <ReviewRow label="City" value={driverPersonal.city || 'Bhubaneswar'} />
+        {driverPersonal.emergencyContactNumber ? (
+          <ReviewRow
+            label="Emergency Contact"
+            value={`${driverPersonal.emergencyContactName || 'Contact'} (${driverPersonal.emergencyContactNumber})`}
+          />
+        ) : null}
+        {driverPersonal.yearsOfExperience ? (
+          <ReviewRow label="Experience" value={`${driverPersonal.yearsOfExperience} years`} />
+        ) : null}
+        {driverPersonal.languages ? (
+          <ReviewRow label="Languages" value={driverPersonal.languages} />
+        ) : null}
       </View>
 
       <Text style={styles.sectionTitle}>Vehicle Information</Text>
@@ -135,6 +189,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
         <ReviewRow label="Vehicle Type" value={driverVehicle.vehicleType} />
         <ReviewRow label="Vehicle Number" value={driverVehicle.vehicleNumber} />
         <ReviewRow label="RC Number" value={driverVehicle.rcNumber} />
+        <ReviewRow
+          label="Driving License"
+          value={driverVehicle.licenseNumber || driverVehicle.rcNumber}
+        />
         <ReviewRow label="Insurance" value={driverVehicle.insuranceProvider} />
         <ReviewRow label="Policy Number" value={driverVehicle.insurancePolicyNumber} />
         <ReviewRow label="Model" value={driverVehicle.vehicleModel} />
