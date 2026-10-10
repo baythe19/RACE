@@ -47,18 +47,17 @@ Cloud-hosted API (Render) + admin (Vercel) + customer Android APK (Expo EAS `@we
 
 Customer app visual redesign queue. Auth + Home + service discovery are the current design baseline. Remaining work is screen-by-screen (bookings, SOS, profile, booking flows, and other named screens).
 
-## Known Blockers
+## Known Blockers & Completed Gaps
 
-None. Waiting on next product task.
-
-## Known Gaps (Product — Not Started)
-
+- [x] Driver KYC document upload & persistence to API (DRV-01, DRV-02, DRV-03, DRV-04, DRV-05)
+- [x] Booking model fields: `towingMode` (instant/scheduled/emergency) & `driverServiceType` (part_time/full_time/outstation/night) (SVC-01, SVC-02)
+- [x] Admin reports and dashboard query and aggregate real bookings (`TowingBookingModel` + `DriverBookingModel` + `BookingModel`) (ADM-01, DB-01)
+- [x] Vendor bank details collection & interactive agreement checkbox (VND-01, VND-03)
+- [x] Partner offline preview & instant demo logins for Driver & Vendor
+- [x] QR Emergency Vehicle Module: connected `QRScanScreen` -> `VehicleQrEmergencyScreen` with owner contact, emergency contact, 1-tap towing request, and direct SOS (QR-01, QR-02, QR-03, QR-04)
+- [x] OTP Verification parity: both Customer and Partner apps use real OTP verification flow by default (`SKIP_OTP_AUTH = false`), with dev fallback (123456) and one-tap demo logins on both login screens
 - [ ] Real payment gateway (stubs)
-- [ ] Real OTP delivery (`SKIP_OTP_AUTH = true` in both apps)
-- [ ] Driver KYC document upload to API
-- [ ] Booking model fields: `towingMode`, `driverServiceType`
 - [ ] Live GPS tracking on mobile (scaffold only)
-- [ ] Admin reports query legacy `Booking` not real bookings
 - [ ] Automated test framework (`backend/__tests__` empty)
 
 ## Important Files
