@@ -1,4 +1,6 @@
 import { BookingModel } from '../../../models/src/booking';
+import { TowingBookingModel } from '../../../models/src/towingBooking';
+import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { UserModel } from '../../../models/src/user';
 import { TransactionModel } from '../../../models/src/transaction';
 
@@ -25,12 +27,18 @@ export const adminReportsService = {
 
     const [
       revenueTrend,
-      bookingTrend,
+      legacyBookingTrend,
+      towingBookingTrend,
+      driverBookingTrend,
       vendorGrowth,
       customerGrowth,
-      serviceDistribution,
+      legacyServiceDistribution,
+      towingCount,
+      driverCount,
       topVendors,
-      completionRate,
+      legacyCompletionRate,
+      towingCompletionRate,
+      driverCompletionRate,
       revenueAgg,
       topDrivers,
       totalDrivers,
@@ -43,6 +51,16 @@ export const adminReportsService = {
         { $sort: { _id: 1 } },
       ]),
       BookingModel.aggregate([
+        { $match: match },
+        { $group: { _id: { $month: '$createdAt' }, bookings: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      TowingBookingModel.aggregate([
+        { $match: match },
+        { $group: { _id: { $month: '$createdAt' }, bookings: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+      DriverBookingModel.aggregate([
         { $match: match },
         { $group: { _id: { $month: '$createdAt' }, bookings: { $sum: 1 } } },
         { $sort: { _id: 1 } },
@@ -63,6 +81,8 @@ export const adminReportsService = {
         { $sort: { count: -1 } },
         { $limit: 6 },
       ]),
+      TowingBookingModel.countDocuments(match),
+      DriverBookingModel.countDocuments(match),
       UserModel.find({ ...match, role: 'vendor' }).sort({ createdAt: -1 }).limit(5).lean(),
       BookingModel.aggregate([
         { $match: match },
@@ -78,6 +98,42 @@ export const adminReportsService = {
           },
         },
       ]),
+      TowingBookingModel.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $in: ['$status', ['COMPLETED', 'RATED']] }, 1, 0] },
+            },
+            cancelled: { $sum: { $cond: [{ $eq: ['$status', 'CANCELLED'] }, 1, 0] } },
+            revenue: {
+              $sum: {
+                $cond: [{ $eq: ['$paymentStatus', 'FULLY_PAID'] }, '$estimatedFare', '$advanceAmount'],
+              },
+            },
+          },
+        },
+      ]),
+      DriverBookingModel.aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $in: ['$status', ['COMPLETED', 'RATED']] }, 1, 0] },
+            },
+            cancelled: { $sum: { $cond: [{ $eq: ['$status', 'CANCELLED'] }, 1, 0] } },
+            revenue: {
+              $sum: {
+                $cond: [{ $eq: ['$paymentStatus', 'FULLY_PAID'] }, '$estimatedFare', '$advanceAmount'],
+              },
+            },
+          },
+        },
+      ]),
       TransactionModel.aggregate([
         { $match: { ...match, type: 'PAYMENT', status: 'COMPLETED' } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -88,7 +144,34 @@ export const adminReportsService = {
       UserModel.countDocuments({ ...match, role: 'customer' }),
     ]);
 
-    const rates = completionRate[0] ?? { total: 0, completed: 0, cancelled: 0, revenue: 0 };
+    // Merge booking trends across all 3 collections
+    const monthBookingsMap = new Map<number, number>();
+    for (const row of [...legacyBookingTrend, ...towingBookingTrend, ...driverBookingTrend]) {
+      if (typeof row._id === 'number') {
+        monthBookingsMap.set(row._id, (monthBookingsMap.get(row._id) ?? 0) + row.bookings);
+      }
+    }
+    const combinedBookingTrend = Array.from(monthBookingsMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([month, bookings]) => ({ _id: month, bookings }));
+
+    // Combined service distribution
+    const combinedServiceDistribution = [
+      ...(towingCount > 0 ? [{ name: 'Towing Service', value: towingCount }] : []),
+      ...(driverCount > 0 ? [{ name: 'Driver Service', value: driverCount }] : []),
+      ...legacyServiceDistribution.map((row) => ({ name: row._id ?? 'Other', value: row.count })),
+    ];
+
+    const lRates = legacyCompletionRate[0] ?? { total: 0, completed: 0, cancelled: 0, revenue: 0 };
+    const tRates = towingCompletionRate[0] ?? { total: 0, completed: 0, cancelled: 0, revenue: 0 };
+    const dRates = driverCompletionRate[0] ?? { total: 0, completed: 0, cancelled: 0, revenue: 0 };
+
+    const rates = {
+      total: (lRates.total ?? 0) + (tRates.total ?? 0) + (dRates.total ?? 0),
+      completed: (lRates.completed ?? 0) + (tRates.completed ?? 0) + (dRates.completed ?? 0),
+      cancelled: (lRates.cancelled ?? 0) + (tRates.cancelled ?? 0) + (dRates.cancelled ?? 0),
+      revenue: (lRates.revenue ?? 0) + (tRates.revenue ?? 0) + (dRates.revenue ?? 0),
+    };
     const totalRevenue = revenueAgg[0]?.total ?? 0;
     const totalBookings = rates.total ?? 0;
     const avgBookingValue = totalBookings ? Math.round((rates.revenue ?? 0) / totalBookings) : 0;
@@ -104,7 +187,7 @@ export const adminReportsService = {
         label: monthLabel(row._id),
         value: row.revenue,
       })),
-      bookingTrend: bookingTrend.map((row) => ({
+      bookingTrend: combinedBookingTrend.map((row) => ({
         label: monthLabel(row._id),
         value: row.bookings,
       })),
@@ -116,10 +199,7 @@ export const adminReportsService = {
         label: monthLabel(row._id),
         value: row.count,
       })),
-      serviceDistribution: serviceDistribution.map((row) => ({
-        name: row._id ?? 'Other',
-        value: row.count,
-      })),
+      serviceDistribution: combinedServiceDistribution,
       topVendors: topVendors.map((vendor) => ({
         id: vendor._id.toString(),
         name: vendor.vendorProfile?.businessName ?? vendor.vendorProfile?.ownerName ?? vendor.fullName ?? 'Vendor',
