@@ -17,6 +17,25 @@ const EARTH_RADIUS_KM = 6371;
 /** Open-offer radius (km). Drivers without GPS still see all eligible offers. */
 const DEFAULT_OFFER_RADIUS_KM = 50;
 
+/**
+ * Decision window for an open marketplace offer, in milliseconds.
+ *
+ * The window is decided by the backend (never by the app) and can be tuned per
+ * environment: `OFFER_DECISION_WINDOW_SECONDS` (default 120s, minimum 30s).
+ * Vendor-fleet jobs are exempt — those are already routed to a specific vendor
+ * and may legitimately wait longer for a fleet driver to claim them.
+ */
+export const OFFER_DECISION_WINDOW_MS =
+  Math.max(30, Number(process.env.OFFER_DECISION_WINDOW_SECONDS ?? 120)) * 1000;
+
+export function offerExpiresAt(createdAt: Date): Date {
+  return new Date(createdAt.getTime() + OFFER_DECISION_WINDOW_MS);
+}
+
+export function isOfferExpired(createdAt: Date, now: Date = new Date()): boolean {
+  return now.getTime() > offerExpiresAt(createdAt).getTime();
+}
+
 /** Drivers eligible for towing / roadside tow bookings */
 export const TOWING_DRIVER_TYPES = ['Tow Driver'] as const;
 
@@ -94,7 +113,42 @@ export type OpenBookingOffer = {
   assignedFleetVehicleLabel?: string;
   /** True when vendor approved the job and a driver still needs to claim it. */
   vendorApproved?: boolean;
+  /**
+   * Backend-decided deadline for accepting this open offer. Absent for
+   * vendor-routed jobs, which do not run on the marketplace clock.
+   */
+  offerExpiresAt?: string;
+  /** Server-computed: the decision window has already lapsed. */
+  isExpired?: boolean;
 };
+
+/** Specific, bookable name for an offer — falls back to the broad category. */
+function offerServiceLabel(
+  bookingType: 'towing' | 'driver',
+  booking: {
+    towingMode?: 'instant' | 'scheduled' | 'emergency';
+    driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
+  },
+): string {
+  if (bookingType === 'towing') {
+    if (booking.towingMode === 'emergency') return 'Emergency Towing';
+    if (booking.towingMode === 'scheduled') return 'Scheduled Towing';
+    if (booking.towingMode === 'instant') return 'Instant Towing';
+    return 'Towing';
+  }
+  switch (booking.driverServiceType) {
+    case 'full_time':
+      return 'Full-Time Driver';
+    case 'part_time':
+      return 'Part-Time Driver';
+    case 'outstation':
+      return 'Outstation Driver';
+    case 'night':
+      return 'Night Driver';
+    default:
+      return 'Driver hire';
+  }
+}
 
 function mapOffer(
   bookingType: 'towing' | 'driver',
@@ -109,8 +163,12 @@ function mapOffer(
     createdAt: Date;
     vendorId?: { toString(): string } | null;
     assignedFleetVehicleLabel?: string | null;
+    towingMode?: 'instant' | 'scheduled' | 'emergency';
+    driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   },
   distanceKm?: number,
+  /** Marketplace offers carry the backend decision window; vendor jobs do not. */
+  includeDecisionWindow = false,
 ): OpenBookingOffer {
   const vendorId = booking.vendorId?.toString();
   return {
@@ -123,10 +181,16 @@ function mapOffer(
     estimatedFare: booking.estimatedFare,
     createdAt: booking.createdAt.toISOString(),
     distanceKm,
-    serviceLabel: bookingType === 'towing' ? 'Towing' : 'Driver hire',
+    serviceLabel: offerServiceLabel(bookingType, booking),
     vendorId,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
     vendorApproved: Boolean(vendorId),
+    ...(includeDecisionWindow
+      ? {
+          offerExpiresAt: offerExpiresAt(booking.createdAt).toISOString(),
+          isExpired: isOfferExpired(booking.createdAt),
+        }
+      : {}),
   };
 }
 
@@ -244,7 +308,7 @@ export async function listOpenBookingOffers(options?: {
       }
     }
 
-    offers.push(mapOffer(bookingType, booking, distanceKm));
+    offers.push(mapOffer(bookingType, booking, distanceKm, !skipRadiusFilter));
   };
 
   for (const booking of towing) consider('towing', booking);
@@ -399,6 +463,12 @@ export async function claimOpenBookingOffer(
     }
   } else if (driverVendorId) {
     throw new ForbiddenError('Your vendor must approve this job before you can accept it');
+  }
+
+  // Open marketplace offers run on the backend decision clock. Vendor-routed
+  // jobs are exempt, since their approval can legitimately land later.
+  if (!bookingVendorId && isOfferExpired(existing.createdAt)) {
+    throw new ConflictError('This request expired. Please wait for the next request.');
   }
 
   const vendorId = bookingVendorId ?? options?.vendorId;

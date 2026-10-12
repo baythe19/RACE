@@ -2,7 +2,7 @@ import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { DriverJobBooking } from '../driver/driverApi';
-import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../../constants/preview';
 import { MOCK_JOB_OFFERS } from '../../data/mockPartnerData';
 
 export type VendorApproveResult = {

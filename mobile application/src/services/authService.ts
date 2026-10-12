@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
 import { clearTokens, saveTokens, unwrapApi, api } from './api';
 import type { User, VerifyOtpResponse } from '../types/auth';
-import { UI_PREVIEW_MODE } from '../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../constants/preview';
 import { MOCK_DRIVER_USER, MOCK_VENDOR_USER } from '../data/mockPartnerData';
 
 export interface SendOtpPayload {

@@ -4,17 +4,26 @@ import {
   sanitizeUpdateProfileRequest,
   type UpdateProfileRequest,
 } from '../utils/profilePayload';
-import { store } from '../redux/store';
-import { UI_PREVIEW_MODE } from '../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../constants/preview';
 import { MOCK_DRIVER_PROFILE, MOCK_VENDOR_PROFILE } from '../data/mockPartnerData';
+
+function getMockProfileForActiveUser(): Profile {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { store } = require('../redux/store');
+    const user = store?.getState()?.auth?.user;
+    return user?.role === 'vendor' ? MOCK_VENDOR_PROFILE : MOCK_DRIVER_PROFILE;
+  } catch {
+    return MOCK_DRIVER_PROFILE;
+  }
+}
 
 export async function getProfile(): Promise<Profile> {
   try {
     return await unwrapApi(api.get('/api/v1/profile'));
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      const user = store.getState().auth.user;
-      return user?.role === 'vendor' ? MOCK_VENDOR_PROFILE : MOCK_DRIVER_PROFILE;
+      return getMockProfileForActiveUser();
     }
     throw error;
   }
@@ -26,8 +35,7 @@ export async function updateProfile(data: UpdateProfileRequest): Promise<Profile
     return await unwrapApi(api.put('/api/v1/profile', body));
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      const user = store.getState().auth.user;
-      const base = user?.role === 'vendor' ? MOCK_VENDOR_PROFILE : MOCK_DRIVER_PROFILE;
+      const base = getMockProfileForActiveUser();
       return {
         ...base,
         fullName: data.fullName ?? base.fullName,

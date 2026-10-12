@@ -5,7 +5,6 @@ import type { SendOtpPayload, VerifyOtpPayload } from '../services/authService';
 import { getApiErrorMessage } from '../services/api';
 import { clearSessionStores } from './authSession';
 import { bindSetOnboardingRequired } from './authState';
-import { useProfileStore } from './profileStore';
 import type { User } from '../types/auth';
 
 export interface SetAuthPayload {
@@ -20,7 +19,7 @@ interface AuthState {
   error: string | null;
   onboardingRequired: boolean;
   /** After logout, partner app opens this auth screen instead of splash. */
-  partnerAuthEntry: 'PartnerSplash' | 'PartnerRoleSelection' | 'PartnerLogin';
+  partnerAuthEntry: 'PartnerSplash' | 'PartnerWelcome' | 'PartnerLogin';
   /** Bumps on logout so navigation remounts reliably. */
   authSessionVersion: number;
   sendOtp: (payload: SendOtpPayload) => Promise<authService.SendOtpResult>;
@@ -48,6 +47,7 @@ async function completeAuthSession(
   result: Awaited<ReturnType<typeof authService.verifyOtp>>,
 ): Promise<boolean> {
   try {
+    const { useProfileStore } = require('./profileStore') as typeof import('./profileStore');
     await useProfileStore.getState().fetchProfile();
   } catch {
     // Keep session even if profile fails to load.
@@ -161,7 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const nextSessionVersion = get().authSessionVersion + 1;
     set({
-      partnerAuthEntry: 'PartnerRoleSelection',
+      partnerAuthEntry: 'PartnerWelcome',
       authSessionVersion: nextSessionVersion,
     });
 
@@ -178,7 +178,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await syncReduxLogout();
 
     set({
-      partnerAuthEntry: 'PartnerRoleSelection',
+      partnerAuthEntry: 'PartnerWelcome',
       authSessionVersion: nextSessionVersion,
       user: null,
       isAuthenticated: false,

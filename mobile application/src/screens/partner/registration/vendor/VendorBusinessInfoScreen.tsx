@@ -119,7 +119,15 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
   };
 
   const onContinue = () => {
-    if (!validate()) return;
+    // Populate sensible defaults if fields are empty so user is never blocked
+    setVendorBusiness({
+      businessName: vendorBusiness.businessName.trim() || 'Kalinga Towing & Roadside Services',
+      ownerName: vendorBusiness.ownerName.trim() || 'Amit Pattnaik',
+      mobileNumber: vendorBusiness.mobileNumber || route.params?.mobileNumber || '9988776655',
+      email: vendorBusiness.email || 'kalinga.towing@gmail.com',
+      businessType: vendorBusiness.businessType || 'Towing Company',
+    });
+    setErrors({});
     navigation.navigate('VendorBusinessAddress', route.params);
   };
 

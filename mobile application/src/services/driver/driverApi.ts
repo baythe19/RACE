@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
-import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../../constants/preview';
 import {
   MOCK_DRIVER_JOBS,
   MOCK_JOB_OFFERS,
@@ -29,6 +29,29 @@ export type DriverJobBooking = {
   estimatedFare?: number;
   createdAt: string;
   distanceKm?: number;
+  /**
+   * Backend-decided deadline for accepting an open marketplace offer.
+   * Absent for vendor-routed jobs, which do not run on the marketplace clock.
+   */
+  offerExpiresAt?: string;
+  /** Server-computed: the offer decision window has already lapsed. */
+  isExpired?: boolean;
+  /**
+   * Amount the backend confirmed when the job was completed. Present only after
+   * COMPLETED — this is the source of truth for earnings, not `estimatedFare`.
+   */
+  finalFare?: number;
+  /** Read-only status timeline, used to show real trip timings. */
+  statusHistory?: Array<{ status: string; timestamp: string }>;
+  /**
+   * Customer contact for the assigned job.
+   * NOTE: the current backend driver-booking payload does not send this yet —
+   * the job-cycle UI only renders the contact row when it is present.
+   */
+  customer?: {
+    name?: string;
+    mobileNumber?: string;
+  };
   serviceLabel?: string;
   vendorId?: string;
   assignedFleetVehicleLabel?: string;

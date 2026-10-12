@@ -7,18 +7,18 @@
 
 ## Current Objective
 
-**Customer mobile UI/UX redesign, one screen at a time.** Scope is `customer application/` only. Design rules live in `.agents/uiux/` (`SKILL.md`, `MOBILE_APP_PATTERNS.md`, `AGENT_QUICK_RULES.md`).
+**Partner mobile (Driver Registration) UI/UX implementation.**
+Complete, pixel-perfect 4-step Driver Registration flow built and verified in `mobile application/` matching designs and specifications:
+- Step 1: `DriverPersonalInfoScreen.tsx`
+- Step 2: `DriverVehicleInfoScreen.tsx`
+- Step 3: `DriverDocumentsScreen.tsx`
+- Step 4: `DriverReviewScreen.tsx`
 
-Already treated as done (do not restyle unless asked): onboarding, sign up, sign in, Home, and service pages (Services, Towing, Driver, Roadside, More, location picker).
-
-Next: wait for the user to name the next screen. Before code, write the skill’s screen contract (goal, one primary CTA, keep/remove, states).
-
-Cloud production remains documented in `docs/ops/CLOUD_PRODUCTION_RUNBOOK.md`. Do not start Render/Vercel/EAS work in this design pass.
+All 4 steps support frictionless mock testing with sensible defaults, forward/backward navigation, modals for DOB/City/Emergency contact/Experience, interactive vehicle cards with custom SVG artwork, grouped document checklist (core required, conditional, later), dynamic review status, and submission.
 
 ## Active Branch
 
-`v2.5.2-development` (HEAD) — this is the current work branch.
-Previous cleanup branch `v2.0.1-cleanup` was merged/superseded.
+`3.0.0-driver-app-development` (HEAD) — current work branch.
 
 ## Phase
 

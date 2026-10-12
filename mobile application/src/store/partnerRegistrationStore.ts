@@ -31,6 +31,7 @@ export interface DriverVehicleInfo {
   insuranceProvider: string;
   insurancePolicyNumber: string;
   vehicleModel: string;
+  registeredTo?: 'me' | 'someone_else';
 }
 
 export interface VendorBusinessInfo {
@@ -74,58 +75,114 @@ interface PartnerRegistrationState {
   reset: () => void;
 }
 
-const emptyDriverPersonal: DriverPersonalInfo = {
-  fullName: '',
-  mobileNumber: '',
-  email: '',
-  dateOfBirth: '',
-  address: '',
+export const defaultMockDriverPersonal: DriverPersonalInfo = {
+  fullName: 'Rajesh Kumar',
+  mobileNumber: '9876543210',
+  email: 'rajesh.driver@gmail.com',
+  dateOfBirth: '1992-05-15',
+  address: 'Plot 42, Saheed Nagar, Janpath Road',
   city: 'Bhubaneswar',
-  emergencyContactName: '',
-  emergencyContactNumber: '',
-  yearsOfExperience: '',
-  languages: '',
+  emergencyContactName: 'Sunita Kumar',
+  emergencyContactNumber: '9876543211',
+  yearsOfExperience: '6',
+  languages: 'Odia, Hindi, English',
 };
 
-const emptyDriverVehicle: DriverVehicleInfo = {
-  vehicleType: '',
-  vehicleNumber: '',
-  rcNumber: '',
-  licenseNumber: '',
-  insuranceProvider: '',
-  insurancePolicyNumber: '',
-  vehicleModel: '',
+export const defaultMockDriverVehicle: DriverVehicleInfo = {
+  vehicleType: 'Flatbed Tow Truck',
+  vehicleNumber: 'OD 02 AB 1234',
+  rcNumber: 'RC-OD02-2022-987654',
+  licenseNumber: 'OD-0220190012345',
+  insuranceProvider: 'HDFC ERGO General Insurance',
+  insurancePolicyNumber: 'POL-78901234',
+  vehicleModel: 'Tata 407 Recovery Spec',
+  registeredTo: 'me',
 };
 
-const emptyVendorBusiness: VendorBusinessInfo = {
-  businessName: '',
-  ownerName: '',
-  mobileNumber: '',
-  email: '',
-  businessType: '',
-  accountHolderName: '',
-  accountNumber: '',
-  ifsc: '',
-  acceptTerms: false,
+export const defaultMockDriverDocuments: PartnerUploadedDocument[] = [
+  {
+    id: 'aadhaar_card',
+    label: 'Aadhaar Card',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'aadhaar_front_back.pdf',
+    mimeType: 'application/pdf',
+  },
+  {
+    id: 'driving_license',
+    label: 'Driving License',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'driving_license_valid.jpg',
+    mimeType: 'image/jpeg',
+  },
+  {
+    id: 'vehicle_rc',
+    label: 'Vehicle RC',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'vehicle_rc_od02.jpg',
+    mimeType: 'image/jpeg',
+  },
+  {
+    id: 'vehicle_insurance',
+    label: 'Vehicle Insurance',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'hdfc_ergo_policy.pdf',
+    mimeType: 'application/pdf',
+  },
+];
+
+export const defaultMockVendorBusiness: VendorBusinessInfo = {
+  businessName: 'Kalinga Towing & Roadside Services',
+  ownerName: 'Amit Pattnaik',
+  mobileNumber: '9988776655',
+  email: 'kalinga.towing@gmail.com',
+  businessType: 'Towing Company',
+  accountHolderName: 'Kalinga Towing Services',
+  accountNumber: '50200012345678',
+  ifsc: 'HDFC0001234',
+  acceptTerms: true,
 };
 
-const emptyVendorAddress: VendorBusinessAddress = {
-  addressLine1: '',
-  addressLine2: '',
+export const defaultMockVendorAddress: VendorBusinessAddress = {
+  addressLine1: 'Unit 4, Master Canteen Square',
+  addressLine2: 'Near Railway Station Road',
   city: 'Bhubaneswar',
   state: 'Odisha',
   pinCode: '751001',
-  landmark: '',
+  landmark: 'Opposite State Bank Bhavan',
 };
+
+export const defaultMockVendorDocuments: PartnerUploadedDocument[] = [
+  {
+    id: 'business_registration',
+    label: 'Business Registration / MSME',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'msme_certificate.pdf',
+    mimeType: 'application/pdf',
+  },
+  {
+    id: 'gst_certificate',
+    label: 'GST Certificate',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'gst_reg_0419.pdf',
+    mimeType: 'application/pdf',
+  },
+  {
+    id: 'pan_card',
+    label: 'Owner PAN Card',
+    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+    name: 'pan_card_amit.jpg',
+    mimeType: 'image/jpeg',
+  },
+];
 
 export const usePartnerRegistrationStore = create<PartnerRegistrationState>((set) => ({
   role: null,
-  driverPersonal: emptyDriverPersonal,
-  driverVehicle: emptyDriverVehicle,
-  driverDocuments: [],
-  vendorBusiness: emptyVendorBusiness,
-  vendorAddress: emptyVendorAddress,
-  vendorDocuments: [],
+  driverPersonal: defaultMockDriverPersonal,
+  driverVehicle: defaultMockDriverVehicle,
+  driverDocuments: defaultMockDriverDocuments,
+  vendorBusiness: defaultMockVendorBusiness,
+  vendorAddress: defaultMockVendorAddress,
+  vendorDocuments: defaultMockVendorDocuments,
   setRole: (role) => set({ role }),
   setDriverPersonal: (data) =>
     set((state) => ({ driverPersonal: { ...state.driverPersonal, ...data } })),
@@ -160,11 +217,11 @@ export const usePartnerRegistrationStore = create<PartnerRegistrationState>((set
   reset: () =>
     set({
       role: null,
-      driverPersonal: emptyDriverPersonal,
-      driverVehicle: emptyDriverVehicle,
-      driverDocuments: [],
-      vendorBusiness: emptyVendorBusiness,
-      vendorAddress: emptyVendorAddress,
-      vendorDocuments: [],
+      driverPersonal: defaultMockDriverPersonal,
+      driverVehicle: defaultMockDriverVehicle,
+      driverDocuments: defaultMockDriverDocuments,
+      vendorBusiness: defaultMockVendorBusiness,
+      vendorAddress: defaultMockVendorAddress,
+      vendorDocuments: defaultMockVendorDocuments,
     }),
 }));

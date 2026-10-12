@@ -2,12 +2,20 @@ import { API_CONFIG, API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { VendorProfileResponse, VendorRegistrationRequest } from '../../types/vendor';
 import { apiClient } from '../api/apiClient';
-import { store } from '../../redux/store';
-import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../../constants/preview';
 import {
   MOCK_VENDOR_DASHBOARD,
   MOCK_VENDOR_STATUS,
 } from '../../data/mockPartnerData';
+
+function getAuthTokenSafe(): string | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return require('../../redux/store').store?.getState()?.auth?.accessToken ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export async function saveVendorDraft(
   payload: Partial<VendorRegistrationRequest> & { vendorType: VendorRegistrationRequest['vendorType'] },
@@ -126,7 +134,7 @@ export async function uploadVendorDocument(
       type: file.mimeType,
     } as unknown as Blob);
 
-    const token = store.getState().auth.accessToken;
+    const token = getAuthTokenSafe();
 
     const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
       API_ENDPOINTS.vendorUploadDocument,
@@ -164,7 +172,7 @@ export async function uploadVendorSelfie(
       type: file.mimeType,
     } as unknown as Blob);
 
-    const token = store.getState().auth.accessToken;
+    const token = getAuthTokenSafe();
 
     const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
       API_ENDPOINTS.vendorSelfie,

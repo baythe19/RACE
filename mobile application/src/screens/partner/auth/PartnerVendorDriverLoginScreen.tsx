@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -11,11 +12,21 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowLeft, Eye, EyeOff, KeyRound, Lock, ShieldCheck } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Lock,
+  ShieldCheck,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { images } from '../../../assets';
 import AuthToast, { AuthLoadingOverlay } from '../../../components/auth/AuthToast';
+import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
 import { completeOnboarding } from '../../../redux/auth/authSlice';
 import {
@@ -26,16 +37,15 @@ import type {
   PartnerAuthStackParamList,
   PartnerRootStackParamList,
 } from '../../../types/partnerNavigation';
-import { colors, layout, radius, shadows, spacing, typography } from '../../../theme';
+import { loginAsMockDriver, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerVendorDriverLogin'>;
 
 const REF_W = 390;
-const PAGE_BG = '#F7F7F5';
 
 export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
-  const loading = useAppSelector(state => state.auth.loading);
+  const loading = useAppSelector((state) => state.auth.loading);
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const scale = width / REF_W;
@@ -50,25 +60,28 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
 
   const loginMutation = useDriverCredentialLoginMutation();
 
-  const canSubmit = loginId.trim().length >= 4 && password.length >= 6 && !loading;
+  const canSubmit = loginId.trim().length >= 3 && password.length >= 4 && !loading;
 
   const goToPartnerMain = () => {
     const rootNavigation =
       navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
-    rootNavigation?.reset({
-      index: 0,
-      routes: [{ name: 'PartnerMain' }],
-    });
+    const routeNames = rootNavigation?.getState()?.routeNames;
+    if (routeNames && routeNames.includes('PartnerMain')) {
+      rootNavigation?.reset({
+        index: 0,
+        routes: [{ name: 'PartnerMain' }],
+      });
+    }
   };
 
   const handleLogin = async () => {
     setError('');
-    if (loginId.trim().length < 4) {
+    if (loginId.trim().length < 3) {
       setError('Enter the Login ID provided by your vendor');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 4) {
+      setError('Password must be at least 4 characters');
       return;
     }
 
@@ -80,267 +93,430 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
       dispatch(completeOnboarding(result.user));
       goToPartnerMain();
     } catch (err) {
+      if (UI_PREVIEW_MODE) {
+        await loginAsMockDriver(dispatch);
+        goToPartnerMain();
+        return;
+      }
       setError(getApiErrorMessage(err, 'Invalid login ID or password'));
     }
   };
 
+  const isSubmitting = loginMutation.isPending || loading;
+
   return (
     <>
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={PAGE_BG} />
+      <View style={styles.root}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-        <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
+        {/* Top Header Bar — Exactly aligned across all auth screens */}
+        <View
+          style={[
+            styles.topBar,
+            {
+              paddingTop: insets.top + px(4),
+              paddingHorizontal: px(20),
+              height: insets.top + px(54),
+            },
+          ]}>
           <Pressable
             onPress={() => navigation.goBack()}
             hitSlop={12}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-            <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
+            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Go back">
+            <ArrowLeft size={px(24)} color="#111827" strokeWidth={2.4} />
           </Pressable>
-          <View style={styles.brandBlock}>
-            <Text style={[styles.brandRace, { fontSize: px(18) }]}>RACE</Text>
-            <Text style={[styles.brandPartner, { fontSize: px(11) }]}>PARTNER</Text>
+
+          <View style={styles.headerLogoContainer}>
+            <PartnerHeaderLogo width={px(104)} />
           </View>
-          <View style={styles.backButton} />
+
+          <View style={{ width: px(32) }} />
         </View>
 
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
+            style={styles.scroll}
+            bounces={false}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{
-              paddingHorizontal: px(layout.screenPadding),
-              paddingBottom: insets.bottom + px(spacing.xl),
-            }}>
-            <Text style={[styles.title, { fontSize: px(26), lineHeight: px(32) }]}>
-              Vendor driver login
-            </Text>
-            <Text style={[styles.subtitle, { fontSize: px(14), lineHeight: px(21) }]}>
-              Use the Login ID and password shared by your vendor.
-            </Text>
+            contentContainerStyle={[
+              styles.scrollContent,
+              {
+                paddingHorizontal: px(20),
+                paddingBottom: insets.bottom + px(16),
+              },
+            ]}>
+            {/* Title & Subtitle — Left Aligned, Clean & Professional */}
+            <View style={[styles.titleSection, { marginTop: px(16) }]}>
+              <Text style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
+                Vendor Driver Login
+              </Text>
+              <Text style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
+                Sign in with the ID and password given by your vendor.
+              </Text>
+            </View>
 
+            {/* Pre-Selected Role Card / Badge */}
             <View
               style={[
-                styles.card,
-                shadows.card,
+                styles.roleBadgeCard,
                 {
-                  marginTop: px(spacing.xl),
-                  padding: px(spacing.xl),
-                  borderRadius: px(18),
+                  marginTop: px(22),
+                  paddingHorizontal: px(14),
+                  paddingVertical: px(12),
+                  borderRadius: px(16),
                 },
               ]}>
-              <View style={styles.iconWrap}>
-                <KeyRound size={px(26)} color={colors.primary} strokeWidth={2.2} />
+              <View
+                style={[
+                  styles.roleIconBox,
+                  {
+                    width: px(38),
+                    height: px(38),
+                    borderRadius: px(19),
+                    backgroundColor: '#F3F4F6',
+                    overflow: 'hidden',
+                  },
+                ]}>
+                <Image
+                  source={images.vendorDriverAvatar}
+                  style={{ width: px(38), height: px(38) }}
+                  resizeMode="cover"
+                  accessibilityLabel="Vendor Driver"
+                />
               </View>
-              <Text style={[styles.cardTitle, { fontSize: px(18), marginTop: px(12) }]}>
-                Sign in with credentials
+
+              <Text style={[styles.roleBadgeTitle, { fontSize: px(15) }]}>
+                Vendor Driver account
               </Text>
 
-              <Text style={[styles.label, { fontSize: px(13), marginTop: px(22) }]}>Login ID</Text>
+              <View style={[styles.roleDivider, { height: px(18) }]} />
+
+              <Pressable
+                onPress={() => navigation.goBack()}
+                hitSlop={8}
+                style={({ pressed }) => [pressed && styles.pressed]}>
+                <Text style={[styles.changeRoleText, { fontSize: px(14) }]}>
+                  Change type
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Credentials Input Fields */}
+            <View style={[styles.inputSection, { marginTop: px(24) }]}>
+              {/* Login ID */}
+              <Text style={[styles.fieldLabel, { fontSize: px(14) }]}>Login ID</Text>
               <View
                 style={[
                   styles.inputWrap,
                   {
-                    minHeight: px(52),
+                    height: px(52),
                     borderRadius: px(12),
-                    borderColor: loginIdFocused ? colors.primary : colors.border,
+                    marginTop: px(8),
+                    borderColor: loginIdFocused ? '#F59E0B' : '#E5E7EB',
+                    borderWidth: loginIdFocused ? 1.8 : 1.2,
                   },
                 ]}>
+                <KeyRound size={px(18)} color="#9CA3AF" style={{ marginRight: px(10) }} />
                 <TextInput
                   value={loginId}
-                  onChangeText={text => {
-                    setLoginId(text.replace(/\s/g, ''));
+                  onChangeText={(text) => {
+                    setLoginId(text);
                     if (error) setError('');
                   }}
                   onFocus={() => setLoginIdFocused(true)}
                   onBlur={() => setLoginIdFocused(false)}
-                  autoCapitalize="none"
+                  autoCapitalize="characters"
                   autoCorrect={false}
-                  placeholder="e.g. driver.odisha01"
-                  placeholderTextColor={colors.textMuted}
-                  style={[styles.input, { fontSize: px(16) }]}
+                  placeholder="e.g. DRV-1002"
+                  placeholderTextColor="#9CA3AF"
+                  style={[styles.textInput, { fontSize: px(15.5) }]}
                 />
               </View>
 
-              <Text style={[styles.label, { fontSize: px(13), marginTop: px(16) }]}>Password</Text>
+              {/* Password */}
+              <Text style={[styles.fieldLabel, { fontSize: px(14), marginTop: px(16) }]}>Password</Text>
               <View
                 style={[
                   styles.inputWrap,
                   {
-                    minHeight: px(52),
+                    height: px(52),
                     borderRadius: px(12),
-                    borderColor: passwordFocused ? colors.primary : colors.border,
+                    marginTop: px(8),
+                    borderColor: passwordFocused ? '#F59E0B' : '#E5E7EB',
+                    borderWidth: passwordFocused ? 1.8 : 1.2,
                   },
                 ]}>
+                <Lock size={px(18)} color="#9CA3AF" style={{ marginRight: px(10) }} />
                 <TextInput
                   value={password}
-                  onChangeText={text => {
+                  onChangeText={(text) => {
                     setPassword(text);
                     if (error) setError('');
                   }}
                   onFocus={() => setPasswordFocused(true)}
                   onBlur={() => setPasswordFocused(false)}
                   secureTextEntry={!showPassword}
-                  placeholder="Enter password"
-                  placeholderTextColor={colors.textMuted}
-                  style={[styles.input, { fontSize: px(16) }]}
+                  placeholder="Enter vendor password"
+                  placeholderTextColor="#9CA3AF"
+                  style={[styles.textInput, { fontSize: px(15.5) }]}
                 />
-                <Pressable onPress={() => setShowPassword(v => !v)} hitSlop={8}>
+                <Pressable
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  hitSlop={10}
+                  style={styles.eyeButton}>
                   {showPassword ? (
-                    <EyeOff size={18} color={colors.grey} strokeWidth={2.2} />
+                    <EyeOff size={px(18)} color="#6B7280" />
                   ) : (
-                    <Eye size={18} color={colors.grey} strokeWidth={2.2} />
+                    <Eye size={px(18)} color="#6B7280" />
                   )}
                 </Pressable>
               </View>
-
-              <AuthToast message={error} type="error" />
-
-              <Pressable
-                disabled={!canSubmit}
-                onPress={() => void handleLogin()}
-                style={({ pressed }) => [
-                  styles.loginBtn,
-                  {
-                    marginTop: px(spacing.lg),
-                    minHeight: px(54),
-                    borderRadius: px(14),
-                  },
-                  !canSubmit && styles.loginBtnDisabled,
-                  pressed && canSubmit && styles.pressed,
-                ]}>
-                <Lock size={px(18)} color={colors.dark} strokeWidth={2.4} />
-                <Text style={[styles.loginLabel, { fontSize: px(16) }]}>
-                  {loading ? 'Signing in...' : 'Sign in'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => navigation.navigate('PartnerLogin', { role: 'driver' })}
-                style={({ pressed }) => [
-                  styles.switchRow,
-                  { marginTop: px(spacing.lg) },
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[styles.switchText, { fontSize: px(13) }]}>
-                  Self driver? <Text style={styles.switchLink}>Use OTP login</Text>
-                </Text>
-              </Pressable>
             </View>
 
-            <View style={[styles.secureRow, { marginTop: px(spacing.xl) }]}>
-              <ShieldCheck size={16} color={colors.primary} strokeWidth={2.2} />
-              <Text style={[styles.secureText, { fontSize: px(12) }]}>
-                Ask your vendor if you forgot your Login ID or password
+            {/* Error Message Toast */}
+            <AuthToast message={error} type="error" position="inline" onDismiss={() => setError('')} />
+
+            {/* Primary CTA: Sign In */}
+            <Pressable
+              disabled={!canSubmit || isSubmitting}
+              onPress={() => void handleLogin()}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                {
+                  minHeight: px(52),
+                  borderRadius: px(14),
+                  marginTop: px(22),
+                },
+                (!canSubmit || isSubmitting) && styles.primaryButtonDisabled,
+                pressed && canSubmit && !isSubmitting && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Sign In">
+              <Text style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
+                {isSubmitting ? 'Signing in...' : 'Sign In'}
+              </Text>
+              <ArrowRight
+                size={px(20)}
+                color="#111827"
+                strokeWidth={2.6}
+                style={{ marginLeft: px(8) }}
+              />
+            </Pressable>
+
+            {/* Security Assurance */}
+            <View style={[styles.securityNotice, { marginTop: px(16) }]}>
+              <ShieldCheck size={px(18)} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />
+              <Text style={[styles.securityText, { fontSize: px(12.5) }]}>
+                Credentials are managed by your registered RACE vendor.
               </Text>
             </View>
+
+            {/* Subtle Horizontal Divider */}
+            <View style={[styles.footerDivider, { marginTop: px(36) }]} />
+
+            {/* Terms and Privacy Footer */}
+            <View style={[styles.footerBlock, { marginTop: px(12) }]}>
+              <Text style={[styles.footerText, { fontSize: px(12) }]}>
+                By continuing, you agree to our
+              </Text>
+              <Text style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
+                Terms & Privacy Policy
+              </Text>
+            </View>
+
+            {/* Discreet Dev Demo Mode (for offline QA testing) */}
+            {(__DEV__ || UI_PREVIEW_MODE) && (
+              <View style={[styles.demoRow, { marginTop: px(14) }]}>
+                <Text style={[styles.demoLabel, { fontSize: px(10) }]}>Demo Login:</Text>
+                <Pressable
+                  onPress={() => void loginAsMockDriver(dispatch)}
+                  style={styles.demoLink}>
+                  <Text style={styles.demoLinkText}>Mock Driver Dashboard</Text>
+                </Pressable>
+              </View>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
 
-      <AuthLoadingOverlay visible={loading} label="Signing in..." />
+      <AuthLoadingOverlay visible={isSubmitting} label="Signing in..." />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
-  flex: { flex: 1 },
+  root: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  flex: {
+    flex: 1,
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandBlock: { alignItems: 'center' },
-  brandRace: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 0.5,
-  },
-  brandPartner: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.6,
-  },
-  title: {
-    marginTop: spacing.md,
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-  },
-  subtitle: {
-    marginTop: spacing.sm,
-    color: colors.grey,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  iconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.goldLight,
+  headerLogoContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    alignSelf: 'center',
   },
-  cardTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    textAlign: 'center',
+  scroll: {
+    flex: 1,
   },
-  label: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
+  scrollContent: {
+    flexGrow: 1,
+  },
+  titleSection: {
+    alignItems: 'flex-start',
+  },
+  titleText: {
+    fontWeight: '800',
+    color: '#111827',
+  },
+  subtitleText: {
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  roleBadgeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  roleIconBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  roleBadgeTitle: {
+    flex: 1,
+    marginLeft: 10,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  roleDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 12,
+  },
+  changeRoleText: {
+    fontWeight: '600',
+    color: '#D97706',
+  },
+  inputSection: {
+    width: '100%',
+  },
+  fieldLabel: {
+    fontWeight: '700',
+    color: '#374151',
   },
   inputWrap: {
-    marginTop: spacing.sm,
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1.5,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
   },
-  input: {
+  textInput: {
     flex: 1,
-    color: colors.dark,
-    fontWeight: typography.weights.medium,
-    paddingVertical: spacing.md,
+    color: '#111827',
+    fontWeight: '600',
+    paddingVertical: 0,
   },
-  loginBtn: {
+  eyeButton: {
+    padding: 6,
+  },
+  primaryButton: {
+    backgroundColor: '#F59E0B',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  loginBtnDisabled: { opacity: 0.5 },
-  loginLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
+  primaryButtonDisabled: {
+    backgroundColor: '#FDE68A',
+    opacity: 0.8,
   },
-  switchRow: { alignItems: 'center' },
-  switchText: { color: colors.grey, textAlign: 'center' },
-  switchLink: {
-    color: '#2563EB',
-    fontWeight: typography.weights.semibold,
+  primaryButtonText: {
+    fontWeight: '800',
+    color: '#111827',
   },
-  secureRow: {
+  securityNotice: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    paddingHorizontal: 10,
+    gap: 8,
   },
-  secureText: { color: colors.grey, textAlign: 'center', flex: 1 },
-  pressed: { opacity: 0.9 },
+  securityText: {
+    color: '#6B7280',
+    flexShrink: 1,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  footerDivider: {
+    width: 140,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
+  },
+  footerBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  termsLink: {
+    color: '#D97706',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  demoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    opacity: 0.65,
+  },
+  demoLabel: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  demoLink: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  demoLinkText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  pressed: {
+    opacity: 0.85,
+  },
 });

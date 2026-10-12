@@ -6,6 +6,7 @@ import DriverDocumentsScreen from '../screens/partner/registration/driver/Driver
 import DriverPersonalInfoScreen from '../screens/partner/registration/driver/DriverPersonalInfoScreen';
 import DriverReviewScreen from '../screens/partner/registration/driver/DriverReviewScreen';
 import DriverVehicleInfoScreen from '../screens/partner/registration/driver/DriverVehicleInfoScreen';
+import DriverVerificationPendingScreen from '../screens/partner/registration/DriverVerificationPendingScreen';
 import VendorBusinessAddressScreen from '../screens/partner/registration/vendor/VendorBusinessAddressScreen';
 import VendorBusinessInfoScreen from '../screens/partner/registration/vendor/VendorBusinessInfoScreen';
 import VendorDocumentsScreen from '../screens/partner/registration/vendor/VendorDocumentsScreen';
@@ -40,11 +41,14 @@ export default function PartnerRegistrationNavigator({ route }: Props) {
 
   return (
     <Stack.Navigator
+      key={role}
       initialRouteName={initialRoute}
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
+        contentStyle: { backgroundColor: '#F8F9FA' },
         animation: 'slide_from_right',
+        animationDuration: 280,
+        gestureEnabled: true,
       }}>
       <Stack.Screen
         name="DriverPersonalInfo"
@@ -64,6 +68,11 @@ export default function PartnerRegistrationNavigator({ route }: Props) {
       <Stack.Screen
         name="DriverReview"
         component={DriverReviewScreen}
+        initialParams={screenParams}
+      />
+      <Stack.Screen
+        name="DriverVerificationPending"
+        component={DriverVerificationPendingScreen}
         initialParams={screenParams}
       />
       <Stack.Screen

@@ -1,8 +1,7 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
-import { store } from '../../redux/store';
-import { UI_PREVIEW_MODE } from '../../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../../constants/preview';
 import { MOCK_VENDOR_DRIVERS } from '../../data/mockPartnerData';
 
 /** @deprecated Prefer VendorDriver */
@@ -127,7 +126,13 @@ export async function uploadVendorDriverDocument(
       type: file.mimeType,
     } as unknown as Blob);
 
-    const token = store.getState().auth.accessToken;
+    let token: string | null = null;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      token = require('../../redux/store').store?.getState()?.auth?.accessToken ?? null;
+    } catch {
+      // ignore
+    }
     const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
       API_ENDPOINTS.vendorDriverUploadDocument(driverId),
       formData,

@@ -1,12 +1,16 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import StackBackButton from '../components/navigation/StackBackButton';
+import DriverOfferAlert from '../components/partner/DriverOfferAlert';
 import PartnerTabBar from '../components/partner/PartnerTabBar';
 import { useAppSelector } from '../redux/hooks';
 import PartnerHomeScreen from '../screens/partner/PartnerHomeScreen';
+import DriverDashboardScreen from '../screens/partner/driver/DriverDashboardScreen';
+import DriverJobsScreen from '../screens/partner/driver/DriverJobsScreen';
+import DriverActiveJobScreen from '../screens/partner/driver/DriverActiveJobScreen';
 import PartnerJobsScreen from '../screens/partner/PartnerJobsScreen';
 import PartnerActiveJobScreen from '../screens/partner/PartnerActiveJobScreen';
 import PartnerAccountScreen from '../screens/partner/PartnerAccountScreen';
@@ -20,6 +24,10 @@ import type {
   PartnerTabParamList,
 } from '../types/partnerNavigation';
 import { colors, typography } from '../theme';
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
 
 const Tab = createBottomTabNavigator<PartnerTabParamList>();
 const AccountStack = createNativeStackNavigator<PartnerAccountStackParamList>();
@@ -46,17 +54,21 @@ const stackScreenOptions = {
 };
 
 function PartnerJobsStackNavigator() {
+  const isDriver = useAppSelector(state => state.auth.user?.role === 'driver');
+
   return (
     <JobsStack.Navigator screenOptions={stackScreenOptions}>
+      {/* Drivers get the board-01 job list and the 4-step job cycle; vendors keep
+          the existing screens. */}
       <JobsStack.Screen
         name="PartnerJobsList"
-        component={PartnerJobsScreen}
+        component={isDriver ? DriverJobsScreen : PartnerJobsScreen}
         options={{ headerShown: false }}
       />
       <JobsStack.Screen
         name="PartnerActiveJob"
-        component={PartnerActiveJobScreen}
-        options={{ headerTitle: 'Active job' }}
+        component={isDriver ? DriverActiveJobScreen : PartnerActiveJobScreen}
+        options={isDriver ? { headerShown: false } : { headerTitle: 'Active job' }}
       />
       <JobsStack.Screen
         name="VendorVehicles"
@@ -102,12 +114,21 @@ function PartnerAccountStackNavigator() {
 export default function PartnerNavigator() {
   const user = useAppSelector(state => state.auth.user);
   const isPartner = user?.role === 'driver' || user?.role === 'vendor';
+  const isDriver = user?.role === 'driver';
 
   return (
+    /* The incoming-request alert wraps the navigator so it can pop over any tab
+       without being re-mounted per screen. */
+    <View style={styles.root}>
     <Tab.Navigator
       tabBar={props => <PartnerTabBar {...props} />}
       screenOptions={{ headerShown: false }}>
-      <Tab.Screen name="PartnerHome" component={PartnerHomeScreen} options={{ title: 'Dashboard' }} />
+      {/* Drivers get the dedicated board-01 dashboard; vendors keep the vendor home. */}
+      <Tab.Screen
+        name="PartnerHome"
+        component={isDriver ? DriverDashboardScreen : PartnerHomeScreen}
+        options={{ title: 'Home' }}
+      />
       {isPartner ? (
         <Tab.Screen
           name="PartnerJobs"
@@ -121,5 +142,7 @@ export default function PartnerNavigator() {
         options={{ title: 'Account' }}
       />
     </Tab.Navigator>
+    <DriverOfferAlert />
+    </View>
   );
 }

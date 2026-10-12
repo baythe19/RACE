@@ -31,6 +31,13 @@ export interface ITowingBooking extends Document {
   distanceKm?: number;
   estimatedFare: number;
   fareBreakdown?: TowingFareBreakdown;
+  /**
+   * Amount the backend confirms at completion. Written once, when the driver
+   * marks the job COMPLETED, so partner/earnings screens never have to trust a
+   * client-side estimate.
+   */
+  finalFare?: number;
+  finalFareConfirmedAt?: Date;
   advanceAmount: number;
   advancePaid: boolean;
   advancePaymentId?: string;
@@ -93,6 +100,8 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     distanceKm: { type: Number },
     estimatedFare: { type: Number, required: true },
     fareBreakdown: { type: Schema.Types.Mixed },
+    finalFare: { type: Number },
+    finalFareConfirmedAt: { type: Date },
     advanceAmount: { type: Number, required: true },
     advancePaid: { type: Boolean, default: false },
     advancePaymentId: { type: String },

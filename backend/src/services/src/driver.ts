@@ -34,6 +34,19 @@ function assertDriverRole(role: string): void {
   }
 }
 
+/**
+ * Status timeline is exposed read-only so the app can show real trip timings
+ * (e.g. total time on the completion summary) instead of inventing them.
+ */
+function mapStatusHistory(
+  history?: Array<{ status: string; timestamp: Date }>,
+): Array<{ status: string; timestamp: string }> {
+  return (history ?? []).map((entry) => ({
+    status: entry.status,
+    timestamp: entry.timestamp.toISOString(),
+  }));
+}
+
 async function assertDriverApproved(driverId: string): Promise<void> {
   const driver = await userRepository.findById(driverId);
   if (!driver?.driverProfile) {
@@ -124,7 +137,10 @@ export class DriverService {
         pickup: booking.pickup,
         dropoff: booking.dropoff,
         estimatedFare: booking.estimatedFare,
+        finalFare: booking.finalFare,
+        distanceKm: booking.distanceKm,
         createdAt: booking.createdAt.toISOString(),
+        statusHistory: mapStatusHistory(booking.statusHistory),
       })),
       ...driverBookings.map((booking) => ({
         bookingType: 'driver' as const,
@@ -134,7 +150,9 @@ export class DriverService {
         pickup: booking.pickup,
         dropoff: booking.dropoff,
         estimatedFare: booking.estimatedFare,
+        finalFare: booking.finalFare,
         createdAt: booking.createdAt.toISOString(),
+        statusHistory: mapStatusHistory(booking.statusHistory),
       })),
     ];
 
@@ -167,7 +185,10 @@ export class DriverService {
         pickup?: unknown;
         dropoff?: unknown | null;
         estimatedFare?: number;
+        finalFare?: number;
+        distanceKm?: number;
         createdAt: Date;
+        statusHistory?: Array<{ status: string; timestamp: Date }>;
       },
     ) => ({
       bookingType: type,
@@ -177,7 +198,10 @@ export class DriverService {
       pickup: booking.pickup,
       dropoff: booking.dropoff,
       estimatedFare: booking.estimatedFare,
+      finalFare: booking.finalFare,
+      distanceKm: booking.distanceKm,
       createdAt: booking.createdAt.toISOString(),
+      statusHistory: mapStatusHistory(booking.statusHistory),
     });
 
     if (bookingType === 'towing') {
@@ -228,10 +252,26 @@ export class DriverService {
       assertTripStartOtp(booking, dto.tripOtp);
     }
 
+    // The backend — not the app — confirms what the driver earned. Written in the
+    // same atomic update as the status so the two can never disagree.
+    const breakdownTotal =
+      booking.fareBreakdown && 'totalFare' in booking.fareBreakdown
+        ? (booking.fareBreakdown as { totalFare?: number }).totalFare
+        : undefined;
+    const completionExtra =
+      dto.status === 'COMPLETED'
+        ? {
+            finalFare:
+              typeof breakdownTotal === 'number' ? breakdownTotal : booking.estimatedFare,
+            finalFareConfirmedAt: new Date(),
+          }
+        : undefined;
+
     const updated = await Model.updateStatus(
       bookingId,
       dto.status,
       appendStatusHistory(booking.statusHistory, dto.status),
+      completionExtra,
     );
 
     if (!updated) {

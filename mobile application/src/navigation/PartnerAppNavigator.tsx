@@ -7,6 +7,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useAppSelector } from '../redux/hooks';
 import { useAuthStore } from '../store/authStore';
 import PartnerAuthNavigator from './PartnerAuthNavigator';
+import { partnerNavigationRef } from './partnerNavigationRef';
 import PartnerRegistrationNavigator from './PartnerRegistrationNavigator';
 import PartnerSelectSheet from '../components/partner/PartnerSelectSheet';
 import WrongAppRoleScreen from '../screens/partner/auth/WrongAppRoleScreen';
@@ -65,7 +66,7 @@ export default function PartnerAppNavigator() {
     : `partner-auth-${authSessionVersion}`;
 
   return (
-    <NavigationContainer key={navigatorKey} theme={navigationTheme}>
+    <NavigationContainer key={navigatorKey} theme={navigationTheme} ref={partnerNavigationRef}>
       <PartnerSelectSheet />
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         {enterMain ? (

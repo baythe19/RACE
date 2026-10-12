@@ -1,5 +1,6 @@
 export const images = {
   logo:          require('./images/logo.png'),
+  logoTransparent: require('./images/logo-transparent.png'),
   raceLogoFull:  require('./images/race-logo-full.png'),
   splashContent: require('./images/splash-content.png'),
   splashBg:        require('./images/splash-bg.png'),
@@ -11,6 +12,9 @@ export const images = {
   splashHeader:  require('./images/splash-header.png'),
   splashTruck:   require('./images/splash-truck.png'),
   partnerWelcomeIllustration: require('./images/partner-welcome-illustration.png'),
+  partnerWelcomeHero: require('./images/partner-welcome-hero.png'),
+  selfDriverAvatar: require('./images/self-driver-avatar.png'),
+  vendorDriverAvatar: require('./images/vendor-driver-avatar.png'),
   onboarding1:   require('./images/onboarding-1.png'),
   onboarding2:   require('./images/onboarding-2.png'),
   onboarding3:   require('./images/onboarding-3.png'),

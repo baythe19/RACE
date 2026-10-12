@@ -22,6 +22,7 @@ interface PartnerScreenLayoutProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  headerRight?: ReactNode;
   headerExtra?: ReactNode;
   footer?: ReactNode;
   bottomBar?: ReactNode;
@@ -31,12 +32,15 @@ interface PartnerScreenLayoutProps {
   showBackButton?: boolean;
   /** Extra top spacing inside the scroll area (default: comfortable offset below header). */
   contentTopSpacing?: number;
+  /** Floating top toast notification rendered at the screen root outside the scroll area. */
+  toast?: ReactNode;
 }
 
 export default function PartnerScreenLayout({
   title,
   subtitle,
   onBack,
+  headerRight,
   headerExtra,
   footer,
   bottomBar,
@@ -45,6 +49,7 @@ export default function PartnerScreenLayout({
   scrollContentStyle,
   showBackButton = true,
   contentTopSpacing = spacing.xxxl,
+  toast,
 }: PartnerScreenLayoutProps) {
   const insets = useSafeAreaInsets();
 
@@ -63,13 +68,13 @@ export default function PartnerScreenLayout({
             <Pressable
               onPress={onBack}
               hitSlop={12}
-              style={({ pressed }) => [styles.sideSlot, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel="Go back">
               <ArrowLeft size={24} color={colors.dark} strokeWidth={2.5} />
             </Pressable>
           ) : (
-            <View style={styles.sideSlot} />
+            <View style={styles.sideSpacer} />
           )}
 
           <View style={styles.titleBlock}>
@@ -83,7 +88,11 @@ export default function PartnerScreenLayout({
             ) : null}
           </View>
 
-          <View style={styles.sideSlot} />
+          {headerRight ? (
+            <View style={styles.sideSlot}>{headerRight}</View>
+          ) : (
+            <View style={styles.sideSpacer} />
+          )}
         </View>
 
         {headerExtra ? <View style={styles.headerExtra}>{headerExtra}</View> : null}
@@ -137,6 +146,7 @@ export default function PartnerScreenLayout({
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      {toast ? toast : null}
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
           style={styles.flex}
@@ -168,7 +178,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
-  sideSlot: {
+  backButton: {
     width: HEADER_SIDE,
     height: HEADER_SIDE,
     alignItems: 'center',
@@ -177,6 +187,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGrey,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  sideSlot: {
+    width: HEADER_SIDE,
+    height: HEADER_SIDE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sideSpacer: {
+    width: HEADER_SIDE,
+    height: HEADER_SIDE,
   },
   titleBlock: {
     flex: 1,

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Image,
   Pressable,
   ScrollView,
   StatusBar,
@@ -8,52 +9,22 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Building2,
-  CircleUser,
-  KeyRound,
-  Smartphone,
-} from 'lucide-react-native';
+import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { images } from '../../../assets';
+import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { useAppDispatch } from '../../../redux/hooks';
 import { setSignupPath } from '../../../redux/onboarding/onboardingSlice';
 import { usePartnerOnboardingStore } from '../../../store/partnerOnboardingStore';
 import type { PartnerAuthStackParamList } from '../../../types/partnerNavigation';
-import { colors, layout, radius, shadows, spacing, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerDriverAuthMode'>;
 
-type DriverAuthMode = 'self' | 'vendor';
+type DriverType = 'self' | 'vendor';
 
 const REF_W = 390;
-const PAGE_BG = '#F7F7F5';
-
-const OPTIONS = [
-  {
-    mode: 'self' as const,
-    title: 'Self driver',
-    description: 'Independent drivers sign in with mobile number and OTP.',
-    Icon: CircleUser,
-    features: [
-      { label: 'OTP login', Icon: Smartphone },
-      { label: 'Own account', Icon: CircleUser },
-    ],
-  },
-  {
-    mode: 'vendor' as const,
-    title: 'Vendor driver',
-    description: 'Drivers added by a vendor sign in with Login ID and password.',
-    Icon: Building2,
-    features: [
-      { label: 'Login ID', Icon: KeyRound },
-      { label: 'Assigned by vendor', Icon: Building2 },
-    ],
-  },
-];
 
 export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
@@ -61,100 +32,205 @@ export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const scale = width / REF_W;
   const px = (value: number) => Math.max(1, Math.round(value * scale));
-  const setSelectedRole = usePartnerOnboardingStore(state => state.setSelectedRole);
+  const setSelectedRole = usePartnerOnboardingStore((state) => state.setSelectedRole);
 
-  const [mode, setMode] = useState<DriverAuthMode>('self');
+  const [driverType, setDriverType] = useState<DriverType>('self');
 
   const handleContinue = () => {
     setSelectedRole('driver');
     dispatch(setSignupPath({ accountType: 'driver', vendorType: null }));
 
-    if (mode === 'vendor') {
+    if (driverType === 'vendor') {
+      // Vendor Driver uses Login ID and Password
       navigation.navigate('PartnerVendorDriverLogin');
-      return;
+    } else {
+      // Self Driver uses Mobile Number OTP login
+      navigation.navigate('PartnerLogin', { role: 'driver' });
     }
-    navigation.navigate('PartnerLogin', { role: 'driver' });
   };
 
-  return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={PAGE_BG} />
+  const isSelf = driverType === 'self';
+  const isVendorDriver = driverType === 'vendor';
 
-      <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
+  return (
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+      {/* Top Header Bar — Exactly aligned across all auth screens */}
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingTop: insets.top + px(4),
+            paddingHorizontal: px(20),
+            height: insets.top + px(54),
+          },
+        ]}>
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={12}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
-          <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back">
+          <ArrowLeft size={px(24)} color="#111827" strokeWidth={2.4} />
         </Pressable>
-        <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(18) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(11) }]}>PARTNER</Text>
+
+        <View style={styles.headerLogoContainer}>
+          <PartnerHeaderLogo width={px(104)} />
         </View>
-        <View style={styles.backButton} />
+
+        <View style={{ width: px(32) }} />
       </View>
 
       <ScrollView
-        contentContainerStyle={{
-          paddingHorizontal: px(layout.screenPadding),
-          paddingBottom: insets.bottom + px(spacing.xl),
-        }}
-        showsVerticalScrollIndicator={false}>
-        <Text style={[styles.title, { fontSize: px(26), lineHeight: px(32) }]}>
-          How do you drive?
-        </Text>
-        <Text style={[styles.subtitle, { fontSize: px(14), lineHeight: px(21) }]}>
-          Choose self driver for OTP login, or vendor driver if your company gave you a Login ID.
-        </Text>
-
-        <View style={{ marginTop: px(spacing.xl), gap: px(12) }}>
-          {OPTIONS.map(option => {
-            const selected = mode === option.mode;
-            return (
-              <Pressable
-                key={option.mode}
-                onPress={() => setMode(option.mode)}
-                style={({ pressed }) => [
-                  styles.card,
-                  shadows.card,
-                  selected && styles.cardSelected,
-                  pressed && styles.pressed,
-                ]}>
-                <View style={styles.cardHeader}>
-                  <View style={[styles.iconWrap, selected && styles.iconWrapSelected]}>
-                    <option.Icon
-                      size={22}
-                      color={selected ? colors.dark : colors.primary}
-                      strokeWidth={2.2}
-                    />
-                  </View>
-                  <View style={styles.cardText}>
-                    <Text style={styles.cardTitle}>{option.title}</Text>
-                    <Text style={styles.cardDescription}>{option.description}</Text>
-                  </View>
-                </View>
-                <View style={styles.featureRow}>
-                  {option.features.map(feature => (
-                    <View key={feature.label} style={styles.featureChip}>
-                      <feature.Icon size={14} color={colors.primaryDark} strokeWidth={2.2} />
-                      <Text style={styles.featureLabel}>{feature.label}</Text>
-                    </View>
-                  ))}
-                </View>
-              </Pressable>
-            );
-          })}
+        style={styles.scroll}
+        bounces={false}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingHorizontal: px(20),
+            paddingBottom: insets.bottom + px(24),
+          },
+        ]}>
+        {/* Title & Subtitle (Left-aligned, clean and concise) */}
+        <View style={[styles.headingBlock, { marginTop: px(16) }]}>
+          <Text style={[styles.mainTitle, { fontSize: px(28), lineHeight: px(34) }]}>
+            Choose your
+          </Text>
+          <Text style={[styles.mainTitle, { fontSize: px(28), lineHeight: px(34) }]}>
+            driver type
+          </Text>
+          <Text style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(8) }]}>
+            Select how you work with RACE.
+          </Text>
         </View>
 
+        {/* Options List with Prominent Optimized Avatars (Instantly Loaded) */}
+        <View style={[styles.cardsContainer, { marginTop: px(22) }]}>
+          {/* Option 1: Self Driver */}
+          <Pressable
+            onPress={() => setDriverType('self')}
+            style={({ pressed }) => [
+              styles.optionCard,
+              isSelf ? styles.optionCardSelected : styles.optionCardUnselected,
+              { padding: px(16), borderRadius: px(20), minHeight: px(116) },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isSelf }}>
+            {/* Prominent High-Res Self Driver Avatar */}
+            <View
+              style={[
+                styles.avatarBox,
+                {
+                  width: px(88),
+                  height: px(88),
+                  borderRadius: px(44),
+                  backgroundColor: '#FEF3C7',
+                },
+              ]}>
+              <Image
+                source={images.selfDriverAvatar}
+                style={{ width: px(88), height: px(88), borderRadius: px(44) }}
+                resizeMode="cover"
+                accessibilityLabel="Self Driver"
+              />
+            </View>
+
+            <View style={styles.cardTextBox}>
+              <Text style={[styles.cardTitle, { fontSize: px(17) }]}>Self Driver</Text>
+              <Text style={[styles.cardDescription, { fontSize: px(13), marginTop: px(4) }]}>
+                I own my vehicle and work independently using my mobile number.
+              </Text>
+            </View>
+
+            {/* Custom Radio Button */}
+            <View
+              style={[
+                styles.radioOuter,
+                isSelf ? styles.radioOuterSelected : styles.radioOuterUnselected,
+                { width: px(22), height: px(22), borderRadius: px(11) },
+              ]}>
+              {isSelf ? (
+                <View
+                  style={[
+                    styles.radioInnerSelected,
+                    { width: px(11), height: px(11), borderRadius: px(5.5) },
+                  ]}
+                />
+              ) : null}
+            </View>
+          </Pressable>
+
+          {/* Option 2: Vendor Driver */}
+          <Pressable
+            onPress={() => setDriverType('vendor')}
+            style={({ pressed }) => [
+              styles.optionCard,
+              isVendorDriver ? styles.optionCardSelected : styles.optionCardUnselected,
+              { padding: px(16), borderRadius: px(20), minHeight: px(116), marginTop: px(14) },
+              pressed && styles.pressed,
+            ]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: isVendorDriver }}>
+            {/* Prominent High-Res Vendor Driver Avatar */}
+            <View
+              style={[
+                styles.avatarBox,
+                {
+                  width: px(88),
+                  height: px(88),
+                  borderRadius: px(44),
+                  backgroundColor: '#F3F4F6',
+                },
+              ]}>
+              <Image
+                source={images.vendorDriverAvatar}
+                style={{ width: px(88), height: px(88), borderRadius: px(44) }}
+                resizeMode="cover"
+                accessibilityLabel="Vendor Driver"
+              />
+            </View>
+
+            <View style={styles.cardTextBox}>
+              <Text style={[styles.cardTitle, { fontSize: px(17) }]}>Vendor Driver</Text>
+              <Text style={[styles.cardDescription, { fontSize: px(13), marginTop: px(4) }]}>
+                I'm a driver working with a registered RACE vendor. I have a Login ID and Password from my vendor.
+              </Text>
+            </View>
+
+            {/* Custom Radio Button */}
+            <View
+              style={[
+                styles.radioOuter,
+                isVendorDriver ? styles.radioOuterSelected : styles.radioOuterUnselected,
+                { width: px(22), height: px(22), borderRadius: px(11) },
+              ]}>
+              {isVendorDriver ? (
+                <View
+                  style={[
+                    styles.radioInnerSelected,
+                    { width: px(11), height: px(11), borderRadius: px(5.5) },
+                  ]}
+                />
+              ) : null}
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Primary CTA Button */}
         <Pressable
           onPress={handleContinue}
           style={({ pressed }) => [
-            styles.continueBtn,
-            { minHeight: px(54), marginTop: px(spacing.xxl) },
+            styles.continueButton,
+            { minHeight: px(52), borderRadius: px(14), marginTop: px(26) },
             pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</Text>
-          <ArrowRight size={18} color={colors.dark} strokeWidth={2.4} />
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Continue">
+          <Text style={[styles.continueButtonText, { fontSize: px(16.5) }]}>Continue</Text>
+          <ArrowRight size={px(20)} color="#111827" strokeWidth={2.6} style={{ marginLeft: px(8) }} />
         </Pressable>
       </ScrollView>
     </View>
@@ -162,107 +238,109 @@ export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
+  root: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandBlock: { alignItems: 'center' },
-  brandRace: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 0.5,
+  headerLogoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  brandPartner: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.6,
+  scroll: {
+    flex: 1,
   },
-  title: {
-    marginTop: spacing.md,
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
+  scrollContent: {
+    flexGrow: 1,
+  },
+  headingBlock: {
+    alignItems: 'flex-start',
+  },
+  mainTitle: {
+    fontWeight: '800',
+    color: '#111827',
   },
   subtitle: {
-    marginTop: spacing.sm,
-    color: colors.grey,
+    fontWeight: '400',
+    color: '#6B7280',
   },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: radius.lg,
+  cardsContainer: {
+    width: '100%',
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  optionCardSelected: {
+    backgroundColor: '#FFFDF5',
+    borderWidth: 1.8,
+    borderColor: '#F59E0B',
+  },
+  optionCardUnselected: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: colors.border,
-    padding: spacing.lg,
+    borderColor: '#E5E7EB',
   },
-  cardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.goldLight,
-  },
-  cardHeader: { flexDirection: 'row', gap: spacing.md },
-  iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.goldLight,
+  avatarBox: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  iconWrapSelected: {
-    backgroundColor: colors.primary,
+  cardTextBox: {
+    flex: 1,
+    marginLeft: 14,
+    marginRight: 8,
   },
-  cardText: { flex: 1 },
   cardTitle: {
-    color: colors.dark,
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
+    fontWeight: '800',
+    color: '#111827',
   },
   cardDescription: {
-    marginTop: 4,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
+    fontWeight: '400',
+    color: '#6B7280',
+    lineHeight: 18.5,
   },
-  featureRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  featureChip: {
-    flexDirection: 'row',
+  radioOuter: {
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.background,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
+    justifyContent: 'center',
+    borderWidth: 2,
   },
-  featureLabel: {
-    color: colors.dark,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
+  radioOuterSelected: {
+    borderColor: '#F59E0B',
   },
-  continueBtn: {
+  radioOuterUnselected: {
+    borderColor: '#D1D5DB',
+  },
+  radioInnerSelected: {
+    backgroundColor: '#F59E0B',
+  },
+  continueButton: {
+    backgroundColor: '#F59E0B',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-    borderRadius: radius.button,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  continueLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
+  continueButtonText: {
+    fontWeight: '800',
+    color: '#111827',
   },
-  pressed: { opacity: 0.9 },
+  pressed: {
+    opacity: 0.88,
+  },
 });

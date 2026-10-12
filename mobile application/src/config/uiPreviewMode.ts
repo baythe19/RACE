@@ -6,13 +6,7 @@ import {
   MOCK_VENDOR_USER,
 } from '../data/mockPartnerData';
 
-/**
- * UI Preview / Mock Mode:
- * Allows frontend inspection of all Driver and Vendor screens
- * without requiring the backend server to be running.
- */
-export const UI_PREVIEW_MODE =
-  process.env.EXPO_PUBLIC_UI_PREVIEW_MODE !== 'false';
+export { UI_PREVIEW_MODE } from '../constants/preview';
 
 export async function loginAsMockDriver(dispatch: AppDispatch): Promise<void> {
   const token = 'mock-driver-token';

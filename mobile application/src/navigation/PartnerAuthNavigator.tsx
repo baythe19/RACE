@@ -36,7 +36,7 @@ export default function PartnerAuthNavigator() {
       }}>
       <Stack.Screen name="PartnerSplash" component={PartnerSplashScreen} />
       <Stack.Screen name="PartnerWelcome" component={PartnerWelcomeScreen} />
-      <Stack.Screen name="PartnerRoleSelection" component={PartnerRoleSelectionScreen} />
+      <Stack.Screen name="PartnerRoleSelection" component={PartnerWelcomeScreen as any} />
       <Stack.Screen name="PartnerDriverAuthMode" component={PartnerDriverAuthModeScreen} />
       <Stack.Screen name="PartnerVendorDriverLogin" component={PartnerVendorDriverLoginScreen} />
       <Stack.Screen name="PartnerLogin" component={PartnerLoginScreen} />

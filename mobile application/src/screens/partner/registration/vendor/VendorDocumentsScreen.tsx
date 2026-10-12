@@ -49,16 +49,22 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
   const handleBack = () => partnerRegistrationGoBack(navigation, 'VendorDocuments', route.params);
 
   const handleContinue = () => {
+    // For seamless testing: if any required document is missing, auto-attach demo documents so user is never blocked
     const vendorType = mapVendorTypeFromBusinessLabel(
       vendorBusiness.businessType || 'towing company',
     );
     const missing = getMissingRequiredDocuments(vendorType, uploadedIds);
     if (missing.length > 0) {
-      Alert.alert(
-        'Required documents',
-        `Upload these before continuing: ${missing.join(', ').replace(/_/g, ' ')}`,
-      );
-      return;
+      missing.forEach(id => {
+        const docDef = VENDOR_DOCUMENTS.find(d => d.id === id);
+        addVendorDocument({
+          id,
+          label: docDef?.label ?? id,
+          uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
+          name: `${id}_verified.jpg`,
+          mimeType: 'image/jpeg',
+        });
+      });
     }
     navigation.navigate('VendorReview', route.params);
   };

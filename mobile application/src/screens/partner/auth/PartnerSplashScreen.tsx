@@ -37,10 +37,13 @@ export default function PartnerSplashScreen() {
 
   const handleContinue = useCallback(() => {
     if (isAuthenticated && shouldUsePartnerExperience(user, false)) {
-      rootNavigation?.reset({
-        index: 0,
-        routes: [{ name: 'PartnerMain' }],
-      });
+      const routeNames = rootNavigation?.getState()?.routeNames;
+      if (routeNames && routeNames.includes('PartnerMain')) {
+        rootNavigation?.reset({
+          index: 0,
+          routes: [{ name: 'PartnerMain' }],
+        });
+      }
       return;
     }
 

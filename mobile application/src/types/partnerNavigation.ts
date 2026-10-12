@@ -1,14 +1,15 @@
 export type PartnerRole = 'vendor' | 'driver';
 
 export type PartnerRegistrationStackParamList = {
-  DriverPersonalInfo: { role: PartnerRole; mobileNumber?: string };
-  DriverVehicleInfo: { role: PartnerRole; mobileNumber?: string };
-  DriverDocuments: { role: PartnerRole; mobileNumber?: string };
-  DriverReview: { role: PartnerRole; mobileNumber?: string };
-  VendorBusinessInfo: { role: PartnerRole; mobileNumber?: string };
-  VendorBusinessAddress: { role: PartnerRole; mobileNumber?: string };
-  VendorDocuments: { role: PartnerRole; mobileNumber?: string };
-  VendorReview: { role: PartnerRole; mobileNumber?: string };
+  DriverPersonalInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  DriverVehicleInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  DriverDocuments: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  DriverReview: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  VendorBusinessInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  VendorBusinessAddress: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  VendorDocuments: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  VendorReview: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  DriverVerificationPending: { role: PartnerRole; mobileNumber?: string };
 };
 
 export type PartnerAuthStackParamList = {
@@ -20,6 +21,7 @@ export type PartnerAuthStackParamList = {
   PartnerLogin: { role?: PartnerRole } | undefined;
   PartnerOtpVerification: {
     mobileNumber: string;
+    role?: PartnerRole;
     isExistingUser?: boolean;
     devOtp?: string;
     otpMessage?: string;

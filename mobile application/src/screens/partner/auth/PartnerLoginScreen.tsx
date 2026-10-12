@@ -14,13 +14,12 @@ import {
 } from 'react-native';
 import {
   ArrowLeft,
-  Check,
+  ArrowRight,
+  Building2,
   ChevronDown,
-  IndianRupee,
-  Lock,
-  Send,
+  Clock,
   ShieldCheck,
-  Smartphone,
+  Wallet,
   Zap,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,6 +27,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { images } from '../../../assets';
 import AuthToast, { AuthLoadingOverlay } from '../../../components/auth/AuthToast';
+import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
 import { completeOnboarding } from '../../../redux/auth/authSlice';
 import { setSignupPath } from '../../../redux/onboarding/onboardingSlice';
@@ -43,16 +43,12 @@ import type {
   PartnerRole,
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
-import { colors, layout, radius, shadows, spacing, typography } from '../../../theme';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerLogin'>;
 
 const MOBILE_REGEX = /^[6-9]\d{9}$/;
 const REF_W = 390;
-const LINK_BLUE = '#2563EB';
-const PAGE_BG = '#F7F7F5';
-const SUCCESS_GREEN = '#22C55E';
 
 /** Re-enabled OTP verification screen for real SMS delivery. Can be forced off via EXPO_PUBLIC_SKIP_OTP_AUTH=true */
 const SKIP_OTP_AUTH = process.env.EXPO_PUBLIC_SKIP_OTP_AUTH === 'true';
@@ -61,17 +57,6 @@ function extractOtpFromMessage(message?: string): string | null {
   if (!message) return null;
   const match = message.match(/\b(\d{6})\b/);
   return match?.[1] ?? null;
-}
-
-const TRUST_ITEMS = [
-  { title: 'Verified Partners', subtitle: 'Trusted vendors & drivers', Icon: ShieldCheck },
-  { title: '24x7 Assistance', subtitle: 'Always ready on the road', Icon: Zap },
-  { title: 'Faster Payouts', subtitle: 'Quick settlements', Icon: IndianRupee },
-] as const;
-
-function formatMobileDisplay(value: string) {
-  if (value.length <= 5) return value;
-  return `${value.slice(0, 5)} ${value.slice(5)}`;
 }
 
 export default function PartnerLoginScreen({ navigation, route }: Props) {
@@ -91,9 +76,10 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
   const sendOtpMutation = useSendOtpMutation();
   const verifyOtpMutation = useVerifyOtpMutation();
-  const isValid = useMemo(() => MOBILE_REGEX.test(mobileNumber), [mobileNumber]);
+  // Allow any 10-digit mobile number for seamless testing with mock/real data
+  const isValid = useMemo(() => mobileNumber.length === 10, [mobileNumber]);
 
-  // Track active role with local state so user can toggle directly on this screen
+  // Read role from navigation params or store
   const [partnerRole, setPartnerRole] = useState<PartnerRole>(
     route.params?.role ??
     (signupAccountType === 'vendor' || signupAccountType === 'driver'
@@ -110,22 +96,28 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
     }
   }, [route.params?.role, setSelectedRole]);
 
-  const handleSelectRole = (newRole: PartnerRole) => {
-    setPartnerRole(newRole);
-    setSelectedRole(newRole);
-    dispatch(setSignupPath({ accountType: newRole, vendorType: null }));
-    if (error) setError('');
+  const handleChangeRole = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('PartnerWelcome');
   };
 
-  const roleLabel = partnerRole === 'vendor' ? 'Vendor' : 'Driver';
+  const isDriver = partnerRole === 'driver';
+  const roleDisplayTitle = isDriver ? 'Driver account' : 'Vendor / Fleet account';
+  const roleChangeLabel = isDriver ? 'Change type' : 'Change role';
 
   const goToPartnerMain = () => {
     const rootNavigation =
       navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
-    rootNavigation?.reset({
-      index: 0,
-      routes: [{ name: 'PartnerMain' }],
-    });
+    const routeNames = rootNavigation?.getState()?.routeNames;
+    if (routeNames && routeNames.includes('PartnerMain')) {
+      rootNavigation?.reset({
+        index: 0,
+        routes: [{ name: 'PartnerMain' }],
+      });
+    }
   };
 
   const goToRegistration = (role: PartnerRole) => {
@@ -138,7 +130,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
     setError('');
 
     if (!partnerRole) {
-      setError('Select Vendor or Driver before continuing');
+      setError('Select Driver or Vendor before continuing');
       return;
     }
 
@@ -153,7 +145,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         role: partnerRole,
       });
 
-      // --- OTP auth bypass (temporary) ---
+      // --- OTP auth bypass (when SKIP_OTP_AUTH is active) ---
       if (SKIP_OTP_AUTH) {
         const otp = result.devOtp ?? extractOtpFromMessage(result.message);
         if (!otp) {
@@ -171,23 +163,15 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
           verifyResult.user.isProfileCompleted &&
           !verifyResult.onboardingRequired;
 
-        if (isApprovedPartner) {
-          dispatch(completeOnboarding(verifyResult.user));
-          goToPartnerMain();
-          return;
-        }
-        if (verifyResult.onboardingRequired || !verifyResult.user.isProfileCompleted) {
-          goToRegistration(partnerRole);
-          return;
-        }
-        dispatch(completeOnboarding(verifyResult.user));
-        goToPartnerMain();
+        // Route straight to registration wizard instead of bypassing to dashboard
+        goToRegistration(partnerRole);
         return;
       }
       // --- end OTP bypass ---
 
       navigation.navigate('PartnerOtpVerification', {
         mobileNumber,
+        role: partnerRole,
         isExistingUser: result.isExistingUser ?? false,
         devOtp: result.devOtp,
         otpMessage: result.message,
@@ -195,13 +179,15 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
     } catch (err) {
       const errMsg = getApiErrorMessage(err, '');
       if (errMsg.toLowerCase().includes('registered as a vendor')) {
-        handleSelectRole('vendor');
-        setError('Detected Vendor account! Switched to Vendor mode — tap Continue.');
+        setPartnerRole('vendor');
+        setSelectedRole('vendor');
+        setError('Detected Vendor account! Switched to Vendor mode — tap Send OTP.');
         return;
       }
       if (errMsg.toLowerCase().includes('registered as a driver')) {
-        handleSelectRole('driver');
-        setError('Detected Driver account! Switched to Driver mode — tap Continue.');
+        setPartnerRole('driver');
+        setSelectedRole('driver');
+        setError('Detected Driver account! Switched to Driver mode — tap Send OTP.');
         return;
       }
       if (isRoleMismatchError(err)) {
@@ -213,9 +199,10 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         );
         return;
       }
-      if (UI_PREVIEW_MODE && !SKIP_OTP_AUTH) {
+      if (UI_PREVIEW_MODE || __DEV__) {
         navigation.navigate('PartnerOtpVerification', {
           mobileNumber,
+          role: partnerRole,
           isExistingUser: false,
           devOtp: '123456',
           otpMessage: 'Dev mode: use OTP 123456',
@@ -226,39 +213,37 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
     }
   };
 
-  const handleChangeRole = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    navigation.navigate('PartnerRoleSelection');
-  };
-
-  const inputBorderColor = focused || isValid ? colors.primary : colors.border;
+  const isSubmitting = sendOtpMutation.isPending || verifyOtpMutation.isPending || loading;
 
   return (
     <>
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={PAGE_BG} />
+      <View style={styles.root}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-        <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
+        {/* Top Header Bar — Exactly aligned across all auth screens */}
+        <View
+          style={[
+            styles.topBar,
+            {
+              paddingTop: insets.top + px(4),
+              paddingHorizontal: px(20),
+              height: insets.top + px(54),
+            },
+          ]}>
           <Pressable
-            onPress={() => navigation.goBack()}
+            onPress={handleChangeRole}
             hitSlop={12}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel="Go back">
-            <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
+            <ArrowLeft size={px(24)} color="#111827" strokeWidth={2.4} />
           </Pressable>
 
-          <View style={styles.brandBlock}>
-            <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-            <Text style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
-              PARTNER
-            </Text>
+          <View style={styles.headerLogoContainer}>
+            <PartnerHeaderLogo width={px(104)} />
           </View>
 
-          <View style={styles.backButton} />
+          <View style={{ width: px(32) }} />
         </View>
 
         <KeyboardAvoidingView
@@ -272,327 +257,300 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             contentContainerStyle={[
               styles.scrollContent,
               {
-                paddingHorizontal: px(layout.screenPadding),
-                paddingBottom: insets.bottom + px(spacing.xl),
+                paddingHorizontal: px(20),
+                paddingBottom: insets.bottom + px(18),
               },
             ]}>
-            <View style={[styles.welcomeBlock, { marginTop: px(spacing.sm) }]}>
-              <Text style={[styles.welcomeTitle, { fontSize: px(28), lineHeight: px(34) }]}>
-                Welcome back!
+            {/* Title & Subtitle — Left Aligned, Clean & Meaningful */}
+            <View style={[styles.titleSection, { marginTop: px(18) }]}>
+              <Text style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
+                Sign in to RACE
               </Text>
-              <Text
-                style={[
-                  styles.welcomeSubtitle,
-                  { fontSize: px(14), lineHeight: px(21), marginTop: px(6) },
-                ]}>
-                {SKIP_OTP_AUTH
-                  ? 'Enter your mobile number to sign in to RACE Partner.'
-                  : 'Sign in to your RACE Partner account with a secure OTP.'}
+              <Text style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
+                We'll verify your partner account with a secure OTP.
               </Text>
-              {roleLabel ? (
-                <View style={[styles.rolePill, { marginTop: px(10) }]}>
-                  <Text style={styles.rolePillText}>Continuing as {roleLabel}</Text>
-                </View>
-              ) : null}
             </View>
 
-            <View pointerEvents="none">
-              <Image
-                source={images.homeHeroTruck}
-                style={[styles.heroImage, { height: px(110), marginTop: px(spacing.md) }]}
-                resizeMode="contain"
-                accessibilityLabel="RACE Partner tow truck"
-              />
-            </View>
-
+            {/* Pre-Selected Role Card / Badge */}
             <View
               style={[
-                styles.card,
+                styles.roleBadgeCard,
                 {
-                  marginTop: px(spacing.md),
-                  paddingHorizontal: px(spacing.xl),
-                  paddingTop: px(spacing.xxl),
-                  paddingBottom: px(spacing.xl),
-                  borderRadius: px(18),
+                  marginTop: px(24),
+                  paddingHorizontal: px(12),
+                  paddingVertical: px(11),
+                  borderRadius: px(16),
                 },
               ]}>
-              <View style={styles.phoneIconWrap}>
-                <Smartphone size={px(26)} color={colors.primary} strokeWidth={2.2} />
-              </View>
-
-              <Text style={[styles.cardTitle, { fontSize: px(20), marginTop: px(14) }]}>
-                Enter mobile number
-              </Text>
-              <Text
+              <View
                 style={[
-                  styles.cardSubtitle,
-                  { fontSize: px(13), lineHeight: px(19), marginTop: px(6) },
+                  styles.roleIconBox,
+                  {
+                    width: px(36),
+                    height: px(36),
+                    borderRadius: px(10),
+                    backgroundColor: isDriver ? '#FEF3C7' : '#F3F4F6',
+                  },
                 ]}>
-                {SKIP_OTP_AUTH
-                  ? 'We will sign you in with this number.'
-                  : "We'll send a 6-digit OTP to verify your partner account."}
-              </Text>
-
-              <View style={[styles.roleSelectorRow, { marginTop: px(14), marginBottom: px(4) }]}>
-                <Pressable
-                  onPress={() => handleSelectRole('driver')}
-                  hitSlop={6}
-                  style={[
-                    styles.roleSelectorBtn,
-                    partnerRole === 'driver' && styles.roleSelectorBtnActive,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.roleSelectorText,
-                      partnerRole === 'driver' && styles.roleSelectorTextActive,
-                    ]}>
-                    🚗 Driver
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => handleSelectRole('vendor')}
-                  hitSlop={6}
-                  style={[
-                    styles.roleSelectorBtn,
-                    partnerRole === 'vendor' && styles.roleSelectorBtnActive,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.roleSelectorText,
-                      partnerRole === 'vendor' && styles.roleSelectorTextActive,
-                    ]}>
-                    🏢 Vendor / Fleet
-                  </Text>
-                </Pressable>
+                {isDriver ? (
+                  <Image
+                    source={images.icons.truck}
+                    style={{ width: px(28), height: px(18) }}
+                    resizeMode="contain"
+                    accessibilityLabel="Driver"
+                  />
+                ) : (
+                  <Building2 size={px(20)} color="#374151" strokeWidth={2.2} />
+                )}
               </View>
 
-              <Text style={[styles.fieldLabel, { fontSize: px(13), marginTop: px(18) }]}>
-                Mobile number
+              <Text style={[styles.roleBadgeTitle, { fontSize: px(14.5) }]} numberOfLines={1}>
+                {roleDisplayTitle}
               </Text>
+
+              {/* Vertical divider */}
+              <View style={[styles.roleDivider, { height: px(18), marginHorizontal: px(8) }]} />
+
+              {/* Change role link */}
+              <Pressable
+                onPress={handleChangeRole}
+                hitSlop={8}
+                style={({ pressed }) => [pressed && styles.pressed]}>
+                <Text style={[styles.changeRoleText, { fontSize: px(13.5) }]}>
+                  {roleChangeLabel}
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Mobile Number Label & Inputs */}
+            <View style={[styles.inputSection, { marginTop: px(26) }]}>
+              <Text style={[styles.fieldLabel, { fontSize: px(14) }]}>Mobile number</Text>
 
               <View style={[styles.phoneRow, { marginTop: px(8), gap: px(10) }]}>
-                <View style={[styles.countryBox, { minHeight: px(52), borderRadius: px(12) }]}>
+                {/* Country Code Picker Box */}
+                <View
+                  style={[
+                    styles.countryBox,
+                    {
+                      height: px(52),
+                      borderRadius: px(12),
+                      paddingHorizontal: px(12),
+                    },
+                  ]}>
+                  <Text style={[styles.flagEmoji, { fontSize: px(16) }]}>🇮🇳</Text>
                   <Text style={[styles.countryCode, { fontSize: px(15) }]}>+91</Text>
-                  <ChevronDown size={px(16)} color={colors.grey} strokeWidth={2.5} />
+                  <ChevronDown size={px(16)} color="#6B7280" strokeWidth={2.4} />
                 </View>
 
+                {/* 10-Digit Mobile Input Box */}
                 <View
                   style={[
                     styles.phoneInputWrap,
                     {
-                      minHeight: px(52),
+                      height: px(52),
                       borderRadius: px(12),
-                      borderColor: inputBorderColor,
+                      borderColor: focused ? '#F59E0B' : '#E5E7EB',
+                      borderWidth: focused ? 1.8 : 1.2,
                     },
                   ]}>
                   <TextInput
-                    value={formatMobileDisplay(mobileNumber)}
+                    value={mobileNumber}
                     onChangeText={(text) => {
                       setMobileNumber(text.replace(/\D/g, '').slice(0, 10));
                       if (error) setError('');
                     }}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
-                    keyboardType="number-pad"
-                    placeholder="98765 43210"
-                    placeholderTextColor={colors.textMuted}
-                    maxLength={11}
+                    keyboardType="phone-pad"
+                    placeholder="10-digit mobile number"
+                    placeholderTextColor="#9CA3AF"
+                    maxLength={10}
                     style={[styles.phoneInput, { fontSize: px(16) }]}
                   />
-                  {isValid ? (
-                    <View style={styles.validCheck}>
-                      <Check size={14} color={SUCCESS_GREEN} strokeWidth={3} />
-                    </View>
-                  ) : null}
                 </View>
-              </View>
-
-              <AuthToast message={error} type="error" />
-
-              <Pressable
-                disabled={!isValid || loading}
-                onPress={() => void handleSendOtp()}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                style={({ pressed }) => [
-                  styles.sendButton,
-                  {
-                    marginTop: px(spacing.lg),
-                    minHeight: px(54),
-                    borderRadius: px(14),
-                    zIndex: 999,
-                    elevation: 5,
-                  },
-                  (!isValid || loading) && styles.sendButtonDisabled,
-                  pressed && isValid && !loading && styles.pressed,
-                ]}>
-                <Send size={px(18)} color={colors.dark} strokeWidth={2.4} />
-                <Text style={[styles.sendButtonLabel, { fontSize: px(16) }]}>
-                  {loading
-                    ? SKIP_OTP_AUTH
-                      ? 'Signing in...'
-                      : 'Sending OTP...'
-                    : SKIP_OTP_AUTH
-                      ? 'Continue'
-                      : 'Send OTP'}
-                </Text>
-              </Pressable>
-
-              {/* Instant Mock Preview Shortcuts */}
-              <View style={{ marginTop: px(spacing.md), padding: px(12), backgroundColor: '#F3F4F6', borderRadius: px(10) }}>
-                <Text style={{ fontSize: px(11), fontWeight: '700', color: colors.primaryDark, textAlign: 'center' }}>
-                  ⚡ QUICK DEMO MODE (NO BACKEND)
-                </Text>
-                <View style={{ flexDirection: 'row', gap: px(8), marginTop: px(8) }}>
-                  <Pressable
-                    onPress={() => void loginAsMockDriver(dispatch)}
-                    style={({ pressed }) => [styles.demoSmallButton, pressed && styles.pressed]}>
-                    <Text style={styles.demoSmallButtonText}>🚗 Demo Driver</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => void loginAsMockVendor(dispatch)}
-                    style={({ pressed }) => [styles.demoSmallButton, pressed && styles.pressed]}>
-                    <Text style={styles.demoSmallButtonText}>🏢 Demo Vendor</Text>
-                  </Pressable>
-                </View>
-              </View>
-
-              <Pressable
-                onPress={handleChangeRole}
-                style={({ pressed }) => [
-                  styles.changeRoleRow,
-                  { marginTop: px(spacing.lg) },
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[styles.changeRoleText, { fontSize: px(13) }]}>
-                  Wrong role? <Text style={styles.changeRoleLink}>Change role</Text>
-                </Text>
-              </Pressable>
-
-              <View style={[styles.safeRow, { marginTop: px(spacing.xl) }]}>
-                <Lock size={13} color={colors.grey} strokeWidth={2.2} />
-                <Text style={[styles.safeText, { fontSize: px(12) }]}>
-                  Your data is safe and secure with RACE
-                </Text>
               </View>
             </View>
 
-            <View style={[styles.trustRow, { marginTop: px(spacing.xl), gap: px(8) }]}>
-              {TRUST_ITEMS.map(({ title, subtitle, Icon }) => (
-                <View key={title} style={styles.trustItem}>
-                  <View style={styles.trustIconWrap}>
-                    <Icon size={16} color={colors.primary} strokeWidth={2.2} />
-                  </View>
-                  <Text style={[styles.trustTitle, { fontSize: px(11) }]} numberOfLines={1}>
-                    {title}
-                  </Text>
-                  <Text
-                    style={[styles.trustSubtitle, { fontSize: px(10), lineHeight: px(13) }]}
-                    numberOfLines={2}>
-                    {subtitle}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            {/* Error Message Toast */}
+            <AuthToast message={error} type="error" position="inline" onDismiss={() => setError('')} />
 
-            <View style={[styles.encryptionRow, { marginTop: px(spacing.lg) }]}>
-              <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
-              <Text style={[styles.encryptionText, { fontSize: px(11) }]}>
-                Secured by enterprise-grade encryption
+            {/* Primary CTA: Send OTP */}
+            <Pressable
+              disabled={!isValid || isSubmitting}
+              onPress={() => void handleSendOtp()}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                {
+                  minHeight: px(54),
+                  borderRadius: px(14),
+                  marginTop: px(22),
+                },
+                (!isValid || isSubmitting) && styles.primaryButtonDisabled,
+                pressed && isValid && !isSubmitting && styles.pressed,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Send OTP">
+              <Text style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
+                {isSubmitting ? 'Sending OTP...' : 'Send OTP'}
+              </Text>
+              <ArrowRight
+                size={px(20)}
+                color="#111827"
+                strokeWidth={2.6}
+                style={{ marginLeft: px(8) }}
+              />
+            </Pressable>
+
+            {/* Security Assurance with Word Wrapping */}
+            <View style={[styles.securityNotice, { marginTop: px(16) }]}>
+              <ShieldCheck size={px(18)} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />
+              <Text style={[styles.securityText, { fontSize: px(12.5) }]}>
+                Your number is used to verify your partner account.
               </Text>
             </View>
+
+            {/* Partner Benefits Trust Card (Fills bottom void professionally) */}
+            <View style={[styles.trustSectionCard, { marginTop: px(26), padding: px(16), borderRadius: px(16) }]}>
+              <View style={styles.trustRow}>
+                <View style={[styles.trustIconCircle, { backgroundColor: '#FEF3C7' }]}>
+                  <Zap size={px(16)} color="#D97706" strokeWidth={2.4} />
+                </View>
+                <View style={styles.trustTextCol}>
+                  <Text style={[styles.trustTitle, { fontSize: px(13.5) }]}>Instant Roadside Requests</Text>
+                  <Text style={[styles.trustSubtitle, { fontSize: px(12) }]}>Receive customer breakdowns in real-time</Text>
+                </View>
+              </View>
+
+              <View style={[styles.trustInnerDivider, { marginVertical: px(12) }]} />
+
+              <View style={styles.trustRow}>
+                <View style={[styles.trustIconCircle, { backgroundColor: '#ECFDF5' }]}>
+                  <Wallet size={px(16)} color="#059669" strokeWidth={2.4} />
+                </View>
+                <View style={styles.trustTextCol}>
+                  <Text style={[styles.trustTitle, { fontSize: px(13.5) }]}>Guaranteed Fast Settlements</Text>
+                  <Text style={[styles.trustSubtitle, { fontSize: px(12) }]}>Direct deposits straight to your account</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Subtle Horizontal Divider */}
+            <View style={[styles.footerDivider, { marginTop: px(26) }]} />
+
+            {/* Terms and Privacy Footer */}
+            <View style={[styles.footerBlock, { marginTop: px(10) }]}>
+              <Text style={[styles.footerText, { fontSize: px(12) }]}>
+                By continuing, you agree to our
+              </Text>
+              <Text style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
+                Terms & Privacy Policy
+              </Text>
+            </View>
+
+            {/* Discreet Dev Demo Mode (for offline QA testing) */}
+            {(__DEV__ || UI_PREVIEW_MODE) && (
+              <View style={[styles.demoRow, { marginTop: px(14) }]}>
+                <Text style={[styles.demoLabel, { fontSize: px(10) }]}>Quick Preview:</Text>
+                <Pressable
+                  onPress={() => void loginAsMockDriver(dispatch)}
+                  style={styles.demoLink}>
+                  <Text style={styles.demoLinkText}>Driver</Text>
+                </Pressable>
+                <Text style={styles.demoDivider}>•</Text>
+                <Pressable
+                  onPress={() => void loginAsMockVendor(dispatch)}
+                  style={styles.demoLink}>
+                  <Text style={styles.demoLinkText}>Vendor</Text>
+                </Pressable>
+              </View>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
 
-      <AuthLoadingOverlay
-        visible={loading}
-        label={SKIP_OTP_AUTH ? 'Signing in...' : 'Sending OTP...'}
-      />
+      <AuthLoadingOverlay visible={isSubmitting} label="Processing..." />
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: PAGE_BG },
-  flex: { flex: 1 },
+  root: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  flex: {
+    flex: 1,
+  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
+    backgroundColor: '#FFFFFF',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  brandBlock: { alignItems: 'center' },
-  brandRace: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 0.5,
+  headerLogoContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  brandPartner: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.6,
+  scroll: {
+    flex: 1,
   },
-  scroll: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  welcomeBlock: { alignItems: 'flex-start' },
-  welcomeTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
+  scrollContent: {
+    flexGrow: 1,
   },
-  welcomeSubtitle: { color: colors.grey },
-  rolePill: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.goldLight,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderWidth: 1,
-    borderColor: '#F5D98A',
+  titleSection: {
+    alignItems: 'flex-start',
   },
-  rolePillText: {
-    color: colors.primaryDark,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
+  titleText: {
+    fontWeight: '800',
+    color: '#111827',
   },
-  heroImage: {
+  subtitleText: {
+    fontWeight: '400',
+    color: '#6B7280',
+  },
+  roleBadgeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  roleIconBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleBadgeTitle: {
+    flex: 1,
+    marginLeft: 12,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  roleDivider: {
+    width: 1,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 12,
+  },
+  changeRoleText: {
+    fontWeight: '600',
+    color: '#D97706',
+  },
+  inputSection: {
     width: '100%',
-    maxWidth: 260,
-    alignSelf: 'center',
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  phoneIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.goldLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-  },
-  cardTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    textAlign: 'center',
-  },
-  cardSubtitle: {
-    color: colors.grey,
-    textAlign: 'center',
   },
   fieldLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
+    fontWeight: '700',
+    color: '#374151',
   },
   phoneRow: {
     flexDirection: 'row',
@@ -601,134 +559,139 @@ const styles = StyleSheet.create({
   countryBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.lightGrey,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.2,
+    borderColor: '#E5E7EB',
+    gap: 6,
+  },
+  flagEmoji: {
+    includeFontPadding: false,
   },
   countryCode: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
+    fontWeight: '600',
+    color: '#111827',
   },
   phoneInputWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.md,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
   },
   phoneInput: {
-    flex: 1,
-    color: colors.dark,
-    fontWeight: typography.weights.medium,
-    paddingVertical: spacing.md,
+    color: '#111827',
+    fontWeight: '600',
+    paddingVertical: 0,
   },
-  validCheck: { marginLeft: spacing.xs },
-  sendButton: {
+  primaryButton: {
+    backgroundColor: '#F59E0B',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  sendButtonDisabled: { opacity: 0.5 },
-  sendButtonLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
+  primaryButtonDisabled: {
+    backgroundColor: '#FDE68A',
+    opacity: 0.8,
   },
-  changeRoleRow: { alignItems: 'center' },
-  changeRoleText: {
-    color: colors.grey,
+  primaryButtonText: {
+    fontWeight: '800',
+    color: '#111827',
+  },
+  securityNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  securityText: {
+    color: '#6B7280',
+    flexShrink: 1,
     textAlign: 'center',
+    lineHeight: 18,
   },
-  changeRoleLink: {
-    color: LINK_BLUE,
-    fontWeight: typography.weights.semibold,
+  trustSectionCard: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
   },
-  safeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  safeText: { color: colors.grey },
   trustRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  trustItem: {
-    flex: 1,
     alignItems: 'center',
   },
-  trustIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.goldLight,
+  trustIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+  },
+  trustTextCol: {
+    flex: 1,
+    marginLeft: 12,
   },
   trustTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
+    fontWeight: '700',
+    color: '#111827',
   },
   trustSubtitle: {
-    color: colors.grey,
-    textAlign: 'center',
-    marginTop: 2,
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 1,
   },
-  encryptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  encryptionText: { color: colors.grey },
-  roleSelectorRow: {
-    flexDirection: 'row',
+  trustInnerDivider: {
+    height: 1,
     backgroundColor: '#EEEEEE',
-    borderRadius: radius.pill,
-    padding: 3,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  roleSelectorBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radius.pill,
+  footerDivider: {
+    width: 140,
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    alignSelf: 'center',
   },
-  roleSelectorBtnActive: {
-    backgroundColor: colors.background,
-    ...shadows.card,
-  },
-  roleSelectorText: {
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-    color: colors.grey,
-  },
-  roleSelectorTextActive: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  pressed: { opacity: 0.9 },
-  demoSmallButton: {
-    flex: 1,
-    paddingVertical: 8,
-    backgroundColor: colors.primary,
-    borderRadius: 8,
+  footerBlock: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  demoSmallButtonText: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-    fontSize: 12,
+  footerText: {
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  termsLink: {
+    color: '#D97706',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  demoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    opacity: 0.65,
+  },
+  demoLabel: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  demoLink: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+  },
+  demoLinkText: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+  },
+  demoDivider: {
+    color: '#D1D5DB',
+    fontSize: 10,
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

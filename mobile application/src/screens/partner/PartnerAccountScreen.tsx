@@ -103,13 +103,11 @@ export default function PartnerAccountScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('VendorVehicles')}
           />
         ) : null}
-        {isVendor ? (
-          <PrimaryButton
-            label="Verification timeline"
-            variant="outline"
-            onPress={() => navigation.navigate('VendorVerificationStatus')}
-          />
-        ) : null}
+        <PrimaryButton
+          label="Verification status & documents"
+          variant="outline"
+          onPress={() => navigation.navigate('VendorVerificationStatus')}
+        />
         <PrimaryButton
           label={isDriver ? '⚡ Switch to Vendor Preview' : '⚡ Switch to Driver Preview'}
           variant="outline"
