@@ -7,14 +7,14 @@
 
 ## Current Objective
 
-**Partner mobile (Driver Registration) UI/UX implementation.**
-Complete, pixel-perfect 4-step Driver Registration flow built and verified in `mobile application/` matching designs and specifications:
-- Step 1: `DriverPersonalInfoScreen.tsx`
-- Step 2: `DriverVehicleInfoScreen.tsx`
-- Step 3: `DriverDocumentsScreen.tsx`
-- Step 4: `DriverReviewScreen.tsx`
-
-All 4 steps support frictionless mock testing with sensible defaults, forward/backward navigation, modals for DOB/City/Emergency contact/Experience, interactive vehicle cards with custom SVG artwork, grouped document checklist (core required, conditional, later), dynamic review status, and submission.
+**Partner mobile (Driver Registration & Motion/Interaction Standard) UI/UX implementation.**
+Complete, pixel-perfect 4-step Driver Registration flow + Under Verification screen + Motion Tokens implemented and verified in `mobile application/`:
+- Step 1: `DriverPersonalInfoScreen.tsx` (DOB modal, city search, emergency contact)
+- Step 2: `DriverVehicleInfoScreen.tsx` (Vehicle artwork selection, uppercase input)
+- Step 3: `DriverDocumentsScreen.tsx` (Core/conditional/later docs, instant demo filler, preview modal)
+- Step 4: `DriverReviewScreen.tsx` (3 edit cards, submit transition to verification)
+- Under Verification: `DriverVerificationPendingScreen.tsx` (matches image copy 4.png)
+- Motion Standard Tokens: `theme/motion.ts` (implements RACE_MOTION_INTERACTION_STANDARD.md Section 3)
 
 ## Active Branch
 
@@ -84,6 +84,15 @@ Customer app visual redesign queue. Auth + Home + service discovery are the curr
 ## Active Decisions
 
 See `.agents/state/DECISIONS_INDEX.md` for all decisions.
+
+## Recent Work — Driver verification gate (Partner app)
+
+- Board "Your account is under verification" is implemented as a **shared view**: `mobile application/src/components/partner/DriverVerificationView.tsx`, used by both the post-registration screen and the in-app gate (`screens/partner/driver/DriverVerificationGateScreen.tsx`).
+- `driverProfile.status` is now exposed by **GET /api/v1/profile** for role `driver` (`backend/src/services/src/profile.ts` → `mapDriverProfile`; DTO in `profileValidator.ts`). No credentials (`loginId`, `passwordHash`) are ever returned.
+- Step tracker/state/copy live in `mobile application/src/utils/driverVerification.ts` (`buildDriverVerification`) — the dashboard verification card reads the same module.
+- **Fixed bug:** `isVerified` is set to `true` at driver registration even while the review is open, so the dashboard used to claim "Verification approved" for pending drivers. Approval is now `driverProfile.status === 'APPROVED'` (same field the backend gates on).
+- `PartnerAppNavigator` starts an unapproved driver on the gate instead of the live tabs; "Go to Dashboard (Read only)" opens them. The dashboard skips jobs/offers/availability/location requests until approved (they would 403).
+- Removed fabricated `mock-driver-token` / placeholder user from the verification screen; `DriverReviewScreen` still contains its own mock fallbacks (untouched, separate task).
 
 ## Next Action (When User Returns)
 

@@ -34,6 +34,25 @@ export const MOCK_DRIVER_PROFILE: Profile = {
     pincode: '751001',
     country: 'India',
   },
+  // Preview-only driver record, shaped exactly like GET /api/v1/profile returns
+  // it. Kept PENDING so UI preview renders the "under verification" board.
+  driverProfile: {
+    status: 'PENDING',
+    driverCode: 'DRV0042',
+    driverType: 'Tow Driver',
+    licenseNo: 'OD-0220190012345',
+    city: 'Bhubaneswar',
+    state: 'Odisha',
+    vehicleRegistration: 'OD 02 AB 1234',
+    policeVerificationStatus: 'PENDING',
+    documents: [
+      { type: 'driving_license', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
+      { type: 'vehicle_insurance', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
+      { type: 'rc', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
+    ],
+    statusHistory: [{ status: 'PENDING', changedAt: '2026-10-09T09:12:00.000Z' }],
+    submittedAt: '2026-10-09T09:12:00.000Z',
+  },
 };
 
 export const MOCK_VENDOR_USER: AuthUser = {

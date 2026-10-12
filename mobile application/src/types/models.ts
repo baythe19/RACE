@@ -22,6 +22,34 @@ export interface Brand {
   features: string[];
 }
 
+export type DriverVerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+
+export type DriverDocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+/**
+ * Driver-only verification summary returned by GET /api/v1/profile.
+ * Mirrors the backend's `driverProfile.status` — the same field the driver
+ * endpoints gate on — so the app never has to guess from `isVerified`.
+ */
+export interface DriverProfileSummary {
+  status: DriverVerificationStatus;
+  driverCode?: string;
+  driverType?: string;
+  licenseNo?: string;
+  city?: string;
+  state?: string;
+  vehicleRegistration?: string;
+  fleetSource?: 'vendor' | 'admin';
+  policeVerificationStatus?: DriverDocumentStatus;
+  documents: Array<{
+    type: string;
+    status: DriverDocumentStatus;
+    uploadedAt?: string;
+  }>;
+  statusHistory: Array<{ status: string; note?: string; changedAt: string }>;
+  submittedAt?: string;
+}
+
 export interface Profile {
   id: string;
   mobileNumber: string;
@@ -47,6 +75,7 @@ export interface Profile {
   isProfileCompleted: boolean;
   role: 'customer' | 'vendor' | 'driver';
   isAvailable?: boolean;
+  driverProfile?: DriverProfileSummary;
 }
 
 export interface Service {

@@ -13,6 +13,7 @@
 | [ADR-007](../decisions/ADR-007-leftover-screens.md) | Do not delete leftover screens without an import graph | 2026-09-05 | Active |
 | [ADR-008](../decisions/ADR-008-skills-strategy.md) | Unlazy for gates; complementary skills only; no Superpowers TDD pack | 2026-09-05 | Active |
 | [ADR-009](../decisions/ADR-009-context-engineering.md) | Layered `.agents/` context architecture replacing flat `.cursor/` memory | 2026-10-02 | Active |
+| [ADR-010](../decisions/ADR-010-ui-motion-consistency-standard.md) | UI/UX consistency, clamped scaling (0.88-1.22x), motion tokens & verification progression | 2026-10-12 | Active |
 
 ---
 

@@ -65,9 +65,9 @@ import {
   useDriverAvailabilityMutation,
   useDriverJobOffersQuery,
   useDriverJobsQuery,
+  useDriverProfileQuery,
 } from '../../../services/driver/useDriverQueries';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
-import { getProfile } from '../../../services/profileService';
 import type { PartnerTabParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
 import {
@@ -76,6 +76,7 @@ import {
   isCompletedBookingStatus,
   jobEarnings,
 } from '../../../utils/driverBookingStatus';
+import { buildDriverVerification } from '../../../utils/driverVerification';
 import {
   driverColors as C,
   driverMetrics as M,
@@ -751,38 +752,37 @@ export default function DriverDashboardScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<PartnerTabParamList>>();
   const user = useAppSelector(state => state.auth.user);
 
-  const { data: jobs = [], refetch: refetchJobs } = useDriverJobsQuery(true);
-  const { data: offers = [], refetch: refetchOffers } = useDriverJobOffersQuery(true);
-  const { data: activeJob, refetch: refetchActive } = useDriverActiveJobQuery(true);
+  /* Approval state first — everything else is gated on it. The backend rejects
+     jobs, offers, availability and location for an unapproved driver, so asking
+     for them would only produce failures. */
+  const {
+    data: profile,
+    isLoading: loadingProfile,
+    refetch: refetchProfile,
+  } = useDriverProfileQuery(true);
+  const verification = useMemo(() => buildDriverVerification(profile), [profile]);
+  const isApproved = verification.isApproved;
+
+  const { data: jobs = [], refetch: refetchJobs } = useDriverJobsQuery(isApproved);
+  const { data: offers = [], refetch: refetchOffers } = useDriverJobOffersQuery(isApproved);
+  const { data: activeJob, refetch: refetchActive } = useDriverActiveJobQuery(isApproved);
   const availabilityMutation = useDriverAvailabilityMutation();
 
   const [isOnline, setIsOnline] = useState(false);
   const [period, setPeriod] = useState<Period>('week');
   const [periodOpen, setPeriodOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
   const locationHealth = useDriverPresenceStore(state => state.locationHealth);
 
   /* Availability is read from the backend — never mutated on mount. */
   useEffect(() => {
-    let cancelled = false;
-    void getProfile()
-      .then(profile => {
-        if (cancelled || typeof profile.isAvailable !== 'boolean') return;
-        setIsOnline(profile.isAvailable);
-        // Share availability with the request alert + location reporter.
-        useDriverPresenceStore.getState().setOnline(profile.isAvailable);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!cancelled) setLoadingProfile(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (typeof profile?.isAvailable !== 'boolean') return;
+    setIsOnline(profile.isAvailable);
+    // Share availability with the request alert + location reporter.
+    useDriverPresenceStore.getState().setOnline(profile.isAvailable);
+  }, [profile?.isAvailable]);
 
-  useDriverLocationReporting(isOnline);
+  useDriverLocationReporting(isApproved && isOnline);
 
   const todayCompleted = useMemo(() => {
     const dayStart = +startOfDay(new Date());
@@ -810,24 +810,6 @@ export default function DriverDashboardScreen() {
         activeJob.pickup?.address || activeJob.pickup?.label,
       )}`.replace(/ · —$/, '')
     : undefined;
-
-  const verification = useMemo(() => {
-    if (user?.isVerified) {
-      return { title: 'Verification approved', hint: 'Your partner account is active.', badge: 'Approved' };
-    }
-    if (user?.isProfileCompleted) {
-      return {
-        title: 'Verification in review',
-        hint: 'We are reviewing your documents.',
-        badge: 'In progress',
-      };
-    }
-    return {
-      title: 'Verification pending',
-      hint: 'Complete your profile to start getting jobs.',
-      badge: 'Pending',
-    };
-  }, [user?.isProfileCompleted, user?.isVerified]);
 
   const openJobs = useCallback(() => {
     navigation.navigate('PartnerJobs');
@@ -867,11 +849,11 @@ export default function DriverDashboardScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refetchJobs(), refetchOffers(), refetchActive()]);
+      await Promise.all([refetchProfile(), refetchJobs(), refetchOffers(), refetchActive()]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchActive, refetchJobs, refetchOffers]);
+  }, [refetchActive, refetchJobs, refetchOffers, refetchProfile]);
 
   const name = firstName(user?.fullName);
   const availableBars = bars.some(bar => bar.value > 0);
@@ -1018,16 +1000,26 @@ export default function DriverDashboardScreen() {
       {/* availability ---------------------------------------------------- */}
       <Pressable
         onPress={() => void toggleAvailability()}
-        disabled={availabilityMutation.isPending || loadingProfile}
+        disabled={!isApproved || availabilityMutation.isPending || loadingProfile}
         accessibilityRole="button"
-        accessibilityLabel={isOnline ? 'You are online' : 'You are offline'}
+        accessibilityLabel={
+          !isApproved
+            ? 'Availability unlocks after approval'
+            : isOnline
+              ? 'You are online'
+              : 'You are offline'
+        }
         style={({ pressed }) => ({
           height: px(M.onlineCardHeight),
           marginTop: px(14),
           borderRadius: px(R.onlineCard),
           borderWidth: 1,
-          borderColor: isOnline ? C.greenCardBorder : C.hairline,
-          backgroundColor: isOnline ? C.greenCard : C.card,
+          borderColor: !isApproved
+            ? C.amberBorder
+            : isOnline
+              ? C.greenCardBorder
+              : C.hairline,
+          backgroundColor: !isApproved ? C.cream : isOnline ? C.greenCard : C.card,
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: px(16),
@@ -1039,25 +1031,49 @@ export default function DriverDashboardScreen() {
             width: px(16),
             height: px(16),
             borderRadius: px(8),
-            backgroundColor: isOnline ? C.green : '#C4C6CD',
+            backgroundColor: !isApproved
+              ? C.amberBorder
+              : isOnline
+                ? C.green
+                : '#C4C6CD',
           }}
         />
         <View style={{ flex: 1, marginLeft: px(18) }}>
           <Text style={[T.cardTitle, { fontSize: px(16), lineHeight: px(20), color: C.ink }]}>
-            {isOnline ? "You're online" : "You're offline"}
+            {!isApproved
+              ? 'Offline until approved'
+              : isOnline
+                ? "You're online"
+                : "You're offline"}
           </Text>
           <Text
             style={[
               T.cardSubtitle,
               { fontSize: px(13), lineHeight: px(18), color: C.grey, marginTop: px(1) },
             ]}>
-            {isOnline ? 'Receiving nearby requests' : 'Go online to receive jobs'}
+            {!isApproved
+              ? 'Accepting jobs unlocks once RACE approves your account'
+              : isOnline
+                ? 'Receiving nearby requests'
+                : 'Go online to receive jobs'}
           </Text>
         </View>
         {availabilityMutation.isPending || loadingProfile ? (
           <ActivityIndicator size="small" color={C.green} />
-        ) : (
+        ) : isApproved ? (
           <DriverToggle value={isOnline} onChange={() => void toggleAvailability()} />
+        ) : (
+          <View
+            style={{
+              height: px(M.rowPillHeight + 6),
+              borderRadius: px(R.pill),
+              paddingHorizontal: px(12),
+              justifyContent: 'center',
+              marginRight: px(6),
+              backgroundColor: C.amberTile,
+            }}>
+            <Text style={[T.pill, { fontSize: px(12), lineHeight: px(16), color: C.ink }]}>In review</Text>
+          </View>
         )}
       </Pressable>
 
@@ -1378,13 +1394,13 @@ export default function DriverDashboardScreen() {
             width: px(M.rowIcon),
             height: px(M.rowIcon),
             borderRadius: px(R.tileSm),
-            backgroundColor: user?.isVerified ? C.greenTile : C.amberTileSoft,
+            backgroundColor: isApproved ? C.greenTile : C.amberTileSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}>
           <ShieldCheck
             size={px(20)}
-            color={user?.isVerified ? C.green : C.amber}
+            color={isApproved ? C.green : C.amber}
             strokeWidth={2.4}
           />
         </View>
@@ -1408,12 +1424,12 @@ export default function DriverDashboardScreen() {
             paddingHorizontal: px(12),
             justifyContent: 'center',
             marginLeft: px(8),
-            backgroundColor: user?.isVerified ? C.greenPill : C.amberTile,
+            backgroundColor: isApproved ? C.greenPill : C.amberTile,
           }}>
           <Text
             style={[
               T.pill,
-              { fontSize: px(12.5), lineHeight: px(16), color: user?.isVerified ? C.green : C.ink },
+              { fontSize: px(12.5), lineHeight: px(16), color: isApproved ? C.green : C.ink },
             ]}>
             {verification.badge}
           </Text>

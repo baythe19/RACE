@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { getProfile } from '../profileService';
 import {
   acceptDriverJob,
   getDriverActiveJob,
@@ -15,7 +16,22 @@ export const driverQueryKeys = {
   jobs: ['driver', 'jobs'] as const,
   offers: ['driver', 'offers'] as const,
   active: ['driver', 'active'] as const,
+  profile: ['driver', 'profile'] as const,
 };
+
+/**
+ * Driver account profile — carries `driverProfile.status`, the approval field the
+ * driver endpoints gate on. Shared by the verification screen (gate) and the
+ * dashboard verification card so both read the same value.
+ */
+export function useDriverProfileQuery(enabled = true) {
+  return useQuery({
+    queryKey: driverQueryKeys.profile,
+    queryFn: getProfile,
+    enabled,
+    refetchInterval: 60_000,
+  });
+}
 
 export function useDriverJobsQuery(enabled = true) {
   return useQuery({

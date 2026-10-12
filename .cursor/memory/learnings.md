@@ -21,3 +21,5 @@
 - VPS `APP_BASE_URL` is a laptop LAN IP, not the public VM.
 - Expo apps hit `:3000` (Node public); admin hits `:80` (nginx). Both work today.
 - PM2 out log is ~99% internet scanners (404/429). Real bug in file: Twilio trial `send-otp` 502 (21608).
+- **RACE UI/UX & Motion Standard (Oct 2026):** All screens scale against `REF_W = 390` with clamped scale `Math.min(1.22, Math.max(0.88, width / REF_W))`. Standard header height `insets.top + px(58)` with `<PartnerHeaderLogo width={px(104)} />`. ScrollViews must set `keyboardDismissMode="on-drag"` and `keyboardShouldPersistTaps="handled"`. Indian mobile inputs must strip `+91`/`0` prefixes. Motion tokens live in `theme/motion.ts` (100ms tap feedback, 280ms screen transition). Driver registration routes through 4 steps to `DriverVerificationPendingScreen` (vertical status tracker matching image copy 4.png). Details documented in `.agents/rules/ui-consistency-patterns.md` and ADR-010.
+

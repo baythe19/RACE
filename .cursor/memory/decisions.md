@@ -2,6 +2,10 @@
 
 Newest first. One block per decision. Do not rewrite history — add a new block if we reverse.
 
+## 2026-10-12 — UI/UX Consistency, Clamped Scaling & Motion Standard (ADR-010)
+
+Adopted `.agents/rules/ui-consistency-patterns.md` and `theme/motion.ts` across mobile and web. Clamped scale (0.88–1.22x on REF_W 390), 58px header height with 104px partner logo, keyboard on-drag dismiss, Indian phone paste normalization, and post-submission route to `DriverVerificationPendingScreen` (image copy 4.png).
+
 ## 2026-09-05 — VPS env stays gitignored; snapshot is keys + errors only
 
 Production `.env` lives in app folders for local education. Secrets never go in git or `.cursor/memory`. Sanitized findings: `docs/ops/vps-snapshot-2026-09-05.md`.

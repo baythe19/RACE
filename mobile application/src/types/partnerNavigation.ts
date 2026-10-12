@@ -32,6 +32,8 @@ export type PartnerRootStackParamList = {
   PartnerBootstrap: undefined;
   PartnerRegistration: { role: PartnerRole; mobileNumber?: string };
   PartnerMain: undefined;
+  /** Gate shown while a driver's application is not approved yet. */
+  PartnerDriverVerification: undefined;
 };
 
 export type PartnerTabParamList = {
