@@ -32,3 +32,15 @@ export function openDriverJobs(): void {
   if (!partnerNavigationRef.isReady()) return;
   partnerNavigationRef.navigate('PartnerMain', { screen: 'PartnerJobs' } as never);
 }
+
+/** Opens the canonical Notifications screen in the Account stack. */
+export function openPartnerNotifications(): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate(
+    'PartnerMain',
+    {
+      screen: 'PartnerAccount',
+      params: { screen: 'PartnerNotifications' },
+    } as never,
+  );
+}

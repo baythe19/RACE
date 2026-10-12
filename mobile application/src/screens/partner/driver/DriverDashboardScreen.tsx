@@ -815,6 +815,15 @@ export default function DriverDashboardScreen() {
     navigation.navigate('PartnerJobs');
   }, [navigation]);
 
+  const openNotifications = useCallback(() => {
+    navigation.navigate(
+      'PartnerAccount',
+      {
+        screen: 'PartnerNotifications',
+      } as never,
+    );
+  }, [navigation]);
+
   const openActiveJob = useCallback(() => {
     if (!activeJob) {
       openJobs();
@@ -879,7 +888,7 @@ export default function DriverDashboardScreen() {
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable
-            onPress={openJobs}
+            onPress={openNotifications}
             hitSlop={10}
             accessibilityRole="button"
             accessibilityLabel={

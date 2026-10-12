@@ -61,6 +61,15 @@ export type PartnerJobsStackParamList = {
 
 export type PartnerAccountStackParamList = {
   PartnerAccountMain: undefined;
+  PartnerEditProfile: undefined;
+  PartnerVehicleInfo: undefined;
+  PartnerDocuments: undefined;
+  PartnerEarnings: undefined;
+  PartnerNotifications: undefined;
+  PartnerSettings: undefined;
+  PartnerHelpSupport: undefined;
+  PartnerBankDetails: undefined;
+  PartnerTripHistory: undefined;
   VendorVerificationStatus: undefined;
   VendorDrivers: undefined;
   VendorVehicles: undefined;

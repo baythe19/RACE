@@ -29,6 +29,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
+import { openPartnerNotifications } from '../../../navigation/partnerNavigationRef';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
@@ -594,7 +595,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
             <PartnerHeaderLogo width={px(56)} />
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Pressable
-                onPress={() => undefined}
+                onPress={openPartnerNotifications}
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Notifications"

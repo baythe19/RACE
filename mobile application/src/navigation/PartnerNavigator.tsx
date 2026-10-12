@@ -18,6 +18,15 @@ import PartnerVerificationStatusScreen from '../screens/partner/PartnerVerificat
 import VendorDriversScreen from '../screens/partner/VendorDriversScreen';
 import VendorVehiclesScreen from '../screens/partner/VendorVehiclesScreen';
 import VendorAssignJobScreen from '../screens/partner/VendorAssignJobScreen';
+import PartnerEditProfileScreen from '../screens/partner/account/PartnerEditProfileScreen';
+import PartnerVehicleInfoScreen from '../screens/partner/account/PartnerVehicleInfoScreen';
+import PartnerDocumentsScreen from '../screens/partner/account/PartnerDocumentsScreen';
+import PartnerEarningsScreen from '../screens/partner/account/PartnerEarningsScreen';
+import PartnerNotificationsScreen from '../screens/partner/account/PartnerNotificationsScreen';
+import PartnerSettingsScreen from '../screens/partner/account/PartnerSettingsScreen';
+import PartnerHelpSupportScreen from '../screens/partner/account/PartnerHelpSupportScreen';
+import PartnerBankDetailsScreen from '../screens/partner/account/PartnerBankDetailsScreen';
+import PartnerTripHistoryScreen from '../screens/partner/account/PartnerTripHistoryScreen';
 import type {
   PartnerAccountStackParamList,
   PartnerJobsStackParamList,
@@ -90,6 +99,51 @@ function PartnerAccountStackNavigator() {
       <AccountStack.Screen
         name="PartnerAccountMain"
         component={PartnerAccountScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerEditProfile"
+        component={PartnerEditProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerVehicleInfo"
+        component={PartnerVehicleInfoScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerDocuments"
+        component={PartnerDocumentsScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerEarnings"
+        component={PartnerEarningsScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerNotifications"
+        component={PartnerNotificationsScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerSettings"
+        component={PartnerSettingsScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerHelpSupport"
+        component={PartnerHelpSupportScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerBankDetails"
+        component={PartnerBankDetailsScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="PartnerTripHistory"
+        component={PartnerTripHistoryScreen}
         options={{ headerShown: false }}
       />
       <AccountStack.Screen

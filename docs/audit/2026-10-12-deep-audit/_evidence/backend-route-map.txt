@@ -1,0 +1,390 @@
+====================================================================================================
+FILE src/controller/src/admin/adminAuth.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/adminAuthRoutes.ts
+====================================================================================================
+  L15    POST   '/login'                           | validate(adminLoginSchema) ; adminAuthController.login
+  L16    POST   '/refresh-token'                   | validate(adminRefreshTokenSchema) ; adminAuthController.refreshToken
+  L17    POST   '/logout'                          | adminAuthController.logout
+  L18    POST   '/forgot-password'                 | validate(adminForgotPasswordSchema) ; adminAuthController.forgotPassword
+  L19    POST   '/reset-password'                  | validate(adminResetPasswordSchema) ; adminAuthController.resetPassword
+  L20    GET    '/me'                              | adminAuthMiddleware ; adminAuthController.me
+
+====================================================================================================
+FILE src/controller/src/admin/adminDashboard.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/adminDashboardRoutes.ts
+====================================================================================================
+  [mount] L10: router.use(adminAuthMiddleware)
+  L11    GET    '/'                                | requireAdminPermission(AdminPermission.DASHBOARD_VIEW) ; adminDashboardController.getDashboard
+
+====================================================================================================
+FILE src/controller/src/admin/admins.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/adminsRoutes.ts
+====================================================================================================
+  L10    GET    '/admins'                          | adminAuthMiddleware ; requireAdminPermission(AdminPermission.ADMIN_USERS_VIEW) ; adminUsersController.list
+  L16    POST   '/admins'                          | adminAuthMiddleware ; requireAdminPermission(AdminPermission.ADMIN_USERS_MANAGE) ; adminUsersController.create
+  L22    PATCH  '/admins/:id'                      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.ADMIN_USERS_MANAGE) ; adminUsersController.update
+  L28    DELETE '/admins/:id'                      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.ADMIN_USERS_MANAGE) ; adminUsersController.remove
+  L34    GET    '/activity-logs'                   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.AUDIT_LOGS_VIEW) ; adminActivityController.list
+
+====================================================================================================
+FILE src/controller/src/admin/bookings.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/bookingsRoutes.ts
+====================================================================================================
+  L16    GET    '/bookings'                        | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_VIEW) ; adminBookingsController.list
+  L22    GET    '/bookings/counts'                 | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_VIEW) ; adminBookingsController.getCounts
+  L28    GET    '/bookings/:id'                    | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_VIEW) ; adminBookingsController.getById
+  L34    POST   '/bookings'                        | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.create
+  L40    PATCH  '/bookings/:id'                    | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.update
+  L46    DELETE '/bookings/:id'                    | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.remove
+  L52    POST   '/bookings/:id/assign-vendor'      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.assignVendor
+  L58    POST   '/bookings/:id/assign-driver'      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.assignDriver
+  L64    PATCH  '/bookings/:id/assign-driver'      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; validate(assignServiceBookingDriverSchema) ; adminBookingsController.a
+  L71    POST   '/bookings/:id/cancel'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; validate(cancelServiceBookingSchema) ; adminBookingsController.cancelS
+  L78    POST   '/bookings/:id/status'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.updateStatus
+  L84    PATCH  '/bookings/:id/status'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.BOOKINGS_MANAGE) ; adminBookingsController.updateStatus
+  L90    PATCH  '/vehicles/:id'                    | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVehiclesController.update
+  L96    DELETE '/vehicles/:id'                    | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVehiclesController.remove
+
+====================================================================================================
+FILE src/controller/src/admin/customers.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/customersRoutes.ts
+====================================================================================================
+  L10    GET    '/customers/export/csv'            | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_VIEW) ; adminCustomersController.exportCsv
+  L16    GET    '/customers/cities'                | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_VIEW) ; adminCustomersController.getCities
+  L22    GET    '/customers'                       | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_VIEW) ; adminCustomersController.list
+  L28    GET    '/customers/:id'                   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_VIEW) ; adminCustomersController.getById
+  L34    POST   '/customers'                       | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_MANAGE) ; adminCustomersController.create
+  L40    PATCH  '/customers/:id/status'            | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_MANAGE) ; adminCustomersController.setStatus
+  L46    PATCH  '/customers/:id'                   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_MANAGE) ; adminCustomersController.update
+  L52    DELETE '/customers/:id'                   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.CUSTOMERS_MANAGE) ; adminCustomersController.remove
+
+====================================================================================================
+FILE src/controller/src/admin/documents.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/documentsRoutes.ts
+====================================================================================================
+  L10    GET    '/documents/vendor/:vendorId/:docKey' | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_VIEW) ; adminDocumentsController.getVendorDocument
+  L16    GET    '/documents/driver/:driverId/:docKey' | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_VIEW) ; adminDocumentsController.getDriverDocument
+
+====================================================================================================
+FILE src/controller/src/admin/drivers.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/driversRoutes.ts
+====================================================================================================
+  L10    GET    '/drivers/counts'                  | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_VIEW) ; adminDriversController.getCounts
+  L16    GET    '/drivers'                         | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_VIEW) ; adminDriversController.list
+  L22    GET    '/drivers/available'               | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_VIEW) ; adminDriversController.listAvailable
+  L28    GET    '/drivers/:id'                     | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_VIEW) ; adminDriversController.getById
+  L34    POST   '/drivers'                         | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_MANAGE) ; adminDriversController.create
+  L40    PATCH  '/drivers/:id'                     | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_MANAGE) ; adminDriversController.update
+  L46    DELETE '/drivers/:id'                     | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_MANAGE) ; adminDriversController.remove
+  L52    POST   '/drivers/:id/approve'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_APPROVE) ; adminDriversController.approve
+  L58    POST   '/drivers/:id/reject'              | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_APPROVE) ; adminDriversController.reject
+  L64    PATCH  '/drivers/:id/documents/:documentId' | adminAuthMiddleware ; requireAdminPermission(AdminPermission.DRIVERS_APPROVE) ; adminDriversController.reviewDocument
+
+====================================================================================================
+FILE src/controller/src/admin/finance.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/financeRoutes.ts
+====================================================================================================
+  L10    GET    '/transactions'                    | adminAuthMiddleware ; requireAdminPermission(AdminPermission.FINANCE_VIEW) ; adminFinanceController.listTransactions
+  L16    GET    '/transactions/summary'            | adminAuthMiddleware ; requireAdminPermission(AdminPermission.FINANCE_VIEW) ; adminFinanceController.getSummary
+
+====================================================================================================
+FILE src/controller/src/admin/index.ts
+====================================================================================================
+  [mount] L19: router.use('/auth', adminAuthRoutes)
+  [mount] L20: router.use('/dashboard', adminDashboardRoutes)
+  [mount] L21: router.use(documentsRoutes)
+  [mount] L22: router.use(customersRoutes)
+  [mount] L23: router.use(vendorsRoutes)
+  [mount] L24: router.use(driversRoutes)
+  [mount] L25: router.use(bookingsRoutes)
+  [mount] L26: router.use(financeRoutes)
+  [mount] L27: router.use(reportsRoutes)
+  [mount] L28: router.use(settingsRoutes)
+  [mount] L29: router.use(notificationsRoutes)
+  [mount] L30: router.use(adminsRoutes)
+  [mount] L31: router.use(subscriptionsRoutes)
+
+====================================================================================================
+FILE src/controller/src/admin/notifications.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/notificationsRoutes.ts
+====================================================================================================
+  L10    GET    '/notifications'                   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.NOTIFICATIONS_VIEW) ; adminNotificationsController.list
+  L16    GET    '/notifications/unread-count'      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.NOTIFICATIONS_VIEW) ; adminNotificationsController.getUnreadCount
+  L22    PATCH  '/notifications/:id/read'          | adminAuthMiddleware ; requireAdminPermission(AdminPermission.NOTIFICATIONS_VIEW) ; adminNotificationsController.markRead
+  L28    POST   '/notifications/read-all'          | adminAuthMiddleware ; requireAdminPermission(AdminPermission.NOTIFICATIONS_VIEW) ; adminNotificationsController.markAllRead
+
+====================================================================================================
+FILE src/controller/src/admin/reports.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/reportsRoutes.ts
+====================================================================================================
+  L10    GET    '/reports'                         | adminAuthMiddleware ; requireAdminPermission(AdminPermission.REPORTS_VIEW) ; adminReportsController.getReports
+
+====================================================================================================
+FILE src/controller/src/admin/settings.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/settingsRoutes.ts
+====================================================================================================
+  L10    GET    '/settings'                        | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SETTINGS_VIEW) ; adminSettingsController.get
+  L16    PUT    '/settings'                        | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SETTINGS_MANAGE) ; adminSettingsController.update
+
+====================================================================================================
+FILE src/controller/src/admin/subscriptions.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/subscriptionsRoutes.ts
+====================================================================================================
+  L10    GET    '/subscriptions/overview'          | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SUBSCRIPTIONS_VIEW) ; adminSubscriptionsController.getOverview
+  L16    GET    '/subscriptions/plans'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SUBSCRIPTIONS_VIEW) ; adminSubscriptionsController.listPlans
+  L22    POST   '/subscriptions/plans'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SUBSCRIPTIONS_MANAGE) ; adminSubscriptionsController.createPlan
+  L28    PATCH  '/subscriptions/plans/:id'         | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SUBSCRIPTIONS_MANAGE) ; adminSubscriptionsController.updatePlan
+  L34    POST   '/subscriptions/assign'            | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SUBSCRIPTIONS_MANAGE) ; adminSubscriptionsController.assignSubscription
+  L40    POST   '/subscriptions/:id/cancel'        | adminAuthMiddleware ; requireAdminPermission(AdminPermission.SUBSCRIPTIONS_MANAGE) ; adminSubscriptionsController.cancelSubscription
+
+====================================================================================================
+FILE src/controller/src/admin/vehicles.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/vendors.ts
+====================================================================================================
+
+====================================================================================================
+FILE src/controller/src/admin/vendorsRoutes.ts
+====================================================================================================
+  L10    GET    '/vendors/counts'                  | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_VIEW) ; adminVendorsController.getCounts
+  L16    GET    '/vendors'                         | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_VIEW) ; adminVendorsController.list
+  L22    GET    '/vendors/:id'                     | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_VIEW) ; adminVendorsController.getById
+  L28    POST   '/vendors'                         | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.create
+  L34    POST   '/vendors/:id/approve'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_APPROVE) ; adminVendorsController.approve
+  L40    POST   '/vendors/:id/reject'              | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_APPROVE) ; adminVendorsController.reject
+  L46    PATCH  '/vendors/:id/documents/:docKey'   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_APPROVE) ; adminVendorsController.reviewDocument
+  L52    PATCH  '/vendors/:id'                     | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.update
+  L58    DELETE '/vendors/:id'                     | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.remove
+  L64    POST   '/vendors/:id/suspend'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.suspend
+  L70    POST   '/vendors/:id/assign-drivers'      | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.assignDrivers
+  L76    POST   '/vendors/:id/unassign-drivers/:driverId' | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.unassignDriver
+  L82    GET    '/vendors/:id/vehicles'            | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_VIEW) ; adminVendorsController.listVehicles
+  L88    POST   '/vendors/:id/vehicles'            | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.createVehicle
+  L94    GET    '/vendors/:id/drivers'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_VIEW) ; adminVendorsController.listFleetDrivers
+  L100   POST   '/vendors/:id/drivers'             | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.createFleetDriver
+  L106   DELETE '/vendors/:id/drivers/:driverId'   | adminAuthMiddleware ; requireAdminPermission(AdminPermission.VENDORS_MANAGE) ; adminVendorsController.removeFleetDriver
+
+====================================================================================================
+FILE src/controller/src/authRoutes.ts
+====================================================================================================
+  L15    POST   '/send-otp'                        | otpRateLimiter ; authRateLimiter ; validate(sendOtpSchema) ; authController.sendOtp
+  L23    POST   '/verify-otp'                      | authRateLimiter ; validate(verifyOtpSchema) ; authController.verifyOtp
+  L30    POST   '/driver-login'                    | authRateLimiter ; validate(driverCredentialLoginSchema) ; authController.driverLogin
+  L37    POST   '/refresh-token'                   | authRateLimiter ; validate(refreshTokenSchema) ; authController.refreshToken
+
+====================================================================================================
+FILE src/controller/src/bookingPaymentRoutes.ts
+====================================================================================================
+  [mount] L13: router.use(authMiddleware)
+  L15    POST   '/advance'                         | validate(initiateBookingPaymentSchema) ; bookingPaymentController.initiateAdvance
+  L16    POST   '/advance/verify'                  | validate(verifyBookingPaymentSchema) ; bookingPaymentController.verifyAdvance
+  L21    POST   '/final'                           | validate(initiateBookingPaymentSchema) ; bookingPaymentController.initiateFinal
+  L22    POST   '/final/verify'                    | validate(verifyBookingPaymentSchema) ; bookingPaymentController.verifyFinal
+
+====================================================================================================
+FILE src/controller/src/bookingRoutes.ts
+====================================================================================================
+  [mount] L10: router.use(authMiddleware)
+  L13    GET    '/'                                | validate(combinedBookingListQuerySchema, 'query') ; bookingController.list
+
+====================================================================================================
+FILE src/controller/src/brandRoutes.ts
+====================================================================================================
+  L7     GET    '/'                                | brandController.get
+
+====================================================================================================
+FILE src/controller/src/driverBookingRoutes.ts
+====================================================================================================
+  [mount] L16: router.use(authMiddleware)
+  L18    POST   '/'                                | validate(createDriverBookingSchema) ; driverBookingController.create
+  L19    GET    '/'                                | validate(driverBookingStatusQuerySchema, 'query') ; driverBookingController.list
+  L20    GET    '/:id/tracking'                    | driverBookingController.getTracking
+  L21    GET    '/:id/cancel-preview'              | driverBookingController.getCancelPreview
+  L22    POST   '/:id/cancel'                      | validate(cancelDriverBookingSchema) ; driverBookingController.cancel
+  L23    POST   '/:id/rating'                      | validate(submitServiceBookingRatingSchema) ; driverBookingController.submitRating
+  L28    GET    '/:id'                             | driverBookingController.getById
+  L29    PATCH  '/:id/status'                      | validate(updateDriverBookingStatusSchema) ; driverBookingController.updateStatus
+
+====================================================================================================
+FILE src/controller/src/driverRoutes.ts
+====================================================================================================
+  [mount] L18: router.use(authMiddleware)
+  [mount] L27: router.use(requireRole('driver')
+  L21    POST   '/register'                        | validate(registerDriverSelfSchema) ; driverController.registerSelf
+  L29    PATCH  '/availability'                    | validate(updateDriverAvailabilitySchema) ; driverController.updateAvailability
+  L34    PATCH  '/location'                        | validate(updateDriverLocationSchema) ; driverController.updateLocation
+  L39    GET    '/bookings'                        | validate(driverBookingsQuerySchema, 'query') ; driverController.listBookings
+  L44    GET    '/bookings/offers'                 | driverController.listOpenOffers
+  L45    GET    '/bookings/active'                 | driverController.getActiveBooking
+  L46    PATCH  '/bookings/:id/status'             | validate(updateDriverBookingStatusSchema) ; driverController.updateBookingStatus
+  L51    POST   '/bookings/:id/accept'             | validate(driverBookingActionSchema) ; driverController.acceptBooking
+  L56    POST   '/bookings/:id/reject'             | validate(driverBookingActionSchema) ; driverController.rejectBooking
+
+====================================================================================================
+FILE src/controller/src/fareRoutes.ts
+====================================================================================================
+  L9     GET    '/towing'                          | validate(towingFareQuerySchema, 'query') ; fareController.estimateTowing
+  L10    GET    '/driver'                          | validate(driverFareQuerySchema, 'query') ; fareController.estimateDriver
+
+====================================================================================================
+FILE src/controller/src/healthRoutes.ts
+====================================================================================================
+  L7     GET    '/'                                | (_req, res) => { return sendSuccess(res, { status: 'ok' }); }
+
+====================================================================================================
+FILE src/controller/src/locationRoutes.ts
+====================================================================================================
+  [mount] L10: router.use(authMiddleware)
+  L12    GET    '/'                                | locationController.list
+  L13    POST   '/'                                | validate(createLocationSchema) ; locationController.create
+  L14    PUT    '/:id'                             | validate(updateLocationSchema) ; locationController.update
+  L15    DELETE '/:id'                             | locationController.remove
+
+====================================================================================================
+FILE src/controller/src/notificationRoutes.ts
+====================================================================================================
+  [mount] L10: router.use(authMiddleware)
+  L12    GET    '/'                                | notificationController.list
+  L13    PATCH  '/read-all'                        | notificationController.markAllRead
+  L14    GET    '/preferences'                     | notificationController.getPrefs
+  L15    PATCH  '/preferences'                     | validate(updateNotificationPrefsSchema) ; notificationController.updatePrefs
+
+====================================================================================================
+FILE src/controller/src/paymentRoutes.ts
+====================================================================================================
+  [mount] L10: router.use(authMiddleware)
+  L12    GET    '/'                                | paymentController.listMethods
+  L13    POST   '/'                                | validate(createPaymentMethodSchema) ; paymentController.createMethod
+  L14    DELETE '/:id'                             | paymentController.removeMethod
+
+====================================================================================================
+FILE src/controller/src/profileRoutes.ts
+====================================================================================================
+  [mount] L10: router.use(authMiddleware)
+  L12    GET    '/'                                | profileController.getProfile
+  L13    PUT    '/complete'                        | validate(completeProfileSchema) ; profileController.completeProfile
+  L14    PUT    '/'                                | validate(updateProfileSchema) ; profileController.updateProfile
+
+====================================================================================================
+FILE src/controller/src/qrRoutes.ts
+====================================================================================================
+  L9     GET    '/:id'                             | validate(vehicleIdSchema, 'params') ; vehicleController.verifyQr
+  L10    GET    '/:id/metadata'                    | validate(vehicleIdSchema, 'params') ; vehicleController.getQrMetadata
+
+====================================================================================================
+FILE src/controller/src/roadsideBookingRoutes.ts
+====================================================================================================
+  [mount] L12: router.use(authMiddleware)
+  L10    GET    '/availability'                    | roadsideBookingController.getAvailability
+  L14    POST   '/'                                | validate(createRoadsideBookingSchema) ; roadsideBookingController.create
+
+====================================================================================================
+FILE src/controller/src/serviceRoutes.ts
+====================================================================================================
+  L7     GET    '/upcoming'                        | serviceController.upcoming
+  L8     GET    '/'                                | serviceController.list
+
+====================================================================================================
+FILE src/controller/src/sosRoutes.ts
+====================================================================================================
+  [mount] L12: router.use(authMiddleware)
+  L10    GET    '/config'                          | sosController.getConfig
+  L14    GET    '/context'                         | sosController.getContext
+  L15    POST   '/alert'                           | validate(sosAlertSchema) ; sosController.trigger
+
+====================================================================================================
+FILE src/controller/src/subscriptionRoutes.ts
+====================================================================================================
+  [mount] L12: router.use(authMiddleware)
+  L10    GET    '/plans'                           | subscriptionController.listPlans
+  L14    GET    '/'                                | subscriptionController.getCurrent
+  L15    POST   '/'                                | validate(subscribeSchema) ; subscriptionController.subscribe
+  L16    POST   '/cancel'                          | validate(cancelSubscriptionSchema) ; subscriptionController.cancel
+
+====================================================================================================
+FILE src/controller/src/towingBookingRoutes.ts
+====================================================================================================
+  [mount] L16: router.use(authMiddleware)
+  L18    POST   '/'                                | validate(createTowingBookingSchema) ; towingBookingController.create
+  L19    GET    '/'                                | validate(towingBookingStatusQuerySchema, 'query') ; towingBookingController.list
+  L20    GET    '/:id/tracking'                    | towingBookingController.getTracking
+  L21    GET    '/:id/cancel-preview'              | towingBookingController.getCancelPreview
+  L22    POST   '/:id/cancel'                      | validate(cancelTowingBookingSchema) ; towingBookingController.cancel
+  L23    POST   '/:id/rating'                      | validate(submitServiceBookingRatingSchema) ; towingBookingController.submitRating
+  L28    GET    '/:id'                             | towingBookingController.getById
+  L29    PATCH  '/:id/status'                      | validate(updateTowingBookingStatusSchema) ; towingBookingController.updateStatus
+
+====================================================================================================
+FILE src/controller/src/vehicleRoutes.ts
+====================================================================================================
+  [mount] L16: router.use(authMiddleware)
+  L14    GET    '/:id/verify'                      | validate(vehicleIdSchema, 'params') ; vehicleController.verifyQr
+  L18    POST   '/'                                | validate(createVehicleSchema) ; vehicleController.create
+  L19    GET    '/'                                | vehicleController.list
+  L20    GET    '/:id'                             | validate(vehicleIdSchema, 'params') ; vehicleController.getById
+  L21    PUT    '/:id'                             | validate(vehicleIdSchema, 'params') ; validate(updateVehicleSchema) ; vehicleController.update
+  L27    DELETE '/:id'                             | validate(vehicleIdSchema, 'params') ; vehicleController.remove
+
+====================================================================================================
+FILE src/controller/src/vendorRoutes.ts
+====================================================================================================
+  [mount] L27: router.use(authMiddleware)
+  L29    POST   '/draft'                           | validate(saveVendorDraftSchema) ; vendorController.saveDraft
+  L30    POST   '/register'                        | validate(registerVendorSchema) ; vendorController.register
+  L31    PUT    '/update'                          | validate(updateVendorSchema) ; vendorController.update
+  L32    GET    '/profile'                         | vendorController.getProfile
+  L33    GET    '/status'                          | vendorController.getStatus
+  L34    GET    '/dashboard'                       | requireRole('vendor') ; vendorController.getDashboard
+  L36    POST   '/upload-document'                 | vendorDocumentUpload.single('file') ; validate(uploadDocumentSchema) ; vendorController.uploadDocument
+  L43    POST   '/selfie'                          | vendorDocumentUpload.single('file') ; vendorController.uploadSelfie
+  L45    GET    '/drivers'                         | requireRole('vendor') ; vendorController.listDrivers
+  L46    POST   '/drivers'                         | requireRole('vendor') ; validate(createVendorDriverSchema) ; vendorController.createDriver
+  L52    POST   '/drivers/:id/upload-document'     | requireRole('vendor') ; vendorDocumentUpload.single('file') ; validate(uploadVendorDriverDocumentSchema) ; vendorController.uploadDriverDocument
+  L59    POST   '/drivers/claim'                   | requireRole('vendor') ; validate(claimVendorDriverSchema) ; vendorController.claimDriver
+  L65    DELETE '/drivers/:id'                     | requireRole('vendor') ; vendorController.removeDriver
+  L67    GET    '/vehicles'                        | requireRole('vendor') ; vendorController.listVehicles
+  L68    POST   '/vehicles'                        | requireRole('vendor') ; validate(createVendorVehicleSchema) ; vendorController.createVehicle
+  L74    PUT    '/vehicles/:id'                    | requireRole('vendor') ; validate(updateVendorVehicleSchema) ; vendorController.updateVehicle
+  L80    DELETE '/vehicles/:id'                    | requireRole('vendor') ; vendorController.removeVehicle
+  L82    GET    '/bookings/offers'                 | requireRole('vendor') ; vendorController.listBookingOffers
+  L83    POST   '/bookings/:id/approve'            | requireRole('vendor') ; validate(vendorApproveBookingSchema) ; vendorController.approveBooking
+  L89    POST   '/bookings/:id/assign'             | requireRole('vendor') ; validate(vendorAssignBookingSchema) ; vendorController.assignBooking
+  L95    POST   '/bookings/:id/verify-trip-otp'    | requireRole('vendor') ; validate(vendorVerifyTripOtpSchema) ; vendorController.verifyTripOtp
