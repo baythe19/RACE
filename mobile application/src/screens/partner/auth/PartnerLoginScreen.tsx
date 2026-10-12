@@ -44,6 +44,8 @@ import type {
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { isUiTestPermissiveMode } from '../../../constants/preview';
+import { Sparkles } from 'lucide-react-native';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerLogin'>;
 
@@ -126,22 +128,39 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
     rootNavigation?.navigate('PartnerRegistration', { role, mobileNumber });
   };
 
+  const handleQuickMockLogin = async (role: 'driver' | 'vendor') => {
+    if (role === 'driver') {
+      await loginAsMockDriver(dispatch);
+    } else {
+      await loginAsMockVendor(dispatch);
+    }
+    const rootNavigation =
+      navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
+    rootNavigation?.navigate('PartnerMain' as never);
+  };
+
   const handleSendOtp = async () => {
     setError('');
 
-    if (!partnerRole) {
-      setError('Select Driver or Vendor before continuing');
-      return;
+    let phoneToUse = mobileNumber;
+    if (isUiTestPermissiveMode() && !phoneToUse) {
+      phoneToUse = '9876543210';
+      setMobileNumber('9876543210');
     }
 
-    if (!isValid) {
+    if (!partnerRole) {
+      setPartnerRole('driver');
+      setSelectedRole('driver');
+    }
+
+    if (!isValid && !isUiTestPermissiveMode()) {
       setError('Enter a valid 10-digit mobile number');
       return;
     }
 
     try {
       const result = await sendOtpMutation.mutateAsync({
-        mobileNumber,
+        mobileNumber: phoneToUse || '9876543210',
         role: partnerRole,
       });
 
@@ -170,7 +189,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
       // --- end OTP bypass ---
 
       navigation.navigate('PartnerOtpVerification', {
-        mobileNumber,
+        mobileNumber: phoneToUse || '9876543210',
         role: partnerRole,
         isExistingUser: result.isExistingUser ?? false,
         devOtp: result.devOtp,
@@ -199,9 +218,9 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         );
         return;
       }
-      if (UI_PREVIEW_MODE || __DEV__) {
+      if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode()) {
         navigation.navigate('PartnerOtpVerification', {
-          mobileNumber,
+          mobileNumber: phoneToUse || '9876543210',
           role: partnerRole,
           isExistingUser: false,
           devOtp: '123456',
@@ -376,7 +395,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
             {/* Primary CTA: Send OTP */}
             <Pressable
-              disabled={!isValid || isSubmitting}
+              disabled={(!isValid && !isUiTestPermissiveMode()) || isSubmitting}
               onPress={() => void handleSendOtp()}
               style={({ pressed }) => [
                 styles.primaryButton,
@@ -385,8 +404,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                   borderRadius: px(14),
                   marginTop: px(22),
                 },
-                (!isValid || isSubmitting) && styles.primaryButtonDisabled,
-                pressed && isValid && !isSubmitting && styles.pressed,
+                (!isValid && !isUiTestPermissiveMode() || isSubmitting) && styles.primaryButtonDisabled,
+                pressed && !isSubmitting && styles.pressed,
               ]}
               accessibilityRole="button"
               accessibilityLabel="Send OTP">
@@ -400,6 +419,28 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                 style={{ marginLeft: px(8) }}
               />
             </Pressable>
+
+            {/* Quick Test Mode Buttons */}
+            {UI_PREVIEW_MODE ? (
+              <View style={{ marginTop: px(12), gap: px(8) }}>
+                <Pressable
+                  style={styles.devBtn}
+                  onPress={() => void handleQuickMockLogin(isDriver ? 'driver' : 'vendor')}>
+                  <Zap size={14} color="#D97706" />
+                  <Text style={styles.devBtnText}>
+                    ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Dashboard (Mock)
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.devBtn}
+                  onPress={() => goToRegistration(isDriver ? 'driver' : 'vendor')}>
+                  <Sparkles size={14} color="#D97706" />
+                  <Text style={styles.devBtnText}>
+                    ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Registration Flow
+                  </Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {/* Security Assurance with Word Wrapping */}
             <View style={[styles.securityNotice, { marginTop: px(16) }]}>
@@ -693,5 +734,22 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.85,
+  },
+  devBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  devBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#92400E',
   },
 });

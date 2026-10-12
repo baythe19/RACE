@@ -38,6 +38,26 @@ Navigation is a real graph (60+ registered routes) with a main tab (Home / Booki
 | QR scan | ❌ dead | see §3 |
 | PIN / password screens | ❌ dead | see §3 |
 
+## 2b. Backend touchpoints (backend ⇄ this app) [V]
+
+| This app's area | Endpoint group | Backend route file | Service / logic | Collection(s) |
+|-----------------|----------------|--------------------|-----------------|---------------|
+| Login/OTP | `/api/v1/auth/*` | `controller/src/authRoutes.ts` | `services/src/auth.ts` + `services/src/otp.ts` (+ `utils/src/sms.ts` MessageCentral) | `users`, `otplogs` |
+| Profile & wizard | `/api/v1/profile*` | `controller/src/profileRoutes.ts` | `services/src/profile.ts` | `users` (`driverProfile` exposed for drivers) |
+| Vehicles + QR verify | `/api/v1/vehicles*` | `controller/src/vehicleRoutes.ts` | vehicle service + `utils/src/qrCode.ts` | `vehicles`, `vehicleqrcodes` |
+| Towing booking | `/api/v1/bookings/towing*` | `controller/src/towingBookingRoutes.ts` | `services/src/bookings/*` | `towingbookings` |
+| Driver-hire booking | `/api/v1/bookings/driver*` | `controller/src/driverBookingRoutes.ts` | `services/src/bookings/*` | `driverbookings` |
+| Roadside | `/api/v1/bookings/roadside*` | `controller/src/roadsideBookingRoutes.ts` | roadside booking service | booking collections |
+| Combined history | `GET /api/v1/bookings` | `controller/src/bookingRoutes.ts` | `services/src/combinedBooking.ts` | all booking collections |
+| Fare preview | `/api/v1/fare/*` | `controller/src/fareRoutes.ts` | `services/src/fare.ts` + `services/src/googleMaps.ts` | — (external Google) |
+| Payments (stub) | `/api/v1/payments/*` | `controller/src/bookingPaymentRoutes.ts` | `services/src/bookingPayment.ts` (**stub gateway**) | `paymenttransactions` |
+| Subscriptions | `/api/v1/subscriptions*` | `controller/src/subscriptionRoutes.ts` | subscription service | `subscriptionplans`, `usersubscriptions` |
+| Saved locations / methods / notifications / wallet | `/api/v1/profile/{locations,payment-methods,notifications,wallet}` | `locationRoutes.ts`, `paymentRoutes.ts`, `notificationRoutes.ts`, `index.ts` (wallet inline) | profile-adjacent services | `savedlocations`, `paymentmethods`, `notifications`, `wallets` |
+| SOS | `/api/v1/sos/*` | `controller/src/sosRoutes.ts` | SOS service (**logs only**, no dispatch) | `activitylogs`/notifications |
+| Self-driver onboarding | `/api/v1/driver/*` | `controller/src/driverRoutes.ts` | `services/src/driverSelf.ts` + `services/src/driver.ts` | `users.driverProfile` |
+
+**Frontend-only, no backend counterpart:** PIN/password screens, QR scan, SOS dispatch, plan payment.
+
 ## 3. Findings specific to this app
 
 | ID | Severity | Finding | Evidence |

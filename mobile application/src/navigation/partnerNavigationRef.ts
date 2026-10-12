@@ -44,3 +44,64 @@ export function openPartnerNotifications(): void {
     } as never,
   );
 }
+
+/** Opens any tab in PartnerMain. */
+export function jumpToPartnerMainTab(
+  tab: 'PartnerHome' | 'PartnerJobs' | 'PartnerAccount',
+): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate('PartnerMain', { screen: tab } as never);
+}
+
+/** Opens any subpage in the PartnerAccount stack. */
+export function jumpToPartnerAccountScreen(
+  screen: string,
+  params?: Record<string, unknown>,
+): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate(
+    'PartnerMain',
+    {
+      screen: 'PartnerAccount',
+      params: { screen, params },
+    } as never,
+  );
+}
+
+/** Opens the Registration stack directly at any step. */
+export function jumpToPartnerRegistration(
+  role: 'driver' | 'vendor',
+  screenName?: string,
+  mobileNumber = '9876543210',
+): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate(
+    'PartnerRegistration',
+    {
+      role,
+      mobileNumber,
+      screen: screenName,
+    } as never,
+  );
+}
+
+/** Opens any screen in the Bootstrap / Auth flow. */
+export function jumpToPartnerAuth(
+  screenName: string,
+  params?: Record<string, unknown>,
+): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate(
+    'PartnerBootstrap',
+    {
+      screen: screenName,
+      params,
+    } as never,
+  );
+}
+
+/** Opens the driver verification gate. */
+export function jumpToDriverVerificationGate(): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate('PartnerDriverVerification' as never);
+}

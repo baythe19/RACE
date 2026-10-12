@@ -29,6 +29,7 @@ import type {
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { isUiTestPermissiveMode } from '../../../constants/preview';
 import { colors, radius, spacing, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerOtpVerification'>;
@@ -127,7 +128,14 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
 
   const handleVerify = useCallback(
     async (code: string) => {
-      if (verified || loading || verifyLockRef.current || code.length !== 6) {
+      const finalCode =
+        code && code.length === 6
+          ? code
+          : isUiTestPermissiveMode()
+            ? (devOtp ?? '123456')
+            : code;
+
+      if (verified || loading || verifyLockRef.current || finalCode.length !== 6) {
         return;
       }
 
@@ -139,7 +147,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
       try {
         const result = await verifyOtpMutation.mutateAsync({
           mobileNumber,
-          otp: code,
+          otp: finalCode,
           role,
         });
         setVerified(true);
@@ -161,7 +169,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         goToRegistration(role);
         return;
       } catch (err) {
-        if (UI_PREVIEW_MODE || __DEV__ || code === '123456' || code === '000000') {
+        if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode() || finalCode === '123456' || finalCode === '000000') {
           const fallbackRole = resolvePartnerRole();
           setVerified(true);
 
@@ -358,12 +366,12 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
       </View>
 
       <Pressable
-        disabled={otp.length !== 6 || loading || verified}
+        disabled={(!isUiTestPermissiveMode() && otp.length !== 6) || loading || verified}
         onPress={() => void handleVerify(otp)}
         style={({ pressed }) => [
           styles.primaryButton,
-          (otp.length !== 6 || verified) && !loading && styles.primaryButtonDisabled,
-          pressed && otp.length === 6 && !loading && !verified && styles.pressed,
+          (!isUiTestPermissiveMode() && otp.length !== 6 || verified) && !loading && styles.primaryButtonDisabled,
+          pressed && !loading && !verified && styles.pressed,
         ]}>
         {isVerifying ? (
           <View style={styles.buttonContent}>

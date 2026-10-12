@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Truck, ChevronRight } from 'lucide-react-native';
 
+import { useDriverJobsQuery } from '../../../services/driver/useDriverQueries';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
@@ -26,8 +27,28 @@ const HISTORY_DATA = [
 
 export default function PartnerTripHistoryScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<StatusTab>('All');
+  const { data: realJobs = [] } = useDriverJobsQuery();
 
-  const filtered = HISTORY_DATA.filter(item => {
+  const tripList = useMemo(() => {
+    if (realJobs.length > 0) {
+      return realJobs.map(job => {
+        const d = new Date(job.createdAt);
+        const dateStr = !isNaN(d.getTime())
+          ? `${d.toLocaleDateString([], { day: '2-digit', month: 'short' })}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+          : 'Recent';
+        return {
+          id: job.id,
+          bookingNumber: job.bookingNumber ? `#${job.bookingNumber}` : `#${job.id.slice(-6)}`,
+          time: dateStr,
+          fare: typeof job.estimatedFare === 'number' ? `₹${Math.round(job.estimatedFare).toLocaleString('en-IN')}` : '₹—',
+          status: job.status === 'COMPLETED' ? 'Completed' : job.status === 'CANCELLED' ? 'Cancelled' : 'Completed',
+        };
+      });
+    }
+    return HISTORY_DATA;
+  }, [realJobs]);
+
+  const filtered = tripList.filter(item => {
     if (activeTab === 'All') return true;
     return item.status === activeTab;
   });

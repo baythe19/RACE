@@ -9,6 +9,9 @@
     "dev:customer": "cd \"customer application\" && npm start",
     "dev:partner": "cd \"mobile application\" && npm start",
     "seed": "cd backend && npm run seed",
-    "seed:backend": "cd backend && npm run seed"
+    "seed:backend": "cd backend && npm run seed",
+    "test:ui-on": "bash scripts/toggle-ui-test-mode.sh on",
+    "test:ui-off": "bash scripts/toggle-ui-test-mode.sh off",
+    "test:ui-status": "bash scripts/toggle-ui-test-mode.sh status"
   }
 }

@@ -10,6 +10,7 @@ import PartnerAuthNavigator from './PartnerAuthNavigator';
 import { partnerNavigationRef } from './partnerNavigationRef';
 import PartnerRegistrationNavigator from './PartnerRegistrationNavigator';
 import PartnerSelectSheet from '../components/partner/PartnerSelectSheet';
+import UiTestNavigator from '../components/partner/UiTestNavigator';
 import DriverVerificationGateScreen from '../screens/partner/driver/DriverVerificationGateScreen';
 import WrongAppRoleScreen from '../screens/partner/auth/WrongAppRoleScreen';
 import { useDriverProfileQuery } from '../services/driver/useDriverQueries';
@@ -115,6 +116,7 @@ export default function PartnerAppNavigator() {
   return (
     <NavigationContainer key={navigatorKey} theme={navigationTheme} ref={partnerNavigationRef}>
       <PartnerSelectSheet />
+      <UiTestNavigator />
       <RootStack.Navigator
         screenOptions={{ headerShown: false }}
         initialRouteName={
@@ -122,25 +124,24 @@ export default function PartnerAppNavigator() {
             ? needsDriverGate
               ? 'PartnerDriverVerification'
               : 'PartnerMain'
-            : undefined
+            : 'PartnerBootstrap'
         }>
-        {enterMain ? (
-          <>
-            <RootStack.Screen
-              name="PartnerMain"
-              component={PartnerMainSuspense}
-            />
-            <RootStack.Screen
-              name="PartnerDriverVerification"
-              component={DriverVerificationGateScreen}
-            />
-          </>
-        ) : (
-          <>
-            <RootStack.Screen name="PartnerBootstrap" component={PartnerAuthNavigator} />
-            <RootStack.Screen name="PartnerRegistration" component={PartnerRegistrationNavigator} />
-          </>
-        )}
+        <RootStack.Screen
+          name="PartnerMain"
+          component={PartnerMainSuspense}
+        />
+        <RootStack.Screen
+          name="PartnerDriverVerification"
+          component={DriverVerificationGateScreen}
+        />
+        <RootStack.Screen
+          name="PartnerBootstrap"
+          component={PartnerAuthNavigator}
+        />
+        <RootStack.Screen
+          name="PartnerRegistration"
+          component={PartnerRegistrationNavigator}
+        />
       </RootStack.Navigator>
     </NavigationContainer>
   );

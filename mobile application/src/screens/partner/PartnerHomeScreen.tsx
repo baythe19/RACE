@@ -1,6 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
 import {
+  Bell,
   Briefcase,
   ChevronDown,
   ChevronRight,
@@ -16,26 +16,21 @@ import {
   CloudUpload,
   FileSearch,
   Info,
+  Landmark,
   ShieldCheck,
   Truck,
   Users,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { openPartnerNotifications } from '../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { useAppSelector } from '../../redux/hooks';
-import { useDriverLocationReporting } from '../../hooks/useDriverLocationReporting';
-import {
-  useDriverActiveJobQuery,
-  useDriverAvailabilityMutation,
-  useDriverJobsQuery,
-  useDriverJobOffersQuery,
-} from '../../services/driver/useDriverQueries';
-import { getProfile } from '../../services/profileService';
 import {
   useVendorBookingOffersQuery,
   useVendorFleetDriversQuery,
+  useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
 import { useVendorDashboardQuery, useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
@@ -144,7 +139,6 @@ function verificationCopy(vendor?: VendorProfileResponse | null) {
 }
 
 function weekdayIndex(date = new Date()) {
-  // Convert JS Sunday=0 → Monday=0
   return (date.getDay() + 6) % 7;
 }
 
@@ -357,8 +351,7 @@ export default function PartnerHomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<PartnerTabParamList>>();
   const { width } = useWindowDimensions();
   const user = useAppSelector(state => state.auth.user);
-  const isDriver = user?.role === 'driver';
-  const isVendor = user?.role === 'vendor';
+  const isVendor = true;
 
   const {
     data: vendor,
@@ -369,66 +362,26 @@ export default function PartnerHomeScreen() {
   const { data: vendorDashboard, refetch: refetchDashboard } = useVendorDashboardQuery(isVendor);
   const { data: offers = [], refetch: refetchOffers } = useVendorBookingOffersQuery(isVendor);
   const { data: drivers = [], refetch: refetchDrivers } = useVendorFleetDriversQuery(isVendor);
-  const { data: jobs = [], refetch: refetchDriverJobs } = useDriverJobsQuery(isDriver);
-  const { data: driverOffers = [], refetch: refetchDriverOffers } = useDriverJobOffersQuery(isDriver);
-  const { data: activeJob } = useDriverActiveJobQuery(isDriver);
-  const availabilityMutation = useDriverAvailabilityMutation();
+  const { data: vehicles = [], refetch: refetchVehicles } = useVendorFleetVehiclesQuery(isVendor);
 
-  const [isOnline, setIsOnline] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (!isDriver) return;
-    void getProfile()
-      .then(profile => {
-        if (typeof profile.isAvailable === 'boolean') {
-          setIsOnline(profile.isAvailable);
-        }
-      })
-      .catch(() => {
-        // Keep default online state if profile fetch fails.
-      });
-  }, [isDriver]);
-
-  useDriverLocationReporting(isDriver && isOnline);
-
-  const earningsToday = useMemo(() => {
-    if (isVendor) return vendorDashboard?.earningsToday ?? 0;
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return jobs
-      .filter(
-        job =>
-          new Date(job.createdAt) >= start &&
-          job.status === 'COMPLETED' &&
-          typeof job.estimatedFare === 'number',
-      )
-      .reduce((sum, job) => sum + (job.estimatedFare ?? 0), 0);
-  }, [isVendor, jobs, vendorDashboard?.earningsToday]);
+  const earningsToday = vendorDashboard?.earningsToday ?? 0;
+  const earningsTotal = vendorDashboard?.earningsTotal ?? earningsToday;
 
   const weekPoints = useMemo(() => buildWeekSeries(earningsToday), [earningsToday]);
   const chartWidth = Math.max(260, width - layout.screenPadding * 2 - spacing.lg * 2);
 
-  const jobsTodayCount = isVendor
-    ? (vendorDashboard?.jobsToday ?? offers.length)
-    : jobs.filter(job => {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        return new Date(job.createdAt) >= start;
-      }).length;
-
-  const openJobs = isVendor
-    ? offers.length
-    : jobs.filter(j => j.status === 'SEARCHING' || j.status === 'DRIVER_ASSIGNED').length;
-  const inProgressJobs = isVendor
-    ? drivers.filter(d => d.isBusy).length
-    : jobs.filter(j =>
-        ['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(j.status),
-      ).length;
+  const jobsTodayCount = vendorDashboard?.jobsToday ?? offers.length;
+  const openJobs = offers.length;
+  const inProgressJobs = drivers.filter(d => d.isBusy).length;
 
   const activeDrivers = drivers.length;
   const onJobDrivers = drivers.filter(d => d.isBusy).length;
   const availableDrivers = drivers.filter(d => d.isAvailable && !d.isBusy).length;
+
+  const activeVehicles = vehicles.filter(v => v.status === 'active' || !v.status).length;
+  const maintenanceVehicles = vehicles.filter(v => v.status === 'maintenance').length;
 
   const verification = verificationCopy(vendorLoading ? null : vendor);
   const activity = useMemo(
@@ -437,43 +390,26 @@ export default function PartnerHomeScreen() {
   );
 
   const name = firstName(user?.fullName);
-  const initial = name.charAt(0).toUpperCase() || 'P';
-
-  const toggleAvailability = async () => {
-    if (!isDriver) return;
-    const next = !isOnline;
-    try {
-      const result = await availabilityMutation.mutateAsync(next);
-      setIsOnline(result.isAvailable);
-    } catch (error) {
-      const message =
-        error && typeof error === 'object' && 'response' in error
-          ? String(
-              (error as { response?: { data?: { message?: string } } }).response?.data?.message,
-            )
-          : 'Could not update availability';
-      Alert.alert('Availability', message || 'Could not update availability');
-    }
-  };
+  const initial = name.charAt(0).toUpperCase() || 'V';
 
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      if (isVendor) {
-        await Promise.all([
-          refetchVendor(),
-          refetchDashboard(),
-          refetchOffers(),
-          refetchDrivers(),
-        ]);
-      }
-      if (isDriver) await refetchDriverJobs();
+      await Promise.all([
+        refetchVendor(),
+        refetchDashboard(),
+        refetchOffers(),
+        refetchDrivers(),
+        refetchVehicles(),
+      ]);
     } finally {
       setRefreshing(false);
     }
   };
 
-  const goAccountScreen = (screen: 'VendorDrivers' | 'VendorVehicles' | 'VendorVerificationStatus') => {
+  const goAccountScreen = (
+    screen: 'VendorDrivers' | 'VendorVehicles' | 'VendorVerificationStatus' | 'PartnerBankDetails',
+  ) => {
     navigation.navigate('PartnerAccount', { screen } as never);
   };
 
@@ -481,7 +417,7 @@ export default function PartnerHomeScreen() {
     <AppScreenLayout
       backgroundColor={PAGE_BG}
       refreshing={refreshing || vendorRefetching}
-      onRefresh={isVendor || isDriver ? () => void onRefresh() : undefined}
+      onRefresh={() => void onRefresh()}
       header={
         <View style={styles.headerPad}>
           <View style={styles.headerTop}>
@@ -490,15 +426,23 @@ export default function PartnerHomeScreen() {
               <Text style={styles.brandPartner}>PARTNER</Text>
             </View>
             <View style={styles.headerRight}>
+              <Pressable
+                onPress={openPartnerNotifications}
+                hitSlop={10}
+                style={styles.bellBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications">
+                <Bell size={19} color={colors.dark} strokeWidth={2.2} />
+              </Pressable>
               <View style={styles.partnerPill}>
-                <Text style={styles.partnerPillText}>Partner</Text>
+                <Text style={styles.partnerPillText}>Vendor Fleet</Text>
               </View>
               <View style={styles.avatarRow}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initial}</Text>
                 </View>
                 <Text style={styles.avatarName} numberOfLines={1}>
-                  {user?.fullName ?? 'Partner'}
+                  {user?.fullName ?? 'Vendor'}
                 </Text>
               </View>
             </View>
@@ -507,30 +451,59 @@ export default function PartnerHomeScreen() {
           <Text style={styles.greeting}>
             {greetingForNow()}, {name} 👋
           </Text>
-          <Text style={styles.subtitle}>Here's what's happening with your business today.</Text>
+          <Text style={styles.subtitle}>Here's what's happening with your fleet today.</Text>
         </View>
       }>
-      {isDriver ? (
-        <Pressable
-          onPress={() => void toggleAvailability()}
-          style={[styles.onlineCard, isOnline && styles.onlineCardActive]}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.onlineLabel}>Availability</Text>
-            <Text style={styles.onlineValue}>
-              {availabilityMutation.isPending
-                ? 'Updating…'
-                : isOnline
-                  ? 'You are online — ready for jobs'
-                  : 'Go online to receive jobs'}
-            </Text>
+      {offers.length > 0 ? (
+        <View style={styles.leadsBanner}>
+          <View style={styles.leadsHeaderRow}>
+            <View style={styles.leadsTitleGroup}>
+              <View style={styles.pulseDot} />
+              <Text style={styles.leadsTitle}>
+                Incoming leads ({offers.length})
+              </Text>
+            </View>
+            <Pressable onPress={() => navigation.navigate('PartnerJobs')}>
+              <Text style={styles.leadsViewAll}>View all</Text>
+            </Pressable>
           </View>
-          <View style={[styles.onlinePill, isOnline && styles.onlinePillActive]}>
-            <View style={[styles.offlineDot, isOnline && styles.onlineDot]} />
-            <Text style={[styles.onlinePillText, isOnline && styles.onlinePillTextActive]}>
-              {isOnline ? 'Online' : 'Offline'}
-            </Text>
-          </View>
-        </Pressable>
+          {offers.slice(0, 2).map(lead => (
+            <View key={lead.id} style={styles.leadCard}>
+              <View style={styles.leadTopRow}>
+                <View style={styles.leadBadge}>
+                  <Text style={styles.leadBadgeText}>
+                    {lead.serviceLabel || (lead.bookingType === 'towing' ? 'Towing' : 'Driver')}
+                  </Text>
+                </View>
+                <Text style={styles.leadFare}>
+                  {typeof lead.estimatedFare === 'number' ? formatInr(lead.estimatedFare) : '₹—'}
+                </Text>
+              </View>
+              <Text style={styles.leadNumber}>#{lead.bookingNumber || lead.id.slice(-6)}</Text>
+              <Text style={styles.leadAddress} numberOfLines={1}>
+                {formatReadableAddress(lead.pickup?.address || lead.pickup?.label) || 'Pickup nearby'}
+              </Text>
+              <Pressable
+                style={styles.assignCta}
+                onPress={() => {
+                  navigation.navigate('PartnerJobs', {
+                    screen: 'VendorAssignJob',
+                    params: {
+                      bookingId: lead.id,
+                      bookingType: lead.bookingType,
+                      bookingNumber: lead.bookingNumber,
+                      serviceLabel: lead.serviceLabel,
+                      pickupAddress: lead.pickup?.address || lead.pickup?.label,
+                      estimatedFare: lead.estimatedFare,
+                    },
+                  } as never);
+                }}>
+                <Truck size={15} color="#FFFFFF" strokeWidth={2.4} />
+                <Text style={styles.assignCtaText}>Assign vehicle & driver</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
       ) : null}
 
       <View style={styles.earningsCard}>
@@ -547,7 +520,7 @@ export default function PartnerHomeScreen() {
         <Text style={styles.earningsValue}>{formatInr(earningsToday)}</Text>
         <Text style={styles.earningsGrowth}>
           {earningsToday > 0
-            ? `Today's completed earnings · Total ${formatInr(vendorDashboard?.earningsTotal ?? earningsToday)}`
+            ? `Today's completed earnings · Total ${formatInr(earningsTotal)}`
             : 'No completed earnings yet this week'}
         </Text>
         <View style={styles.chartWrap}>
@@ -557,64 +530,41 @@ export default function PartnerHomeScreen() {
 
       <View style={styles.actionsGrid}>
         <QuickAction
-          title="View requests"
-          subtitle="See new towing & roadside requests"
+          title="Booking leads"
+          subtitle={`${offers.length} lead(s) waiting for fleet assignment`}
           Icon={ClipboardList}
           onPress={() => navigation.navigate('PartnerJobs')}
         />
-        {isVendor ? (
-          <>
-            <QuickAction
-              title="Manage drivers"
-              subtitle="Add, edit & manage your vendor drivers"
-              Icon={Users}
-              onPress={() => goAccountScreen('VendorDrivers')}
-            />
-            <QuickAction
-              title="Manage vehicles"
-              subtitle="Add, edit & manage your vendor vehicles"
-              Icon={Truck}
-              onPress={() => goAccountScreen('VendorVehicles')}
-            />
-            <QuickAction
-              title="Verification"
-              subtitle="Track your verification status & documents"
-              Icon={ShieldCheck}
-              onPress={() => goAccountScreen('VendorVerificationStatus')}
-            />
-          </>
-        ) : (
-          <QuickAction
-            title={activeJob ? 'Active trip' : driverOffers.length > 0 ? 'Trips ready' : 'Jobs'}
-            subtitle={
-              activeJob
-                ? `#${activeJob.bookingNumber} · ${formatReadableAddress(activeJob.pickup?.address || activeJob.pickup?.label)}`
-                : driverOffers.length > 0
-                  ? `${driverOffers.length} trip(s) waiting — tap to accept`
-                  : 'No active trip — check Jobs for vendor-approved requests'
-            }
-            Icon={Briefcase}
-            onPress={() => {
-              if (activeJob) {
-                navigation.navigate('PartnerJobs', {
-                  screen: 'PartnerActiveJob',
-                  params: {
-                    bookingId: activeJob.id,
-                    bookingType: activeJob.bookingType,
-                  },
-                } as never);
-                return;
-              }
-              navigation.navigate('PartnerJobs');
-            }}
-          />
-        )}
+        <QuickAction
+          title="Manage drivers"
+          subtitle={`${drivers.length} registered driver(s) · ${availableDrivers} available`}
+          Icon={Users}
+          onPress={() => goAccountScreen('VendorDrivers')}
+        />
+        <QuickAction
+          title="Manage vehicles"
+          subtitle={`${vehicles.length} vehicle(s) · ${activeVehicles} active`}
+          Icon={Truck}
+          onPress={() => goAccountScreen('VendorVehicles')}
+        />
+        <QuickAction
+          title="Bank & payouts"
+          subtitle="Manage settlement account & payout readiness"
+          Icon={Landmark}
+          onPress={() => goAccountScreen('PartnerBankDetails')}
+        />
+        <QuickAction
+          title="Verification & KYC"
+          subtitle="Track business approval & document status"
+          Icon={ShieldCheck}
+          onPress={() => goAccountScreen('VendorVerificationStatus')}
+        />
       </View>
 
       <View style={styles.statusStack}>
         <Pressable
-          onPress={() => (isVendor ? goAccountScreen('VendorVerificationStatus') : undefined)}
-          style={({ pressed }) => [styles.statusCard, pressed && isVendor && styles.pressed]}>
+          onPress={() => goAccountScreen('VendorVerificationStatus')}
+          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
           <View style={[styles.statusIcon, { backgroundColor: colors.goldLight }]}>
             <ShieldCheck size={18} color={colors.primaryDark} strokeWidth={2.2} />
           </View>
@@ -666,26 +616,43 @@ export default function PartnerHomeScreen() {
           </View>
         </Pressable>
 
-        {isVendor ? (
-          <Pressable
-            onPress={() => goAccountScreen('VendorDrivers')}
-            style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
-            <View style={[styles.statusIcon, { backgroundColor: '#DCFCE7' }]}>
-              <Users size={18} color={SUCCESS_GREEN} strokeWidth={2.2} />
+        <Pressable
+          onPress={() => goAccountScreen('VendorDrivers')}
+          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
+          <View style={[styles.statusIcon, { backgroundColor: '#DCFCE7' }]}>
+            <Users size={18} color={SUCCESS_GREEN} strokeWidth={2.2} />
+          </View>
+          <View style={styles.statusCopy}>
+            <Text style={styles.statusEyebrow}>Active drivers</Text>
+            <Text style={styles.statusBig}>{String(activeDrivers)}</Text>
+            <View style={styles.dotRow}>
+              <View style={[styles.dot, { backgroundColor: colors.primary }]} />
+              <Text style={styles.dotText}>{onJobDrivers} On job</Text>
+              <Text style={styles.dotSep}>•</Text>
+              <View style={[styles.dot, { backgroundColor: SUCCESS_GREEN }]} />
+              <Text style={styles.dotText}>{availableDrivers} Available</Text>
             </View>
-            <View style={styles.statusCopy}>
-              <Text style={styles.statusEyebrow}>Active drivers</Text>
-              <Text style={styles.statusBig}>{String(activeDrivers)}</Text>
-              <View style={styles.dotRow}>
-                <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-                <Text style={styles.dotText}>{onJobDrivers} On job</Text>
-                <Text style={styles.dotSep}>•</Text>
-                <View style={[styles.dot, { backgroundColor: SUCCESS_GREEN }]} />
-                <Text style={styles.dotText}>{availableDrivers} Available</Text>
-              </View>
+          </View>
+        </Pressable>
+
+        <Pressable
+          onPress={() => goAccountScreen('VendorVehicles')}
+          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
+          <View style={[styles.statusIcon, { backgroundColor: '#FEF3C7' }]}>
+            <Truck size={18} color={colors.primaryDark} strokeWidth={2.2} />
+          </View>
+          <View style={styles.statusCopy}>
+            <Text style={styles.statusEyebrow}>Fleet vehicles</Text>
+            <Text style={styles.statusBig}>{String(vehicles.length)}</Text>
+            <View style={styles.dotRow}>
+              <View style={[styles.dot, { backgroundColor: SUCCESS_GREEN }]} />
+              <Text style={styles.dotText}>{activeVehicles} Active</Text>
+              <Text style={styles.dotSep}>•</Text>
+              <View style={[styles.dot, { backgroundColor: colors.error }]} />
+              <Text style={styles.dotText}>{maintenanceVehicles} Maintenance</Text>
             </View>
-          </Pressable>
-        ) : null}
+          </View>
+        </Pressable>
       </View>
 
       <View style={styles.activityCard}>
@@ -756,6 +723,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     flexShrink: 1,
+  },
+  bellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   partnerPill: {
     backgroundColor: colors.goldLight,
@@ -1130,4 +1107,96 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   pressed: { opacity: 0.92 },
+  leadsBanner: {
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  leadsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  leadsTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+  },
+  leadsTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.dark,
+  },
+  leadsViewAll: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primaryDark,
+  },
+  leadCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginTop: 8,
+  },
+  leadTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  leadBadge: {
+    backgroundColor: colors.goldLight,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  leadBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primaryDark,
+    textTransform: 'capitalize',
+  },
+  leadFare: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.dark,
+  },
+  leadNumber: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.grey,
+    marginTop: 4,
+  },
+  leadAddress: {
+    fontSize: 13,
+    color: colors.dark,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  assignCta: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: colors.dark,
+    borderRadius: 8,
+    paddingVertical: 8,
+  },
+  assignCtaText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });

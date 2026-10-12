@@ -44,7 +44,9 @@ Full generated map: [`_evidence/backend-route-map.txt`](./_evidence/backend-rout
 | Admin | `/api/v1/admin` | 62 | `adminAuthMiddleware` + `requireAdminPermission` |
 | Health | `/health` | 1 | public |
 
-**≈159 endpoints total.** [O]
+**171 route registrations across 136 unique paths** (33 `*Routes.ts` files + 1 inline route in `controller/src/index.ts`) — machine-counted two independent ways that agree. [V]
+
+> ⚠️ *Corrected in self-review (`02-§6`): an earlier draft published "≈159 endpoints". That count came from a mount table that silently skipped 12 routers (`.ts` suffix bug), so every downstream number in `13` was low. The figures below are the corrected ones.*
 
 ### Two auth-ordering details worth knowing [V]
 

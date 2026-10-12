@@ -29,6 +29,26 @@ Guards: `protected-route.tsx` + `permission-guard.tsx` ✅ — routes are permis
 
 State: Zustand (`auth`, `dashboard`, `layout`, `theme`) + React Query hooks per domain (20 hooks) ✅ modern, consistent.
 
+## 1b. Backend touchpoints (backend ⇄ this app) [V]
+
+| Admin page / area | Endpoint group | Backend route file | Service / logic | Collection(s) |
+|-------------------|----------------|--------------------|-----------------|---------------|
+| Login / session | `/api/v1/admin/auth/*` | `controller/src/admin/adminAuthRoutes.ts` | `services/src/admin/adminAuth.ts` (**hardcoded identity**), `adminJwt.ts`, `config/hardcoded-admin.ts` | — (env-based) + `activitylogs` |
+| Dashboard KPIs | `GET /admin/dashboard` | `admin/adminDashboardRoutes.ts` | `services/src/admin/adminDashboard.ts` | `bookings` + `towingbookings` + `driverbookings` (**summed**) |
+| Bookings | `/admin/bookings*` | `admin/bookingsRoutes.ts` | `adminBookings.ts`, `transactionEngine.ts` | all three booking collections |
+| Customers | `/admin/customers*` | `admin/customersRoutes.ts` | `adminCustomers.ts` | `users` (role customer), `bookings` |
+| Vendors (+fleet) | `/admin/vendors*` | `admin/vendorsRoutes.ts` | `adminVendors.ts` | `users.vendorProfile`, `vendorvehicles` |
+| Drivers | `/admin/drivers*` | `admin/driversRoutes.ts` | `adminDrivers.ts` | `users.driverProfile` |
+| Document review (view = unused) | `PATCH /admin/{vendors,drivers}/:id/documents/...`; `GET /admin/documents/...` | `admin/documentsRoutes.ts`, `admin/vendorsRoutes.ts` | `adminDocuments.ts` | `vendordocuments`, `users.driverProfile.documents` |
+| Finance | `/admin/transactions*` | `admin/financeRoutes.ts` | `adminFinance.ts` | `transactions`, `paymenttransactions` (**stub gateway**) |
+| Reports | `GET /admin/reports` | `admin/reportsRoutes.ts` | `adminReports.ts` | all three booking collections |
+| Subscriptions | `/admin/subscriptions*` | `admin/subscriptionsRoutes.ts` | `adminSubscriptions.ts` | `subscriptionplans`, `usersubscriptions` |
+| Settings | `/admin/settings` | `admin/settingsRoutes.ts` | `adminSettings.ts` | `platformsettings` |
+| Notifications | `/admin/notifications*` | `admin/notificationsRoutes.ts` | `adminNotifications.ts` | `adminnotifications` |
+| Admin users (UI cannot manage) | `/admin/admins*` | `admin/adminsRoutes.ts` | `adminAuth.ts` (**throws**) | `admins` (model unused for auth) |
+| Audit trail (no page) | `GET /admin/activity-logs` | `admin/adminsRoutes.ts` | `admin/activityLogger.ts` | `activitylogs` |
+| RBAC enforcement | every `/admin/*` route | `middleware/src/requirePermission.ts` | `services/src/admin/rbac.ts` (roles + permission map) | — |
+
 ## 2. Finding AD-1 (HIGH) — the admin UI is wired to ~half the API
 
 Orphaned admin endpoints (no call site anywhere in `packages/api` or `apps/admin-web`), full list in [`13-API-CONNECTION-MATRIX.md`](./13-API-CONNECTION-MATRIX.md#5-orphan-endpoints--backend-capability-no-client-uses):

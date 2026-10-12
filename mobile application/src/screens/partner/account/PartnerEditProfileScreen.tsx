@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -15,6 +15,7 @@ import { Camera, Calendar, MapPin, CheckCircle, ChevronDown, Plus, X } from 'luc
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 
+import { useAppSelector } from '../../../redux/hooks';
 import { useDriverProfileQuery, driverQueryKeys } from '../../../services/driver/useDriverQueries';
 import { updateProfile } from '../../../services/profileService';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
@@ -28,14 +29,15 @@ type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerEditPr
 export default function PartnerEditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const user = useAppSelector(state => state.auth.user);
   const { data: profile } = useDriverProfileQuery();
 
-  const [fullName, setFullName] = useState(profile?.fullName ?? 'Om Singh');
-  const [email, setEmail] = useState(profile?.email ?? 'om.singh@example.com');
+  const [fullName, setFullName] = useState(profile?.fullName || user?.fullName || 'Partner');
+  const [email, setEmail] = useState(profile?.email || user?.email || '');
   const [dob, setDob] = useState('29 Jun 1998');
-  const [city, setCity] = useState(profile?.address?.city ?? 'Bhubaneswar');
+  const [city, setCity] = useState(profile?.address?.city || 'Bhubaneswar');
   const [address, setAddress] = useState(
-    profile?.address?.line1 ?? 'Station Square, Bhubaneswar, Odisha',
+    profile?.address?.line1 || 'Station Square, Bhubaneswar, Odisha',
   );
   const [languages, setLanguages] = useState<string[]>(['Odia', 'Hindi']);
   const [showAddLang, setShowAddLang] = useState(false);
@@ -46,7 +48,22 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
   const [successVisible, setSuccessVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const mobileNumber = profile?.mobileNumber ?? '+91 99765 43210';
+  const mobileNumber = profile?.mobileNumber || user?.mobileNumber || '+91 99765 43210';
+
+  useEffect(() => {
+    if (profile?.fullName || user?.fullName) {
+      setFullName(profile?.fullName || user?.fullName || '');
+    }
+    if (profile?.email || user?.email) {
+      setEmail(profile?.email || user?.email || '');
+    }
+    if (profile?.address?.city) {
+      setCity(profile.address.city);
+    }
+    if (profile?.address?.line1) {
+      setAddress(profile.address.line1);
+    }
+  }, [profile, user]);
 
   const handleAddLanguage = () => {
     if (newLangInput.trim() && !languages.includes(newLangInput.trim())) {

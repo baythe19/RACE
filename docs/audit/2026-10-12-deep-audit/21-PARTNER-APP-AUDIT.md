@@ -32,6 +32,24 @@ Shared infra: `DriverOfferAlert` (overlay), `PartnerTabBar`, `PartnerScreenLayou
 | Driver job cycle | offer alert (with server-provided expiry) → accept → en route → arrived → start OTP → complete → earnings | ✅ `/driver/bookings/*`, approval-gated |
 | Driver pre-approval | verification gate replaces the tabs until `driverProfile.status === 'APPROVED'` | ✅ gate + read-only dashboard |
 
+## 2b. Backend touchpoints (backend ⇄ this app) [V]
+
+| This app's area | Endpoint group | Backend route file | Service / logic | Collection(s) |
+|-----------------|----------------|--------------------|-----------------|---------------|
+| Login (OTP + vendor-driver credentials) | `/api/v1/auth/send-otp\|verify-otp\|refresh-token\|driver-login` | `controller/src/authRoutes.ts` | `services/src/auth.ts` (+ `utils/src/driverPassword.ts` bcrypt) | `users`, `otplogs` |
+| Vendor onboarding & profile | `/api/v1/vendor/{draft,register,update,profile,status,dashboard}` | `controller/src/vendorRoutes.ts` | `services/src/vendor.ts` | `users.vendorProfile` |
+| KYC upload | `/api/v1/vendor/upload-document`, `/vendor/selfie`, `/vendor/drivers/:id/upload-document` | `vendorRoutes.ts` (+ `middleware/src/upload.ts` multer) | `storage/src/index.ts` (GCS → **local fallback**) | `vendordocuments`, filesystem `uploads/` |
+| Fleet drivers | `/api/v1/vendor/drivers*`, `/vendor/drivers/claim` | `vendorRoutes.ts` | vendor service + `userProfileSchema` loginId/passwordHash | `users.driverProfile` |
+| Fleet vehicles | `/api/v1/vendor/vehicles*` | `vendorRoutes.ts` | vendor service | `vendorvehicles` |
+| Vendor job flow | `/api/v1/vendor/bookings/*` | `vendorRoutes.ts` | `services/src/bookings/driverAssignment.ts` | `towingbookings`, `driverbookings` |
+| Driver job cycle | `/api/v1/driver/bookings/*` | `controller/src/driverRoutes.ts` | `services/src/driver.ts` (+ `bookings/tripOtp.ts`) | both booking collections |
+| Driver self-registration | `POST /api/v1/driver/register` | `driverRoutes.ts` (declared **before** `requireRole('driver')`) | `services/src/driverSelf.ts` | `users.driverProfile` |
+| Availability / location | `PATCH /api/v1/driver/{availability,location}` | `driverRoutes.ts` | `services/src/driver.ts` + `services/src/socket.ts` (emits `driver:location`) | `users.currentLocation` |
+| Notifications | `/api/v1/profile/notifications*` | `controller/src/notificationRoutes.ts` | notification service | `notifications`, `notificationprefs` |
+| Vehicles read (reused customer endpoints) | `/api/v1/vehicles*` | `controller/src/vehicleRoutes.ts` | vehicle service | `vehicles` |
+
+**Backend capability that this app has no screen for:** vendor trip-start OTP (`/vendor/bookings/:id/verify-trip-otp`) and any vendor view of an in-flight job.
+
 ## 3. Findings specific to this app
 
 | ID | Severity | Finding | Evidence |
@@ -41,7 +59,7 @@ Shared infra: `DriverOfferAlert` (overlay), `PartnerTabBar`, `PartnerScreenLayou
 | PA-3 | 🟠 High | `DriverReviewScreen` fabricates profile data when fields are empty (name `'Rajesh Kumar'`, email `rajesh.driver@gmail.com`, licence `OD-0220190012345`, vehicle `OD 02 AB 1234`, languages `['Odia','Hindi','English']`) and, when no session exists, invents a `mock-driver-token` | `DriverReviewScreen.tsx:94-130, 141-170` |
 | PA-4 | 🟡 Medium | Driver dashboard/active-job have **no map** while the customer app does; a driver cannot see the route | `DriverDashboardScreen.tsx` (1445 lines, no MapView) |
 | PA-5 | 🟡 Medium | **No background location**; location reporting stops with the app backgrounded and resumes on foreground | `hooks/useDriverLocationReporting.ts` (no task-manager/background registration); `AppState` re-report added |
-| PA-6 | 🟡 Medium | Partner app has **no socket client** — offers/jobs/active job poll at 8 s / 10 s / 15 s (`useDriverQueries.ts`) | grep: socket.io-client only in the customer app |
+| PA-6 | 🟡 Medium | Partner app has **no socket client** — offers/jobs/active job poll at 8 s / 10 s / 15 s (`useDriverQueries.ts`) | `socket.io-client@^4.8.3` is listed in `mobile application/package.json` but **never imported** anywhere under `mobile application/src` ⇒ dead dependency, polling only. (Corrected in self-review: an earlier draft said the dependency was absent. See `02-§6`.) |
 | PA-7 | 🟢 Low | `EXPO_PUBLIC_SKIP_OTP_AUTH` now defaults **false** (real OTP) — this contradicts older project memory that says both Expo login screens hard-skip OTP; the current code requires the env var to be `'true'` | `PartnerLoginScreen.tsx:53-54` |
 
 ## 4. UI/UX assessment
@@ -91,3 +109,26 @@ Shared infra: `DriverOfferAlert` (overlay), `PartnerTabBar`, `PartnerScreenLayou
 | P4 | Add the job map + background location (active job only) | M–L |
 | P5 | Split persona logic out of the god-screens into `driver/` and `vendor/` folders; delete dead branches | M |
 | P6 | Vendor "active jobs" view using existing `/vendor/bookings/offers` + assignment data | M |
+
+## 7. Post-scan addendum (parallel work landed during the audit)
+
+The partner app was being edited by another process while this audit ran. Files under `mobile application/src` changed **after** the scan (22 files, committed externally in `7ce2f3c`). New surfaces that were **not** audited:
+
+| New screen / component | Size | Audited? |
+|------------------------|-----:|----------|
+| `screens/partner/account/PartnerEarningsScreen.tsx` | 579 lines | ❌ not audited |
+| `screens/partner/account/PartnerBankDetailsScreen.tsx` | 272 | ❌ |
+| `screens/partner/account/PartnerTripHistoryScreen.tsx` | — | ❌ |
+| `screens/partner/account/PartnerSettingsScreen.tsx` | — | ❌ |
+| `screens/partner/account/PartnerNotificationsScreen.tsx` | — | ❌ |
+| `screens/partner/account/PartnerHelpSupportScreen.tsx` | — | ❌ |
+| `components/partner/dialogs/PartnerLanguageSheet.tsx` | 211 | ❌ |
+| `components/partner/dialogs/PartnerLocationSheet.tsx` | 140 | ❌ |
+| `components/partner/dialogs/PartnerLogoutDialog.tsx` | 149 | ❌ |
+| `components/partner/dialogs/PartnerNotificationPreferencesModal.tsx` | 250 | ❌ |
+| `components/partner/dialogs/PartnerSuccessDialog.tsx` | 113 | ❌ |
+| `components/partner/dialogs/PartnerUploadSheet.tsx` | 172 | ❌ |
+
+What was re-checked for those files [V]: **none of them import `UI_PREVIEW_MODE` and none reference an `API_ENDPOINTS.*` constant directly** — so PA-1's mock-risk count (40 sites) and the endpoint matrix above describe them correctly as *not* mock-fallback sites, but their own data wiring (hooks, local state, new services such as `services/useNotificationQueries.ts`) has **not** been verified and must be re-audited before quoting any number for these screens.
+
+Consequences to re-check later: screen count (32 → **38**), tab/navigation composition (`PartnerNavigator.tsx` changed, +54 lines), and whether any of the new endpoints used by these screens are outside the 136-path backend inventory (all client paths resolve today — no dead calls).

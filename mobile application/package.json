@@ -9,6 +9,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "tsc --noEmit",
+    "test:ui-on": "bash ../scripts/toggle-ui-test-mode.sh on",
+    "test:ui-off": "bash ../scripts/toggle-ui-test-mode.sh off",
+    "test:ui-status": "bash ../scripts/toggle-ui-test-mode.sh status",
     "eas:build": "eas build --platform android --profile production",
     "eas:build:ios": "eas build --platform ios --profile production"
   },

@@ -54,7 +54,7 @@ Every row has evidence. Nothing was fixed in this audit.
 | BUG-33 | `hashPassword` is identity and `resetPassword` throws — no admin recovery path | `services/src/admin/adminAuth.ts:105-111` |
 | BUG-34 | Refresh-token reuse detection missing (rotation exists, family revocation does not) | `utils/src/jwt.ts`, `services/src/auth.ts:263-283` |
 | BUG-35 | Partner app god-screens (1445 / 1134 / 877 / 411 lines) contain dead persona branches | file inventory |
-| BUG-36 | No automated tests on backend or either mobile app (2 admin tests total) | repo-wide test grep |
+| BUG-36 | **Zero runnable automated tests repo-wide.** Two `*.test.ts` files exist (admin `permissions.test.ts`, `dashboard.test.ts`) but they `import … from 'vitest'` and **vitest is not installed** in any workspace; there is no `test` script and no test config | `ls node_modules/.bin \| grep vitest` → empty in root, `apps/admin-web`, `packages/utils`; test file heads import vitest |
 
 ## 4. Gaps (product capability, not defects)
 

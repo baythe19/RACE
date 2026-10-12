@@ -2,7 +2,9 @@
 
 **Question answered:** *which APIs are open/unused, which are connected, and which client calls can never succeed.*
 
-**Method [O]/[V]:** backend routes were machine-extracted into [`_evidence/backend-route-map.txt`](./_evidence/backend-route-map.txt) (159 endpoints). Client usage was extracted by grepping every `.ts/.tsx` in each app for **literal paths, template paths and endpoint-constant keys**, then reading each service module that owns them. Template-built paths (`${API_ENDPOINTS.x}/cancel`) were resolved by hand.
+**Method [O]/[V]:** backend routes were machine-extracted into [`_evidence/backend-route-map.txt`](./_evidence/backend-route-map.txt) (171 route registrations / 136 unique paths). Client usage was extracted by grepping every `.ts/.tsx` in each app for **literal paths, template paths and endpoint-constant keys**, then reading each service module that owns them. Template-built paths (`${API_ENDPOINTS.x}/cancel`) were resolved by hand.
+
+> ⚠️ **Template-built paths are the trap in this analysis.** Counting only quoted literals marks 7 endpoints as "unused" that clients actually call (`${API_ENDPOINTS.subscriptions}/cancel`, `${…notifications}/read-all`, `${…notifications}/preferences`, `${…savedLocations}/${id}`, `${…paymentMethods}/${id}`, `${…towingBooking(id)}/rating`, `${…driverBooking(id)}/rating`). The first pass of this matrix made exactly that mistake; `02-§6` records the fix. Every orphan listed below was re-verified by hand against the client service modules.
 
 > One API serves all surfaces (`backend/src/controller/src/index.ts` mounts customer, partner *and* admin routers in the same app). The customer app therefore also calls `/api/v1/driver/*` (self-driver onboarding) and the partner app also calls `/api/v1/vehicles` (customer vehicle endpoints) — both legal on the same JWT.
 
@@ -68,20 +70,26 @@
 
 Used: `/admin/auth/{login,refresh-token,logout,me}`, `/admin/dashboard`, `/admin/customers` (+`:id`, `/status`, `/cities`, `/export/csv`), `/admin/vendors` (+`/counts`, `:id`, `/approve`, `/reject`, `/suspend`, `/assign-drivers`, `/drivers/:driverId`, `:id/documents/:docKey` PATCH), `/admin/drivers` (+`/counts`, `/available`, `:id`, `/approve`, `/reject`, `:id/documents/:documentId` PATCH), `/admin/bookings` (+`/counts`, `:id`, `:id/assign-driver`, `:id/assign-vendor`, `PATCH :id/status`), `/admin/vehicles/:id` (PATCH/DELETE), `/admin/transactions` (+`/summary`), `/admin/reports`, `/admin/settings` (GET+PUT), `/admin/subscriptions/overview`, `/admin/subscriptions/plans` (GET), `/admin/notifications` (+unread-count, read-all, `:id/read`).
 
-## 5. Orphan endpoints — backend capability no client uses
+## 5. Orphan endpoints — backend capability no client uses [V]
+
+**Verified orphans: 17 of 136 paths.** Each one was checked by hand against the client service modules (literal **and** template-concatenated call sites).
 
 | Endpoint(s) | Area | Consequence |
 |-------------|------|-------------|
-| `GET /api/v1/qr/:id`, `GET /api/v1/qr/:id/metadata` | public QR lookup | **Entire QR feature has no consumer** — clients use `/vehicles/:id/verify` instead. Also unauthenticated (SEC-9) |
-| `GET /api/v1/services/upcoming` | service catalog | No screen lists "upcoming services" |
-| `POST /api/v1/vendor/bookings/:id/verify-trip-otp` | vendor trip start | Vendor cannot start a trip with OTP from the app |
-| `GET /api/v1/admin/documents/vendor/:vendorId/:docKey`, `.../driver/:driverId/:docKey` | admin document **viewing** | Admins can approve/reject documents (`PATCH .../documents/...`) but the UI never calls the *view* endpoints — reviewers approve blind unless the detail payload embeds a public URL (which is the SEC-3 problem) |
-| `GET /api/v1/admin/activity-logs` | admin audit trail | Activity is logged but never shown |
-| `POST/PATCH/DELETE /api/v1/admin/admins` | admin user management | UI has an `/admin-users` route but calls no admin API ⇒ page cannot manage admins; auth is hardcoded anyway (SEC-1) |
-| `POST /api/v1/admin/subscriptions/assign`, `POST /api/v1/admin/subscriptions/:id/cancel`, `POST/PATCH /api/v1/admin/subscriptions/plans` | subscription admin | Plans can be listed but not created/edited/assigned from the UI |
-| `POST/DELETE /api/v1/admin/bookings`, `POST /api/v1/admin/bookings/:id/cancel`, `POST /api/v1/admin/customers`, `POST /api/v1/admin/vendors`, `POST /api/v1/admin/drivers` | admin create/delete | Creation paths exist server-side, not exposed in UI |
-| `PUT/DELETE /api/v1/profile/locations/:id` (and `PUT /profile/payment-methods` sibling delete) | saved data editing | **Unconfirmed** — `savedLocations` is used (4 call sites) but I did not verify PUT/DELETE usage; treat as "verify" before quoting |
-| `POST /api/v1/driver/bookings/:id/reject` for **vendor** drivers | — | Used by self-drivers only |
+| `GET /api/v1/admin/documents/vendor/:vendorId/:docKey`, `.../driver/:driverId/:docKey` | admin document **viewing** | Admins can approve/reject documents (`PATCH .../documents/...` **is** wired) but the UI never calls the *view* endpoints — reviewers approve blind unless the detail payload embeds a public URL (which is the SEC-3 problem). The single most damaging orphan |
+| `GET /api/v1/admin/activity-logs` | admin audit trail | Activity is logged but never shown; `/admin-users`-style admin pages exist but call no admin API |
+| `GET/POST /api/v1/admin/admins`, `PATCH/DELETE /api/v1/admin/admins/:id` | admin user management | No UI path manages admins; auth is hardcoded anyway (SEC-1) |
+| `POST /api/v1/admin/subscriptions/assign`, `POST /api/v1/admin/subscriptions/:id/cancel`, `PATCH /api/v1/admin/subscriptions/plans/:id` | subscription admin | Plans can be **listed** (`/plans` GET is wired) but not edited/assigned/cancelled from the UI |
+| `POST /api/v1/admin/bookings/:id/cancel` | admin booking ops | `booking.service.ts` has no cancel call; admins can re-assign and change status but not cancel |
+| `POST /api/v1/admin/auth/forgot-password`, `POST /api/v1/admin/auth/reset-password` | admin recovery | No UI uses them (consistent with the hardcoded credential, SEC-1) |
+| `GET /api/v1/qr/:id`, `GET /api/v1/qr/:id/metadata` | public QR lookup | **Entire QR feature has no consumer** — clients only *display* a `raceservice.in/qr/<id>` string and use `/vehicles/:id/verify` for checks. Also unauthenticated (SEC-9) |
+| `PATCH /api/v1/bookings/towing/:id/status`, `PATCH /api/v1/bookings/driver/:id/status` | customer-side booking status | Transitions are driven by the driver (`/driver/bookings/:id/status`) and admin (`/admin/bookings/:id/status`) routes; the customer-facing twins have no caller |
+| `GET /api/v1/services/upcoming`, `GET /health` | catalog / ops | No screen lists "upcoming services"; `/health` is defined in both apps' `config/api.ts` but never called (it is a probe endpoint, so this is fine — listed for completeness) |
+
+**Not an orphan (corrected in self-review — the client calls these by string concatenation):**
+`${subscriptions}/cancel`, `${notifications}/read-all`, `${notifications}/preferences` (GET+PATCH), `${savedLocations}/${id}` (PUT+DELETE), `${paymentMethods}/${id}` (DELETE), `${towingBooking(id)}/rating`, `${driverBooking(id)}/rating`. Owner files: `customer application/src/services/subscriptions/subscriptionApi.ts:85`, `…/profile/notificationApi.ts:109,114,123`, `…/profile/locationApi.ts:82,89`, `…/profile/paymentApi.ts:50`, `…/bookings/serviceBookingApi.ts:121-122`.
+
+**Referenced in code but not reachable from any screen:** `POST /api/v1/vendor/bookings/:id/verify-trip-otp` exists in `mobile application/src/config/api.ts` and nowhere else ⇒ the vendor-side trip-start OTP has no UI (a UI gap, not a backend orphan).
 
 ## 6. Client calls that cannot succeed today
 
@@ -93,21 +101,27 @@ Used: `/admin/auth/{login,refresh-token,logout,me}`, `/admin/dashboard`, `/admin
 | Admin document preview | View endpoints unused + public URLs are the only access path | `13-§5`, SEC-3 |
 | Any `.populate('driverId'/'vendorId')` (future) | ref points to an unregistered `Driver`/`Vendor` model | `towingBooking.ts:122-123`, DB-1 |
 
-## 7. Connection-health scoring per surface
+## 7. Connection-health scoring per surface (corrected counts)
 
-| Surface | Endpoints available for it | Actually wired | Wiring coverage | Notes |
-|---------|---------------------------:|---------------:|----------------:|-------|
-| Customer app | ~55 | 47 | **85%** | Missing: roadside detail/tracking, QR lookup, payment truth |
-| Partner app | ~31 | 27 | **87%** | Missing: vendor trip-OTP, vendor active-jobs view |
-| Admin web | 62 | 32 | **52%** | Missing: document viewing, audit logs, admin users, plan/assign management, create flows |
-| **All** | **159** | **106** | **67%** | 15+ endpoints are orphans; several exist only for future features |
+| Surface | Backend paths in its scope | Referenced in client code | Not referenced | Coverage | Notes |
+|---------|---------------------------:|--------------------------:|---------------:|---------:|-------|
+| Customer app | 52 (shared + public) | 46 | 6 | **88%** | Missing: QR lookup, `services/upcoming`, customer-side booking-status twins, `/health` |
+| Partner app | 27 (vendor + driver) | 27 | 0 | **100%** | Every vendor/driver path is referenced; gap is UI reachability (trip-OTP, active-jobs view), not wiring |
+| Admin web | 57 | 46 | 11 | **81%** | Missing: document viewing, audit logs, admin users, plan edit/assign/cancel, booking cancel, password recovery |
+| **All** | **136** | **119** | **17** | **88%** | "Referenced" = path appears in client code (constant or call site). A few are constants-only (see §5 note) |
+
+> **Method caveat [V]:** "referenced" counts a path as soon as it appears anywhere in client code — including definition-only entries in `config/api.ts`. A path can therefore be referenced-but-unreachable (the vendor trip-OTP case), which is why §6 lists UI-reachability gaps separately from wiring gaps.
 
 ### Two-level view
 
 | Capability | If DONE | If NOT done | Today |
 |-----------|--------:|------------:|-------|
-| Every endpoint has at least one client consumer or is documented as internal | 10 | 3 | **5** |
+| Every endpoint has at least one client consumer or is documented as internal | 10 | 3 | **7** (88% of paths referenced; the 17 orphans above are the deduction) |
 | Client never calls a non-existent/mismatched route | 10 | 5 | **9** — no dead paths found |
 | Auth/role contract matches per surface | 10 | 3 | **8** |
 | Admin can exercise the lifecycle it owns (view docs, audit, plans) | 10 | 2 | **3** |
 | Partner can complete every job step end-to-end in-app | 10 | 2 | **6** |
+| **Simple average (area score used in `01-SCORECARD.md`)** | — | — | **6.6 / 10** |
+
+> Wiring-coverage roll-up: customer 88%, partner 100%, admin 81%, overall 119/136 = **88%** (path-level).
+> First pass of this document reported 85/87/52% and 67% overall against a "159-endpoint" inventory — all four figures were wrong because of the two counting bugs explained at the top of this file. Weighted platform impact of the correction: connections 6.2 → 6.6, platform 5.7 → 5.8.

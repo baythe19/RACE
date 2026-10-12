@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import {
+  Bell,
   Briefcase,
   Calendar,
   Car,
@@ -21,6 +22,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import axios from 'axios';
+import { openPartnerNotifications } from '../../navigation/partnerNavigationRef';
 
 import GlassCard from '../../components/ui/GlassCard';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
@@ -473,14 +475,24 @@ export default function PartnerJobsScreen() {
                   : 'Trips approved by your vendor appear here — accept to start.'}
               </Text>
             </View>
-            {isVendor ? (
+            <View style={styles.headerActions}>
+              {isVendor ? (
+                <Pressable
+                  onPress={() => navigation.navigate('VendorVehicles')}
+                  style={styles.addVehicleBtn}>
+                  <Plus size={16} color={colors.dark} strokeWidth={2.6} />
+                  <Text style={styles.addVehicleLabel}>Vehicle</Text>
+                </Pressable>
+              ) : null}
               <Pressable
-                onPress={() => navigation.navigate('VendorVehicles')}
-                style={styles.addVehicleBtn}>
-                <Plus size={16} color={colors.dark} strokeWidth={2.6} />
-                <Text style={styles.addVehicleLabel}>Vehicle</Text>
+                onPress={openPartnerNotifications}
+                hitSlop={10}
+                style={styles.bellBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications">
+                <Bell size={20} color={colors.dark} strokeWidth={2.2} />
               </Pressable>
-            ) : null}
+            </View>
           </View>
 
           {isVendor ? (
@@ -642,6 +654,21 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   headerCopy: { flex: 1 },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  bellBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     color: colors.dark,
     fontSize: typography.sizes.xxl,

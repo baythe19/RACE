@@ -37,7 +37,7 @@ import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { usePartnerOnboardingStore } from '../../store/partnerOnboardingStore';
 import { useDriverProfileQuery } from '../../services/driver/useDriverQueries';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
-import { switchMockRole } from '../../config/uiPreviewMode';
+import { UI_PREVIEW_MODE, switchMockRole } from '../../config/uiPreviewMode';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
 import PartnerLogoutDialog from '../../components/partner/dialogs/PartnerLogoutDialog';
@@ -396,6 +396,21 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
               <Pressable
                 style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
+                onPress={() => navigation.navigate('PartnerHelpSupport')}>
+                <View style={[styles.menuIconCircle, { backgroundColor: '#FEF2F2' }]}>
+                  <HelpCircle size={18} color="#DC2626" strokeWidth={2.2} />
+                </View>
+                <View style={styles.menuTextCol}>
+                  <Text style={styles.menuTitle}>Help & Support</Text>
+                  <Text style={styles.menuSubtitle}>FAQs and contact support</Text>
+                </View>
+                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
+              </Pressable>
+
+              <View style={styles.divider} />
+
+              <Pressable
+                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
                 onPress={() => navigation.navigate('PartnerSettings')}>
                 <View style={[styles.menuIconCircle, { backgroundColor: driverColors.light }]}>
                   <Settings size={18} color={driverColors.ink} strokeWidth={2.2} />
@@ -410,17 +425,19 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           )}
         </View>
 
-        {/* Development Mode Role Switcher */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.switchRoleButton,
-            getPressableFeedback(pressed),
-          ]}
-          onPress={() => void switchMockRole(dispatch, isDriver ? 'vendor' : 'driver')}>
-          <Text style={styles.switchRoleText}>
-            {isDriver ? '⚡ Switch to Vendor Preview' : '⚡ Switch to Driver Preview'}
-          </Text>
-        </Pressable>
+        {/* Development Mode Role Switcher (gated to preview mode) */}
+        {UI_PREVIEW_MODE ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.switchRoleButton,
+              getPressableFeedback(pressed),
+            ]}
+            onPress={() => void switchMockRole(dispatch, isDriver ? 'vendor' : 'driver')}>
+            <Text style={styles.switchRoleText}>
+              {isDriver ? '⚡ Switch to Vendor Preview' : '⚡ Switch to Driver Preview'}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {/* Logout Button */}
         <Pressable

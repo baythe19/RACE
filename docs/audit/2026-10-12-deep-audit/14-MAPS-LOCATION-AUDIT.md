@@ -41,7 +41,7 @@
 | Driver dashboard / active job | **no map** in `DriverDashboardScreen` (1445 lines) or `DriverActiveJobScreen` — a driver cannot see route/pickup on a map during the job **[V]** |
 | Location permission flow | implemented with health states (`hooks/useDriverLocationReporting.ts`, `store/driverPresenceStore`) |
 | Background location | **not** used (no `expo-location` background task / task-manager registration found) ⇒ location stops when the app is backgrounded; the app re-reports on foreground **[V]** |
-| Socket | **no socket.io-client in the partner app**; job/offer freshness relies on polling (offers 8 s, active job 10 s, jobs 15 s) **[V]** |
+| Socket | Partner app ships `socket.io-client@^4.8.3` in `package.json` but never imports it; job/offer freshness therefore relies on polling (offers 8 s, active job 10 s, jobs 15 s) **[V]** |
 
 **Operational consequence:** a driver navigating the last 500 m with the phone screen off stops updating the customer's map. This is the single most visible "this is a demo" behaviour in the field, and it is a **product decision**, not a bug: implementing background updates needs `expo-task-manager` + `expo-location` background config + store-review justification.
 
@@ -73,7 +73,7 @@ This independently re-confirms the client-gap doc's "admin live map missing" cla
 | M3 | Add a map + route line to the driver's active-job screen | Driver usability is the weakest link in the live experience | M |
 | M4 | Background location during an active job only | Customer trust; scope with store policy | M–L |
 | M5 | Admin "live ops" map from open bookings + driver `currentLocation` | The client asked for it; data already exists | M |
-| M6 | Move live tracking off polling where possible (partner app already uses sockets on backend) | Battery + freshness | M |
+| M6 | Move live tracking and vendor job lists off polling (the backend already emits over Socket.IO; the partner app just never subscribes) | Battery + freshness | M |
 
 ## 7. Maps score
 

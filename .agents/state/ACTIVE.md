@@ -1,24 +1,40 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-07
+> **Updated:** 2026-10-12
 > **Read this first in every new session.**
 
 ---
 
 ## Current Objective
 
-**Partner mobile (Driver Registration & Motion/Interaction Standard) UI/UX implementation.**
-Complete, pixel-perfect 4-step Driver Registration flow + Under Verification screen + Motion Tokens implemented and verified in `mobile application/`:
-- Step 1: `DriverPersonalInfoScreen.tsx` (DOB modal, city search, emergency contact)
-- Step 2: `DriverVehicleInfoScreen.tsx` (Vehicle artwork selection, uppercase input)
-- Step 3: `DriverDocumentsScreen.tsx` (Core/conditional/later docs, instant demo filler, preview modal)
-- Step 4: `DriverReviewScreen.tsx` (3 edit cards, submit transition to verification)
-- Under Verification: `DriverVerificationPendingScreen.tsx` (matches image copy 4.png)
-- Motion Standard Tokens: `theme/motion.ts` (implements RACE_MOTION_INTERACTION_STANDARD.md Section 3)
+**Partner mobile (Master Prompt UI/UX, Driver–Vendor Parity, Flow Connectivity & Deliverables) COMPLETED.**
+Complete, high-fidelity implementation matching Master Prompt & Reference Boards 1 & 2 in `mobile application/`:
+- Screen A: `PartnerAccountScreen.tsx` (Account/Profile hub with role-aware metrics, verified badge, quick navigation)
+- Screen B: `PartnerEditProfileScreen.tsx` (Profile edit with avatar upload, mobile lock, DOB, city, address, languages chips)
+- Screen C: `PartnerVehicleInfoScreen.tsx` (Tow truck / vehicle artwork, plate number, active badge, RC, model, insurance)
+- Screen D: `PartnerDocumentsScreen.tsx` (All required docs approved banner, Required 6 vs Optional 2 tabs, upload sheet)
+- Screen E: `PartnerEarningsScreen.tsx` (Dual-tab Earnings & Payouts, weekly bar chart with highlight tooltip, trip metrics, recent trips, recent payouts)
+- Screen F: `PartnerNotificationsScreen.tsx` (Canonical notifications inbox with Mark all read, filter chips, Today/Yesterday grouping, unread dots, action navigation)
+- Screen G: `PartnerNotificationPreferencesModal.tsx` (Toggles for job requests, updates, account, earnings alerts, promotions)
+- Screen H: `PartnerSettingsScreen.tsx` (Account, App Settings, Support, About, Session with language picker, dark mode switch)
+- Screen I: `PartnerHelpSupportScreen.tsx` (Searchable FAQs, 24x7 Call Support, WhatsApp chat, common topics, Contact Us banner)
+- Screen J: `PartnerBankDetailsScreen.tsx` (Bank details with masked account, IFSC with Find IFSC, bank name, automated payout readiness)
+- Screen K: `PartnerTripHistoryScreen.tsx` (All, Completed, Cancelled tabs with fare, timestamps, references)
+- Screen L: Modals (`PartnerLogoutDialog.tsx`, `PartnerSuccessDialog.tsx`, `PartnerLanguageSheet.tsx`, `PartnerUploadSheet.tsx`, `PartnerLocationSheet.tsx`)
+- Screen M: `PartnerHomeScreen.tsx` (Vendor Home elevated with incoming leads banner, quick assign CTA, fleet KPIs, notification bell)
+- Screen N: `VendorAssignJobScreen.tsx` (Elevated to `PartnerScreenLayout` with vehicle artwork, radio selection, and assignment mutation)
+- Navigation & Notifications: Wired `openPartnerNotifications()` helper into top notification bells (`DriverDashboardScreen.tsx`, `DriverJobsScreen.tsx`, `PartnerHomeScreen.tsx`, `PartnerJobsScreen.tsx`)
+- Floating UI QA Navigator & Zero-Blocking UI Testing Mode:
+  - Added `UiTestNavigator.tsx` floating badge (`⚡ UI QA`) with 1-tap role switcher and instant jump to ~30 Driver, Vendor, and Account screens.
+  - Zero-blocking inputs: tapping Continue/Next/Submit on any registration or login screen auto-fills sensible defaults if blank.
+  - Toggle script: `scripts/toggle-ui-test-mode.sh` (or `npm run test:ui-on` / `npm run test:ui-off` / `npm run test:ui-status`) controls `EXPO_PUBLIC_UI_TEST_PERMISSIVE_MODE` on demand.
+  - In-app live switch: Toggle Permissive Mode ON/OFF directly inside the `⚡ UI QA` sheet with zero restart needed.
+- Deliverables generated: `docs/partner-app-audit.md`, `docs/partner-flow-map.md`, `docs/partner-implementation-report.md`
+- Quality status: 0 TypeScript errors in `mobile application/` and `backend/`.
 
 ## Active Branch
 
-`3.0.0-driver-app-development` (HEAD) — current work branch.
+`3.5.0-new-driver-screeens` (HEAD at last check) — current work branch. `3.0.0-driver-app-development` was the branch during the 2026-10-12 audit; the tree has since switched, and `PartnerHomeScreen.tsx` / `PartnerJobsScreen.tsx` / `VendorAssignJobScreen.tsx` carry uncommitted UI edits.
 
 ## Phase
 
@@ -93,6 +109,16 @@ See `.agents/state/DECISIONS_INDEX.md` for all decisions.
 - **Fixed bug:** `isVerified` is set to `true` at driver registration even while the review is open, so the dashboard used to claim "Verification approved" for pending drivers. Approval is now `driverProfile.status === 'APPROVED'` (same field the backend gates on).
 - `PartnerAppNavigator` starts an unapproved driver on the gate instead of the live tabs; "Go to Dashboard (Read only)" opens them. The dashboard skips jobs/offers/availability/location requests until approved (they would 403).
 - Removed fabricated `mock-driver-token` / placeholder user from the verification screen; `DriverReviewScreen` still contains its own mock fallbacks (untouched, separate task).
+
+## Deep audit — 2026-10-12 (documentation only, no code changed)
+
+Full audit lives in `docs/audit/2026-10-12-deep-audit/` (README index + scorecard + per-surface docs + bug register + test catalogue).
+Key outcomes: **platform readiness 5.8/10**, launch readiness 3.6/10; four blockers (partner-app mock mode on by default, publicly readable KYC uploads, unauthenticated Socket.IO rooms, hardcoded admin credential with a default).
+Execution order for the fixes: `80-IMPLEMENTATION-PLAN.md` (phases 0-6, owner + connection + verification per item); pure numbers: `81-SCORING-ONLY.md`.
+MVP scope added on request: `82-MVP-DEFINITION-AND-BUILD-PLAN.md` — what a working MVP is across all four surfaces + API, three tiers (**MVP-0 honest demo ~14 dd · MVP-A working MVP ~29 dd · MVP-B pilot-hardened ~38.5 dd**), per-surface completeness tables, the 7 end-to-end journeys with exact screen→endpoint connections, an ordered work list (MVP-01…MVP-23 with verify steps), and a ~50-check acceptance script for calling the MVP "done".
+Self-review corrections (see `02-§6`): backend is **171 route registrations / 136 unique paths** (not 159); client wiring is **88%** (not 67%) and admin **81%** (not 52%) — the first pass undercounted because of a mount-table bug and template-concatenated client paths. Score moved connections 6.2 → 6.6, platform 5.7 → 5.8.
+
+**Correction to older memory:** `SKIP_OTP_AUTH` is **no longer hardcoded `true`** in the Expo login screens — both apps now use `process.env.EXPO_PUBLIC_SKIP_OTP_AUTH === 'true'` (default false). The partner app instead has `EXPO_PUBLIC_UI_PREVIEW_MODE` which **defaults to on** and returns mock data on API failure (40 sites) — that is the real "looks done but is not" switch now.
 
 ## Next Action (When User Returns)
 

@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react-native';
 
+import { useAppSelector } from '../../../redux/hooks';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
@@ -26,7 +27,8 @@ import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuc
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerBankDetails'>;
 
 export default function PartnerBankDetailsScreen({ navigation }: Props) {
-  const [holderName, setHolderName] = useState('Om Singh');
+  const user = useAppSelector(state => state.auth.user);
+  const [holderName, setHolderName] = useState(user?.fullName || 'Partner');
   const [accountNumber, setAccountNumber] = useState('91881234567890');
   const [ifsc, setIfsc] = useState('SBIN0001234');
   const [bankName, setBankName] = useState('State Bank of India');
@@ -135,7 +137,7 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
             <TextInput
               style={styles.inputIconText}
               value={ifsc}
-              onChangeText={setIfsc}
+              onChangeText={t => setIfsc(t.toUpperCase())}
               placeholder="Enter IFSC code"
               placeholderTextColor={driverColors.greySoft}
               autoCapitalize="characters"
