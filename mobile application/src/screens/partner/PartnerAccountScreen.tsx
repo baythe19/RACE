@@ -18,18 +18,17 @@ import {
   DollarSign,
   Bell,
   HelpCircle,
-  Settings,
-  PhoneCall,
   LogOut,
   ChevronRight,
   CheckCircle,
   Users,
   Building,
-  Star,
-  Briefcase,
-  Clock,
   Edit2,
   AlertCircle,
+  MapPin,
+  Globe,
+  Info,
+  Settings,
 } from 'lucide-react-native';
 
 import { useAuthActions } from '../../hooks/useAuth';
@@ -40,8 +39,13 @@ import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import { UI_PREVIEW_MODE, switchMockRole } from '../../config/uiPreviewMode';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
+import { buildDriverVerification } from '../../utils/driverVerification';
 import PartnerLogoutDialog from '../../components/partner/dialogs/PartnerLogoutDialog';
+import PartnerLanguageSheet from '../../components/partner/dialogs/PartnerLanguageSheet';
+import PartnerLocationSheet from '../../components/partner/dialogs/PartnerLocationSheet';
+import PartnerNotificationPreferencesModal from '../../components/partner/dialogs/PartnerNotificationPreferencesModal';
 import { useNotificationsQuery } from '../../services/useNotificationQueries';
+import { openLocationSettings } from '../../hooks/useDriverLocationReporting';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerAccountMain'>;
 
@@ -60,8 +64,23 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [langSheetVisible, setLangSheetVisible] = useState(false);
+  const [locationSheetVisible, setLocationSheetVisible] = useState(false);
+  const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
+  const [selectedLang, setSelectedLang] = useState('en');
 
   const unreadNotifs = notifData?.unreadCount ?? 0;
+  const driverVerification = buildDriverVerification(driverProfile);
+  const accountApproved = isVendor
+    ? vendor?.status === 'approved'
+    : driverVerification.isApproved;
+  const accountStatusLabel = isVendor
+    ? vendor?.status === 'approved'
+      ? 'Approved'
+      : 'In review'
+    : driverVerification.badge;
+  const driverDocuments = driverProfile?.driverProfile?.documents ?? [];
+  const verifiedDriverDocuments = driverDocuments.filter(doc => doc.status === 'VERIFIED').length;
 
   const performLogout = async () => {
     try {
@@ -85,6 +104,14 @@ export default function PartnerAccountScreen({ navigation }: Props) {
     : `ID: ${driverProfile?.driverProfile?.driverCode || 'DRV-1024'}`;
 
   const roleLabel = isVendor ? 'Vendor Partner' : 'Self Driver';
+
+  const handleAllowLocation = () => {
+    setLocationSheetVisible(false);
+    void openLocationSettings();
+  };
+
+  const languageDisplayName =
+    selectedLang === 'hi' ? 'हिंदी' : selectedLang === 'or' ? 'ଓଡ଼ିଆ' : 'English';
 
   return (
     <View style={styles.root}>
@@ -128,37 +155,44 @@ export default function PartnerAccountScreen({ navigation }: Props) {
             <View style={styles.rolePill}>
               <Text style={styles.roleText}>{roleLabel}</Text>
             </View>
-            <View style={styles.verifiedPill}>
-              <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
-              <Text style={styles.verifiedText}>Verified</Text>
+            <View style={accountApproved ? styles.verifiedPill : styles.reviewPill}>
+              {accountApproved ? (
+                <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
+              ) : (
+                <AlertCircle size={12} color={driverColors.amberText} strokeWidth={2.4} />
+              )}
+              <Text style={accountApproved ? styles.verifiedText : styles.reviewText}>
+                {accountStatusLabel}
+              </Text>
             </View>
           </View>
 
           <Text style={styles.partnerId}>{partnerCode}</Text>
 
-          {/* Metric Stats Row (Drivers) */}
+          {/* Only show values that come from the profile; do not invent driver KPIs. */}
           {!isVendor ? (
             <View style={styles.metricRow}>
               <View style={styles.metricCol}>
-                <View style={styles.metricLabelRow}>
-                  <Star size={13} color={driverColors.amber} fill={driverColors.amber} />
-                  <Text style={styles.metricValue}>4.8</Text>
-                </View>
-                <Text style={styles.metricSubtitle}>Driver Rating</Text>
+                <Text style={styles.metricValue}>{accountStatusLabel}</Text>
+                <Text style={styles.metricSubtitle}>Account status</Text>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue}>126</Text>
-                <Text style={styles.metricSubtitle}>Total Trips</Text>
+                <Text style={styles.metricValue} numberOfLines={1}>
+                  {driverProfile?.driverProfile?.driverType || '—'}
+                </Text>
+                <Text style={styles.metricSubtitle}>Driver type</Text>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue}>1.2 Yrs</Text>
-                <Text style={styles.metricSubtitle}>Experience</Text>
+                <Text style={styles.metricValue} numberOfLines={1}>
+                  {driverProfile?.driverProfile?.city || '—'}
+                </Text>
+                <Text style={styles.metricSubtitle}>Operating city</Text>
               </View>
             </View>
           ) : (
@@ -176,9 +210,9 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           )}
         </View>
 
-        {/* Menu Navigation Card */}
+        {/* Section 1: Account Operations & Fleet */}
+        <Text style={styles.sectionHeader}>{isVendor ? 'Vendor Operations' : 'Account & Vehicle'}</Text>
         <View style={styles.menuCard}>
-          {/* Driver specific items */}
           {!isVendor ? (
             <>
               <Pressable
@@ -204,7 +238,11 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.menuTextCol}>
                   <Text style={styles.menuTitle}>Vehicle Information</Text>
-                  <Text style={styles.menuSubtitle}>Tata 407 • OD-02-TOW-1001</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {driverProfile?.driverProfile?.vehicleRegistration ||
+                      driverProfile?.driverProfile?.driverType ||
+                      'Vehicle details not added'}
+                  </Text>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -219,14 +257,13 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.menuTextCol}>
                   <Text style={styles.menuTitle}>Documents</Text>
-                  <Text style={styles.menuSubtitle}>6/6 verified</Text>
+                  <Text style={styles.menuSubtitle}>
+                    {driverDocuments.length > 0
+                      ? `${verifiedDriverDocuments}/${driverDocuments.length} verified`
+                      : 'Verification status unavailable'}
+                  </Text>
                 </View>
-                <View style={styles.badgeRight}>
-                  <View style={styles.approvedPill}>
-                    <Text style={styles.approvedText}>Approved</Text>
-                  </View>
-                  <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-                </View>
+                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
 
               <View style={styles.divider} />
@@ -241,12 +278,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Text style={styles.menuTitle}>Bank & Payouts</Text>
                   <Text style={styles.menuSubtitle}>Add or manage bank details</Text>
                 </View>
-                <View style={styles.badgeRight}>
-                  <View style={styles.verifiedPill}>
-                    <Text style={styles.verifiedText}>Verified</Text>
-                  </View>
-                  <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-                </View>
+                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
 
               <View style={styles.divider} />
@@ -283,36 +315,6 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                     <Text style={styles.unreadCounterText}>{unreadNotifs}</Text>
                   </View>
                 ) : null}
-                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
-
-              <View style={styles.divider} />
-
-              <Pressable
-                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-                onPress={() => navigation.navigate('PartnerHelpSupport')}>
-                <View style={[styles.menuIconCircle, { backgroundColor: '#FEF2F2' }]}>
-                  <HelpCircle size={18} color="#DC2626" strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Help & Support</Text>
-                  <Text style={styles.menuSubtitle}>FAQs and contact support</Text>
-                </View>
-                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
-
-              <View style={styles.divider} />
-
-              <Pressable
-                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-                onPress={() => navigation.navigate('PartnerSettings')}>
-                <View style={[styles.menuIconCircle, { backgroundColor: driverColors.light }]}>
-                  <Settings size={18} color={driverColors.ink} strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Settings</Text>
-                  <Text style={styles.menuSubtitle}>App preferences and support</Text>
-                </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
             </>
@@ -391,38 +393,84 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
-
-              <View style={styles.divider} />
-
-              <Pressable
-                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-                onPress={() => navigation.navigate('PartnerHelpSupport')}>
-                <View style={[styles.menuIconCircle, { backgroundColor: '#FEF2F2' }]}>
-                  <HelpCircle size={18} color="#DC2626" strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Help & Support</Text>
-                  <Text style={styles.menuSubtitle}>FAQs and contact support</Text>
-                </View>
-                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
-
-              <View style={styles.divider} />
-
-              <Pressable
-                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-                onPress={() => navigation.navigate('PartnerSettings')}>
-                <View style={[styles.menuIconCircle, { backgroundColor: driverColors.light }]}>
-                  <Settings size={18} color={driverColors.ink} strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Settings</Text>
-                  <Text style={styles.menuSubtitle}>App preferences and legal</Text>
-                </View>
-                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
             </>
           )}
+        </View>
+
+        {/* Section 2: Preferences (Location, Language, Notifications - moved directly into Profile) */}
+        <Text style={styles.sectionHeader}>Preferences</Text>
+        <View style={styles.menuCard}>
+          <Pressable
+            style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
+            onPress={() => setLocationSheetVisible(true)}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#ECFDF5' }]}>
+              <MapPin size={18} color="#059669" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Location Settings</Text>
+              <Text style={styles.menuSubtitle}>Manage GPS & location permissions</Text>
+            </View>
+            <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable
+            style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
+            onPress={() => setLangSheetVisible(true)}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#EFF6FF' }]}>
+              <Globe size={18} color="#2563EB" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Language</Text>
+              <Text style={styles.menuSubtitle}>{languageDisplayName}</Text>
+            </View>
+            <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Pressable
+            style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
+            onPress={() => setNotifPrefsVisible(true)}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#FFF7ED' }]}>
+              <Bell size={18} color="#EA580C" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Notification Preferences</Text>
+              <Text style={styles.menuSubtitle}>Sound alerts, trip requests & reminders</Text>
+            </View>
+            <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
+          </Pressable>
+        </View>
+
+        {/* Section 3: Support & About */}
+        <Text style={styles.sectionHeader}>Support & About</Text>
+        <View style={styles.menuCard}>
+          <Pressable
+            style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
+            onPress={() => navigation.navigate('PartnerHelpSupport')}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#FEF2F2' }]}>
+              <HelpCircle size={18} color="#DC2626" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>Help & Support</Text>
+              <Text style={styles.menuSubtitle}>FAQs and contact support</Text>
+            </View>
+            <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <View style={styles.menuRow}>
+            <View style={[styles.menuIconCircle, { backgroundColor: '#F1F5F9' }]}>
+              <Info size={18} color="#64748B" strokeWidth={2.2} />
+            </View>
+            <View style={styles.menuTextCol}>
+              <Text style={styles.menuTitle}>App Version</Text>
+              <Text style={styles.menuSubtitle}>RACE Partner v1.0.0 (Production Build)</Text>
+            </View>
+          </View>
         </View>
 
         {/* Development Mode Role Switcher (gated to preview mode) */}
@@ -451,12 +499,30 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         </Pressable>
       </ScrollView>
 
-      {/* Logout Confirmation Dialog */}
+      {/* Supporting Dialogs & Sheets */}
       <PartnerLogoutDialog
         visible={logoutVisible}
         isLoading={loggingOut}
         onCancel={() => setLogoutVisible(false)}
         onConfirm={performLogout}
+      />
+
+      <PartnerLanguageSheet
+        visible={langSheetVisible}
+        selectedLanguage={selectedLang}
+        onSelect={setSelectedLang}
+        onClose={() => setLangSheetVisible(false)}
+      />
+
+      <PartnerLocationSheet
+        visible={locationSheetVisible}
+        onAllow={handleAllowLocation}
+        onDeny={() => setLocationSheetVisible(false)}
+      />
+
+      <PartnerNotificationPreferencesModal
+        visible={notifPrefsVisible}
+        onClose={() => setNotifPrefsVisible(false)}
       />
     </View>
   );
@@ -564,6 +630,20 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: driverColors.green,
   },
+  reviewPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: driverColors.amberTile,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: driverRadius.pill,
+  },
+  reviewText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: driverColors.amberText,
+  },
   partnerId: {
     fontSize: 12,
     color: driverColors.greySoft,
@@ -603,13 +683,28 @@ const styles = StyleSheet.create({
     height: 24,
     backgroundColor: '#E2E4E8',
   },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: driverColors.grey,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+    marginLeft: 4,
+    marginTop: 4,
+  },
   menuCard: {
     backgroundColor: driverColors.white,
     borderRadius: driverRadius.card,
     borderWidth: 1,
-    borderColor: driverColors.hairline,
+    borderColor: '#E2E8F0',
     marginBottom: 16,
     overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   menuRow: {
     flexDirection: 'row',

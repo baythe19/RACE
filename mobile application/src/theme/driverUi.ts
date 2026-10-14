@@ -13,13 +13,13 @@
  */
 
 export const driverColors = {
-  /** Screen background — warm off-white used behind every card. */
-  pageBg: '#F8F9F7',
+  /** Screen background — pure crisp white. */
+  pageBg: '#FFFFFF',
   card: '#FFFFFF',
   /** Hairline used on card outlines and list dividers. */
-  hairline: '#F0F1EF',
+  hairline: '#F1F5F9',
   /** Neutral chip / pill fill. */
-  light: '#F4F5F2',
+  light: '#F8FAFC',
 
   /** Headings, values, job titles. The boards use pure black, not #1A1A1A. */
   ink: '#000000',
@@ -54,6 +54,8 @@ export const driverColors = {
   /** Live / verified / positive signal. */
   green: '#0FA94A',
   greenCard: '#F3FBF6',
+  /** More visible outline used only by the online availability control. */
+  greenOnlineBorder: '#71D7A2',
   greenCardBorder: '#CEF4DE',
   greenPill: '#E5F9ED',
   greenTile: '#E9FAF0',

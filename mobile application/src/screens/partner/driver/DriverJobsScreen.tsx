@@ -23,12 +23,26 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Bell, CalendarDays, Car, MapPin, TriangleAlert } from 'lucide-react-native';
+import {
+  Bell,
+  CalendarDays,
+  Car,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock3,
+  Inbox,
+  MapPin,
+  Navigation,
+  RefreshCw,
+  Route,
+  TriangleAlert,
+  User,
+} from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { openPartnerNotifications } from '../../../navigation/partnerNavigationRef';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
@@ -183,57 +197,59 @@ function RequestJobCard({
     <View
       style={{
         backgroundColor: C.card,
-        borderRadius: px(R.card),
+        borderRadius: px(R.innerCard),
         borderWidth: 1,
         borderColor: C.amberBorder,
-        padding: px(14),
-        marginBottom: px(12),
+        padding: px(12),
+        marginBottom: px(10),
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
           style={{
-            width: px(46),
-            height: px(46),
-            borderRadius: px(23),
+            width: px(40),
+            height: px(40),
+            borderRadius: px(20),
             backgroundColor: C.amberTileSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <JobGlyph job={job} px={px} size={26} />
+          <JobGlyph job={job} px={px} size={24} />
         </View>
 
-        <View style={{ flex: 1, marginLeft: px(12) }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View
-              style={{
-                backgroundColor: C.bluePill,
-                borderRadius: px(R.pill),
-                paddingHorizontal: px(9),
-                paddingVertical: px(3),
-                marginRight: px(8),
-              }}>
-              <Text style={[T.pill, { fontSize: px(10.5), lineHeight: px(13), color: C.blue }]}>
-                NEW
-              </Text>
-            </View>
-            <Text
-              numberOfLines={1}
-              style={[T.jobTitle, { flex: 1, fontSize: px(14.5), color: C.inkSoft }]}>
-              #{job.bookingNumber}
-            </Text>
-          </View>
-          {job.distanceKm != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(3) }}>
-              <MapPin size={px(13)} color={C.green} strokeWidth={2.6} />
+        <View style={{ flex: 1, marginLeft: px(10) }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  backgroundColor: C.bluePill,
+                  borderRadius: px(R.pill),
+                  paddingHorizontal: px(7),
+                  paddingVertical: px(2),
+                  marginRight: px(6),
+                }}>
+                <Text style={[T.pill, { fontSize: px(10), lineHeight: px(13), color: C.blue }]}>
+                  NEW
+                </Text>
+              </View>
               <Text
-                style={[
-                  T.distance,
-                  { fontSize: px(13.5), lineHeight: px(18), color: C.green, marginLeft: px(4) },
-                ]}>
-                {job.distanceKm} km away
+                numberOfLines={1}
+                style={[T.jobTitle, { fontSize: px(13.5), color: C.inkSoft }]}>
+                #{job.bookingNumber}
               </Text>
             </View>
-          ) : null}
+            {job.distanceKm != null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MapPin size={px(12)} color={C.green} strokeWidth={2.6} />
+                <Text
+                  style={[
+                    T.distance,
+                    { fontSize: px(12.5), lineHeight: px(16), color: C.green, marginLeft: px(3) },
+                  ]}>
+                  {job.distanceKm} km away
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -241,26 +257,26 @@ function RequestJobCard({
         numberOfLines={1}
         style={[
           T.jobTitle,
-          { fontSize: px(15), lineHeight: px(20), color: C.ink, marginTop: px(10) },
+          { fontSize: px(14.5), lineHeight: px(19), color: C.ink, marginTop: px(8) },
         ]}>
         {serviceTitle(job)}
       </Text>
 
       {pickup || drop ? (
-        <View style={{ flexDirection: 'row', marginTop: px(10) }}>
+        <View style={{ flexDirection: 'row', marginTop: px(7) }}>
           <RouteSpine px={px} />
-          <View style={{ flex: 1, marginLeft: px(10) }}>
+          <View style={{ flex: 1, marginLeft: px(9) }}>
             {pickup ? (
               <Text
                 numberOfLines={1}
-                style={[T.body, { fontSize: px(13.5), color: C.inkSoft }]}>
+                style={[T.body, { fontSize: px(13), color: C.inkSoft }]}>
                 {pickup}
               </Text>
             ) : null}
             {drop ? (
               <Text
                 numberOfLines={1}
-                style={[T.body, { fontSize: px(13.5), color: C.inkSoft, marginTop: px(11) }]}>
+                style={[T.body, { fontSize: px(13), color: C.inkSoft, marginTop: px(6) }]}>
                 {drop}
               </Text>
             ) : null}
@@ -273,14 +289,14 @@ function RequestJobCard({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginTop: px(10),
+            marginTop: px(6),
             paddingLeft: px(24),
           }}>
-          <CalendarDays size={px(15)} color={C.greySoft} strokeWidth={2.2} />
+          <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
           <Text
             style={[
               T.meta,
-              { fontSize: px(13), lineHeight: px(18), color: C.greySoft, marginLeft: px(9) },
+              { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginLeft: px(6) },
             ]}>
             {formatWhen(job.createdAt)}
           </Text>
@@ -288,59 +304,73 @@ function RequestJobCard({
       ) : null}
 
       {job.estimatedFare != null ? (
-        <View style={{ marginTop: px(12), paddingLeft: px(24) }}>
-          <Text style={[T.metricValue, { fontSize: px(24), lineHeight: px(29), color: C.ink }]}>
+        <View style={{ marginTop: px(8), paddingLeft: px(24) }}>
+          <Text style={[T.metricValue, { fontSize: px(22), lineHeight: px(26), color: C.ink }]}>
             {formatInr(job.estimatedFare)}
           </Text>
           <Text
             style={[
               T.small,
-              { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(1) },
+              { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft, marginTop: px(1) },
             ]}>
             Estimated earnings
           </Text>
         </View>
       ) : null}
 
-      <Pressable
-        onPress={onAccept}
-        disabled={busy}
-        accessibilityRole="button"
-        accessibilityLabel={`Accept trip ${job.bookingNumber}`}
-        style={({ pressed }) => ({
-          height: px(M.ctaHeight),
-          marginTop: px(14),
-          borderRadius: px(R.button),
-          backgroundColor: busy ? C.amberBorder : C.amber,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: pressed ? 0.94 : 1,
-        })}>
-        {accepting ? (
-          <ActivityIndicator color={C.ink} />
-        ) : (
-          <Text style={[T.button, { fontSize: px(16), color: C.ink }]}>Accept trip</Text>
-        )}
-      </Pressable>
+      {/* Action buttons in one line side-by-side */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(10) }}>
+        <Pressable
+          onPress={onDecline}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={`Decline trip ${job.bookingNumber}`}
+          style={({ pressed }) => ({
+            flex: 1,
+            height: px(40),
+            borderRadius: px(R.button),
+            backgroundColor: C.light,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: px(10),
+            opacity: pressed ? 0.85 : 1,
+          })}>
+          {declining ? (
+            <ActivityIndicator size="small" color={C.grey} />
+          ) : (
+            <Text
+              style={[
+                T.button,
+                { fontSize: px(14.5), fontWeight: '600', color: busy ? C.greySoft : C.grey },
+              ]}>
+              Decline
+            </Text>
+          )}
+        </Pressable>
 
-      <Pressable
-        onPress={onDecline}
-        disabled={busy}
-        accessibilityRole="button"
-        accessibilityLabel={`Decline trip ${job.bookingNumber}`}
-        style={{ paddingVertical: px(12), alignItems: 'center', justifyContent: 'center' }}>
-        {declining ? (
-          <ActivityIndicator color={C.grey} />
-        ) : (
-          <Text
-            style={[
-              T.button,
-              { fontSize: px(15), color: busy ? C.greySoft : C.grey },
-            ]}>
-            Decline
-          </Text>
-        )}
-      </Pressable>
+        <Pressable
+          onPress={onAccept}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={`Accept trip ${job.bookingNumber}`}
+          style={({ pressed }) => ({
+            flex: 1.5,
+            height: px(40),
+            borderRadius: px(R.button),
+            backgroundColor: busy ? C.amberBorder : C.amber,
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: pressed ? 0.9 : 1,
+          })}>
+          {accepting ? (
+            <ActivityIndicator size="small" color={C.ink} />
+          ) : (
+            <Text style={[T.button, { fontSize: px(15), fontWeight: '700', color: C.ink }]}>
+              Accept trip
+            </Text>
+          )}
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -415,71 +445,273 @@ function ActiveJobRow({
 function DoneJobRow({
   job,
   px,
+  expanded,
+  onOpen,
+  onViewSummary,
 }: {
   job: DriverJobBooking;
   px: (value: number) => number;
+  expanded: boolean;
+  onOpen: () => void;
+  onViewSummary: () => void;
 }) {
-  const pickup = addressOf(job.pickup?.address || job.pickup?.label);
-  const drop = addressOf(job.dropoff?.address || job.dropoff?.label);
+  const pickup = addressOf(job.pickup?.address || job.pickup?.label) || 'Pickup point';
+  const drop = addressOf(job.dropoff?.address || job.dropoff?.label) || 'Drop location';
   const cancelled = isCancelledBookingStatus(job.status);
   const earned = jobEarnings(job);
+  const completedEntry = [...(job.statusHistory ?? [])]
+    .reverse()
+    .find(entry => entry.status === 'COMPLETED');
+
   return (
     <View
       style={{
         backgroundColor: C.card,
         borderRadius: px(R.card),
         borderWidth: 1,
-        borderColor: C.hairline,
-        padding: px(14),
+        borderColor: expanded ? C.amberBorder : C.hairline,
         marginBottom: px(12),
+        overflow: 'hidden',
       }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <View
-          style={{
-            width: px(M.rowIcon),
-            height: px(M.rowIcon),
-            borderRadius: px(M.rowIcon / 2),
-            backgroundColor: C.creamRow,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <JobGlyph job={job} px={px} size={20} />
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} details for job ${job.bookingNumber}`}
+        style={({ pressed }) => ({
+          padding: px(14),
+          opacity: pressed ? 0.95 : 1,
+        })}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              width: px(40),
+              height: px(40),
+              borderRadius: px(20),
+              backgroundColor: C.creamRow,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <JobGlyph job={job} px={px} size={20} />
+          </View>
+          <View style={{ flex: 1, marginLeft: px(12) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={[T.jobTitle, { fontSize: px(14.5), color: C.ink }]}>
+                #{job.bookingNumber}
+              </Text>
+              <View
+                style={{
+                  height: px(M.rowPillHeight),
+                  paddingHorizontal: px(9),
+                  borderRadius: px(R.pill),
+                  backgroundColor: cancelled ? C.redPill : C.greenPill,
+                  justifyContent: 'center',
+                }}>
+                <Text
+                  style={[
+                    T.pill,
+                    { fontSize: px(11.5), color: cancelled ? C.red : C.green, fontWeight: '700' },
+                  ]}>
+                  {cancelled ? 'Cancelled' : 'Completed'}
+                </Text>
+              </View>
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[T.meta, { fontSize: px(12.5), color: C.greySoft, marginTop: px(2) }]}>
+              {serviceTitle(job)} • {formatWhen(job.createdAt) || 'Recent'}
+            </Text>
+          </View>
         </View>
-        <View style={{ flex: 1, marginLeft: px(12) }}>
-          <Text style={[T.jobTitle, { fontSize: px(14), color: C.ink }]}>
-            #{job.bookingNumber}
-          </Text>
+
+        {/* Route preview snippet */}
+        <View style={{ marginTop: px(10), flexDirection: 'row', alignItems: 'center' }}>
+          <MapPin size={px(13)} color={C.blue} strokeWidth={2.4} />
           <Text
             numberOfLines={1}
-            style={[T.meta, { fontSize: px(12.5), color: C.greySoft, marginTop: px(2) }]}>
-            {[formatWhen(job.createdAt), pickup].filter(Boolean).join(' • ')}
+            style={[T.body, { flex: 1, fontSize: px(12.5), color: C.inkSoft, marginLeft: px(6) }]}>
+            {pickup}
           </Text>
+          {drop && drop !== 'Drop location' ? (
+            <>
+              <Text style={{ marginHorizontal: px(4), color: C.greySoft, fontSize: px(12) }}>→</Text>
+              <Text
+                numberOfLines={1}
+                style={[T.body, { flex: 1, fontSize: px(12.5), color: C.inkSoft }]}>
+                {drop}
+              </Text>
+            </>
+          ) : null}
         </View>
+
+        {/* Fare row & expand toggle */}
         <View
           style={{
-            height: px(M.rowPillHeight),
-            paddingHorizontal: px(10),
-            borderRadius: px(R.pill),
-            backgroundColor: cancelled ? C.redPill : C.greenPill,
-            justifyContent: 'center',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: px(10),
+            paddingTop: px(8),
+            borderTopWidth: 1,
+            borderTopColor: C.hairline,
           }}>
-          <Text
-            style={[
-              T.pill,
-              { fontSize: px(12), color: cancelled ? C.red : C.green },
-            ]}>
-            {cancelled ? 'Cancelled' : 'Completed'}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {earned != null ? (
+              <Text style={[T.jobTitle, { fontSize: px(15), color: C.green, fontWeight: '700' }]}>
+                {formatInr(earned)}
+              </Text>
+            ) : null}
+            {job.distanceKm != null ? (
+              <Text
+                style={[
+                  T.meta,
+                  { fontSize: px(12), color: C.greySoft, marginLeft: earned != null ? px(8) : 0 },
+                ]}>
+                {job.distanceKm} km
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={[T.link, { fontSize: px(12), color: C.grey }]}>
+              {expanded ? 'Hide details' : 'Trip details'}
+            </Text>
+            {expanded ? (
+              <ChevronUp size={px(16)} color={C.grey} strokeWidth={2.2} style={{ marginLeft: px(4) }} />
+            ) : (
+              <ChevronDown size={px(16)} color={C.grey} strokeWidth={2.2} style={{ marginLeft: px(4) }} />
+            )}
+          </View>
         </View>
-      </View>
-      {earned != null ? (
-        <Text
-          style={[
-            T.jobTitle,
-            { fontSize: px(14.5), color: C.ink, marginTop: px(10) },
-          ]}>
-          {formatInr(earned)}
-        </Text>
+      </Pressable>
+
+      {/* Expanded detailed trip view */}
+      {expanded ? (
+        <View
+          style={{
+            paddingHorizontal: px(14),
+            paddingBottom: px(14),
+            backgroundColor: '#FAFAFA',
+            borderTopWidth: 1,
+            borderTopColor: C.hairline,
+          }}>
+          <View style={{ paddingTop: px(10), gap: px(8) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View style={{ width: px(18), alignItems: 'center', paddingTop: px(2) }}>
+                <MapPin size={px(14)} color={C.blue} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1, marginLeft: px(8) }}>
+                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Pickup point</Text>
+                <Text style={[T.body, { fontSize: px(13), color: C.ink, marginTop: px(1) }]}>
+                  {pickup}
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View style={{ width: px(18), alignItems: 'center', paddingTop: px(2) }}>
+                <MapPin size={px(14)} color={C.amberText} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1, marginLeft: px(8) }}>
+                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Drop-off point</Text>
+                <Text style={[T.body, { fontSize: px(13), color: C.ink, marginTop: px(1) }]}>
+                  {drop}
+                </Text>
+              </View>
+            </View>
+
+            {job.createdAt ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: px(18), alignItems: 'center' }}>
+                  <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
+                </View>
+                <Text style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
+                  Requested: {formatWhen(job.createdAt)}
+                </Text>
+              </View>
+            ) : null}
+
+            {completedEntry ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: px(18), alignItems: 'center' }}>
+                  <Clock3 size={px(13)} color={C.green} strokeWidth={2.2} />
+                </View>
+                <Text style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
+                  Finished: {formatWhen(completedEntry.timestamp)}
+                </Text>
+              </View>
+            ) : null}
+
+            {job.customer?.name ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: px(18), alignItems: 'center' }}>
+                  <User size={px(13)} color={C.greySoft} strokeWidth={2.2} />
+                </View>
+                <Text style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
+                  Customer: {job.customer.name}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* Metrics summary */}
+          <View
+            style={{
+              flexDirection: 'row',
+              marginTop: px(12),
+              padding: px(10),
+              borderRadius: px(R.innerCard),
+              backgroundColor: C.white,
+              borderWidth: 1,
+              borderColor: C.hairline,
+            }}>
+            {job.distanceKm != null ? (
+              <View style={{ flex: 1 }}>
+                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Distance</Text>
+                <Text style={[T.jobTitle, { fontSize: px(14), color: C.ink, marginTop: px(2) }]}>
+                  {job.distanceKm} km
+                </Text>
+              </View>
+            ) : null}
+            {earned != null ? (
+              <View style={{ flex: 1 }}>
+                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Earnings</Text>
+                <Text style={[T.jobTitle, { fontSize: px(14), color: C.green, marginTop: px(2) }]}>
+                  {formatInr(earned)}
+                </Text>
+              </View>
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Status</Text>
+              <Text
+                style={[
+                  T.jobTitle,
+                  { fontSize: px(14), color: cancelled ? C.red : C.green, marginTop: px(2) },
+                ]}>
+                {cancelled ? 'Cancelled' : 'Completed'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Full view button */}
+          <Pressable
+            onPress={onViewSummary}
+            accessibilityRole="button"
+            accessibilityLabel={`View full summary for trip ${job.bookingNumber}`}
+            style={({ pressed }) => ({
+              height: px(38),
+              borderRadius: px(R.button),
+              backgroundColor: C.amber,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: px(12),
+              opacity: pressed ? 0.9 : 1,
+            })}>
+            <Text style={[T.button, { fontSize: px(13.5), fontWeight: '700', color: C.ink }]}>
+              View trip receipt & summary
+            </Text>
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -491,34 +723,51 @@ function JobsCount({
   px,
 }: {
   count: number;
-  label: string;
+  label: 'ready to accept' | 'active trip';
   px: (value: number) => number;
 }) {
+  const isReady = label === 'ready to accept';
+  const Icon = isReady ? Inbox : Navigation;
+  const iconColor = isReady ? C.amberText : C.blue;
+  const iconBg = isReady ? C.amberTile : C.bluePill;
+
   return (
-    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: px(8) }}>
+    <View
+      style={{
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: px(10),
+        paddingVertical: px(6),
+      }}>
       <View
         style={{
-          width: px(28),
-          height: px(28),
+          width: px(34),
+          height: px(34),
           borderRadius: px(10),
-          backgroundColor: C.amberTile,
+          backgroundColor: iconBg,
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-        <View
-          style={{
-            width: px(8),
-            height: px(8),
-            borderRadius: px(4),
-            backgroundColor: C.amber,
-          }}
-        />
+        <Icon size={px(17)} color={iconColor} strokeWidth={2.4} />
       </View>
-      <View style={{ marginLeft: px(8) }}>
-        <Text style={[T.metricValue, { fontSize: px(20), lineHeight: px(23), color: C.ink }]}>
+      <View style={{ marginLeft: px(10) }}>
+        <Text style={[T.metricValue, { fontSize: px(18), lineHeight: px(22), color: C.ink }]}>
           {count}
         </Text>
-        <Text style={[T.small, { fontSize: px(11.5), lineHeight: px(15), color: C.grey }]}>
+        <Text
+          style={[
+            T.small,
+            {
+              fontSize: px(11),
+              lineHeight: px(14),
+              fontWeight: '600',
+              color: C.grey,
+              textTransform: 'uppercase',
+              letterSpacing: 0.3,
+              marginTop: px(1),
+            },
+          ]}>
           {label}
         </Text>
       </View>
@@ -555,6 +804,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const [segment, setSegment] = useState<Segment>('available');
   const [pendingAcceptId, setPendingAcceptId] = useState<string | null>(null);
   const [pendingDeclineId, setPendingDeclineId] = useState<string | null>(null);
+  const [expandedDoneId, setExpandedDoneId] = useState<string | null>(null);
   const initialLoading = profileLoading || jobsLoading || offersLoading || activeLoading;
   const hasQueryError = jobsError || offersError || activeError;
 
@@ -643,60 +893,29 @@ export default function DriverJobsScreen({ navigation }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: px(24) }}>
-        {/* header ------------------------------------------------------- */}
-        <View
-          style={{
-            paddingTop: insets.top + px(6),
-            paddingHorizontal: px(M.pagePadding),
-            paddingBottom: px(4),
-          }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ flex: 1 }} />
-            <PartnerHeaderLogo width={px(70)} cropZoom={1.4} showPartnerText />
-            <View style={{ flex: 1, alignItems: 'flex-end' }}>
-              <Pressable
-                onPress={openPartnerNotifications}
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="Notifications"
-                style={{
-                  width: px(36),
-                  height: px(36),
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <Bell size={px(22)} color={C.ink} strokeWidth={2} />
-                {offers.length > 0 ? (
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: px(4),
-                      right: px(5),
-                      width: px(9),
-                      height: px(9),
-                      borderRadius: px(5),
-                      backgroundColor: C.red,
-                      borderWidth: px(2),
-                      borderColor: C.pageBg,
-                    }}
-                  />
-                ) : null}
-              </Pressable>
-            </View>
-          </View>
-
+      {/* fixed header ------------------------------------------------- */}
+      <View
+        style={{
+          paddingTop: insets.top + px(6),
+          paddingHorizontal: px(M.pagePadding),
+          paddingBottom: px(6),
+          backgroundColor: C.pageBg,
+          borderBottomWidth: 1,
+          borderBottomColor: C.hairline,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          zIndex: 10,
+        }}>
+        <View>
           <Text
             style={[
               T.greeting,
               {
-                fontSize: px(27),
-                lineHeight: px(34),
+                fontSize: px(22),
+                lineHeight: px(28),
                 color: C.ink,
-                marginTop: px(10),
-                letterSpacing: -0.4,
+                letterSpacing: -0.3,
               },
             ]}>
             Jobs
@@ -704,36 +923,79 @@ export default function DriverJobsScreen({ navigation }: Props) {
           <Text
             style={[
               T.subtitle,
-              { fontSize: px(14.5), lineHeight: px(20), color: C.grey, marginTop: px(2) },
+              { fontSize: px(12.5), lineHeight: px(16), color: C.grey, marginTop: px(1) },
             ]}>
             Trips approved for you
           </Text>
         </View>
 
+        <Pressable
+          onPress={openPartnerNotifications}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+          style={{
+            width: px(36),
+            height: px(36),
+            borderRadius: px(18),
+            backgroundColor: C.card,
+            borderWidth: 1,
+            borderColor: C.hairline,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Bell size={px(18)} color={C.ink} strokeWidth={2} />
+          {offers.length > 0 ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: px(6),
+                right: px(7),
+                width: px(8),
+                height: px(8),
+                borderRadius: px(4),
+                backgroundColor: C.red,
+                borderWidth: px(1.5),
+                borderColor: C.card,
+              }}
+            />
+          ) : null}
+        </Pressable>
+      </View>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: px(24) }}>
         {/* counts ------------------------------------------------------- */}
         <View
           style={{
             flexDirection: 'row',
-            marginTop: px(14),
+            alignItems: 'center',
+            marginTop: px(8),
             marginHorizontal: px(M.pagePadding),
-            borderRadius: px(R.card),
+            borderRadius: px(R.innerCard),
             borderWidth: 1,
             borderColor: C.hairline,
             backgroundColor: C.card,
-            paddingVertical: px(10),
-            paddingHorizontal: px(8),
+            paddingVertical: px(4),
+            paddingHorizontal: px(6),
           }}>
           <JobsCount label="ready to accept" count={offers.length} px={px} />
+          <View style={{ width: 1, height: px(20), backgroundColor: C.hairline }} />
           <JobsCount label="active trip" count={activeJobs.length} px={px} />
         </View>
 
-        {/* segments ----------------------------------------------------- */}
+        {/* segmented tabs ----------------------------------------------- */}
         <View
           style={{
             flexDirection: 'row',
-            marginTop: px(16),
+            marginTop: px(12),
             marginHorizontal: px(M.pagePadding),
-            gap: px(8),
+            padding: px(4),
+            borderRadius: px(14),
+            backgroundColor: '#F1F5F9',
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
           }}>
           {segments.map(item => {
             const selected = item.id === segment;
@@ -744,34 +1006,63 @@ export default function DriverJobsScreen({ navigation }: Props) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected }}
                 style={({ pressed }) => ({
-                  height: px(34),
-                  paddingHorizontal: px(16),
-                  borderRadius: px(R.pill),
-                  backgroundColor: selected ? C.amber : C.light,
+                  flex: 1,
+                  height: px(36),
+                  paddingHorizontal: px(4),
+                  borderRadius: px(10),
+                  backgroundColor: selected ? C.card : 'transparent',
+                  flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  borderWidth: selected ? 1 : 0,
+                  borderColor: selected ? 'rgba(0,0,0,0.06)' : 'transparent',
+                  ...(selected
+                    ? {
+                        shadowColor: '#0F172A',
+                        shadowOpacity: 0.08,
+                        shadowRadius: 4,
+                        shadowOffset: { width: 0, height: 1.5 },
+                        elevation: 2,
+                      }
+                    : {}),
                   opacity: pressed ? 0.9 : 1,
                 })}>
                 <Text
-                  style={[
-                    T.link,
-                    {
-                      fontSize: px(13.5),
-                      lineHeight: px(18),
-                      color: selected ? C.ink : C.grey,
-                    },
-                  ]}>
-                  {item.label} ({item.count})
+                  style={{
+                    fontSize: px(13),
+                    lineHeight: px(17),
+                    fontWeight: selected ? '700' : '600',
+                    color: selected ? C.ink : '#64748B',
+                  }}>
+                  {item.label}
                 </Text>
+                <View
+                  style={{
+                    marginLeft: px(5),
+                    paddingHorizontal: px(6),
+                    paddingVertical: px(1.5),
+                    borderRadius: px(10),
+                    backgroundColor: selected ? C.amberTile : 'rgba(100, 116, 139, 0.12)',
+                  }}>
+                  <Text
+                    style={{
+                      fontSize: px(10.5),
+                      lineHeight: px(13),
+                      fontWeight: '700',
+                      color: selected ? C.amberText : '#64748B',
+                    }}>
+                    {item.count}
+                  </Text>
+                </View>
               </Pressable>
             );
           })}
         </View>
 
         {/* list --------------------------------------------------------- */}
-        <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(14) }}>
+        <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(12) }}>
           {initialLoading ? (
-            <ActivityIndicator color={C.amber} style={{ marginTop: px(28) }} />
+            <JobsSkeleton px={px} />
           ) : !isApproved ? (
             <JobsApprovalState px={px} />
           ) : hasQueryError ? (
@@ -779,9 +1070,11 @@ export default function DriverJobsScreen({ navigation }: Props) {
           ) : segment === 'available' ? (
             offers.length === 0 ? (
               <EmptyState
+                type="available"
                 title="No open requests"
                 subtitle="New towing and roadside requests will appear here."
                 px={px}
+                onRefresh={retryQueries}
               />
             ) : (
               offers.map(job => (
@@ -799,9 +1092,11 @@ export default function DriverJobsScreen({ navigation }: Props) {
           ) : segment === 'active' ? (
             activeJobs.length === 0 ? (
               <EmptyState
+                type="active"
                 title="No active trip"
                 subtitle="Accept a request to start your next trip."
                 px={px}
+                onRefresh={retryQueries}
               />
             ) : (
               activeJobs.map(job => (
@@ -815,13 +1110,21 @@ export default function DriverJobsScreen({ navigation }: Props) {
             )
           ) : doneJobs.length === 0 ? (
             <EmptyState
+              type="done"
               title="No completed jobs yet"
               subtitle="Your finished trips and earnings will be listed here."
               px={px}
             />
           ) : (
             doneJobs.map(job => (
-              <DoneJobRow key={`${job.bookingType}-${job.id}`} job={job} px={px} />
+              <DoneJobRow
+                key={`${job.bookingType}-${job.id}`}
+                job={job}
+                px={px}
+                expanded={expandedDoneId === job.id}
+                onOpen={() => setExpandedDoneId(current => (current === job.id ? null : job.id))}
+                onViewSummary={() => openActiveJob(job)}
+              />
             ))
           )}
         </View>
@@ -907,41 +1210,141 @@ function JobsApprovalState({ px }: { px: (value: number) => number }) {
 }
 
 function EmptyState({
+  type,
   title,
   subtitle,
   px,
+  onRefresh,
 }: {
+  type: 'available' | 'active' | 'done';
   title: string;
   subtitle: string;
   px: (value: number) => number;
+  onRefresh?: () => void;
 }) {
+  const Icon = type === 'available' ? Inbox : type === 'active' ? Navigation : CheckCircle2;
+  const iconColor = type === 'available' ? C.amberText : type === 'active' ? C.blue : C.green;
+  const iconBg = type === 'available' ? C.amberTile : type === 'active' ? C.bluePill : C.greenPill;
+
   return (
-    <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
+    <View
+      style={{
+        alignItems: 'center',
+        paddingVertical: px(36),
+        paddingHorizontal: px(20),
+        marginTop: px(8),
+        borderRadius: px(R.card),
+        backgroundColor: C.card,
+        borderWidth: 1,
+        borderColor: C.hairline,
+      }}>
       <View
         style={{
-          width: px(56),
-          height: px(56),
-          borderRadius: px(28),
-          backgroundColor: C.cream,
+          width: px(60),
+          height: px(60),
+          borderRadius: px(30),
+          backgroundColor: iconBg,
           alignItems: 'center',
           justifyContent: 'center',
+          marginBottom: px(14),
         }}>
-        <CalendarDays size={px(24)} color={C.amber} strokeWidth={2.2} />
+        <Icon size={px(26)} color={iconColor} strokeWidth={2.2} />
       </View>
       <Text
         style={[
-          T.cardTitle,
-          { fontSize: px(16), color: C.ink, marginTop: px(14), textAlign: 'center' },
+          T.sectionTitle,
+          { fontSize: px(16.5), lineHeight: px(21), color: C.ink, textAlign: 'center' },
         ]}>
         {title}
       </Text>
       <Text
         style={[
           T.cardSubtitle,
-          { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
+          {
+            fontSize: px(13),
+            lineHeight: px(18),
+            color: C.grey,
+            marginTop: px(6),
+            textAlign: 'center',
+            maxWidth: px(280),
+          },
         ]}>
         {subtitle}
       </Text>
+      {onRefresh ? (
+        <Pressable
+          onPress={onRefresh}
+          accessibilityRole="button"
+          accessibilityLabel="Check for requests"
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            height: px(38),
+            paddingHorizontal: px(16),
+            borderRadius: px(R.pill),
+            backgroundColor: C.light,
+            borderWidth: 1,
+            borderColor: C.hairline,
+            marginTop: px(16),
+            opacity: pressed ? 0.85 : 1,
+          })}>
+          <RefreshCw size={px(13)} color={C.grey} strokeWidth={2.4} />
+          <Text style={[T.link, { fontSize: px(13), color: C.ink, marginLeft: px(6) }]}>
+            Check for requests
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function JobsSkeleton({ px }: { px: (value: number) => number }) {
+  return (
+    <View accessibilityLabel="Loading jobs" style={{ paddingTop: px(4) }}>
+      {[0, 1, 2].map(index => (
+        <View
+          key={index}
+          style={{
+            height: px(index === 0 ? 204 : index === 1 ? 148 : 110),
+            marginBottom: px(12),
+            padding: px(14),
+            borderRadius: px(R.card),
+            backgroundColor: C.card,
+            borderWidth: 1,
+            borderColor: C.hairline,
+          }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: px(40),
+                height: px(40),
+                borderRadius: px(12),
+                backgroundColor: C.light,
+              }}
+            />
+            <View style={{ flex: 1, marginLeft: px(12) }}>
+              <View style={{ width: '42%', height: px(12), borderRadius: px(6), backgroundColor: C.light }} />
+              <View
+                style={{
+                  width: '68%',
+                  height: px(10),
+                  borderRadius: px(5),
+                  backgroundColor: C.light,
+                  marginTop: px(8),
+                }}
+              />
+            </View>
+          </View>
+          <View style={{ width: '60%', height: px(14), borderRadius: px(7), backgroundColor: C.light, marginTop: px(14) }} />
+          <View style={{ width: '84%', height: px(10), borderRadius: px(5), backgroundColor: C.light, marginTop: px(10) }} />
+          {index === 0 ? (
+            <View style={{ flexDirection: 'row', marginTop: px(16) }}>
+              <View style={{ flex: 1, height: px(38), borderRadius: px(R.button), backgroundColor: C.light }} />
+              <View style={{ flex: 1.5, height: px(38), borderRadius: px(R.button), backgroundColor: C.light, marginLeft: px(10) }} />
+            </View>
+          ) : null}
+        </View>
+      ))}
     </View>
   );
 }

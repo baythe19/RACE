@@ -179,8 +179,17 @@ export async function updateDriverBookingStatus(
       if (status === 'IN_PROGRESS' && tripOtp !== '1234') {
         throw new Error('Incorrect trip OTP. Check the customer app and try again.');
       }
-      updateMockActiveJobStatus(status);
-      return { success: true, status };
+      const updatedJob = updateMockActiveJobStatus(status);
+      // Keep the preview response shaped like the real completion response so
+      // the completion board can distinguish a server-confirmed fare from the
+      // estimate shown before the trip is finished.
+      return {
+        success: true,
+        status,
+        ...(status === 'COMPLETED' && updatedJob?.finalFare != null
+          ? { finalFare: updatedJob.finalFare }
+          : {}),
+      };
     }
     throw error;
   }

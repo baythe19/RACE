@@ -304,29 +304,50 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                 fromReview: true,
               })
             }
-            style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
-            <View style={styles.summarySectionLeft}>
-              <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
-                <Check size={px(11)} color="#15803D" strokeWidth={3} />
-              </View>
-              <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-                <User size={px(15)} color="#D97706" />
-              </View>
-              <View style={styles.summaryTextGroup}>
+            style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+            <View style={styles.summarySectionHeader}>
+              <View style={styles.summarySectionLeft}>
+                <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
+                  <Check size={px(11)} color="#15803D" strokeWidth={3} />
+                </View>
+                <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+                  <User size={px(15)} color="#D97706" />
+                </View>
                 <View style={styles.summaryTitleRow}>
                   <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Personal details</Text>
                   <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
                     <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
                   </View>
                 </View>
-                <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
-                  {driverPersonal.fullName || 'Rajesh Kumar'} • +91 {driverPersonal.mobileNumber || '9876543210'} • {driverPersonal.city || 'Bhubaneswar'}
-                </Text>
+              </View>
+              <View style={styles.editBtn}>
+                <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+                <ChevronRight size={px(13)} color="#2563EB" />
               </View>
             </View>
-            <View style={styles.editBtn}>
-              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-              <ChevronRight size={px(13)} color="#2563EB" />
+
+            {/* Key Information Points (Personal Details) */}
+            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+              <View style={styles.reviewPointRow}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  <Text style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</Text>
+                  {'  •  '}+91 {driverPersonal.mobileNumber || '9876543210'}
+                </Text>
+              </View>
+              <View style={styles.reviewPointRow}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  DOB: <Text style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</Text>
+                  {'  •  '}{driverPersonal.city || 'Bhubaneswar'}
+                </Text>
+              </View>
+              <View style={styles.reviewPointRow}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
+                  Address: <Text style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</Text>
+                </Text>
+              </View>
             </View>
           </Pressable>
 
@@ -341,29 +362,51 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                 fromReview: true,
               })
             }
-            style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
-            <View style={styles.summarySectionLeft}>
-              <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
-                <Check size={px(11)} color="#15803D" strokeWidth={3} />
-              </View>
-              <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-                <Truck size={px(15)} color="#D97706" />
-              </View>
-              <View style={styles.summaryTextGroup}>
+            style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+            <View style={styles.summarySectionHeader}>
+              <View style={styles.summarySectionLeft}>
+                <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
+                  <Check size={px(11)} color="#15803D" strokeWidth={3} />
+                </View>
+                <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+                  <Truck size={px(15)} color="#D97706" />
+                </View>
                 <View style={styles.summaryTitleRow}>
                   <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Vehicle details</Text>
                   <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
                     <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
                   </View>
                 </View>
-                <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
-                  {driverVehicle.vehicleType || 'Flatbed Tow Truck'} • {driverVehicle.vehicleNumber || 'OD 02 AB 1234'} • {driverVehicle.registeredTo === 'someone_else' ? 'NOC' : 'Owner'}
-                </Text>
+              </View>
+              <View style={styles.editBtn}>
+                <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+                <ChevronRight size={px(13)} color="#2563EB" />
               </View>
             </View>
-            <View style={styles.editBtn}>
-              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-              <ChevronRight size={px(13)} color="#2563EB" />
+
+            {/* Key Vehicle Information Points */}
+            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+              <View style={styles.reviewPointRow}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  Type: <Text style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</Text>
+                  {'  •  '}{driverVehicle.vehicleModel || 'Tata 407 Recovery Spec'}
+                </Text>
+              </View>
+              <View style={styles.reviewPointRow}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  Plate: <Text style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</Text>
+                  {'  •  '}RC: <Text style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</Text>
+                </Text>
+              </View>
+              <View style={styles.reviewPointRow}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  DL: <Text style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</Text>
+                  {'  •  '}Ownership: <Text style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</Text>
+                </Text>
+              </View>
             </View>
           </Pressable>
 
@@ -378,24 +421,24 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                 fromReview: true,
               })
             }
-            style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
-            <View style={styles.summarySectionLeft}>
-              <View
-                style={[
-                  styles.headerCheckBadge,
-                  { width: px(18), height: px(18), borderRadius: px(9) },
-                  !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
-                ]}>
-                {isAllCoreComplete ? (
-                  <Check size={px(11)} color="#15803D" strokeWidth={3} />
-                ) : (
-                  <Text style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</Text>
-                )}
-              </View>
-              <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-                <FileText size={px(15)} color="#D97706" />
-              </View>
-              <View style={styles.summaryTextGroup}>
+            style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+            <View style={styles.summarySectionHeader}>
+              <View style={styles.summarySectionLeft}>
+                <View
+                  style={[
+                    styles.headerCheckBadge,
+                    { width: px(18), height: px(18), borderRadius: px(9) },
+                    !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
+                  ]}>
+                  {isAllCoreComplete ? (
+                    <Check size={px(11)} color="#15803D" strokeWidth={3} />
+                  ) : (
+                    <Text style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</Text>
+                  )}
+                </View>
+                <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+                  <FileText size={px(15)} color="#D97706" />
+                </View>
                 <View style={styles.summaryTitleRow}>
                   <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Documents</Text>
                   <View
@@ -414,14 +457,36 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                     </Text>
                   </View>
                 </View>
-                <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
+              </View>
+              <View style={styles.editBtn}>
+                <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+                <ChevronRight size={px(13)} color="#2563EB" />
+              </View>
+            </View>
+
+            {/* Key Document Status & Badges */}
+            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+              <View style={styles.reviewDocTagsRow}>
+                {['RC Book', 'Driving licence', 'Vehicle insurance', 'Fitness cert', 'Vehicle photos'].map(
+                  (docTag) => (
+                    <View
+                      key={docTag}
+                      style={[
+                        styles.docReviewTag,
+                        { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
+                      ]}>
+                      <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
+                      <Text style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</Text>
+                    </View>
+                  ),
+                )}
+              </View>
+              <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
+                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
                   {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
                 </Text>
               </View>
-            </View>
-            <View style={styles.editBtn}>
-              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-              <ChevronRight size={px(13)} color="#2563EB" />
             </View>
           </Pressable>
         </View>
@@ -888,6 +953,14 @@ const styles = StyleSheet.create({
   step4Container: {
     width: '100%',
   },
+  summarySectionCol: {
+    paddingVertical: 3,
+  },
+  summarySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   summarySectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -921,6 +994,48 @@ const styles = StyleSheet.create({
   summarySubtitle: {
     color: '#6B7280',
     marginTop: 1,
+  },
+  reviewDetailsBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reviewPointRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 1.5,
+  },
+  reviewPointDot: {
+    backgroundColor: '#D97706',
+    marginRight: 6,
+  },
+  reviewPointText: {
+    color: '#4B5563',
+    fontWeight: '500',
+    flex: 1,
+  },
+  reviewPointBold: {
+    color: '#111827',
+    fontWeight: '700',
+  },
+  reviewDocTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 1,
+    marginBottom: 2,
+  },
+  docReviewTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  docReviewTagText: {
+    color: '#065F46',
+    fontWeight: '600',
   },
   cardDividerCompact: {
     height: 1,

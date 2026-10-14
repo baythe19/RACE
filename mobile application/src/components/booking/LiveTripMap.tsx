@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, {
   Marker,
@@ -9,7 +9,7 @@ import MapView, {
 } from 'react-native-maps';
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
 
-import { BHUBANESWAR_DEFAULT } from '../../utils/googleMaps';
+import { BHUBANESWAR_DEFAULT, getGoogleMapsApiKey } from '../../utils/googleMaps';
 import { colors } from '../../theme';
 
 const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
@@ -18,6 +18,11 @@ export type MapPoint = {
   latitude: number;
   longitude: number;
   label?: string;
+};
+
+export type RouteMeta = {
+  distanceKm: number;
+  durationMinutes?: number;
 };
 
 type Props = {
@@ -32,6 +37,9 @@ type Props = {
   recenterTrigger?: number;
   /** Render the deterministic board-style map used by the driver preview. */
   previewMap?: boolean;
+  /** Fetch a road-following route when both coordinates and a Maps key exist. */
+  routeApiEnabled?: boolean;
+  onRouteMetaChange?: (meta: RouteMeta | null) => void;
 };
 
 function isValidPoint(point?: MapPoint | null): point is MapPoint {
@@ -73,6 +81,48 @@ function regionForPoints(points: MapPoint[]): Region {
   };
 }
 
+function decodeGooglePolyline(encoded: string): MapPoint[] {
+  const points: MapPoint[] = [];
+  let index = 0;
+  let latitude = 0;
+  let longitude = 0;
+
+  while (index < encoded.length) {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < encoded.length);
+    latitude += result & 1 ? ~(result >> 1) : result >> 1;
+
+    result = 0;
+    shift = 0;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < encoded.length);
+    longitude += result & 1 ? ~(result >> 1) : result >> 1;
+
+    points.push({ latitude: latitude / 100000, longitude: longitude / 100000 });
+  }
+
+  return points;
+}
+
+type GoogleDirectionsResponse = {
+  routes?: Array<{
+    overview_polyline?: { points?: string };
+    legs?: Array<{
+      distance?: { value?: number };
+      duration?: { value?: number };
+    }>;
+  }>;
+};
+
 export default function LiveTripMap({
   pickup,
   dropoff,
@@ -84,8 +134,11 @@ export default function LiveTripMap({
   dropoffColor = colors.error,
   recenterTrigger,
   previewMap = false,
+  routeApiEnabled = false,
+  onRouteMetaChange,
 }: Props) {
   const mapRef = useRef<MapView>(null);
+  const [roadRoute, setRoadRoute] = useState<MapPoint[]>([]);
 
   const points = useMemo(() => {
     const list: MapPoint[] = [];
@@ -96,7 +149,7 @@ export default function LiveTripMap({
 
   const region = useMemo(() => regionForPoints(points), [points]);
 
-  const routeCoords = useMemo(() => {
+  const straightRouteCoords = useMemo(() => {
     const coords: Array<{ latitude: number; longitude: number }> = [];
     if (isValidPoint(pickup)) {
       coords.push({ latitude: pickup.latitude, longitude: pickup.longitude });
@@ -106,6 +159,81 @@ export default function LiveTripMap({
     }
     return coords.length >= 2 ? coords : [];
   }, [pickup, dropoff]);
+
+  useEffect(() => {
+    const origin = isValidPoint(pickup) ? pickup : null;
+    const destination = isValidPoint(dropoff) ? dropoff : null;
+    if (previewMap || !routeApiEnabled || !origin || !destination) {
+      setRoadRoute([]);
+      onRouteMetaChange?.(null);
+      return undefined;
+    }
+
+    const key = getGoogleMapsApiKey();
+    if (!key) {
+      setRoadRoute([]);
+      onRouteMetaChange?.(null);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    let cancelled = false;
+
+    const loadRoadRoute = async () => {
+      try {
+        const params = new URLSearchParams({
+          origin: `${origin.latitude},${origin.longitude}`,
+          destination: `${destination.latitude},${destination.longitude}`,
+          mode: 'driving',
+          region: 'in',
+          language: 'en',
+          key,
+        });
+        const response = await fetch(
+          `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) throw new Error(`Directions request failed: ${response.status}`);
+        const payload = (await response.json()) as GoogleDirectionsResponse;
+        const route = payload.routes?.[0];
+        const encoded = route?.overview_polyline?.points;
+        const decoded = encoded ? decodeGooglePolyline(encoded) : [];
+        if (cancelled) return;
+
+        setRoadRoute(decoded.length >= 2 ? decoded : []);
+        const distanceMeters = (route?.legs ?? []).reduce(
+          (total, leg) => total + (leg.distance?.value ?? 0),
+          0,
+        );
+        const durationSeconds = (route?.legs ?? []).reduce(
+          (total, leg) => total + (leg.duration?.value ?? 0),
+          0,
+        );
+        onRouteMetaChange?.(
+          distanceMeters > 0
+            ? {
+                distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
+                durationMinutes:
+                  durationSeconds > 0 ? Math.max(1, Math.round(durationSeconds / 60)) : undefined,
+              }
+            : null,
+        );
+      } catch (error) {
+        if (!cancelled && (error as { name?: string })?.name !== 'AbortError') {
+          setRoadRoute([]);
+          onRouteMetaChange?.(null);
+        }
+      }
+    };
+
+    void loadRoadRoute();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [dropoff, onRouteMetaChange, pickup, previewMap, routeApiEnabled]);
+
+  const displayRouteCoords = roadRoute.length >= 2 ? roadRoute : straightRouteCoords;
 
   const preview = previewMap ? (
     <PreviewMap
@@ -124,8 +252,23 @@ export default function LiveTripMap({
 
   useEffect(() => {
     if (recenterTrigger == null || points.length === 0) return;
+    if (roadRoute.length >= 2) {
+      mapRef.current?.fitToCoordinates(roadRoute, {
+        edgePadding: { top: 34, right: 28, bottom: 112, left: 28 },
+        animated: true,
+      });
+      return;
+    }
     mapRef.current?.animateToRegion(region, 350);
-  }, [points.length, recenterTrigger, region]);
+  }, [points.length, recenterTrigger, region, roadRoute]);
+
+  useEffect(() => {
+    if (roadRoute.length < 2) return;
+    mapRef.current?.fitToCoordinates(roadRoute, {
+      edgePadding: { top: 34, right: 28, bottom: 112, left: 28 },
+      animated: true,
+    });
+  }, [roadRoute]);
 
   return (
     <View style={[styles.wrap, { borderRadius }, style]}>
@@ -147,8 +290,8 @@ export default function LiveTripMap({
           toolbarEnabled={false}
           pitchEnabled={false}
           rotateEnabled={false}>
-          {routeCoords.length >= 2 ? (
-            <Polyline coordinates={routeCoords} strokeColor={routeColor} strokeWidth={4} />
+          {displayRouteCoords.length >= 2 ? (
+            <Polyline coordinates={displayRouteCoords} strokeColor={routeColor} strokeWidth={4} />
           ) : null}
 
           {isValidPoint(pickup) ? (

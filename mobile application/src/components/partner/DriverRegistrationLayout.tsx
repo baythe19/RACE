@@ -1,4 +1,4 @@
-import React, { type ReactNode } from 'react';
+import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -51,6 +51,26 @@ export default function DriverRegistrationLayout({
 }: DriverRegistrationLayoutProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+  }, [step]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Clamp scaling between 0.88x (small phones) and 1.22x (tablets/foldables) for solid responsiveness
   const scale = Math.min(1.22, Math.max(0.88, width / REF_W));
@@ -225,8 +245,10 @@ export default function DriverRegistrationLayout({
       {/* Main Content Area */}
       <KeyboardAvoidingView
         style={styles.keyboardWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? px(64) : 0}>
         <ScrollView
+          ref={scrollViewRef}
           style={styles.scrollView}
           bounces={false}
           scrollEnabled={scrollEnabled !== undefined ? scrollEnabled : step !== 4}
@@ -239,7 +261,10 @@ export default function DriverRegistrationLayout({
             {
               paddingHorizontal: px(12),
               paddingTop: px(10),
-              paddingBottom: insets.bottom + px(showFooter ? (step === 4 ? 80 : 94) : 28),
+              paddingBottom:
+                insets.bottom +
+                px(showFooter ? (step === 4 ? 80 : 94) : 28) +
+                (keyboardVisible ? px(90) : 0),
             },
           ]}>
           {/* Children Screen Body */}
@@ -247,8 +272,8 @@ export default function DriverRegistrationLayout({
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Sticky Bottom Actions Bar */}
-      {showFooter ? (
+      {/* Sticky Bottom Actions Bar (auto-hidden when typing on steps 1-3 so input is never covered) */}
+      {showFooter && (!keyboardVisible || step === 4) ? (
         footerOverride ? (
           footerOverride
         ) : (

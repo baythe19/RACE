@@ -57,6 +57,61 @@ const CARD_CREAM = '#FEF6E2';
 const CARD_CREAM_INK = '#4A4436';
 const LINK_BLUE = '#2563EB';
 
+function verificationStatusCopy(state: DriverVerificationSummary['state']) {
+  switch (state) {
+    case 'approved':
+      return {
+        label: 'VERIFICATION APPROVED',
+        backgroundColor: '#DCFCE7',
+        borderColor: '#BBF7D0',
+        color: '#15803D',
+      };
+    case 'rejected':
+      return {
+        label: 'ACTION NEEDED',
+        backgroundColor: '#FEE2E2',
+        borderColor: '#FECACA',
+        color: '#B91C1C',
+      };
+    case 'suspended':
+      return {
+        label: 'ACCOUNT ON HOLD',
+        backgroundColor: '#FEE2E2',
+        borderColor: '#FECACA',
+        color: '#B91C1C',
+      };
+    case 'unknown':
+      return {
+        label: 'STATUS UNAVAILABLE',
+        backgroundColor: '#F3F4F6',
+        borderColor: '#E5E7EB',
+        color: '#4B5563',
+      };
+    default:
+      return {
+        label: 'VERIFICATION IN PROGRESS',
+        backgroundColor: '#FEF3C7',
+        borderColor: '#FDE68A',
+        color: '#B45309',
+      };
+  }
+}
+
+function verificationSummary(state: DriverVerificationSummary['state']) {
+  switch (state) {
+    case 'approved':
+      return 'Your documents are verified. Your roadside partner account is active and ready to receive jobs.';
+    case 'rejected':
+      return 'Some details need attention. Update the flagged information and resubmit your application.';
+    case 'suspended':
+      return 'Your account is on hold. Contact RACE support for the next steps before accepting jobs.';
+    case 'unknown':
+      return 'We could not read your application status right now. Refresh to check the RACE server again.';
+    default:
+      return 'Thank you for registering with RACE. Our compliance team is reviewing your profile, vehicle records, and uploaded documents.';
+  }
+}
+
 type Props = {
   verification: DriverVerificationSummary;
   /** Secondary CTA. Omit to hide it (e.g. when there is nowhere to go). */
@@ -167,6 +222,7 @@ export default function DriverVerificationView({
   }, [verification.submittedAt]);
 
   const { application } = verification;
+  const statusCopy = verificationStatusCopy(verification.state);
 
   return (
     <View style={styles.root}>
@@ -211,11 +267,13 @@ export default function DriverVerificationView({
               paddingHorizontal: px(8),
               paddingVertical: px(2),
               borderRadius: px(16),
+              backgroundColor: statusCopy.backgroundColor,
+              borderColor: statusCopy.borderColor,
             },
           ]}>
-          <View style={styles.pulsingDot} />
-          <Text style={[styles.statusPillText, { fontSize: px(9.5) }]}>
-            VERIFICATION IN PROGRESS
+          <View style={[styles.pulsingDot, { backgroundColor: statusCopy.color }]} />
+          <Text style={[styles.statusPillText, { fontSize: px(9.5), color: statusCopy.color }]}>
+            {statusCopy.label}
           </Text>
         </View>
 
@@ -234,7 +292,7 @@ export default function DriverVerificationView({
           {verification.title || 'Your account is under verification'}
         </Text>
 
-        {/* Engaging ~4 lines summary paragraph */}
+        {/* State-specific summary paragraph */}
         <Text
           style={[
             styles.subtitle,
@@ -246,7 +304,7 @@ export default function DriverVerificationView({
               color: '#475569',
             },
           ]}>
-          Thank you for registering with RACE! Our compliance team is actively reviewing your profile details, vehicle records, and uploaded documents. Once verified, your roadside partner account will be activated immediately to receive jobs.
+          {verificationSummary(verification.state)}
         </Text>
 
         {/* tracker ---------------------------------------------------------- */}
@@ -367,7 +425,7 @@ export default function DriverVerificationView({
                 fontWeight: '600',
               },
             ]}>
-            {verification.decisionNote ?? "This usually takes 24 hours. We'll notify you via SMS & app notification."}
+            {verification.decisionNote ?? verification.note}
           </Text>
         </View>
 
@@ -516,14 +574,14 @@ export default function DriverVerificationView({
             <Pressable
               onPress={onOpenDashboard}
               accessibilityRole="button"
-              accessibilityLabel="Go to Dashboard (Read only)"
+              accessibilityLabel={verification.isApproved ? 'Go to Dashboard' : 'Go to Dashboard (Read only)'}
               style={({ pressed }) => [
                 styles.linkButton,
                 { paddingVertical: px(4), marginTop: px(2) },
                 pressed && styles.pressed,
               ]}>
               <Text style={[T.link, { fontSize: px(13), lineHeight: px(18), color: LINK_BLUE }]}>
-                Go to Dashboard (Read only)
+                {verification.isApproved ? 'Go to Dashboard' : 'Go to Dashboard (Read only)'}
               </Text>
             </Pressable>
           ) : null}

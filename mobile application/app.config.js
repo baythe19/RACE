@@ -50,6 +50,17 @@ module.exports = {
       'expo-asset',
       'expo-font',
       'expo-secure-store',
+      ...(googleMapsApiKey
+        ? [
+            [
+              'react-native-maps',
+              {
+                androidGoogleMapsApiKey: googleMapsApiKey,
+                iosGoogleMapsApiKey: googleMapsApiKey,
+              },
+            ],
+          ]
+        : []),
       '@react-native-community/datetimepicker',
       [
         'expo-image-picker',

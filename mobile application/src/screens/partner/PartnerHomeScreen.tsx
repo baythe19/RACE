@@ -38,7 +38,7 @@ import type { VerificationStage, VendorProfileResponse } from '../../types/vendo
 import { formatReadableAddress } from '../../utils/readableAddress';
 import { colors, layout, radius, shadows, spacing, typography } from '../../theme';
 
-const PAGE_BG = '#F7F7F5';
+const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 const INFO_BLUE = '#2563EB';
 const PURPLE = '#7C3AED';

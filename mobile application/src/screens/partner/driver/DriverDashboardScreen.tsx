@@ -67,6 +67,7 @@ import {
   useDriverJobsQuery,
   useDriverProfileQuery,
 } from '../../../services/driver/useDriverQueries';
+import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerTabParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
@@ -277,10 +278,10 @@ function DriverToggle({
     }).start();
   }, [progress, value]);
 
-  const trackWidth = px(59);
-  const trackHeight = px(24);
-  const knob = px(22);
-  const travel = trackWidth - knob - px(2);
+  const trackWidth = px(52);
+  const trackHeight = px(28);
+  const knob = px(24);
+  const travel = trackWidth - knob - px(4);
 
   return (
     <Pressable
@@ -294,8 +295,8 @@ function DriverToggle({
         width: trackWidth,
         height: trackHeight,
         borderRadius: trackHeight / 2,
-        backgroundColor: value ? C.green : '#D8DAD3',
-        paddingHorizontal: px(1),
+        backgroundColor: value ? '#10B981' : '#E2E8F0',
+        paddingHorizontal: px(2),
         justifyContent: 'center',
       }}>
       <Animated.View
@@ -303,7 +304,12 @@ function DriverToggle({
           width: knob,
           height: knob,
           borderRadius: knob / 2,
-          backgroundColor: C.white,
+          backgroundColor: '#FFFFFF',
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.15,
+          shadowRadius: 2.5,
+          elevation: 2,
           transform: [
             {
               translateX: progress.interpolate({
@@ -312,7 +318,6 @@ function DriverToggle({
               }),
             },
           ],
-          ...driverShadow,
         }}
       />
     </Pressable>
@@ -496,115 +501,220 @@ function RequestCard({
   return (
     <View
       style={{
-        marginTop: px(6),
-        backgroundColor: C.card,
-        borderRadius: px(R.innerCard),
-        borderWidth: 1,
-        borderColor: C.amberBorder,
-        padding: px(8),
+        marginTop: px(10),
+        backgroundColor: '#FFFFFF',
+        borderRadius: px(16),
+        borderWidth: 1.5,
+        borderColor: '#FDE68A',
+        padding: px(14),
+        shadowColor: '#D97706',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 10,
+        elevation: 3,
       }}>
+      {/* Top Header: Icon + Title + NEW / Distance */}
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
           style={{
-            width: px(M.jobTile),
-            height: px(M.jobTile),
-            borderRadius: px(R.tileSm),
-            backgroundColor: C.amberTileSoft,
+            width: px(44),
+            height: px(44),
+            borderRadius: px(12),
+            backgroundColor: '#FEF3C7',
             alignItems: 'center',
             justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: '#FDE68A',
           }}>
           {offer.bookingType === 'towing' ? (
             <Image
               source={images.icons.towing}
-              style={{ width: px(22), height: px(18) }}
+              style={{ width: px(24), height: px(20) }}
               resizeMode="contain"
             />
           ) : (
-            <Car size={px(22)} color={C.ink} strokeWidth={2} />
+            <Car size={px(24)} color={C.ink} strokeWidth={2} />
           )}
         </View>
 
-        <View style={{ flex: 1, marginLeft: px(14) }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text numberOfLines={1} style={[T.jobTitle, { flex: 1, fontSize: px(15), color: C.ink }]}>
+        <View style={{ flex: 1, marginLeft: px(12) }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                fontSize: px(15.5),
+                lineHeight: px(20),
+                fontWeight: '800',
+                color: '#111827',
+                marginRight: px(8),
+              }}>
               {serviceTitle(offer)}
             </Text>
             <View
               style={{
-                backgroundColor: C.bluePill,
+                backgroundColor: '#EFF6FF',
                 borderRadius: px(R.pill),
-                paddingHorizontal: px(10),
-                paddingVertical: px(4),
-                marginLeft: px(8),
+                paddingHorizontal: px(8),
+                paddingVertical: px(2.5),
+                borderWidth: 1,
+                borderColor: '#BFDBFE',
               }}>
-              <Text style={[T.pill, { fontSize: px(11), lineHeight: px(14), color: C.blue }]}>
+              <Text style={{ fontSize: px(10.5), fontWeight: '700', color: '#1D4ED8' }}>
                 NEW
               </Text>
             </View>
           </View>
-          {offer.distanceKm != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(4) }}>
-              <MapPin size={px(13)} color={C.green} strokeWidth={2.6} />
-              <Text
-                style={[
-                  T.distance,
-                  { marginLeft: px(4), fontSize: px(14), lineHeight: px(18), color: C.green },
-                ]}>
-                {offer.distanceKm} km away
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(3) }}>
+            {offer.bookingNumber ? (
+              <Text style={{ fontSize: px(12), fontWeight: '600', color: '#6B7280' }}>
+                #{offer.bookingNumber}
+              </Text>
+            ) : null}
+            {offer.bookingNumber && offer.distanceKm != null ? (
+              <Text style={{ fontSize: px(12), color: '#9CA3AF', marginHorizontal: px(6) }}>•</Text>
+            ) : null}
+            {offer.distanceKm != null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MapPin size={px(12)} color="#059669" strokeWidth={2.4} />
+                <Text
+                  style={{
+                    marginLeft: px(3),
+                    fontSize: px(12.5),
+                    fontWeight: '700',
+                    color: '#059669',
+                  }}>
+                  {offer.distanceKm} km away
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+      </View>
+
+      {/* Route Timeline Box */}
+      {showRoute ? (
+        <View
+          style={{
+            marginTop: px(12),
+            backgroundColor: '#F9FAFB',
+            borderRadius: px(12),
+            paddingVertical: px(10),
+            paddingHorizontal: px(12),
+            borderWidth: 1,
+            borderColor: '#F3F4F6',
+          }}>
+          {pickup ? (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <View style={{ alignItems: 'center', width: px(16), paddingTop: px(2) }}>
+                <View
+                  style={{
+                    width: px(9),
+                    height: px(9),
+                    borderRadius: px(4.5),
+                    backgroundColor: '#10B981',
+                  }}
+                />
+                {drop ? (
+                  <View
+                    style={{
+                      width: px(1.5),
+                      height: px(18),
+                      backgroundColor: '#D1D5DB',
+                      marginVertical: px(2),
+                    }}
+                  />
+                ) : null}
+              </View>
+              <View style={{ flex: 1, marginLeft: px(8) }}>
+                <Text style={{ fontSize: px(10), fontWeight: '700', color: '#059669', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Pickup
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: px(13), lineHeight: px(17), fontWeight: '600', color: '#1F2937', marginTop: px(1) }}>
+                  {pickup}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {drop ? (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: pickup ? px(2) : 0 }}>
+              <View style={{ alignItems: 'center', width: px(16), paddingTop: px(3) }}>
+                <View
+                  style={{
+                    width: px(9),
+                    height: px(9),
+                    borderRadius: px(4.5),
+                    backgroundColor: '#F59E0B',
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1, marginLeft: px(8) }}>
+                <Text style={{ fontSize: px(10), fontWeight: '700', color: '#D97706', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Dropoff
+                </Text>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: px(13), lineHeight: px(17), fontWeight: '600', color: '#1F2937', marginTop: px(1) }}>
+                  {drop}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {offer.createdAt ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: px(8),
+                paddingTop: px(8),
+                borderTopWidth: 1,
+                borderTopColor: '#E5E7EB',
+              }}>
+              <CalendarDays size={px(12)} color="#6B7280" strokeWidth={2.2} />
+              <Text style={{ fontSize: px(11.5), color: '#6B7280', marginLeft: px(6) }}>
+                {formatWhen(offer.createdAt)}
               </Text>
             </View>
           ) : null}
         </View>
-      </View>
-
-      {showRoute ? (
-        <View style={{ marginTop: px(6) }}>
-          {pickup ? (
-            <RouteRow address={pickup} tone="start" px={px} dotSize={11} />
-          ) : null}
-          {drop ? <RouteRow address={drop} tone="end" last px={px} dotSize={11} /> : null}
-        </View>
       ) : null}
 
-      {offer.createdAt ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginTop: px(4),
-            paddingLeft: px(22),
-          }}>
-          <CalendarDays size={px(15)} color={C.greySoft} strokeWidth={2.2} />
-          <Text
-            style={[
-              T.meta,
-              { marginLeft: px(9), fontSize: px(13), lineHeight: px(18), color: C.greySoft },
-            ]}>
-            {formatWhen(offer.createdAt)}
-          </Text>
-        </View>
-      ) : null}
-
+      {/* Footer: Earnings + CTA Button */}
       <View
         style={{
           flexDirection: 'row',
-          alignItems: 'flex-end',
+          alignItems: 'center',
           justifyContent: 'space-between',
-          marginTop: px(6),
+          marginTop: px(12),
+          paddingTop: px(12),
+          borderTopWidth: 1,
+          borderTopColor: '#F3F4F6',
         }}>
         <View style={{ flex: 1 }}>
           <Text
-            style={[
-              T.small,
-              { fontSize: px(12), lineHeight: px(16), color: C.greySoft },
-            ]}>
+            style={{
+              fontSize: px(11),
+              lineHeight: px(14),
+              fontWeight: '700',
+              color: '#6B7280',
+              letterSpacing: 0.3,
+              textTransform: 'uppercase',
+            }}>
             Estimated earnings
           </Text>
           <Text
-            style={[
-              T.metricValue,
-              { fontSize: px(24), lineHeight: px(28), color: C.ink, marginTop: px(1) },
-            ]}>
+            style={{
+              fontSize: px(24),
+              lineHeight: px(28),
+              fontWeight: '800',
+              color: '#000000',
+              marginTop: px(2),
+            }}>
             {offer.estimatedFare != null ? formatInr(offer.estimatedFare) : '—'}
           </Text>
         </View>
@@ -616,16 +726,22 @@ function RequestCard({
           style={({ pressed }) => ({
             height: px(40),
             paddingHorizontal: px(20),
-            borderRadius: px(R.button),
-            backgroundColor: C.amber,
+            borderRadius: px(R.pill),
+            backgroundColor: '#FEA701',
             flexDirection: 'row',
             alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#FEA701',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 4,
+            elevation: 2,
             opacity: pressed ? 0.9 : 1,
           })}>
-          <Text style={[T.button, { fontSize: px(14), lineHeight: px(18), color: C.ink }]}>
+          <Text style={{ fontSize: px(14), fontWeight: '700', color: '#000000' }}>
             View details
           </Text>
-          <ArrowRight size={px(16)} color={C.ink} strokeWidth={2.6} style={{ marginLeft: px(8) }} />
+          <ArrowRight size={px(16)} color="#000000" strokeWidth={2.6} style={{ marginLeft: px(6) }} />
         </Pressable>
       </View>
     </View>
@@ -866,13 +982,10 @@ export default function DriverDashboardScreen() {
       setIsOnline(result.isAvailable);
       useDriverPresenceStore.getState().setOnline(result.isAvailable);
     } catch (error) {
-      const message =
-        error && typeof error === 'object' && 'response' in error
-          ? String(
-              (error as { response?: { data?: { message?: string } } }).response?.data?.message,
-            )
-          : '';
-      Alert.alert('Availability', message || 'Could not update availability. Please try again.');
+      Alert.alert(
+        'Availability',
+        getApiErrorMessage(error, 'Could not update availability. Please try again.'),
+      );
     }
   }, [availabilityMutation, isOnline]);
 
@@ -896,128 +1009,189 @@ export default function DriverDashboardScreen() {
     <AppScreenLayout
       backgroundColor={C.pageBg}
       horizontalPadding={px(M.pagePadding)}
-      contentStyle={{ paddingBottom: px(M.tabBarHeight + 20) }}
+      contentStyle={{ paddingTop: px(8), paddingBottom: px(M.tabBarHeight + 56) }}
       refreshing={refreshing}
-      onRefresh={() => void onRefresh()}>
-      {/* brand row ------------------------------------------------------- */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingTop: px(4),
-          minHeight: px(38),
-        }}>
-        <PartnerHeaderLogo width={px(70)} cropZoom={1.4} showPartnerText />
+      onRefresh={() => void onRefresh()}
+      header={
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: px(M.pagePadding),
+            paddingTop: px(6),
+            paddingBottom: px(8),
+            backgroundColor: '#FFFFFF',
+            borderBottomWidth: 1,
+            borderBottomColor: '#F1F5F9',
+            zIndex: 100,
+            elevation: 4,
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 3,
+            minHeight: px(50),
+          }}>
+          <PartnerHeaderLogo width={px(88)} maskColor="#FFFFFF" />
 
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Pressable
-            onPress={openNotifications}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={
-              pendingRequests > 0
-                ? `Notifications, ${pendingRequests} new requests`
-                : 'Notifications'
-            }
-            style={{ width: px(38), height: px(38), alignItems: 'center', justifyContent: 'center' }}>
-            <Bell size={px(22)} color={C.ink} strokeWidth={2} />
-            {pendingRequests > 0 ? (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: px(4),
-                  right: px(5),
-                  width: px(9),
-                  height: px(9),
-                  borderRadius: px(5),
-                  backgroundColor: C.red,
-                  borderWidth: px(2),
-                  borderColor: C.pageBg,
-                }}
-              />
-            ) : null}
-          </Pressable>
-
-          <Pressable
-            onPress={() => navigation.navigate('PartnerAccount')}
-            accessibilityRole="button"
-            accessibilityLabel="Partner account"
-            style={{ flexDirection: 'row', alignItems: 'center', marginLeft: px(6) }}>
-            <View>
-              <View
-                style={{
-                  width: px(30),
-                  height: px(30),
-                  borderRadius: px(15),
-                  backgroundColor: C.amberTile,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <Text
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Pressable
+              onPress={openNotifications}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={
+                pendingRequests > 0
+                  ? `Notifications, ${pendingRequests} new requests`
+                  : 'Notifications'
+              }
+              style={({ pressed }) => ({
+                width: px(36),
+                height: px(36),
+                borderRadius: px(18),
+                backgroundColor: pressed ? '#F1F5F9' : '#FFFFFF',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.03,
+                shadowRadius: 2,
+                elevation: 1,
+              })}>
+              <Bell size={px(18)} color="#1E293B" strokeWidth={2} />
+              {pendingRequests > 0 ? (
+                <View
                   style={{
-                    fontSize: px(14),
-                    lineHeight: px(18),
-                    fontWeight: '700',
-                    color: C.ink,
+                    position: 'absolute',
+                    top: px(5),
+                    right: px(6),
+                    width: px(8),
+                    height: px(8),
+                    borderRadius: px(4),
+                    backgroundColor: '#EF4444',
+                    borderWidth: 1.5,
+                    borderColor: '#FFFFFF',
+                  }}
+                />
+              ) : null}
+            </Pressable>
+
+            <Pressable
+              onPress={() => navigation.navigate('PartnerAccount')}
+              accessibilityRole="button"
+              accessibilityLabel="Partner account"
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: pressed ? '#F1F5F9' : '#FFFFFF',
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                borderRadius: px(24),
+                paddingVertical: px(4),
+                paddingLeft: px(5),
+                paddingRight: px(9),
+                marginLeft: px(8),
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.03,
+                shadowRadius: 2,
+                elevation: 1,
+              })}>
+              <View style={{ position: 'relative' }}>
+                <View
+                  style={{
+                    width: px(30),
+                    height: px(30),
+                    borderRadius: px(15),
+                    backgroundColor: '#FEF3C7',
+                    borderWidth: 1,
+                    borderColor: '#FDE68A',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}>
-                  {initials(user?.fullName)}
+                  <Text
+                    style={{
+                      fontSize: px(13),
+                      fontWeight: '700',
+                      color: '#92400E',
+                    }}>
+                    {initials(user?.fullName)}
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: -1,
+                    bottom: -1,
+                    width: px(10),
+                    height: px(10),
+                    borderRadius: px(5),
+                    backgroundColor: isOnline ? '#10B981' : '#94A3B8',
+                    borderWidth: 2,
+                    borderColor: '#FFFFFF',
+                  }}
+                />
+              </View>
+              <View style={{ marginLeft: px(7), marginRight: px(3), maxWidth: px(100) }}>
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: px(13),
+                    lineHeight: px(16),
+                    fontWeight: '700',
+                    color: '#0F172A',
+                  }}>
+                  {user?.fullName ?? 'RACE Partner'}
                 </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 1 }}>
+                  <View
+                    style={{
+                      width: px(5),
+                      height: px(5),
+                      borderRadius: px(2.5),
+                      backgroundColor: isOnline ? '#10B981' : '#94A3B8',
+                      marginRight: px(3),
+                    }}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: px(11),
+                      lineHeight: px(13),
+                      fontWeight: '600',
+                      color: isOnline ? '#059669' : '#64748B',
+                    }}>
+                    {user?.role === 'vendor' ? 'Vendor' : 'Driver'}
+                  </Text>
+                </View>
               </View>
               <View
                 style={{
-                  position: 'absolute',
-                  right: px(-1),
-                  bottom: px(-1),
-                  width: px(11),
-                  height: px(11),
-                  borderRadius: px(6),
-                  backgroundColor: isOnline ? C.green : '#C4C6CD',
-                  borderWidth: px(2),
-                  borderColor: C.pageBg,
-                }}
-              />
-            </View>
-            <View style={{ marginLeft: px(9), maxWidth: px(110) }}>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: px(15),
-                  lineHeight: px(19),
-                  fontWeight: '700',
-                  color: C.ink,
+                  width: px(18),
+                  height: px(18),
+                  borderRadius: px(9),
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: px(2),
                 }}>
-                {user?.fullName ?? 'RACE Partner'}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={[
-                  T.small,
-                  { fontSize: px(12.5), lineHeight: px(16), color: C.greySoft },
-                ]}>
-                {user?.role === 'vendor' ? 'Vendor' : 'Driver'}
-              </Text>
-            </View>
-            <ChevronDown
-              size={px(16)}
-              color={C.grey}
-              strokeWidth={2.4}
-              style={{ marginLeft: px(6) }}
-            />
-          </Pressable>
+                <ChevronDown size={px(12)} color="#475569" strokeWidth={2.5} />
+              </View>
+            </Pressable>
+          </View>
         </View>
-      </View>
-
+      }>
       {/* greeting -------------------------------------------------------- */}
       <Text
         style={[
           T.greeting,
           {
-            fontSize: px(27),
-            lineHeight: px(34),
+            fontSize: px(22),
+            lineHeight: px(28),
             color: C.ink,
-            marginTop: px(7),
-            letterSpacing: -0.4,
+            marginTop: px(5),
+            letterSpacing: -0.3,
           },
         ]}>
         {greetingForNow()}, {name} 👋
@@ -1025,7 +1199,7 @@ export default function DriverDashboardScreen() {
       <Text
         style={[
           T.subtitle,
-          { fontSize: px(15), lineHeight: px(21), color: C.grey, marginTop: px(2) },
+          { fontSize: px(13.5), lineHeight: px(18), color: C.grey, marginTop: px(1) },
         ]}>
         Ready for your next job?
       </Text>
@@ -1033,46 +1207,125 @@ export default function DriverDashboardScreen() {
       {/* availability ---------------------------------------------------- */}
       <View
         style={{
-          height: px(M.onlineCardHeight),
-          marginTop: px(14),
-          borderRadius: px(R.onlineCard),
-          borderWidth: 1,
+          marginTop: px(10),
+          borderRadius: px(16),
+          borderWidth: 1.5,
           borderColor: !isApproved
             ? C.amberBorder
             : isOnline
-              ? C.greenCardBorder
-              : C.hairline,
-          backgroundColor: !isApproved ? C.cream : isOnline ? C.greenCard : C.card,
+              ? '#86EFAC'
+              : '#E2E8F0',
+          backgroundColor: !isApproved ? C.cream : '#FFFFFF',
           flexDirection: 'row',
           alignItems: 'center',
-          paddingLeft: px(16),
-          paddingRight: px(10),
+          paddingLeft: px(14),
+          paddingRight: px(12),
+          paddingVertical: px(12),
+          shadowColor: isOnline ? '#10B981' : '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isOnline ? 0.08 : 0.04,
+          shadowRadius: 6,
+          elevation: 2,
         }}>
+        {/* Live Radar Beacon Badge */}
         <View
           style={{
-            width: px(16),
-            height: px(16),
-            borderRadius: px(8),
+            width: px(38),
+            height: px(38),
+            borderRadius: px(19),
             backgroundColor: !isApproved
-              ? C.amberBorder
+              ? '#FEF3C7'
               : isOnline
-                ? C.green
-                : '#C4C6CD',
-          }}
-        />
-        <View style={{ flex: 1, marginLeft: px(18) }}>
-          <Text style={[T.cardTitle, { fontSize: px(16), lineHeight: px(20), color: C.ink }]}>
-            {!isApproved
-              ? 'Offline until approved'
+                ? '#ECFDF5'
+                : '#F1F5F9',
+            borderWidth: 1,
+            borderColor: !isApproved
+              ? '#FDE68A'
               : isOnline
-                ? "You're online"
-                : "You're offline"}
-          </Text>
+                ? '#A7F3D0'
+                : '#E2E8F0',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          {!isApproved ? (
+            <ShieldCheck size={px(18)} color="#D97706" strokeWidth={2.4} />
+          ) : isOnline ? (
+            <View
+              style={{
+                width: px(20),
+                height: px(20),
+                borderRadius: px(10),
+                backgroundColor: '#A7F3D0',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <View
+                style={{
+                  width: px(10),
+                  height: px(10),
+                  borderRadius: px(5),
+                  backgroundColor: '#059669',
+                }}
+              />
+            </View>
+          ) : (
+            <View
+              style={{
+                width: px(10),
+                height: px(10),
+                borderRadius: px(5),
+                backgroundColor: '#94A3B8',
+              }}
+            />
+          )}
+        </View>
+
+        <View style={{ flex: 1, marginLeft: px(12) }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text
+              style={{
+                fontSize: px(15.5),
+                lineHeight: px(20),
+                fontWeight: '700',
+                color: C.ink,
+                letterSpacing: -0.2,
+              }}>
+              {!isApproved
+                ? 'Offline until approved'
+                : isOnline
+                  ? "You're online"
+                  : "You're offline"}
+            </Text>
+            {isOnline && isApproved ? (
+              <View
+                style={{
+                  backgroundColor: '#DCFCE7',
+                  paddingHorizontal: px(7),
+                  paddingVertical: px(2),
+                  borderRadius: px(10),
+                  marginLeft: px(8),
+                  borderWidth: 1,
+                  borderColor: '#86EFAC',
+                }}>
+                <Text
+                  style={{
+                    fontSize: px(10.5),
+                    fontWeight: '800',
+                    color: '#15803D',
+                    letterSpacing: 0.5,
+                  }}>
+                  LIVE
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text
-            style={[
-              T.cardSubtitle,
-              { fontSize: px(13), lineHeight: px(18), color: C.grey, marginTop: px(1) },
-            ]}>
+            style={{
+              fontSize: px(12.5),
+              lineHeight: px(17),
+              color: C.grey,
+              marginTop: px(2),
+            }}>
             {!isApproved
               ? 'Accepting jobs unlocks once RACE approves your account'
               : isOnline
@@ -1080,8 +1333,9 @@ export default function DriverDashboardScreen() {
                 : 'Go online to receive jobs'}
           </Text>
         </View>
+
         {availabilityMutation.isPending || loadingProfile ? (
-          <ActivityIndicator size="small" color={C.green} />
+          <ActivityIndicator size="small" color="#10B981" />
         ) : isApproved ? (
           <DriverToggle value={isOnline} onChange={() => void toggleAvailability()} />
         ) : (
@@ -1091,7 +1345,7 @@ export default function DriverDashboardScreen() {
               borderRadius: px(R.pill),
               paddingHorizontal: px(12),
               justifyContent: 'center',
-              marginRight: px(6),
+              marginRight: px(4),
               backgroundColor: C.amberTile,
             }}>
             <Text style={[T.pill, { fontSize: px(12), lineHeight: px(16), color: C.ink }]}>In review</Text>
@@ -1103,64 +1357,66 @@ export default function DriverDashboardScreen() {
       {isOnline && locationIssue ? (
         <View
           style={{
-            marginTop: px(10),
-            borderRadius: px(R.card),
+            marginTop: px(8),
+            borderRadius: px(R.innerCard),
             borderWidth: 1,
             borderColor: C.amberBorder,
             backgroundColor: C.cream,
-            padding: px(14),
+            paddingVertical: px(8),
+            paddingHorizontal: px(12),
             flexDirection: 'row',
-            alignItems: 'flex-start',
+            alignItems: 'center',
           }}>
           <View
             style={{
-              width: px(34),
-              height: px(34),
-              borderRadius: px(R.tileSm),
+              width: px(28),
+              height: px(28),
+              borderRadius: px(7),
               backgroundColor: C.amberTile,
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <TriangleAlert size={px(18)} color={C.amberText} strokeWidth={2.4} />
+            <TriangleAlert size={px(15)} color={C.amberText} strokeWidth={2.4} />
           </View>
-          <View style={{ flex: 1, marginLeft: px(12) }}>
-            <Text style={[T.cardTitle, { fontSize: px(15), lineHeight: px(20), color: C.ink }]}>
+          <View style={{ flex: 1, marginHorizontal: px(10) }}>
+            <Text
+              numberOfLines={1}
+              style={[T.cardTitle, { fontSize: px(13), lineHeight: px(17), color: C.ink, fontWeight: '700' }]}>
               {locationIssue.title}
             </Text>
             <Text
+              numberOfLines={1}
               style={[
                 T.cardSubtitle,
-                { fontSize: px(13), lineHeight: px(18), color: C.grey, marginTop: px(3) },
+                { fontSize: px(11), lineHeight: px(15), color: C.grey, marginTop: px(1) },
               ]}>
               {locationIssue.message}
             </Text>
-            {locationIssue.action ? (
-              <Pressable
-                onPress={() => {
-                  if (locationIssue.action === 'retry') {
-                    retryDriverLocationReport();
-                    return;
-                  }
-                  void openLocationSettings();
-                }}
-                accessibilityRole="button"
-                style={({ pressed }) => ({
-                  alignSelf: 'flex-start',
-                  marginTop: px(10),
-                  height: px(34),
-                  paddingHorizontal: px(16),
-                  borderRadius: px(R.pill),
-                  backgroundColor: C.amber,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.9 : 1,
-                })}>
-                <Text style={[T.small, { fontSize: px(12.5), color: C.ink }]}> 
-                  {locationIssue.actionLabel}
-                </Text>
-              </Pressable>
-            ) : null}
           </View>
+          {locationIssue.action ? (
+            <Pressable
+              onPress={() => {
+                if (locationIssue.action === 'retry') {
+                  retryDriverLocationReport();
+                  return;
+                }
+                void openLocationSettings();
+              }}
+              accessibilityRole="button"
+              style={({ pressed }) => ({
+                height: px(28),
+                paddingHorizontal: px(10),
+                borderRadius: px(R.pill),
+                backgroundColor: C.amber,
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: pressed ? 0.85 : 1,
+              })}>
+              <Text style={[T.small, { fontSize: px(11), fontWeight: '700', color: C.ink }]}>
+                {locationIssue.actionLabel}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -1193,13 +1449,18 @@ export default function DriverDashboardScreen() {
       {/* earnings -------------------------------------------------------- */}
       <View
         style={{
-          marginTop: px(M.cardGap),
+          marginTop: px(10),
           borderRadius: px(R.card),
           borderWidth: 1,
-          borderColor: C.hairline,
-          backgroundColor: C.card,
+          borderColor: '#E2E8F0',
+          backgroundColor: '#FFFFFF',
           paddingHorizontal: px(14),
-          paddingVertical: px(13),
+          paddingVertical: px(11),
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.04,
+          shadowRadius: 6,
+          elevation: 2,
         }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={[T.metricLabel, { fontSize: px(14), lineHeight: px(19), color: C.ink }]}>
@@ -1323,34 +1584,46 @@ export default function DriverDashboardScreen() {
       {pendingRequests > 0 ? (
         <View
           style={{
-            marginTop: px(M.cardGap),
-            borderRadius: px(R.card),
-            backgroundColor: C.cream,
-            padding: px(6),
+            marginTop: px(12),
+            borderRadius: px(20),
+            backgroundColor: '#FEF8E8',
+            borderWidth: 1.5,
+            borderColor: '#FDE68A',
+            padding: px(12),
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View
               style={{
-                width: px(44),
-                height: px(44),
-                borderRadius: px(R.tile),
-                backgroundColor: C.amberTile,
+                width: px(36),
+                height: px(36),
+                borderRadius: px(10),
+                backgroundColor: '#FEF3C7',
                 alignItems: 'center',
                 justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#FDE68A',
               }}>
-              <Bell size={px(22)} color={C.amber} strokeWidth={2} fill={C.amber} />
+              <Bell size={px(18)} color="#D97706" strokeWidth={2.2} fill="#D97706" />
             </View>
-            <View style={{ flex: 1, marginLeft: px(8) }}>
-              <Text style={[T.sectionTitle, { fontSize: px(16), lineHeight: px(21), color: C.ink }]}>
-                {pendingRequests} new {pendingRequests === 1 ? 'request' : 'requests'}
-              </Text>
+            <View style={{ flex: 1, marginLeft: px(10) }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: px(15.5), lineHeight: px(20), fontWeight: '800', color: C.ink }}>
+                  {pendingRequests} new {pendingRequests === 1 ? 'request' : 'requests'}
+                </Text>
+                <View
+                  style={{
+                    width: px(7),
+                    height: px(7),
+                    borderRadius: px(3.5),
+                    backgroundColor: '#10B981',
+                    marginLeft: px(6),
+                  }}
+                />
+              </View>
               <Text
                 numberOfLines={1}
-                style={[
-                  T.sectionSubtitle,
-                  { fontSize: px(12), lineHeight: px(16), color: C.grey, marginTop: px(1) },
-                ]}>
-                New towing &amp; roadside requests nearby
+                style={{ fontSize: px(12), lineHeight: px(16), color: C.grey, marginTop: px(1) }}>
+                Nearby customer requests waiting for you
               </Text>
             </View>
             <Pressable
@@ -1358,13 +1631,19 @@ export default function DriverDashboardScreen() {
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="View all requests"
-              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: px(4) }}>
-              <Text style={[T.link, { fontSize: px(13), lineHeight: px(17), color: C.amberText }]}>
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: px(4),
+                paddingHorizontal: px(6),
+                opacity: pressed ? 0.8 : 1,
+              })}>
+              <Text style={{ fontSize: px(13), fontWeight: '700', color: '#D97706' }}>
                 View all
               </Text>
               <ChevronRight
                 size={px(15)}
-                color={C.amberText}
+                color="#D97706"
                 strokeWidth={2.8}
                 style={{ marginLeft: px(2) }}
               />
@@ -1382,9 +1661,14 @@ export default function DriverDashboardScreen() {
             marginTop: px(M.cardGap),
             borderRadius: px(R.card),
             borderWidth: 1,
-            borderColor: C.hairline,
-            backgroundColor: C.card,
-            padding: px(11),
+            borderColor: '#E2E8F0',
+            backgroundColor: '#FFFFFF',
+            padding: px(12),
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.04,
+            shadowRadius: 6,
+            elevation: 2,
           }}>
           <View
             style={{
@@ -1422,64 +1706,71 @@ export default function DriverDashboardScreen() {
         </View>
       ) : null}
 
-      {/* verification ---------------------------------------------------- */}
-      <View
-        style={{
-          marginTop: px(M.cardGap),
-          borderRadius: px(R.card),
-          borderWidth: 1,
-          borderColor: C.hairline,
-          backgroundColor: C.card,
-          padding: px(10),
-          flexDirection: 'row',
-          alignItems: 'center',
-        }}>
+      {/* verification (only shown when account is pending/in review; hidden when approved) */}
+      {!isApproved ? (
         <View
           style={{
-            width: px(34),
-            height: px(34),
-            borderRadius: px(10),
-            backgroundColor: isApproved ? C.greenTile : C.amberTileSoft,
+            marginTop: px(10),
+            borderRadius: px(R.card),
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            backgroundColor: '#FFFFFF',
+            padding: px(12),
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
+            shadowColor: '#000000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.03,
+            shadowRadius: 4,
+            elevation: 1,
           }}>
-          <ShieldCheck
-            size={px(20)}
-            color={isApproved ? C.green : C.amber}
-            strokeWidth={2.4}
-          />
+          <View
+            style={{
+              width: px(34),
+              height: px(34),
+              borderRadius: px(10),
+              backgroundColor: C.amberTileSoft,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <ShieldCheck
+              size={px(20)}
+              color={C.amber}
+              strokeWidth={2.4}
+            />
+          </View>
+          <View style={{ flex: 1, marginLeft: px(10) }}>
+            <Text style={[T.cardTitle, { fontSize: px(14.5), lineHeight: px(19), color: C.ink }]}>
+              {dashboardVerificationTitle}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[
+                T.cardSubtitle,
+                { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(1) },
+              ]}>
+              {verification.hint}
+            </Text>
+          </View>
+          <View
+            style={{
+              height: px(20),
+              borderRadius: px(R.pill),
+              paddingHorizontal: px(10),
+              justifyContent: 'center',
+              marginLeft: px(8),
+              backgroundColor: C.amberTile,
+            }}>
+            <Text
+              style={[
+                T.pill,
+                { fontSize: px(11.5), lineHeight: px(15), color: C.ink },
+              ]}>
+              {verification.badge}
+            </Text>
+          </View>
         </View>
-        <View style={{ flex: 1, marginLeft: px(10) }}>
-          <Text style={[T.cardTitle, { fontSize: px(14.5), lineHeight: px(19), color: C.ink }]}>
-            {dashboardVerificationTitle}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[
-              T.cardSubtitle,
-              { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(1) },
-            ]}>
-            {verification.hint}
-          </Text>
-        </View>
-        <View
-          style={{
-            height: px(20),
-            borderRadius: px(R.pill),
-            paddingHorizontal: px(10),
-            justifyContent: 'center',
-            marginLeft: px(8),
-            backgroundColor: isApproved ? C.greenPill : C.amberTile,
-          }}>
-          <Text
-            style={[
-              T.pill,
-              { fontSize: px(11.5), lineHeight: px(15), color: isApproved ? C.green : C.ink },
-            ]}>
-            {verification.badge}
-          </Text>
-        </View>
-      </View>
+      ) : null}
 
       <PeriodSheet
         visible={periodOpen}

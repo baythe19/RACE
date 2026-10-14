@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useScreenPx } from '../../hooks/useScreenPx';
 import { useAppSelector } from '../../redux/hooks';
+import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import {
   useAcceptDriverJobMutation,
   useDriverActiveJobQuery,
@@ -149,13 +150,7 @@ export default function DriverOfferAlert() {
       dismiss();
       openDriverActiveJob(offer.id, offer.bookingType);
     } catch (error) {
-      const message =
-        error && typeof error === 'object' && 'response' in error
-          ? String(
-              (error as { response?: { data?: { message?: string } } }).response?.data?.message ??
-                '',
-            )
-          : '';
+      const message = getApiErrorMessage(error, 'Could not accept this request. Please try again.');
       const lowered = message.toLowerCase();
       // The backend is authoritative: a claim on an already-taken or lapsed
       // request aborts the alert instead of pretending the job is ours.
@@ -169,7 +164,7 @@ export default function DriverOfferAlert() {
         setOutcome({
           key: offerKey,
           kind: 'failed',
-          message: message || 'Could not accept this request. Please try again.',
+          message,
         });
       }
     } finally {

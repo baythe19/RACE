@@ -1,6 +1,7 @@
 export const images = {
   logo:          require('./images/logo.png'),
   logoTransparent: require('./images/logo-transparent.png'),
+  partnerLogoClean: require('./images/partner-logo-clean.png'),
   raceLogoFull:  require('./images/race-logo-full.png'),
   splashContent: require('./images/splash-content.png'),
   splashBg:        require('./images/splash-bg.png'),

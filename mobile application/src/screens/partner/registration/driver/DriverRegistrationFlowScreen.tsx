@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Modal,
   Platform,
@@ -66,6 +67,7 @@ import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
 import { completeOnboarding } from '../../../../redux/auth/authSlice';
 import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlice';
 import { API_ENDPOINTS } from '../../../../config/api';
+import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../../../constants/preview';
 import { api, saveTokens } from '../../../../services/api';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import type {
@@ -82,6 +84,30 @@ function normalizeIndianPhone(raw: string): string {
   if (digits.length === 12 && digits.startsWith('91')) return digits.slice(2);
   if (digits.length === 11 && digits.startsWith('0')) return digits.slice(1);
   return digits.slice(0, 10);
+}
+
+function normalizeDobForApi(raw: string): string | undefined {
+  const value = raw.trim();
+  if (!value) return undefined;
+
+  const isoMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const displayMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  const year = isoMatch ? Number(isoMatch[1]) : displayMatch ? Number(displayMatch[3]) : NaN;
+  const month = isoMatch ? Number(isoMatch[2]) : displayMatch ? Number(displayMatch[2]) : NaN;
+  const day = isoMatch ? Number(isoMatch[3]) : displayMatch ? Number(displayMatch[1]) : NaN;
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return undefined;
+
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return undefined;
+  }
+  return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day
+    .toString()
+    .padStart(2, '0')}`;
 }
 
 const REF_W = 390;
@@ -161,41 +187,28 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const animateToStep = (newStep: 1 | 2 | 3 | 4, direction: 'forward' | 'backward') => {
-    const slideOutTo = direction === 'forward' ? -px(35) : px(35);
-    const slideInFrom = direction === 'forward' ? px(35) : -px(35);
+    // Immediately set step state so there is zero render delay or double-screen flicker
+    setCurrentStep(newStep);
+
+    // Prepare smooth incoming slide & fade
+    const slideInFrom = direction === 'forward' ? px(22) : -px(22);
+    slideAnim.setValue(slideInFrom);
+    fadeAnim.setValue(0.35);
 
     Animated.parallel([
       Animated.timing(fadeAnim, {
-        toValue: 0.15,
-        duration: 90,
+        toValue: 1,
+        duration: 150,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
-        toValue: slideOutTo,
-        duration: 90,
+        toValue: 0,
+        duration: 150,
         easing: Easing.out(Easing.quad),
         useNativeDriver: true,
       }),
-    ]).start(() => {
-      setCurrentStep(newStep);
-      slideAnim.setValue(slideInFrom);
-
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 160,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 160,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    });
+    ]).start();
   };
 
   // Redux & Store
@@ -581,7 +594,65 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     }
   };
 
+  const validatePersonalStep = () => {
+    const name = driverPersonal.fullName.trim();
+    const mobile = normalizeIndianPhone(driverPersonal.mobileNumber);
+    if (name.length < 2) {
+      Alert.alert('Full name required', 'Enter your full name as it appears on your driving licence.');
+      return false;
+    }
+    if (mobile.length !== 10) {
+      Alert.alert('Mobile number required', 'Enter the 10-digit verified mobile number.');
+      return false;
+    }
+    if (!normalizeDobForApi(driverPersonal.dateOfBirth)) {
+      Alert.alert('Date of birth required', 'Enter a valid date in DD/MM/YYYY format.');
+      return false;
+    }
+    if (driverPersonal.address.trim().length < 5) {
+      Alert.alert('Address required', 'Enter your current address.');
+      return false;
+    }
+    if (!driverPersonal.city?.trim()) {
+      Alert.alert('City required', 'Select your operating city.');
+      return false;
+    }
+    return true;
+  };
+
+  const validateVehicleStep = () => {
+    if (!driverVehicle.vehicleType.trim()) {
+      Alert.alert('Vehicle type required', 'Select the vehicle type you operate.');
+      return false;
+    }
+    if (driverVehicle.vehicleNumber.trim().length < 4) {
+      Alert.alert('Registration number required', 'Enter a valid vehicle registration number.');
+      return false;
+    }
+    if (driverVehicle.licenseNumber.trim().length < 4) {
+      Alert.alert('Driving licence required', 'Enter your driving licence number.');
+      return false;
+    }
+    return true;
+  };
+
+  const validateDocumentsStep = () => {
+    if (missingCoreDocs.length === 0) return true;
+    Alert.alert(
+      'Documents required',
+      `Upload ${missingCoreDocs.map(doc => doc.title).join(', ')} before continuing.`,
+    );
+    return false;
+  };
+
   const handleFlowContinue = () => {
+    const permissivePreview = UI_PREVIEW_MODE && isUiTestPermissiveMode();
+    if (!permissivePreview) {
+      if (currentStep === 1 && !validatePersonalStep()) return;
+      if (currentStep === 2 && !validateVehicleStep()) return;
+      if (currentStep === 3 && !validateDocumentsStep()) return;
+    }
+
     if (returnToReviewAfterEdit) {
       setReturnToReviewAfterEdit(false);
       animateToStep(4, 'forward');
@@ -590,10 +661,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
     if (currentStep === 1) {
       setDriverPersonal({
-        fullName: driverPersonal.fullName.trim() || 'Rajesh Kumar',
-        dateOfBirth: driverPersonal.dateOfBirth.trim() || '15/05/1992',
-        address: driverPersonal.address.trim() || 'Plot 42, Saheed Nagar, Janpath Road',
-        city: driverPersonal.city || 'Bhubaneswar',
+        fullName: driverPersonal.fullName.trim() || (permissivePreview ? 'Rajesh Kumar' : ''),
+        dateOfBirth:
+          driverPersonal.dateOfBirth.trim() || (permissivePreview ? '15/05/1992' : ''),
+        address:
+          driverPersonal.address.trim() ||
+          (permissivePreview ? 'Plot 42, Saheed Nagar, Janpath Road' : ''),
+        city: driverPersonal.city?.trim() || (permissivePreview ? 'Bhubaneswar' : undefined),
       });
       animateToStep(2, 'forward');
     } else if (currentStep === 2) {
@@ -602,17 +676,21 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         DRIVER_VEHICLE_TYPE_CARDS[0];
 
       setDriverVehicle({
-        vehicleType: driverVehicle.vehicleType || chosenCard.label,
-        vehicleNumber: driverVehicle.vehicleNumber.trim() || 'OD 02 AB 1234',
-        licenseNumber: driverVehicle.licenseNumber.trim() || 'OD-0220190012345',
-        rcNumber: driverVehicle.rcNumber.trim() || 'RC-OD02-2022-987654',
-        vehicleModel: driverVehicle.vehicleModel.trim() || 'Tata 407 Recovery Spec',
-        registeredTo: driverVehicle.registeredTo || 'me',
+        vehicleType: driverVehicle.vehicleType.trim() || (permissivePreview ? chosenCard.label : ''),
+        vehicleNumber:
+          driverVehicle.vehicleNumber.trim() || (permissivePreview ? 'OD 02 AB 1234' : ''),
+        licenseNumber:
+          driverVehicle.licenseNumber.trim() || (permissivePreview ? 'OD-0220190012345' : ''),
+        rcNumber:
+          driverVehicle.rcNumber.trim() || (permissivePreview ? 'RC-OD02-2022-987654' : ''),
+        vehicleModel:
+          driverVehicle.vehicleModel.trim() || (permissivePreview ? 'Tata 407 Recovery Spec' : ''),
+        registeredTo: driverVehicle.registeredTo || (permissivePreview ? 'me' : undefined),
       });
       animateToStep(3, 'forward');
     } else if (currentStep === 3) {
-      if (missingCoreDocs.length > 0) {
-        missingCoreDocs.forEach((doc) => {
+      if (permissivePreview && missingCoreDocs.length > 0) {
+        missingCoreDocs.forEach(doc => {
           addDriverDocument({
             id: doc.id,
             label: doc.title,
@@ -648,29 +726,26 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       const driverType = mapVehicleToDriverType(driverVehicle.vehicleType || 'Flatbed');
 
       const payload = {
-        fullName: driverPersonal.fullName.trim() || authUser?.fullName || 'Rajesh Kumar',
-        email: driverPersonal.email || 'rajesh.driver@gmail.com',
-        address: driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road',
-        city: driverPersonal.city || 'Bhubaneswar',
-        dateOfBirth: driverPersonal.dateOfBirth || '15/05/1992',
+        fullName: driverPersonal.fullName.trim(),
+        email: driverPersonal.email.trim() || undefined,
+        address: driverPersonal.address.trim() || undefined,
+        city: driverPersonal.city?.trim() || undefined,
+        dateOfBirth: normalizeDobForApi(driverPersonal.dateOfBirth),
         emergencyContact,
-        licenseNo:
-          driverVehicle.licenseNumber ||
-          driverVehicle.rcNumber ||
-          'OD-0220190012345',
+        licenseNo: driverVehicle.licenseNumber.trim(),
         driverType,
-        vehicleRegistration: driverVehicle.vehicleNumber || 'OD 02 AB 1234',
-        vehicleType: driverVehicle.vehicleType || 'Flatbed',
+        vehicleRegistration: driverVehicle.vehicleNumber.trim() || undefined,
+        vehicleType: driverVehicle.vehicleType.trim() || undefined,
         documents: documentsPayload,
         experienceYears: driverPersonal.yearsOfExperience
           ? Number(driverPersonal.yearsOfExperience)
-          : 5,
+          : undefined,
         languages: driverPersonal.languages
           ? driverPersonal.languages
               .split(',')
               .map((s) => s.trim())
               .filter(Boolean)
-          : ['Odia', 'Hindi', 'English'],
+          : undefined,
       };
 
       let registeredName = payload.fullName;
@@ -690,6 +765,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           registeredName = data.data.fullName;
         }
       } catch (err) {
+        if (!UI_PREVIEW_MODE) throw err;
         console.warn('Driver self registration API fallback:', err);
       }
 
@@ -1488,29 +1564,50 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             setReturnToReviewAfterEdit(true);
             animateToStep(1, 'backward');
           }}
-          style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
-          <View style={styles.summarySectionLeft}>
-            <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
-              <Check size={px(11)} color="#15803D" strokeWidth={3} />
-            </View>
-            <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-              <User size={px(15)} color="#D97706" />
-            </View>
-            <View style={styles.summaryTextGroup}>
+          style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+          <View style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionLeft}>
+              <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
+                <Check size={px(11)} color="#15803D" strokeWidth={3} />
+              </View>
+              <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+                <User size={px(15)} color="#D97706" />
+              </View>
               <View style={styles.summaryTitleRow}>
                 <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Personal details</Text>
                 <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
                   <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
                 </View>
               </View>
-              <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
-                {driverPersonal.fullName || 'Rajesh Kumar'} • +91 {driverPersonal.mobileNumber || '9876543210'} • {driverPersonal.city || 'Bhubaneswar'}
-              </Text>
+            </View>
+            <View style={styles.editBtn}>
+              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+              <ChevronRight size={px(13)} color="#2563EB" />
             </View>
           </View>
-          <View style={styles.editBtn}>
-            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-            <ChevronRight size={px(13)} color="#2563EB" />
+
+          {/* Key Information Points (Personal Details) */}
+          <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+            <View style={styles.reviewPointRow}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                <Text style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</Text>
+                {'  •  '}+91 {driverPersonal.mobileNumber || '9876543210'}
+              </Text>
+            </View>
+            <View style={styles.reviewPointRow}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                DOB: <Text style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</Text>
+                {'  •  '}{driverPersonal.city || 'Bhubaneswar'}
+              </Text>
+            </View>
+            <View style={styles.reviewPointRow}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
+                Address: <Text style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</Text>
+              </Text>
+            </View>
           </View>
         </Pressable>
 
@@ -1523,29 +1620,51 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             setReturnToReviewAfterEdit(true);
             animateToStep(2, 'backward');
           }}
-          style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
-          <View style={styles.summarySectionLeft}>
-            <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
-              <Check size={px(11)} color="#15803D" strokeWidth={3} />
-            </View>
-            <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-              <Truck size={px(15)} color="#D97706" />
-            </View>
-            <View style={styles.summaryTextGroup}>
+          style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+          <View style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionLeft}>
+              <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
+                <Check size={px(11)} color="#15803D" strokeWidth={3} />
+              </View>
+              <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+                <Truck size={px(15)} color="#D97706" />
+              </View>
               <View style={styles.summaryTitleRow}>
                 <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Vehicle details</Text>
                 <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
                   <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
                 </View>
               </View>
-              <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
-                {driverVehicle.vehicleType || 'Flatbed Tow Truck'} • {driverVehicle.vehicleNumber || 'OD 02 AB 1234'} • {driverVehicle.registeredTo === 'someone_else' ? 'NOC' : 'Owner'}
-              </Text>
+            </View>
+            <View style={styles.editBtn}>
+              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+              <ChevronRight size={px(13)} color="#2563EB" />
             </View>
           </View>
-          <View style={styles.editBtn}>
-            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-            <ChevronRight size={px(13)} color="#2563EB" />
+
+          {/* Key Vehicle Information Points */}
+          <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+            <View style={styles.reviewPointRow}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                Type: <Text style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</Text>
+                {'  •  '}{driverVehicle.vehicleModel || 'Tata 407 Recovery Spec'}
+              </Text>
+            </View>
+            <View style={styles.reviewPointRow}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                Plate: <Text style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</Text>
+                {'  •  '}RC: <Text style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</Text>
+              </Text>
+            </View>
+            <View style={styles.reviewPointRow}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                DL: <Text style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</Text>
+                {'  •  '}Ownership: <Text style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</Text>
+              </Text>
+            </View>
           </View>
         </Pressable>
 
@@ -1558,24 +1677,24 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             setReturnToReviewAfterEdit(true);
             animateToStep(3, 'backward');
           }}
-          style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
-          <View style={styles.summarySectionLeft}>
-            <View
-              style={[
-                styles.headerCheckBadge,
-                { width: px(18), height: px(18), borderRadius: px(9) },
-                !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
-              ]}>
-              {isAllCoreComplete ? (
-                <Check size={px(11)} color="#15803D" strokeWidth={3} />
-              ) : (
-                <Text style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</Text>
-              )}
-            </View>
-            <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-              <FileText size={px(15)} color="#D97706" />
-            </View>
-            <View style={styles.summaryTextGroup}>
+          style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+          <View style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionLeft}>
+              <View
+                style={[
+                  styles.headerCheckBadge,
+                  { width: px(18), height: px(18), borderRadius: px(9) },
+                  !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
+                ]}>
+                {isAllCoreComplete ? (
+                  <Check size={px(11)} color="#15803D" strokeWidth={3} />
+                ) : (
+                  <Text style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</Text>
+                )}
+              </View>
+              <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+                <FileText size={px(15)} color="#D97706" />
+              </View>
               <View style={styles.summaryTitleRow}>
                 <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Documents</Text>
                 <View
@@ -1594,14 +1713,36 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   </Text>
                 </View>
               </View>
-              <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
+            </View>
+            <View style={styles.editBtn}>
+              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+              <ChevronRight size={px(13)} color="#2563EB" />
+            </View>
+          </View>
+
+          {/* Key Document Status & Badges */}
+          <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+            <View style={styles.reviewDocTagsRow}>
+              {['RC Book', 'Driving licence', 'Vehicle insurance', 'Fitness cert', 'Vehicle photos'].map(
+                (docTag) => (
+                  <View
+                    key={docTag}
+                    style={[
+                      styles.docReviewTag,
+                      { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
+                    ]}>
+                    <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
+                    <Text style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</Text>
+                  </View>
+                ),
+              )}
+            </View>
+            <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
+              <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+              <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
                 {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
               </Text>
             </View>
-          </View>
-          <View style={styles.editBtn}>
-            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-            <ChevronRight size={px(13)} color="#2563EB" />
           </View>
         </Pressable>
       </View>
@@ -1998,7 +2139,10 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       {/* Vehicle Model Modal (Popular list + Custom typing) */}
       <Modal visible={modelModalVisible} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setModelModalVisible(false)}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setModelModalVisible(false)} />
           <Pressable
             style={[styles.modalSheet, { maxHeight: px(520), borderTopLeftRadius: px(16), borderTopRightRadius: px(16) }]}
             onPress={(e) => e.stopPropagation()}>
@@ -2072,7 +2216,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               })}
             </ScrollView>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Upload Action Sheet Modal (Step 3) */}
@@ -3365,6 +3509,14 @@ const styles = StyleSheet.create({
   step4Container: {
     width: '100%',
   },
+  summarySectionCol: {
+    paddingVertical: 3,
+  },
+  summarySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   summarySectionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3398,6 +3550,48 @@ const styles = StyleSheet.create({
   summarySubtitle: {
     color: '#6B7280',
     marginTop: 1,
+  },
+  reviewDetailsBox: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  reviewPointRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 1.5,
+  },
+  reviewPointDot: {
+    backgroundColor: '#D97706',
+    marginRight: 6,
+  },
+  reviewPointText: {
+    color: '#4B5563',
+    fontWeight: '500',
+    flex: 1,
+  },
+  reviewPointBold: {
+    color: '#111827',
+    fontWeight: '700',
+  },
+  reviewDocTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 1,
+    marginBottom: 2,
+  },
+  docReviewTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  docReviewTagText: {
+    color: '#065F46',
+    fontWeight: '600',
   },
   cardDividerCompact: {
     height: 1,

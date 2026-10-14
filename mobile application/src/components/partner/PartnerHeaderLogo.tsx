@@ -14,63 +14,51 @@ interface PartnerHeaderLogoProps {
   width?: number;
   style?: StyleProp<ViewStyle>;
   showPartnerText?: boolean;
-  /** Enlarges the padded source artwork inside the same header footprint. */
   cropZoom?: number;
+  maskColor?: string;
 }
 
 export default function PartnerHeaderLogo({
-  width = 114,
+  width = 92,
   style,
-  showPartnerText = false,
-  cropZoom = 1,
+  showPartnerText = true,
+  cropZoom = showPartnerText ? 1.55 : 1.25,
+  maskColor = '#FFFFFF',
 }: PartnerHeaderLogoProps) {
-  // Ratio for splashHeader mark (484w x 300h)
-  const logoHeight = Math.round(width * (108 / 180));
-  const zoom = Math.max(1, cropZoom);
-  const viewportHeight = Math.round(logoHeight * (zoom === 1 ? 1 : 1.2));
-  const imageWidth = Math.round(width * zoom);
-  const imageHeight = Math.round(logoHeight * zoom);
+  // The supplied transparent brand asset still contains the legacy SERVICE
+  // wordmark. Crop it in the shared header and use the app's PARTNER label so
+  // every partner screen gets the same clean lock-up.
+  const imageWidth = Math.round(width * cropZoom);
+  const imageHeight = Math.round(imageWidth * (230 / 480));
+  const containerHeight = Math.round(width * (showPartnerText ? 0.68 : 0.58));
+  const legacyMarkTop = Math.round(imageHeight * 0.6);
+  const legacyMarkHeight = Math.max(8, Math.round(imageHeight * 0.18));
 
   return (
-    <View style={[styles.container, style]}>
-      <View style={{ width, height: viewportHeight, overflow: 'hidden' }}>
-        <Image
-          source={images.splashHeader}
-          style={{
-            width: imageWidth,
-            height: imageHeight,
-            position: 'absolute',
-            left: Math.round((width - imageWidth) / 2),
-            top: Math.round((viewportHeight - imageHeight) / 2),
-          }}
-          resizeMode="contain"
-          accessibilityLabel="RACE"
-        />
-        {showPartnerText ? (
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: width * 0.56,
-              top: viewportHeight * 0.79,
-              width: width * 0.44,
-              height: viewportHeight * 0.17,
-              backgroundColor: '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Text
-              style={{
-                fontSize: Math.max(6, Math.round(width * 0.085)),
-                lineHeight: Math.max(7, Math.round(width * 0.095)),
-                fontWeight: '800',
-                color: '#D97706',
-                letterSpacing: Math.max(0.5, width * 0.01),
-              }}>
-              PARTNER
-            </Text>
-          </View>
-        ) : null}
+    <View style={[styles.container, { width, height: containerHeight }, style]}>
+      <Image
+        source={images.logoTransparent}
+        style={{
+          position: 'absolute',
+          width: imageWidth,
+          height: imageHeight,
+          left: Math.round((width - imageWidth) / 2),
+          top: 0,
+        }}
+        resizeMode="contain"
+        accessibilityLabel="RACE Partner"
+      />
+      <View
+        pointerEvents="none"
+        style={[
+          styles.legacyMarkMask,
+          {
+            top: legacyMarkTop,
+            height: legacyMarkHeight,
+            backgroundColor: maskColor,
+          },
+        ]}>
+        {showPartnerText ? <Text style={styles.partnerLabel}>PARTNER</Text> : null}
       </View>
     </View>
   );
@@ -80,5 +68,20 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  legacyMarkMask: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partnerLabel: {
+    color: '#D97706',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 2.1,
+    lineHeight: 10,
   },
 });

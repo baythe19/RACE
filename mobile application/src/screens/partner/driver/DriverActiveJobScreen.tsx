@@ -49,6 +49,7 @@ import {
   MoreVertical,
   Navigation,
   Phone,
+  RefreshCw,
   Route,
   ShieldCheck,
   TriangleAlert,
@@ -57,7 +58,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import LiveTripMap from '../../../components/booking/LiveTripMap';
+import LiveTripMap, { type RouteMeta } from '../../../components/booking/LiveTripMap';
 import { images } from '../../../assets';
 import { UI_PREVIEW_MODE } from '../../../constants/preview';
 import { useScreenPx } from '../../../hooks/useScreenPx';
@@ -70,6 +71,7 @@ import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
+import { getGoogleMapsApiKey } from '../../../utils/googleMaps';
 import {
   driverColors as C,
   driverMetrics as M,
@@ -185,15 +187,45 @@ function RouteDot({
   tone,
   last,
   px,
+  outlined = false,
+  endColor = C.red,
 }: {
   tone: 'start' | 'end';
   last?: boolean;
   px: (value: number) => number;
+  outlined?: boolean;
+  endColor?: string;
 }) {
+  if (outlined) {
+    return (
+      <View style={{ width: px(18), alignItems: 'center', paddingTop: px(2) }}>
+        <MapPin
+          size={px(16)}
+          color={tone === 'end' ? endColor : C.blue}
+          strokeWidth={2.4}
+        />
+        {last
+          ? null
+          : [0, 1, 2].map(index => (
+              <View
+                key={index}
+                style={{
+                  width: px(1.5),
+                  height: px(3),
+                  marginTop: px(2),
+                  borderRadius: px(1),
+                  backgroundColor: '#C9CBD3',
+                }}
+              />
+            ))}
+      </View>
+    );
+  }
+
   return (
     <View style={{ width: px(18), alignItems: 'center', paddingTop: px(2) }}>
       {tone === 'end' ? (
-        <MapPin size={px(16)} color={C.red} strokeWidth={2.4} fill={C.red} />
+        <MapPin size={px(16)} color={endColor} strokeWidth={2.4} fill={endColor} />
       ) : (
         <View
           style={{
@@ -229,12 +261,12 @@ function StatusChip({
   px,
 }: {
   label: string;
-  tone: 'green' | 'white';
+  tone: 'green' | 'info' | 'white';
   dot?: boolean;
   px: (value: number) => number;
 }) {
-  const bg = tone === 'green' ? C.green : C.white;
-  const fg = tone === 'green' ? C.white : C.green;
+  const bg = tone === 'green' ? C.green : tone === 'info' ? C.bluePill : C.white;
+  const fg = tone === 'green' ? C.white : tone === 'info' ? C.blue : C.green;
   return (
     <View
       style={{
@@ -284,23 +316,25 @@ function MapCallout({
     <View
       style={{
         position: 'absolute',
-        top: px(56),
-        right: px(14),
+        bottom: px(28),
+        left: px(12),
         minWidth: px(112),
-        maxWidth: px(154),
+        maxWidth: px(170),
         paddingHorizontal: px(12),
-        paddingVertical: px(9),
+        paddingVertical: px(8),
         borderRadius: px(12),
         backgroundColor: C.white,
+        borderWidth: 1,
+        borderColor: C.hairline,
         ...driverShadow,
       }}>
-      <Text style={[T.small, { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft }]}>
+      <Text style={[T.small, { fontSize: px(11), lineHeight: px(14), color: C.greySoft }]}>
         {title}
       </Text>
       {detail ? (
         <Text
-          numberOfLines={2}
-          style={[T.jobTitle, { fontSize: px(12.5), lineHeight: px(16), color: C.ink, marginTop: px(2) }]}>
+          numberOfLines={1}
+          style={[T.jobTitle, { fontSize: px(12.5), lineHeight: px(16), color: C.ink, marginTop: px(1) }]}>
           {detail}
         </Text>
       ) : null}
@@ -356,6 +390,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const [otpError, setOtpError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
+  const [mapRouteMeta, setMapRouteMeta] = useState<RouteMeta | null>(null);
   const otpInputRef = useRef<TextInput>(null);
 
   /**
@@ -370,11 +405,14 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     return () => subscription.remove();
   }, [refetch]);
 
+  // Once completion is confirmed, keep the local server-confirmed snapshot in
+  // front of any stale/partially-shaped active-query payload returned during
+  // invalidation. This prevents the earnings card from reverting to estimate.
   const job =
-    activeJob && (!bookingId || activeJob.id === bookingId)
-      ? activeJob
-      : completedJob && (!bookingId || completedJob.id === bookingId)
-        ? completedJob
+    completedJob && (!bookingId || completedJob.id === bookingId)
+      ? completedJob
+      : activeJob && (!bookingId || activeJob.id === bookingId)
+        ? activeJob
         : null;
   const step: Step = job ? stepForStatus(job.status) : 'en_route';
 
@@ -484,6 +522,18 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     ? (job.finalFare ?? job.estimatedFare ?? null)
     : null;
   const tripDuration = tripDurationLabel(job?.statusHistory);
+  const mapDistanceKm = mapRouteMeta?.distanceKm ?? job?.distanceKm;
+  const mapDurationLabel = mapRouteMeta?.durationMinutes
+    ? `${mapRouteMeta.durationMinutes} min`
+    : undefined;
+
+  const onMapRouteMetaChange = useCallback((meta: RouteMeta | null) => {
+    setMapRouteMeta(meta);
+  }, []);
+
+  const mapsApiKey = getGoogleMapsApiKey();
+  const usePreviewMap =
+    !mapsApiKey && UI_PREVIEW_MODE && process.env.EXPO_PUBLIC_UI_PREVIEW_REAL_MAP !== 'true';
 
   const openNavigation = useCallback(() => {
     const lat = job?.pickup?.latitude;
@@ -510,8 +560,12 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         alignItems: 'center',
         paddingTop: insets.top + px(6),
         paddingHorizontal: px(M.pagePadding),
-        paddingBottom: px(10),
-        backgroundColor: C.pageBg,
+        paddingBottom: px(6),
+        height: insets.top + px(54),
+        backgroundColor: C.white,
+        borderBottomWidth: 1,
+        borderBottomColor: C.hairline,
+        zIndex: 10,
       }}>
       <Pressable
         onPress={() => navigation.goBack()}
@@ -581,7 +635,9 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         routeColor={C.blue}
         pickupColor={step === 'in_progress' ? C.blue : C.amber}
         dropoffColor={C.red}
-        previewMap={UI_PREVIEW_MODE}
+        previewMap={usePreviewMap}
+        routeApiEnabled={!usePreviewMap}
+        onRouteMetaChange={onMapRouteMetaChange}
         recenterTrigger={recenterTrigger}
         pickup={
           hasPickupCoords
@@ -616,13 +672,17 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       {step === 'en_route' ? (
         <MapCallout
           title="Pickup"
-          detail={job!.distanceKm != null ? `${job!.distanceKm} km away` : pickup || undefined}
+          detail={mapDistanceKm != null ? `${mapDistanceKm} km away` : pickup || undefined}
           px={px}
         />
       ) : step === 'in_progress' ? (
         <MapCallout
           title="Destination"
-          detail={job!.distanceKm != null ? `${job!.distanceKm} km trip` : dropoff || undefined}
+          detail={
+            mapDistanceKm != null
+              ? `${mapDistanceKm} km${mapDurationLabel ? ` · ${mapDurationLabel}` : ' trip'}`
+              : dropoff || undefined
+          }
           px={px}
         />
       ) : null}
@@ -653,13 +713,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         style={{
           position: 'absolute',
           right: px(12),
-          bottom: px(70),
+          bottom: px(28),
           width: px(38),
           height: px(38),
           borderRadius: px(19),
           backgroundColor: C.white,
           alignItems: 'center',
           justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: C.hairline,
           ...driverShadow,
         }}>
         <LocateFixed size={px(18)} color={C.ink} strokeWidth={2.2} />
@@ -667,7 +729,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     </View>
   );
 
-  if (isLoading) {
+  if (isLoading && !job) {
     return (
       <View style={{ flex: 1, backgroundColor: C.pageBg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={C.amber} size="large" />
@@ -795,8 +857,9 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
+          flexGrow: 1,
           paddingTop: step === 'completed' ? insets.top : 0,
-          paddingBottom: Math.max(insets.bottom, px(24)),
+          paddingBottom: 0,
         }}>
         {showMap ? mapBlock : null}
 
@@ -804,6 +867,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         {step === 'en_route' || step === 'in_progress' ? (
           <View
             style={{
+              flex: 1,
               marginTop: showMap ? px(-18) : 0,
               marginHorizontal: showMap ? 0 : px(M.pagePadding),
               backgroundColor: C.card,
@@ -811,19 +875,20 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               borderTopRightRadius: px(24),
               paddingHorizontal: px(M.pagePadding),
               paddingTop: px(16),
-              paddingBottom: px(4),
-              minHeight: px(220),
+              paddingBottom: Math.max(insets.bottom + px(16), px(28)),
+              justifyContent: 'space-between',
             }}>
-            <View
-              style={{
-                alignSelf: 'center',
-                width: px(32),
-                height: px(4),
-                borderRadius: px(2),
-                backgroundColor: '#D9DBDE',
-                marginBottom: px(10),
-              }}
-            />
+            <View>
+              <View
+                style={{
+                  alignSelf: 'center',
+                  width: px(32),
+                  height: px(4),
+                  borderRadius: px(2),
+                  backgroundColor: '#D9DBDE',
+                  marginBottom: px(10),
+                }}
+              />
             {step === 'en_route' ? (
               <View
                 style={{
@@ -832,7 +897,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   justifyContent: 'space-between',
                   marginBottom: px(12),
                 }}>
-                <StatusChip label="EN ROUTE TO PICKUP" tone="green" px={px} />
+                <StatusChip label="EN ROUTE TO PICKUP" tone="info" px={px} />
                 {job.distanceKm != null ? (
                   <Text style={[T.small, { fontSize: px(12), color: C.greySoft }]}>
                     {job.distanceKm} km away
@@ -862,11 +927,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
             {/* route block */}
             {step === 'in_progress' ? (
-              <DestinationRoute dropoff={dropoff} distanceKm={job.distanceKm} px={px} />
+              <DestinationRoute dropoff={dropoff} distanceKm={mapDistanceKm} px={px} />
             ) : (
               <View style={{ marginTop: px(14), flexDirection: 'row', alignItems: 'flex-start' }}>
                 <View style={{ width: px(18), alignItems: 'center' }}>
-                  <RouteDot tone="start" last px={px} />
+                  <RouteDot tone="start" last px={px} outlined />
                   {[0, 1, 2, 3, 4].map(index => (
                     <View
                       key={index}
@@ -879,7 +944,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       }}
                     />
                   ))}
-                  <RouteDot tone="end" last px={px} />
+                  <RouteDot tone="end" last px={px} outlined endColor={C.amber} />
                 </View>
                 <View style={{ flex: 1, marginLeft: px(10) }}>
                 <Text
@@ -897,13 +962,13 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   ]}>
                   {pickup || 'Pickup location'}
                 </Text>
-                {job.distanceKm != null ? (
+                {mapDistanceKm != null ? (
                   <Text
                     style={[
                       T.meta,
                       { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(2) },
                     ]}>
-                    {job.distanceKm} km trip
+                      {mapDistanceKm} km trip
                   </Text>
                 ) : null}
 
@@ -1018,16 +1083,20 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       <Car size={px(18)} color={C.amberText} strokeWidth={2.2} style={{ marginRight: px(6) }} />
                     )}
                     <Text
-                      numberOfLines={1}
-                      style={[T.small, { flex: 1, fontSize: px(12.5), color: C.ink }]}>
+                      numberOfLines={2}
+                      style={[
+                        T.small,
+                        { flex: 1, maxWidth: px(104), fontSize: px(12.5), color: C.ink },
+                      ]}>
                       {serviceName}
                     </Text>
                   </View>
                 </View>
               </View>
             ) : null}
+            </View>
 
-            <View style={{ marginTop: px(16), paddingBottom: px(12) }}>
+            <View style={{ marginTop: px(16) }}>
               {step === 'en_route' ? (
                 <>
                   <Pressable
@@ -1119,15 +1188,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         {step === 'verify_otp' ? (
           <View
             style={{
+              flex: 1,
               marginTop: px(-18),
               backgroundColor: C.card,
               borderTopLeftRadius: px(24),
               borderTopRightRadius: px(24),
               paddingHorizontal: px(M.pagePadding),
               paddingTop: px(22),
-              paddingBottom: px(4),
+              paddingBottom: Math.max(insets.bottom + px(16), px(28)),
               alignItems: 'center',
-              minHeight: px(340),
             }}>
             <View
               style={{
@@ -1306,10 +1375,18 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               {[
                 { left: px(48), top: px(18), color: C.amber, size: 5 },
                 { left: px(72), top: px(4), color: C.green, size: 4 },
+                { left: px(96), top: px(20), color: C.blue, size: 3 },
+                { left: px(122), top: px(2), color: C.amber, size: 3 },
+                { left: px(148), top: px(12), color: C.green, size: 4 },
                 { left: px(190), top: px(8), color: C.amber, size: 4 },
                 { left: px(232), top: px(30), color: C.blue, size: 3 },
+                { left: px(260), top: px(52), color: C.green, size: 4 },
                 { left: px(42), top: px(68), color: C.blue, size: 3 },
+                { left: px(76), top: px(92), color: C.amber, size: 3 },
+                { left: px(112), top: px(104), color: C.green, size: 3 },
+                { left: px(178), top: px(100), color: C.blue, size: 3 },
                 { left: px(246), top: px(78), color: C.amber, size: 5 },
+                { left: px(274), top: px(96), color: C.amber, size: 3 },
               ].map((dot, index) => (
                 <View
                   key={index}
@@ -1534,16 +1611,26 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        paddingHorizontal: px(12),
-                        height: px(M.pillHeight + 6),
+                        width: px(92),
+                        minHeight: px(M.pillHeight + 12),
+                        paddingHorizontal: px(8),
+                        paddingVertical: px(6),
                         borderRadius: px(R.innerCard),
                         backgroundColor: C.greenPill,
                       }}>
                       <Check size={px(14)} color={C.green} strokeWidth={3} />
                       <Text
+                        numberOfLines={2}
                         style={[
                           T.pill,
-                          { fontSize: px(12), color: C.green, marginLeft: px(6) },
+                          {
+                            flex: 1,
+                            fontSize: px(11),
+                            lineHeight: px(14),
+                            color: C.green,
+                            marginLeft: px(5),
+                            textAlign: 'center',
+                          },
                         ]}>
                         Added to earnings
                       </Text>
@@ -1650,36 +1737,67 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         ) : null}
       </ScrollView>
 
-      {/* options sheet ---------------------------------------------------- */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+      {/* anchored options menu -------------------------------------------- */}
+      <Modal
+        visible={menuOpen}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => setMenuOpen(false)}>
         <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(12,12,14,0.35)', justifyContent: 'flex-end' }}
+          style={{ flex: 1, backgroundColor: 'rgba(12,12,14,0.18)' }}
           onPress={() => setMenuOpen(false)}>
           <Pressable
             style={{
+              position: 'absolute',
+              top: insets.top + px(48),
+              right: px(14),
+              width: px(180),
               backgroundColor: C.card,
-              borderTopLeftRadius: px(20),
-              borderTopRightRadius: px(20),
-              paddingBottom: Math.max(insets.bottom, px(16)),
-              paddingTop: px(10),
-              paddingHorizontal: px(10),
+              borderRadius: px(12),
+              paddingVertical: px(4),
+              paddingHorizontal: px(4),
+              borderWidth: 1,
+              borderColor: C.hairline,
+              ...driverShadow,
             }}
-            onPress={() => undefined}>
+            onPress={e => e.stopPropagation?.()}>
             <Pressable
               onPress={() => {
                 setMenuOpen(false);
                 void refetch();
               }}
-              style={{ paddingVertical: px(15), paddingHorizontal: px(8) }}>
-              <Text style={[T.cardTitle, { fontSize: px(15), color: C.ink }]}>Refresh job status</Text>
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: px(10),
+                paddingHorizontal: px(10),
+                borderRadius: px(8),
+                backgroundColor: pressed ? C.light : C.card,
+              })}>
+              <RefreshCw size={px(15)} color={C.grey} strokeWidth={2.2} />
+              <Text style={[T.cardTitle, { fontSize: px(13), color: C.ink, marginLeft: px(8) }]}>
+                Refresh job status
+              </Text>
             </Pressable>
+            <View style={{ height: 1, backgroundColor: C.hairline, marginHorizontal: px(8) }} />
             <Pressable
               onPress={() => {
                 setMenuOpen(false);
                 void Linking.openURL(SUPPORT_NUMBER);
               }}
-              style={{ paddingVertical: px(15), paddingHorizontal: px(8) }}>
-              <Text style={[T.cardTitle, { fontSize: px(15), color: C.ink }]}>Call support</Text>
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: px(10),
+                paddingHorizontal: px(10),
+                borderRadius: px(8),
+                backgroundColor: pressed ? C.light : C.card,
+              })}>
+              <Phone size={px(15)} color={C.grey} strokeWidth={2.2} />
+              <Text style={[T.cardTitle, { fontSize: px(13), color: C.ink, marginLeft: px(8) }]}>
+                Call support
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>
