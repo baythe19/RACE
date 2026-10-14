@@ -24,6 +24,7 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  Image,
   Linking,
   Modal,
   Platform,
@@ -37,8 +38,10 @@ import {
 import {
   ArrowLeft,
   CalendarDays,
+  Car,
   Check,
   ChevronRight,
+  Clock3,
   House,
   Info,
   LocateFixed,
@@ -46,12 +49,17 @@ import {
   MoreVertical,
   Navigation,
   Phone,
+  Route,
   ShieldCheck,
+  TriangleAlert,
+  User,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LiveTripMap from '../../../components/booking/LiveTripMap';
+import { images } from '../../../assets';
+import { UI_PREVIEW_MODE } from '../../../constants/preview';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import { useDriverLocationReporting } from '../../../hooks/useDriverLocationReporting';
 import {
@@ -339,7 +347,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const px = useScreenPx();
   const insets = useSafeAreaInsets();
   const bookingId = route.params?.bookingId;
-  const { data: activeJob, isLoading, refetch } = useDriverActiveJobQuery(true);
+  const { data: activeJob, isLoading, isError, refetch } = useDriverActiveJobQuery(true);
   const statusMutation = useUpdateDriverBookingStatusMutation();
 
   const [acting, setActing] = useState(false);
@@ -455,6 +463,9 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       );
       return;
     }
+    // Clear the focused job route so returning to Jobs shows the list instead
+    // of reopening the just-completed board from the nested stack.
+    navigation.popToTop();
     navigation.getParent()?.navigate('PartnerHome' as never);
   }, [acting, job, navigation, runStatusUpdate, step, tripOtp]);
 
@@ -565,11 +576,12 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     <View style={{ marginHorizontal: 0 }}>
       <LiveTripMap
         borderRadius={0}
-        style={{ height: px(300) }}
+        style={{ height: px(M.activeMapHeight) }}
         showsUserLocation
         routeColor={C.blue}
         pickupColor={step === 'in_progress' ? C.blue : C.amber}
         dropoffColor={C.red}
+        previewMap={UI_PREVIEW_MODE}
         recenterTrigger={recenterTrigger}
         pickup={
           hasPickupCoords
@@ -581,7 +593,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             : null
         }
         dropoff={
-          hasDropCoords
+          step === 'in_progress' && hasDropCoords
             ? {
                 latitude: job!.dropoff!.latitude as number,
                 longitude: job!.dropoff!.longitude as number,
@@ -663,6 +675,61 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     );
   }
 
+  if (isError && !job) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+        {header}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: px(24) }}>
+          <View
+            style={{
+              width: px(64),
+              height: px(64),
+              borderRadius: px(32),
+              backgroundColor: C.cream,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <TriangleAlert size={px(28)} color={C.amberText} strokeWidth={2.2} />
+          </View>
+          <Text
+            style={[
+              T.sectionTitle,
+              { fontSize: px(19), lineHeight: px(24), color: C.ink, marginTop: px(16) },
+            ]}>
+            Couldn’t load active job
+          </Text>
+          <Text
+            style={[
+              T.cardSubtitle,
+              {
+                fontSize: px(13.5),
+                lineHeight: px(19),
+                color: C.grey,
+                marginTop: px(6),
+                textAlign: 'center',
+              },
+            ]}>
+            Check your connection and try again.
+          </Text>
+          <Pressable
+            onPress={() => void refetch()}
+            accessibilityRole="button"
+            style={{
+              height: px(M.ctaHeight),
+              paddingHorizontal: px(24),
+              borderRadius: px(R.button),
+              backgroundColor: C.amber,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginTop: px(20),
+            }}>
+            <Text style={[T.button, { fontSize: px(15), color: C.ink }]}>Try again</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   if (!job) {
     return (
       <View style={{ flex: 1, backgroundColor: C.pageBg }}>
@@ -727,7 +794,10 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, px(24)) }}>
+        contentContainerStyle={{
+          paddingTop: step === 'completed' ? insets.top : 0,
+          paddingBottom: Math.max(insets.bottom, px(24)),
+        }}>
         {showMap ? mapBlock : null}
 
         {/* ---------------------------------------------------- step content */}
@@ -744,6 +814,16 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               paddingBottom: px(4),
               minHeight: px(220),
             }}>
+            <View
+              style={{
+                alignSelf: 'center',
+                width: px(32),
+                height: px(4),
+                borderRadius: px(2),
+                backgroundColor: '#D9DBDE',
+                marginBottom: px(10),
+              }}
+            />
             {step === 'en_route' ? (
               <View
                 style={{
@@ -784,13 +864,24 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             {step === 'in_progress' ? (
               <DestinationRoute dropoff={dropoff} distanceKm={job.distanceKm} px={px} />
             ) : (
-            <View style={{ marginTop: px(14), flexDirection: 'row', alignItems: 'flex-start' }}>
-              <View style={{ width: px(18), alignItems: 'center' }}>
-                <RouteDot tone="start" px={px} />
-                <View style={{ height: px(22) }} />
-                <RouteDot tone="end" last px={px} />
-              </View>
-              <View style={{ flex: 1, marginLeft: px(10) }}>
+              <View style={{ marginTop: px(14), flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{ width: px(18), alignItems: 'center' }}>
+                  <RouteDot tone="start" last px={px} />
+                  {[0, 1, 2, 3, 4].map(index => (
+                    <View
+                      key={index}
+                      style={{
+                        width: px(1.5),
+                        height: px(3),
+                        marginTop: px(2),
+                        borderRadius: px(1),
+                        backgroundColor: '#C9CBD3',
+                      }}
+                    />
+                  ))}
+                  <RouteDot tone="end" last px={px} />
+                </View>
+                <View style={{ flex: 1, marginLeft: px(10) }}>
                 <Text
                   style={[
                     T.small,
@@ -836,8 +927,8 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   ]}>
                   {dropoff || 'Drop location shared at pickup'}
                 </Text>
+                </View>
               </View>
-            </View>
             )}
 
             {/* customer row — rendered only when the booking carries a contact */}
@@ -860,9 +951,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}>
-                  <Text style={{ fontSize: px(15), fontWeight: '700', color: C.ink }}>
-                    {(job.customer.name ?? 'C').charAt(0).toUpperCase()}
-                  </Text>
+                  <User size={px(19)} color={C.greySoft} strokeWidth={2.2} />
                 </View>
                 <View style={{ flex: 1, marginLeft: px(12) }}>
                   <Text style={[T.jobTitle, { fontSize: px(14.5), color: C.ink }]}>
@@ -918,17 +1007,22 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[T.small, { fontSize: px(12), color: C.greySoft }]}>
-                    Service
-                  </Text>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      T.small,
-                      { fontSize: px(12.5), color: C.ink, marginTop: px(2), maxWidth: px(130) },
-                    ]}>
-                    {serviceName}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', maxWidth: px(142) }}>
+                    {job.bookingType === 'towing' ? (
+                      <Image
+                        source={images.icons.towing}
+                        style={{ width: px(22), height: px(17), marginRight: px(6) }}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Car size={px(18)} color={C.amberText} strokeWidth={2.2} style={{ marginRight: px(6) }} />
+                    )}
+                    <Text
+                      numberOfLines={1}
+                      style={[T.small, { flex: 1, fontSize: px(12.5), color: C.ink }]}>
+                      {serviceName}
+                    </Text>
+                  </View>
                 </View>
               </View>
             ) : null}
@@ -1035,6 +1129,16 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               alignItems: 'center',
               minHeight: px(340),
             }}>
+            <View
+              style={{
+                alignSelf: 'center',
+                width: px(32),
+                height: px(4),
+                borderRadius: px(2),
+                backgroundColor: '#D9DBDE',
+                marginBottom: px(10),
+              }}
+            />
             <View
               style={{
                 width: px(56),
@@ -1272,9 +1376,28 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   alignItems: 'center',
                   justifyContent: 'space-between',
                 }}>
+                <View
+                  style={{
+                    width: px(34),
+                    height: px(34),
+                    borderRadius: px(17),
+                    backgroundColor: C.creamRow,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  {job.bookingType === 'towing' ? (
+                    <Image
+                      source={images.icons.towing}
+                      style={{ width: px(22), height: px(17) }}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Car size={px(20)} color={C.ink} strokeWidth={2} />
+                  )}
+                </View>
                 <Text
                   numberOfLines={1}
-                  style={[T.jobTitle, { flex: 1, fontSize: px(15.5), color: C.ink }]}>
+                  style={[T.jobTitle, { flex: 1, fontSize: px(15.5), color: C.ink, marginLeft: px(10) }]}>
                   {serviceName}
                 </Text>
                 <View
@@ -1301,8 +1424,27 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       marginTop: px(2),
                     }}
                   />
-                  <View style={{ height: px(18) }} />
-                  <MapPin size={px(16)} color={C.red} strokeWidth={2.4} fill={C.red} />
+                  {[0, 1, 2].map(index => (
+                    <View
+                      key={index}
+                      style={{
+                        width: px(1.5),
+                        height: px(3),
+                        marginTop: px(2),
+                        borderRadius: px(1),
+                        backgroundColor: '#C9CBD3',
+                      }}
+                    />
+                  ))}
+                  <View
+                    style={{
+                      width: px(11),
+                      height: px(11),
+                      borderRadius: px(6),
+                      backgroundColor: C.amber,
+                      marginTop: px(2),
+                    }}
+                  />
                 </View>
                 <View style={{ flex: 1, marginLeft: px(10) }}>
                   <Text
@@ -1356,11 +1498,22 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                     flexDirection: 'row',
                     alignItems: 'center',
                     marginTop: px(14),
-                    paddingTop: px(14),
-                    borderTopWidth: 1,
-                    borderTopColor: C.hairline,
+                    padding: px(10),
+                    borderRadius: px(R.innerCard),
+                    backgroundColor: C.greenCard,
                   }}>
-                  <View style={{ flex: 1 }}>
+                  <View
+                    style={{
+                      width: px(30),
+                      height: px(30),
+                      borderRadius: px(15),
+                      backgroundColor: C.greenTile,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Text style={{ fontSize: px(16), fontWeight: '800', color: C.green }}>₹</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: px(10) }}>
                     <Text
                       style={[
                         T.metricValue,
@@ -1403,45 +1556,51 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 <View
                   style={{
                     flexDirection: 'row',
-                    marginTop: px(14),
-                    paddingTop: px(14),
-                    borderTopWidth: 1,
-                    borderTopColor: C.hairline,
+                    marginTop: px(12),
+                    padding: px(12),
+                    borderRadius: px(R.innerCard),
+                    backgroundColor: '#F4F8FC',
                   }}>
                   {tripDuration ? (
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          T.small,
-                          { fontSize: px(12), lineHeight: px(16), color: C.greySoft },
-                        ]}>
-                        Total time
-                      </Text>
-                      <Text
-                        style={[
-                          T.jobTitle,
-                          { fontSize: px(15), color: C.ink, marginTop: px(2) },
-                        ]}>
-                        {tripDuration}
-                      </Text>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                      <View
+                        style={{
+                          width: px(28),
+                          height: px(28),
+                          borderRadius: px(14),
+                          backgroundColor: C.bluePill,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                        <Clock3 size={px(15)} color={C.blue} strokeWidth={2.4} />
+                      </View>
+                      <View style={{ marginLeft: px(8) }}>
+                        <Text style={[T.small, { fontSize: px(11.5), color: C.greySoft }]}>Total time</Text>
+                        <Text style={[T.jobTitle, { fontSize: px(15), color: C.ink, marginTop: px(1) }]}>
+                          {tripDuration}
+                        </Text>
+                      </View>
                     </View>
                   ) : null}
                   {job.distanceKm != null ? (
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          T.small,
-                          { fontSize: px(12), lineHeight: px(16), color: C.greySoft },
-                        ]}>
-                        Total distance
-                      </Text>
-                      <Text
-                        style={[
-                          T.jobTitle,
-                          { fontSize: px(15), color: C.ink, marginTop: px(2) },
-                        ]}>
-                        {job.distanceKm} km
-                      </Text>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                      <View
+                        style={{
+                          width: px(28),
+                          height: px(28),
+                          borderRadius: px(14),
+                          backgroundColor: C.bluePill,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}>
+                        <Route size={px(15)} color={C.blue} strokeWidth={2.4} />
+                      </View>
+                      <View style={{ marginLeft: px(8) }}>
+                        <Text style={[T.small, { fontSize: px(11.5), color: C.greySoft }]}>Total distance</Text>
+                        <Text style={[T.jobTitle, { fontSize: px(15), color: C.ink, marginTop: px(1) }]}>
+                          {job.distanceKm} km
+                        </Text>
+                      </View>
                     </View>
                   ) : null}
                 </View>
@@ -1471,7 +1630,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             </View>
 
             <Pressable
-              onPress={() => navigation.getParent()?.navigate('PartnerJobs' as never)}
+              onPress={() => navigation.popToTop()}
               accessibilityRole="button"
               style={{
                 flexDirection: 'row',

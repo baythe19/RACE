@@ -23,7 +23,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Bell, CalendarDays, Car, MapPin } from 'lucide-react-native';
+import { Bell, CalendarDays, Car, MapPin, TriangleAlert } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,11 +38,13 @@ import {
   useDriverActiveJobQuery,
   useDriverJobOffersQuery,
   useDriverJobsQuery,
+  useDriverProfileQuery,
   useRejectDriverJobMutation,
 } from '../../../services/driver/useDriverQueries';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
+import { buildDriverVerification } from '../../../utils/driverVerification';
 import {
   isActiveBookingStatus,
   isClosedBookingStatus,
@@ -53,7 +55,6 @@ import {
   driverColors as C,
   driverMetrics as M,
   driverRadius as R,
-  driverShadow,
   driverType as T,
 } from '../../../theme/driverUi';
 
@@ -187,14 +188,13 @@ function RequestJobCard({
         borderColor: C.amberBorder,
         padding: px(14),
         marginBottom: px(12),
-        ...driverShadow,
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
           style={{
             width: px(46),
             height: px(46),
-            borderRadius: px(R.tile),
+            borderRadius: px(23),
             backgroundColor: C.amberTileSoft,
             alignItems: 'center',
             justifyContent: 'center',
@@ -369,14 +369,13 @@ function ActiveJobRow({
         padding: px(14),
         marginBottom: px(12),
         opacity: pressed ? 0.95 : 1,
-        ...driverShadow,
       })}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
           style={{
             width: px(46),
             height: px(46),
-            borderRadius: px(R.tile),
+            borderRadius: px(23),
             backgroundColor: C.greenTile,
             alignItems: 'center',
             justifyContent: 'center',
@@ -530,15 +529,38 @@ function JobsCount({
 export default function DriverJobsScreen({ navigation }: Props) {
   const px = useScreenPx();
   const insets = useSafeAreaInsets();
-  const { data: jobs = [], isLoading, refetch } = useDriverJobsQuery(true);
-  const { data: offers = [] } = useDriverJobOffersQuery(true);
-  const { data: activeJob } = useDriverActiveJobQuery(true);
+  const { data: profile, isLoading: profileLoading } = useDriverProfileQuery(true);
+  const isApproved = buildDriverVerification(profile).isApproved;
+  const {
+    data: jobs = [],
+    isLoading: jobsLoading,
+    isError: jobsError,
+    refetch: refetchJobs,
+  } = useDriverJobsQuery(isApproved);
+  const {
+    data: offers = [],
+    isLoading: offersLoading,
+    isError: offersError,
+    refetch: refetchOffers,
+  } = useDriverJobOffersQuery(isApproved);
+  const {
+    data: activeJob,
+    isLoading: activeLoading,
+    isError: activeError,
+    refetch: refetchActive,
+  } = useDriverActiveJobQuery(isApproved);
   const acceptMutation = useAcceptDriverJobMutation();
   const rejectMutation = useRejectDriverJobMutation();
 
   const [segment, setSegment] = useState<Segment>('available');
   const [pendingAcceptId, setPendingAcceptId] = useState<string | null>(null);
   const [pendingDeclineId, setPendingDeclineId] = useState<string | null>(null);
+  const initialLoading = profileLoading || jobsLoading || offersLoading || activeLoading;
+  const hasQueryError = jobsError || offersError || activeError;
+
+  const retryQueries = useCallback(() => {
+    void Promise.all([refetchJobs(), refetchOffers(), refetchActive()]);
+  }, [refetchActive, refetchJobs, refetchOffers]);
 
   const activeJobs = useMemo(() => {
     const list = jobs.filter(job => isActiveBookingStatus(job.status));
@@ -573,7 +595,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
       try {
         // The active job opens only after the API confirms the accept.
         await acceptMutation.mutateAsync({ bookingId: job.id, bookingType: job.bookingType });
-        await refetch();
+        await refetchJobs();
         navigation.navigate('PartnerActiveJob', {
           bookingId: job.id,
           bookingType: job.bookingType,
@@ -584,7 +606,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         setPendingAcceptId(null);
       }
     },
-    [acceptMutation, navigation, pendingAcceptId, pendingDeclineId, refetch],
+    [acceptMutation, navigation, pendingAcceptId, pendingDeclineId, refetchJobs],
   );
 
   const onDecline = useCallback(
@@ -633,7 +655,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ flex: 1 }} />
-            <PartnerHeaderLogo width={px(56)} showPartnerText />
+            <PartnerHeaderLogo width={px(70)} cropZoom={1.4} showPartnerText />
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Pressable
                 onPress={openPartnerNotifications}
@@ -700,7 +722,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
             backgroundColor: C.card,
             paddingVertical: px(10),
             paddingHorizontal: px(8),
-            ...driverShadow,
           }}>
           <JobsCount label="ready to accept" count={offers.length} px={px} />
           <JobsCount label="active trip" count={activeJobs.length} px={px} />
@@ -749,8 +770,12 @@ export default function DriverJobsScreen({ navigation }: Props) {
 
         {/* list --------------------------------------------------------- */}
         <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(14) }}>
-          {isLoading ? (
+          {initialLoading ? (
             <ActivityIndicator color={C.amber} style={{ marginTop: px(28) }} />
+          ) : !isApproved ? (
+            <JobsApprovalState px={px} />
+          ) : hasQueryError ? (
+            <JobsErrorState px={px} onRetry={retryQueries} />
           ) : segment === 'available' ? (
             offers.length === 0 ? (
               <EmptyState
@@ -801,6 +826,82 @@ export default function DriverJobsScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
+    </View>
+  );
+}
+
+function JobsErrorState({
+  px,
+  onRetry,
+}: {
+  px: (value: number) => number;
+  onRetry: () => void;
+}) {
+  return (
+    <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
+      <View
+        style={{
+          width: px(56),
+          height: px(56),
+          borderRadius: px(28),
+          backgroundColor: C.cream,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <TriangleAlert size={px(24)} color={C.amberText} strokeWidth={2.2} />
+      </View>
+      <Text style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
+        Couldn’t load jobs
+      </Text>
+      <Text
+        style={[
+          T.cardSubtitle,
+          { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
+        ]}>
+        Check your connection and try again.
+      </Text>
+      <Pressable
+        onPress={onRetry}
+        accessibilityRole="button"
+        style={{
+          height: px(40),
+          paddingHorizontal: px(20),
+          borderRadius: px(R.button),
+          backgroundColor: C.amber,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: px(16),
+        }}>
+        <Text style={[T.button, { fontSize: px(14), color: C.ink }]}>Try again</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function JobsApprovalState({ px }: { px: (value: number) => number }) {
+  return (
+    <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
+      <View
+        style={{
+          width: px(56),
+          height: px(56),
+          borderRadius: px(28),
+          backgroundColor: C.amberTile,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <TriangleAlert size={px(24)} color={C.amberText} strokeWidth={2.2} />
+      </View>
+      <Text style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
+        Jobs unlock after approval
+      </Text>
+      <Text
+        style={[
+          T.cardSubtitle,
+          { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
+        ]}>
+        Your account is still under review. You can view the dashboard while RACE verifies your documents.
+      </Text>
     </View>
   );
 }

@@ -1,6 +1,6 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-12
+> **Updated:** 2026-10-14
 > **Read this first in every new session.**
 
 ---
@@ -108,6 +108,27 @@ See `.agents/state/DECISIONS_INDEX.md` for all decisions.
 - Step tracker/state/copy live in `mobile application/src/utils/driverVerification.ts` (`buildDriverVerification`) — the dashboard verification card reads the same module.
 - **Fixed bug:** `isVerified` is set to `true` at driver registration even while the review is open, so the dashboard used to claim "Verification approved" for pending drivers. Approval is now `driverProfile.status === 'APPROVED'` (same field the backend gates on).
 - `PartnerAppNavigator` starts an unapproved driver on the gate instead of the live tabs; "Go to Dashboard (Read only)" opens them. The dashboard skips jobs/offers/availability/location requests until approved (they would 403).
+- **Driver Registration Input Validation & Layout Protection (UI Anti-Chaos):**
+  - Standard input conditions and character caps applied across `DriverRegistrationFlowScreen.tsx`, `DriverPersonalInfoScreen.tsx`, `DriverVehicleInfoScreen.tsx`, and `DriverReviewScreen.tsx`.
+  - Full Name: `maxLength={40}`, autoCapitalize `words`, regex sanitization `/[^a-zA-Z\s.-]/g` (blocks numbers/symbols), and character counter when length >= 25 (`{len}/40`).
+  - Vehicle Registration Number: `maxLength={14}`, autoCapitalize `characters`, uppercase alphanumeric sanitization `/[^A-Za-z0-9\s]/g`, and counter when length >= 8 (`{len}/14`).
+  - Driving Licence Number: `maxLength={18}`, autoCapitalize `characters`, uppercase DL sanitization `/[^A-Za-z0-9\-]/g`, and counter when length >= 12 (`{len}/18`).
+  - Vehicle Model: `maxLength={35}`, alphanumeric + hyphen/period sanitization `/[^A-Za-z0-9\s\-.]/g`.
+  - Current Address: `maxLength={120}`, `numberOfLines={2}`, and live character counter (`{len}/120`).
+  - Email Address: `maxLength={50}`, whitespace trimmed.
+  - Emergency Contact: `maxLength={35}` on Name, `maxLength={10}` on Mobile (`replace(/[^0-9]/g, '')`), live counter indicators.
+  - Step 4 Review & Summary Layout Protection: Flex layout stabilized with `flexShrink: 0`, `maxWidth: '45%'` on `detailLabel`, `flex: 1`, `textAlign: 'right'` on `detailValue`, and `numberOfLines={1}` with `ellipsizeMode="tail"` across all detail rows (`numberOfLines={2}` for address), preventing text overflow or container pushing across any device width.
+- **Review Page "Already-Checked" Indicators & Right-Side Action Alignment:**
+  - In `DriverRegistrationFlowScreen.tsx` and `DriverReviewScreen.tsx`, all 3 sections (Personal Details, Vehicle Details, Documents) now display a green `[✔]` check badge and a "Checked" pill indicating they have already been completed by the user.
+  - Tappable section headers and cards with clear `Edit >` button positioned on the **right side** of the card, allowing the user to seamlessly enter that page, make edits, and return.
+  - Documents list: Each document row displays its status on the right side. If uploaded, it shows `Checked` + `Change ▾`. If missing/pending, it shows a prominent **`+ Add →`** button on the **right side** of the row so the user can directly enter and upload that document.
+- **Review Screen Single Viewport Height (VH) Layout, Edit Previous & Re-submission Flow (2026-10-14):**
+  - **Single Screen (VH) Fit:** Replaced the tall 16-row granular fields table in Step 4 Review with 3 compact, elegant summary cards (`Personal details`, `Vehicle details`, `Documents`) matching Board 1 Screen 4. Content height reduced from ~780px to ~290px.
+  - **Scroll Disabled on Step 4:** `DriverRegistrationLayout.tsx` automatically disables scrolling when `step === 4` (`scrollEnabled={scrollEnabled ?? (step !== 4)}`), guaranteeing zero vertical scrolling on normal viewports.
+  - **"Edit your previous details" Button & Picker Modal:** Prominent `[ ✎ Edit your previous details ]` action added. Tapping opens an interactive modal allowing quick navigation to Step 1 (Personal), Step 2 (Vehicle), or Step 3 (Documents) with `returnToReviewAfterEdit = true`.
+  - **Re-submission Mode:** Integrated `isResubmit` support. The continue button dynamically displays **"Re-submit application"** and the status banner confirms re-submission mode.
+  - **Driver Verification Screen VH Fit (`DriverVerificationView.tsx`):** Scaled artwork from 175px to 108px, tightened status pill, title, subtitle, and tracker steps. Default state does not scroll (`scrollEnabled={applicationOpen}`). User can optionally toggle "View submitted details" to expand full records.
+  - Prominent **`[ ✎ Edit your previous details ]`** CTA added to the verification pending view, navigating directly to the editable review screen with `isResubmit: true`.
 - Removed fabricated `mock-driver-token` / placeholder user from the verification screen; `DriverReviewScreen` still contains its own mock fallbacks (untouched, separate task).
 
 ## Recent Work — Driver dashboard visual alignment (2026-10-14)
@@ -123,7 +144,31 @@ See `.agents/state/DECISIONS_INDEX.md` for all decisions.
 - Implemented the next visual/behavior pass: Jobs branding/counts/segments, full-bleed active map, route callouts and marker colors, en-route action order, OTP dimming and manual focus, completion success layout, confirmation before completing, and in-card Back to Home.
 - Preview acceptance now promotes the selected offer into the active trip, removes accepted/declined offers, validates the preview trip OTP (`1234`), records status history/final fare, and treats completed trips as no longer active.
 - Completion preserves a local snapshot so the board remains visible after the real backend releases the active booking. Account/verification visual references were not present in the additional folder.
-- Verified with partner TypeScript, `git diff --check`, Expo Android bundle export, and a preview lifecycle handoff script. Device screenshot comparison remains pending because no emulator/ADB is available.
+- Follow-up reference pass tightened active-job map height to the board proportion (`driverMetrics.activeMapHeight = 260`), added the missing grab handle to the en-route, OTP, and in-progress sheets, matched the generic customer avatar silhouette, added service-type/earnings/metric iconography to the in-progress and completed boards, made Jobs request icons circular, and tuned the Dashboard brand mark size independently from Jobs.
+- Completed the next one-by-one journey pass: Jobs now uses the larger/cropped board logo with lighter card surfaces; En-route only maps the driver-to-pickup leg and has a continuous dotted pickup/drop spine; preview active-job boards use a light deterministic route-map fallback instead of a black native tile surface, while API mode keeps the real `MapView`; In-progress retains the OTP gate and confirmation before completion; Completed retains the final-fare snapshot and earnings summary.
+- Tightened approval behavior across the journey: the tab-bar badge, incoming offer alert, and Jobs queries are disabled for unapproved drivers, and the Jobs screen explains that requests unlock after approval instead of exposing preview offers.
+- Corrected stale preview availability: a pending driver's presence is now forced offline until approval, so the avatar indicator, location reporter, offer alert, and dashboard availability card cannot disagree.
+- Added recovery behavior without changing the happy-path boards: Jobs waits for all three driver queries and exposes a retry state, Active Job preserves cached data and shows a retry state when no job can be loaded, and Dashboard surfaces a compact refresh banner when approved-job data fails.
+- Applied a Home-only visual cleanup: the dashboard now reserves space above the custom tab bar, removes the heavier shared card elevation, and enlarges/crops the padded header logo without changing the Jobs header sizing. The UI QA navigator is now opt-in via `EXPO_PUBLIC_UI_QA_NAVIGATOR=true`, keeping preview/mock data available without floating QA chrome on design screenshots.
+- Preview/mock driver data now defaults to the approved state so the supplied Dashboard → Jobs → active-job boards are reachable during design QA; set `EXPO_PUBLIC_UI_PREVIEW_DRIVER_STATUS=PENDING` to exercise the verification gate. Real API approval gating remains unchanged. The bottom tab bar elevation was also reduced to the lighter reference shadow.
+- Re-audited the supplied boards one by one after the first visual pass. Preview now opens on the request-first Home state (no fabricated active trip before acceptance), while the Jobs accept path and the explicit UI QA active-job shortcut seed the same en-route fixture. The driver header lockup masks the generic `SERVICE` word and renders the board's `RACE PARTNER` treatment.
+- Kept the clean design preview free of the global incoming-offer overlay; `DriverOfferAlert` remains unchanged for production/API mode and can be enabled in preview with `EXPO_PUBLIC_UI_PREVIEW_DRIVER_ALERT=true`. Repaired the partner registration review style inference regression exposed by the audit (duplicate style blocks had made the typecheck report missing review styles).
+- Added completed-board safe-area padding so the headerless Job Completed screen starts below the device status bar while keeping the reference's full white canvas and centered success treatment.
+- Removed the nested Dashboard availability press target: the card is now a visual container and only the dedicated switch can mutate online/offline state, preventing event bubbling from issuing duplicate availability requests.
+- Completed the in-progress registration worktree's missing document-preview style definitions without overwriting its native picker behavior.
+- Verified with partner TypeScript, `git diff --check`, a fresh Expo Android bundle export after the latest interaction edit, pending/approved preview fixtures, the preview offer-alert gate, and the explicit QA lifecycle (Jobs → En route → Arrived → In progress → Completed). Device screenshot comparison remains pending because no emulator/ADB is available; direct API smoke execution is also unavailable in Node because Expo SecureStore's native module is not present outside Expo.
+
+## Recent Work — Driver Document Upload & Native Android Permissions (2026-10-14)
+
+- Configured explicit Android permissions in `mobile application/app.config.js`: `CAMERA`, `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`, and updated `expo-image-picker` plugin descriptions with clear verification justification for store compliance.
+- Wired native permission requesting and checking in `DriverRegistrationFlowScreen.tsx` and `DriverDocumentsScreen.tsx`:
+  - **Camera:** Checks `getCameraPermissionsAsync()`; prompts with `requestCameraPermissionsAsync()`. If permanently denied, presents Alert with "Open Settings" link (`Linking.openSettings()`); when granted, launches camera with auto-crop (`aspect: [4, 3]`, `quality: 0.85`).
+  - **Gallery:** Checks `getMediaLibraryPermissionsAsync()`; prompts with `requestMediaLibraryPermissionsAsync()`. If denied, presents rationale and "Open Settings" option; when granted, launches gallery picker (`allowsEditing: true`).
+  - **PDF / Files:** Uses `DocumentPicker.getDocumentAsync()` supporting PDF, JPEG, and PNG up to 10MB limit with user-friendly file size validation.
+  - **Sample QA Option:** Retained "Use verified sample document" option in the upload sheet for instant testing in emulator/Expo Go without blocking.
+- Real captured/selected files pass directly into `startAnimatedUpload(doc, source, realFile)` and save actual URIs/names into `partnerRegistrationStore`.
+- Enhanced preview modal with dual rendering: rich SVG PDF card for PDF uploads and high-res image container for photos.
+- Verified 0 TypeScript errors across `mobile application/` and `backend/`.
 
 ## Deep audit — 2026-10-12 (documentation only, no code changed)
 

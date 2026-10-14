@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -15,6 +16,8 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   AlertCircle,
   Calendar,
@@ -35,6 +38,7 @@ import {
   MapPin,
   Phone,
   Plus,
+  Pencil,
   RefreshCw,
   Search,
   Shield,
@@ -142,12 +146,15 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
   const initialStepParam = route.params?.initialStep ?? 1;
   const fromReviewParam = Boolean(route.params?.fromReview);
+  const isResubmitParam = Boolean((route.params as any)?.isResubmit);
 
   // Flow Step State (1: Personal, 2: Vehicle, 3: Documents, 4: Review)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(
     initialStepParam >= 1 && initialStepParam <= 4 ? (initialStepParam as any) : 1,
   );
   const [returnToReviewAfterEdit, setReturnToReviewAfterEdit] = useState(fromReviewParam);
+  const [isResubmitApplication, setIsResubmitApplication] = useState(isResubmitParam);
+  const [editSectionModalVisible, setEditSectionModalVisible] = useState(false);
 
   // Slide Animation Value
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -279,9 +286,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // Step 3: Document Verification States
   // -------------------------------------------------------------
   const [activeDocForUpload, setActiveDocForUpload] = useState<DriverDocumentConfig | null>(null);
-  const [previewDocData, setPreviewDocData] = useState<{ title: string; uri: string; name: string } | null>(
-    null,
-  );
+  const [previewDocData, setPreviewDocData] = useState<{
+    title: string;
+    uri: string;
+    name: string;
+    mimeType?: string;
+  } | null>(null);
   const [expandedLater1, setExpandedLater1] = useState(false);
   const [expandedLater2, setExpandedLater2] = useState(false);
 
@@ -296,7 +306,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const isDocUploaded = (docId: string) => driverDocuments.some((d) => d.id === docId);
   const getUploadedDoc = (docId: string) => driverDocuments.find((d) => d.id === docId);
 
-  const startAnimatedUpload = (doc: DriverDocumentConfig, sourceLabel: string) => {
+  const startAnimatedUpload = (
+    doc: DriverDocumentConfig,
+    sourceLabel: string,
+    realFile?: { uri: string; name: string; mimeType: string },
+  ) => {
     setActiveDocForUpload(null);
     setUploadProgressState({
       doc,
@@ -328,12 +342,209 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       addDriverDocument({
         id: doc.id,
         label: doc.title,
-        uri: `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
-        name: `${doc.id}_verified.jpg`,
-        mimeType: 'image/jpeg',
+        uri:
+          realFile?.uri ||
+          `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
+        name: realFile?.name || `${doc.id}_verified.jpg`,
+        mimeType: realFile?.mimeType || 'image/jpeg',
       });
       setUploadProgressState(null);
     }, 1500);
+  };
+
+  // -------------------------------------------------------------
+  // Native Android & Device Permission Handlers for Document Upload
+  // -------------------------------------------------------------
+  const handlePickFromCamera = async (doc: DriverDocumentConfig) => {
+    try {
+      const current = await ImagePicker.getCameraPermissionsAsync();
+      let granted = current.granted;
+
+      if (!granted) {
+        if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
+          Alert.alert(
+            'Camera Permission Required',
+            'Camera access is disabled for RACE Partner. To take clear photos of your documents (e.g. Driving License, RC, Insurance) for quick verification, please enable camera access in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  Linking.openSettings().catch(() => {});
+                },
+              },
+            ],
+          );
+          return;
+        }
+
+        const requested = await ImagePicker.requestCameraPermissionsAsync();
+        granted = requested.granted;
+
+        if (!granted) {
+          Alert.alert(
+            'Camera Permission Needed',
+            'Camera access is required to take photos of your official documents for verification.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Try Again',
+                onPress: () => handlePickFromCamera(doc),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
+      setActiveDocForUpload(null);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const capturedName = asset.fileName || `${doc.id}_photo_${Date.now()}.jpg`;
+
+      startAnimatedUpload(doc, 'Camera', {
+        uri: asset.uri,
+        name: capturedName,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+    } catch (err: any) {
+      console.warn('[CameraPicker] Error launching camera:', err);
+      Alert.alert(
+        'Camera Error',
+        'Could not access the camera. You can also select a photo from your gallery or upload a PDF document.',
+        [{ text: 'OK' }],
+      );
+    }
+  };
+
+  const handlePickFromGallery = async (doc: DriverDocumentConfig) => {
+    try {
+      const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+      let granted = current.granted;
+
+      if (!granted) {
+        if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
+          Alert.alert(
+            'Photo Library Permission Required',
+            'Photo library access is disabled for RACE Partner. To select your document photos from your device, please allow photos access in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  Linking.openSettings().catch(() => {});
+                },
+              },
+            ],
+          );
+          return;
+        }
+
+        const requested = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        granted = requested.granted;
+
+        if (!granted) {
+          Alert.alert(
+            'Gallery Permission Needed',
+            'Photo library access is needed to select and upload document photos.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Try Again',
+                onPress: () => handlePickFromGallery(doc),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
+      setActiveDocForUpload(null);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const selectedName = asset.fileName || `${doc.id}_gallery_${Date.now()}.jpg`;
+
+      startAnimatedUpload(doc, 'Gallery', {
+        uri: asset.uri,
+        name: selectedName,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+    } catch (err: any) {
+      console.warn('[GalleryPicker] Error launching gallery:', err);
+      Alert.alert(
+        'Gallery Error',
+        'Could not open gallery. Please try again or select a PDF document.',
+        [{ text: 'OK' }],
+      );
+    }
+  };
+
+  const handlePickFromFiles = async (doc: DriverDocumentConfig) => {
+    try {
+      setActiveDocForUpload(null);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const maxBytes = 10 * 1024 * 1024; // 10MB
+      if (asset.size && asset.size > maxBytes) {
+        Alert.alert(
+          'File Too Large',
+          'The selected file exceeds 10 MB. Please choose a smaller photo or compressed PDF.',
+          [{ text: 'OK' }],
+        );
+        return;
+      }
+
+      startAnimatedUpload(doc, 'Files', {
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType || 'application/pdf',
+      });
+    } catch (err: any) {
+      console.warn('[FilePicker] Error selecting document:', err);
+      Alert.alert(
+        'File Picker Error',
+        'Could not open document picker. Please try taking a photo with the camera or choosing from gallery.',
+        [{ text: 'OK' }],
+      );
+    }
+  };
+
+  const handlePickSample = (doc: DriverDocumentConfig) => {
+    setActiveDocForUpload(null);
+    startAnimatedUpload(doc, 'Sample', {
+      uri: `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
+      name: `${doc.id}_verified_sample.jpg`,
+      mimeType: 'image/jpeg',
+    });
   };
 
   const coreUploadedCount = CORE_REVIEW_DOCUMENTS.filter((d) => isDocUploaded(d.id)).length;
@@ -526,9 +737,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   };
 
   const getContinueLabel = () => {
-    if (returnToReviewAfterEdit) return 'Save & Return to Review →';
-    if (currentStep === 4) return submitting ? 'Submitting...' : 'Submit application';
-    return 'Continue →';
+    if (returnToReviewAfterEdit) return 'Save & Return';
+    if (currentStep === 4) {
+      if (submitting) return 'Submitting...';
+      return isResubmitApplication ? 'Re-submit application' : 'Submit application';
+    }
+    return 'Continue';
   };
 
   // -------------------------------------------------------------
@@ -553,17 +767,30 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       {/* Full Name */}
       <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Full name <Text style={styles.requiredAsterisk}>*</Text>
-        </Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Full name <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          {driverPersonal.fullName.length >= 25 ? (
+            <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              {driverPersonal.fullName.length}/40
+            </Text>
+          ) : null}
+        </View>
         <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
           <User size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
           <TextInput
-            style={[styles.textInput, { fontSize: px(13.5) }]}
-            placeholder="Enter full name"
+            style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
+            placeholder="Enter full name (as on DL)"
             placeholderTextColor="#9CA3AF"
             value={driverPersonal.fullName}
-            onChangeText={(fullName) => setDriverPersonal({ fullName })}
+            maxLength={40}
+            autoCapitalize="words"
+            autoCorrect={false}
+            onChangeText={(text) => {
+              const sanitized = text.replace(/[^a-zA-Z\s.-]/g, '');
+              setDriverPersonal({ fullName: sanitized });
+            }}
           />
         </View>
       </View>
@@ -582,7 +809,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           <Phone size={px(16)} color="#6B7280" strokeWidth={2} style={styles.leftInputIcon} />
           <Text style={[styles.countryPrefix, { fontSize: px(13.5) }]}>+91</Text>
           <TextInput
-            style={[styles.textInput, styles.lockedTextInput, { fontSize: px(13.5) }]}
+            style={[styles.textInput, styles.lockedTextInput, { fontSize: px(13.5), flex: 1 }]}
             editable={false}
             value={driverPersonal.mobileNumber || '9876543210'}
           />
@@ -602,7 +829,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
           <Calendar size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
           <TextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600' }]}
+            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
             placeholder="15/05/1995"
             placeholderTextColor="#9CA3AF"
             keyboardType="number-pad"
@@ -627,9 +854,14 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       {/* Current Address */}
       <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Current address <Text style={styles.requiredAsterisk}>*</Text>
-        </Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Current address <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+            {driverPersonal.address.length}/120
+          </Text>
+        </View>
         <View
           style={[
             styles.inputContainer,
@@ -638,10 +870,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           ]}>
           <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={[styles.leftInputIcon, { marginTop: px(2) }]} />
           <TextInput
-            style={[styles.textInput, styles.multilineInput, { fontSize: px(13) }]}
+            style={[styles.textInput, styles.multilineInput, { fontSize: px(13), flex: 1 }]}
             placeholder="House/Plot no, street, landmark, area"
             placeholderTextColor="#9CA3AF"
             multiline
+            maxLength={120}
             numberOfLines={2}
             value={driverPersonal.address}
             onChangeText={(address) => setDriverPersonal({ address })}
@@ -760,17 +993,25 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       {/* Vehicle Registration Number */}
       <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Vehicle registration number <Text style={styles.requiredAsterisk}>*</Text>
-        </Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Vehicle registration number <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          {driverVehicle.vehicleNumber.length >= 8 ? (
+            <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              {driverVehicle.vehicleNumber.length}/14
+            </Text>
+          ) : null}
+        </View>
         <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
           <CreditCard size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
           <TextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600' }]}
+            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
             placeholder="e.g. OD 02 AB 1234"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="characters"
             autoCorrect={false}
+            maxLength={14}
             value={driverVehicle.vehicleNumber}
             onChangeText={(text) =>
               setDriverVehicle({
@@ -783,17 +1024,25 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       {/* Driving Licence Number */}
       <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Driving licence number <Text style={styles.requiredAsterisk}>*</Text>
-        </Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Driving licence number <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+          {driverVehicle.licenseNumber.length >= 12 ? (
+            <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              {driverVehicle.licenseNumber.length}/18
+            </Text>
+          ) : null}
+        </View>
         <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
           <FileText size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
           <TextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600' }]}
+            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
             placeholder="Enter Driving License (DL) number"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="characters"
             autoCorrect={false}
+            maxLength={18}
             value={driverVehicle.licenseNumber}
             onChangeText={(text) =>
               setDriverVehicle({
@@ -853,28 +1102,48 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         </View>
       </View>
 
-      {/* Vehicle Model (Optional Dropdown) */}
+      {/* Vehicle Model (Custom Input or Dropdown) */}
       <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Vehicle model <Text style={styles.optionalText}>(Optional)</Text>
-        </Text>
-        <Pressable
-          onPress={() => {
-            setCustomModelInput(driverVehicle.vehicleModel || '');
-            setModelModalVisible(true);
-          }}
-          style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-          <Car size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <Text
-            style={[
-              styles.textValue,
-              { fontSize: px(13) },
-              !driverVehicle.vehicleModel && styles.textPlaceholder,
-            ]}>
-            {driverVehicle.vehicleModel || 'Enter vehicle model (optional)'}
+        <View style={styles.labelWithActionRow}>
+          <Text style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Vehicle model <Text style={styles.optionalText}>(Optional)</Text>
           </Text>
-          <ChevronDown size={px(17)} color="#6B7280" strokeWidth={2} />
-        </Pressable>
+          <Pressable
+            hitSlop={8}
+            onPress={() => {
+              setCustomModelInput(driverVehicle.vehicleModel || '');
+              setModelModalVisible(true);
+            }}>
+            <Text style={[styles.browseDropdownLink, { fontSize: px(11.5) }]}>
+              Choose from list ▾
+            </Text>
+          </Pressable>
+        </View>
+
+        <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+          <Car size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <TextInput
+            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
+            placeholder="Type custom model or choose from list"
+            placeholderTextColor="#9CA3AF"
+            maxLength={35}
+            value={driverVehicle.vehicleModel}
+            onChangeText={(text) =>
+              setDriverVehicle({
+                vehicleModel: text.replace(/[^A-Za-z0-9\s\-.]/g, ''),
+              })
+            }
+          />
+          <Pressable
+            hitSlop={10}
+            onPress={() => {
+              setCustomModelInput(driverVehicle.vehicleModel || '');
+              setModelModalVisible(true);
+            }}
+            style={styles.dropdownChevronBtn}>
+            <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
+          </Pressable>
+        </View>
       </View>
 
       {/* Bottom Notice Box */}
@@ -973,6 +1242,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                     title: doc.title,
                     uri: uploadedData.uri,
                     name: uploadedData.name,
+                    mimeType: uploadedData.mimeType,
                   })
                 }
                 style={({ pressed }) => [
@@ -1128,25 +1398,47 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // Render Step 4: Review
   // -------------------------------------------------------------
   const renderStep4Review = () => (
-    <View>
-      {/* Compact Status Banner */}
-      {isAllCoreComplete ? (
+    <View style={styles.step4Container}>
+      {/* Compact Dynamic Status Banner */}
+      {isResubmitApplication ? (
         <View
           style={[
             styles.statusSuccessCard,
-            { paddingVertical: px(8), paddingHorizontal: px(12), marginBottom: px(8), borderRadius: px(8) },
+            { paddingVertical: px(6), paddingHorizontal: px(10), marginBottom: px(8), borderRadius: px(8) },
           ]}>
           <View style={styles.statusRow}>
             <View
               style={[
                 styles.successIconCircle,
-                { width: px(26), height: px(26), borderRadius: px(13) },
+                { width: px(22), height: px(22), borderRadius: px(11) },
               ]}>
-              <CheckCircle2 size={px(16)} color="#15803D" strokeWidth={2.4} />
+              <CheckCircle2 size={px(14)} color="#15803D" strokeWidth={2.4} />
             </View>
             <View style={styles.statusTextWrap}>
-              <Text style={[styles.statusSuccessTitle, { fontSize: px(13) }]}>Ready to submit</Text>
-              <Text style={[styles.statusSuccessSubtitle, { fontSize: px(11) }]}>
+              <Text style={[styles.statusSuccessTitle, { fontSize: px(12) }]}>Re-submission mode</Text>
+              <Text style={[styles.statusSuccessSubtitle, { fontSize: px(10.5) }]}>
+                Review your updated details below and tap Re-submit.
+              </Text>
+            </View>
+          </View>
+        </View>
+      ) : isAllCoreComplete ? (
+        <View
+          style={[
+            styles.statusSuccessCard,
+            { paddingVertical: px(6), paddingHorizontal: px(10), marginBottom: px(8), borderRadius: px(8) },
+          ]}>
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.successIconCircle,
+                { width: px(22), height: px(22), borderRadius: px(11) },
+              ]}>
+              <CheckCircle2 size={px(14)} color="#15803D" strokeWidth={2.4} />
+            </View>
+            <View style={styles.statusTextWrap}>
+              <Text style={[styles.statusSuccessTitle, { fontSize: px(12) }]}>Ready to submit</Text>
+              <Text style={[styles.statusSuccessSubtitle, { fontSize: px(10.5) }]}>
                 All required information and documents are complete.
               </Text>
             </View>
@@ -1156,222 +1448,188 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         <View
           style={[
             styles.statusWarningCard,
-            { paddingVertical: px(8), paddingHorizontal: px(12), marginBottom: px(8), borderRadius: px(8) },
+            { paddingVertical: px(6), paddingHorizontal: px(10), marginBottom: px(8), borderRadius: px(8) },
           ]}>
           <View style={styles.statusRow}>
             <View
               style={[
                 styles.warningIconCircle,
-                { width: px(26), height: px(26), borderRadius: px(13) },
+                { width: px(22), height: px(22), borderRadius: px(11) },
               ]}>
-              <AlertCircle size={px(16)} color="#D97706" strokeWidth={2.4} />
+              <AlertCircle size={px(14)} color="#D97706" strokeWidth={2.4} />
             </View>
             <View style={styles.statusTextWrap}>
-              <Text style={[styles.statusWarningTitle, { fontSize: px(13) }]}>
-                {coreUploadedCount} of 6 review items complete
+              <Text style={[styles.statusWarningTitle, { fontSize: px(12) }]}>
+                {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} review items complete
               </Text>
-              <Text style={[styles.statusWarningSubtitle, { fontSize: px(11) }]}>
-                {missingCoreDocs.length} required document{missingCoreDocs.length > 1 ? 's' : ''} pending.
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.missingChipsRow, { marginTop: px(5) }]}>
-            {missingCoreDocs.slice(0, 3).map((d) => (
-              <Pressable
-                key={d.id}
-                onPress={() => {
-                  setReturnToReviewAfterEdit(true);
-                  animateToStep(3, 'backward');
-                }}
-                style={[styles.missingChip, { paddingVertical: px(3), paddingHorizontal: px(8) }]}>
-                <Text style={[styles.missingChipText, { fontSize: px(10.5) }]}>+ Add {d.title}</Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* Unified Review Card */}
-      <View style={[styles.summaryCard, { padding: px(12), marginBottom: px(10), borderRadius: px(12) }]}>
-        {/* Section 1: Personal Details */}
-        <View>
-          <View style={[styles.cardHeaderRow, { marginBottom: px(8) }]}>
-            <View style={styles.cardHeaderLeft}>
-              <User size={px(16)} color="#D97706" style={{ marginRight: px(6) }} />
-              <Text style={[styles.cardHeaderTitle, { fontSize: px(13.5) }]}>Personal details</Text>
-            </View>
-            <Pressable
-              hitSlop={12}
-              onPress={() => {
-                setReturnToReviewAfterEdit(true);
-                animateToStep(1, 'backward');
-              }}
-              style={styles.editBtn}>
-              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-              <ChevronRight size={px(13)} color="#2563EB" />
-            </Pressable>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Full name</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-              {driverPersonal.fullName || 'Rajesh Kumar'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Mobile number</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-              +91 {driverPersonal.mobileNumber || '9876543210'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Date of birth</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-              {driverPersonal.dateOfBirth || '15/05/1992'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Operating city</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-              {driverPersonal.city || 'Bhubaneswar'}
-            </Text>
-          </View>
-          <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Current address</Text>
-            <Text
-              style={[styles.detailValue, { fontSize: px(12), flex: 1, textAlign: 'right' }]}
-              numberOfLines={1}>
-              {driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.cardDivider} />
-
-        {/* Section 2: Vehicle Details */}
-        <View>
-          <View style={[styles.cardHeaderRow, { marginBottom: px(8) }]}>
-            <View style={styles.cardHeaderLeft}>
-              <Truck size={px(16)} color="#D97706" style={{ marginRight: px(6) }} />
-              <Text style={[styles.cardHeaderTitle, { fontSize: px(13.5) }]}>Vehicle details</Text>
-            </View>
-            <Pressable
-              hitSlop={12}
-              onPress={() => {
-                setReturnToReviewAfterEdit(true);
-                animateToStep(2, 'backward');
-              }}
-              style={styles.editBtn}>
-              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-              <ChevronRight size={px(13)} color="#2563EB" />
-            </Pressable>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Vehicle type</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12), fontWeight: '700', color: '#B45309' }]}>
-              {driverVehicle.vehicleType || 'Flatbed'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Registration number</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12), fontWeight: '700' }]}>
-              {driverVehicle.vehicleNumber || 'OD 02 AB 1234'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Driving licence number</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-              {driverVehicle.licenseNumber || 'OD-0220190012345'}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Registered to</Text>
-            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-              {driverVehicle.registeredTo === 'someone_else'
-                ? 'Someone else (Owner NOC)'
-                : 'Me / I own this vehicle'}
-            </Text>
-          </View>
-          {driverVehicle.vehicleModel ? (
-            <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-              <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Vehicle model</Text>
-              <Text style={[styles.detailValue, { fontSize: px(12) }]}>
-                {driverVehicle.vehicleModel}
+              <Text style={[styles.statusWarningSubtitle, { fontSize: px(10.5) }]}>
+                {missingCoreDocs.length} pending document{missingCoreDocs.length > 1 ? 's' : ''}.
               </Text>
             </View>
-          ) : null}
-        </View>
-
-        <View style={styles.cardDivider} />
-
-        {/* Section 3: Documents */}
-        <View>
-          <View style={[styles.cardHeaderRow, { marginBottom: px(8) }]}>
-            <View style={styles.cardHeaderLeft}>
-              <FileText size={px(16)} color="#D97706" style={{ marginRight: px(6) }} />
-              <Text style={[styles.cardHeaderTitle, { fontSize: px(13.5) }]}>Documents</Text>
-            </View>
             <Pressable
-              hitSlop={12}
+              hitSlop={8}
               onPress={() => {
                 setReturnToReviewAfterEdit(true);
                 animateToStep(3, 'backward');
               }}
-              style={styles.editBtn}>
-              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
-              <ChevronRight size={px(13)} color="#2563EB" />
+              style={[styles.statusRightActionBtn, { paddingVertical: px(3), paddingHorizontal: px(7) }]}>
+              <Text style={[styles.statusRightActionText, { fontSize: px(10.5) }]}>+ Add →</Text>
             </Pressable>
           </View>
+        </View>
+      )}
 
-          <Text style={[styles.docsSummaryText, { fontSize: px(11.5), marginBottom: px(6) }]}>
-            {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core review documents uploaded
-          </Text>
+      {/* Unified Compact Review Card (3 sections matching Board 1 Screen 4) */}
+      <View style={[styles.summaryCard, { padding: px(10), marginBottom: px(8), borderRadius: px(12) }]}>
+        {/* Section 1: Personal Details */}
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            setReturnToReviewAfterEdit(true);
+            animateToStep(1, 'backward');
+          }}
+          style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
+          <View style={styles.summarySectionLeft}>
+            <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
+              <Check size={px(11)} color="#15803D" strokeWidth={3} />
+            </View>
+            <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+              <User size={px(15)} color="#D97706" />
+            </View>
+            <View style={styles.summaryTextGroup}>
+              <View style={styles.summaryTitleRow}>
+                <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Personal details</Text>
+                <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
+                  <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
+                </View>
+              </View>
+              <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
+                {driverPersonal.fullName || 'Rajesh Kumar'} • +91 {driverPersonal.mobileNumber || '9876543210'} • {driverPersonal.city || 'Bhubaneswar'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.editBtn}>
+            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+            <ChevronRight size={px(13)} color="#2563EB" />
+          </View>
+        </Pressable>
 
-          <View style={styles.docsList}>
-            {CORE_REVIEW_DOCUMENTS.map((doc) => {
-              const uploaded = isDocUploaded(doc.id);
-              return (
-                <View key={doc.id} style={[styles.docSummaryRow, { paddingVertical: px(4) }]}>
-                  <View
-                    style={[
-                      styles.docCheckCircle,
-                      {
-                        width: px(16),
-                        height: px(16),
-                        borderRadius: px(8),
-                        backgroundColor: uploaded ? '#DCFCE7' : '#F3F4F6',
-                      },
-                    ]}>
-                    {uploaded ? (
-                      <Check size={px(10)} color="#15803D" strokeWidth={3} />
-                    ) : (
-                      <Text style={{ fontSize: 9, color: '#9CA3AF' }}>—</Text>
-                    )}
-                  </View>
+        <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
+
+        {/* Section 2: Vehicle Details */}
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            setReturnToReviewAfterEdit(true);
+            animateToStep(2, 'backward');
+          }}
+          style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
+          <View style={styles.summarySectionLeft}>
+            <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
+              <Check size={px(11)} color="#15803D" strokeWidth={3} />
+            </View>
+            <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+              <Truck size={px(15)} color="#D97706" />
+            </View>
+            <View style={styles.summaryTextGroup}>
+              <View style={styles.summaryTitleRow}>
+                <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Vehicle details</Text>
+                <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
+                  <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
+                </View>
+              </View>
+              <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
+                {driverVehicle.vehicleType || 'Flatbed Tow Truck'} • {driverVehicle.vehicleNumber || 'OD 02 AB 1234'} • {driverVehicle.registeredTo === 'someone_else' ? 'NOC' : 'Owner'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.editBtn}>
+            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+            <ChevronRight size={px(13)} color="#2563EB" />
+          </View>
+        </Pressable>
+
+        <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
+
+        {/* Section 3: Documents */}
+        <Pressable
+          hitSlop={8}
+          onPress={() => {
+            setReturnToReviewAfterEdit(true);
+            animateToStep(3, 'backward');
+          }}
+          style={({ pressed }) => [styles.summarySectionRow, pressed && { opacity: 0.75 }]}>
+          <View style={styles.summarySectionLeft}>
+            <View
+              style={[
+                styles.headerCheckBadge,
+                { width: px(18), height: px(18), borderRadius: px(9) },
+                !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
+              ]}>
+              {isAllCoreComplete ? (
+                <Check size={px(11)} color="#15803D" strokeWidth={3} />
+              ) : (
+                <Text style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</Text>
+              )}
+            </View>
+            <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
+              <FileText size={px(15)} color="#D97706" />
+            </View>
+            <View style={styles.summaryTextGroup}>
+              <View style={styles.summaryTitleRow}>
+                <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Documents</Text>
+                <View
+                  style={[
+                    styles.checkedPill,
+                    { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) },
+                    !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
+                  ]}>
                   <Text
                     style={[
-                      styles.docSummaryName,
-                      { fontSize: px(12) },
-                      !uploaded && styles.docSummaryNameMissing,
+                      styles.checkedPillText,
+                      { fontSize: px(9.5) },
+                      !isAllCoreComplete && { color: '#B45309' },
                     ]}>
-                    {doc.title}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.docSummaryStatus,
-                      { fontSize: px(10.5) },
-                      uploaded ? styles.docStatusGreen : styles.docStatusAmber,
-                    ]}>
-                    {uploaded ? 'Verified' : 'Pending'}
+                    {coreUploadedCount}/{CORE_REVIEW_DOCUMENTS.length} Checked
                   </Text>
                 </View>
-              );
-            })}
+              </View>
+              <Text style={[styles.summarySubtitle, { fontSize: px(11) }]} numberOfLines={1} ellipsizeMode="tail">
+                {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
+              </Text>
+            </View>
           </View>
-        </View>
+          <View style={styles.editBtn}>
+            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+            <ChevronRight size={px(13)} color="#2563EB" />
+          </View>
+        </Pressable>
       </View>
+
+      {/* Prominent "Edit your previous details" Button */}
+      <Pressable
+        onPress={() => setEditSectionModalVisible(true)}
+        style={({ pressed }) => [
+          styles.editPreviousBtn,
+          {
+            paddingVertical: px(8),
+            paddingHorizontal: px(12),
+            borderRadius: px(10),
+            marginBottom: px(8),
+          },
+          pressed && styles.pressed,
+        ]}>
+        <View style={styles.editPreviousLeft}>
+          <Pencil size={px(13)} color="#B45309" strokeWidth={2.4} style={{ marginRight: px(7) }} />
+          <Text style={[styles.editPreviousLabel, { fontSize: px(12) }]}>
+            Edit your previous details
+          </Text>
+        </View>
+        <View style={styles.editPreviousRight}>
+          <Text style={[styles.editPreviousActionText, { fontSize: px(11) }]}>Change info</Text>
+          <ChevronRight size={px(12)} color="#B45309" strokeWidth={2.4} />
+        </View>
+      </Pressable>
 
       {/* Blue Informational Banner */}
       <View
@@ -1383,11 +1641,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           <View
             style={[
               styles.noticeIconBox,
-              { width: px(22), height: px(22), borderRadius: px(11) },
+              { width: px(20), height: px(20), borderRadius: px(10) },
             ]}>
-            <Info size={px(13)} color="#2563EB" strokeWidth={2.2} />
+            <Info size={px(12)} color="#2563EB" strokeWidth={2.2} />
           </View>
-          <Text style={[styles.noticeBannerText, { fontSize: px(11) }]}>
+          <Text style={[styles.noticeBannerText, { fontSize: px(10.5), flex: 1 }]}>
             Verification typically takes 2 to 4 hours after submission.
           </Text>
         </View>
@@ -1396,17 +1654,17 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       {/* Confirmation Checkbox */}
       <Pressable
         onPress={() => setConfirmAgreed(!confirmAgreed)}
-        style={[styles.checkboxContainer, { marginBottom: px(10) }]}>
+        style={[styles.checkboxContainer, { marginBottom: px(6) }]}>
         <View
           style={[
             styles.checkboxBox,
-            { width: px(18), height: px(18), borderRadius: px(4) },
+            { width: px(17), height: px(17), borderRadius: px(4) },
             confirmAgreed && styles.checkboxBoxChecked,
           ]}>
-          {confirmAgreed ? <Check size={px(12)} color="#FFFFFF" strokeWidth={3} /> : null}
+          {confirmAgreed ? <Check size={px(11)} color="#FFFFFF" strokeWidth={3} /> : null}
         </View>
-        <Text style={[styles.checkboxLabel, { fontSize: px(11.5) }]}>
-          I confirm that all details provided are genuine and agree to RACE's{' '}
+        <Text style={[styles.checkboxLabel, { fontSize: px(11) }]}>
+          I confirm all details are genuine and agree to RACE{' '}
           <Text style={styles.linkText}>Terms</Text> & <Text style={styles.linkText}>Privacy</Text>.
         </Text>
       </Pressable>
@@ -1421,10 +1679,10 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         }
         style={({ pressed }) => [
           styles.saveLaterLink,
-          { marginBottom: px(8) },
+          { marginBottom: px(4) },
           pressed && styles.pressed,
         ]}>
-        <Text style={[styles.saveLaterText, { fontSize: px(12) }]}>Save and finish later</Text>
+        <Text style={[styles.saveLaterText, { fontSize: px(11.5) }]}>Save and finish later</Text>
       </Pressable>
     </View>
   );
@@ -1694,12 +1952,24 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               This contact will only be called in case of road accidents or emergencies.
             </Text>
             <View style={{ marginBottom: px(10) }}>
-              <Text style={[styles.inputLabel, { fontSize: px(11.5) }]}>Contact Name</Text>
+              <View style={styles.inputLabelRow}>
+                <Text style={[styles.inputLabel, { fontSize: px(11.5) }]}>Contact Name</Text>
+                {driverPersonal.emergencyContactName && driverPersonal.emergencyContactName.length >= 20 ? (
+                  <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                    {driverPersonal.emergencyContactName.length}/35
+                  </Text>
+                ) : null}
+              </View>
               <TextInput
                 style={[styles.simpleInput, { height: px(40), fontSize: px(13) }]}
                 placeholder="e.g. Ramesh Kumar (Brother)"
+                maxLength={35}
                 value={driverPersonal.emergencyContactName ?? ''}
-                onChangeText={(emergencyContactName) => setDriverPersonal({ emergencyContactName })}
+                onChangeText={(text) =>
+                  setDriverPersonal({
+                    emergencyContactName: text.replace(/[^a-zA-Z\s.-]/g, ''),
+                  })
+                }
               />
             </View>
             <View style={{ marginBottom: px(14) }}>
@@ -1712,7 +1982,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 value={driverPersonal.emergencyContactNumber ?? ''}
                 onChangeText={(emergencyContactNumber) =>
                   setDriverPersonal({
-                    emergencyContactNumber: normalizeIndianPhone(emergencyContactNumber),
+                    emergencyContactNumber: emergencyContactNumber.replace(/[^0-9]/g, ''),
                   })
                 }
               />
@@ -1726,31 +1996,65 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         </Pressable>
       </Modal>
 
-      {/* Vehicle Model Dropdown Modal (Step 2) */}
+      {/* Vehicle Model Modal (Popular list + Custom typing) */}
       <Modal visible={modelModalVisible} transparent animationType="slide">
         <Pressable style={styles.modalOverlay} onPress={() => setModelModalVisible(false)}>
           <Pressable
-            style={[styles.modalSheet, { maxHeight: px(500), borderTopLeftRadius: px(16), borderTopRightRadius: px(16) }]}
+            style={[styles.modalSheet, { maxHeight: px(520), borderTopLeftRadius: px(16), borderTopRightRadius: px(16) }]}
             onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { fontSize: px(15) }]}>Select Vehicle Model</Text>
+              <View>
+                <Text style={[styles.sheetTitle, { fontSize: px(15) }]}>Vehicle Model</Text>
+                <Text style={[styles.sheetSubtitle, { fontSize: px(11) }]}>
+                  Type custom model or choose from popular models
+                </Text>
+              </View>
               <Pressable hitSlop={12} onPress={() => setModelModalVisible(false)}>
                 <X size={px(18)} color="#4B5563" />
               </Pressable>
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+
+            {/* Custom Input Box inside modal */}
+            <View style={[styles.modalSearchContainer, { height: px(42), marginHorizontal: px(14), marginBottom: px(10) }]}>
+              <Car size={px(16)} color="#9CA3AF" style={{ marginRight: px(8) }} />
+              <TextInput
+                style={[styles.modalSearchInput, { fontSize: px(13), flex: 1 }]}
+                placeholder="Enter custom vehicle model..."
+                placeholderTextColor="#9CA3AF"
+                maxLength={35}
+                value={customModelInput}
+                onChangeText={(text) => setCustomModelInput(text.replace(/[^A-Za-z0-9\s\-.]/g, ''))}
+              />
+              {customModelInput.trim().length > 0 ? (
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    setDriverVehicle({ vehicleModel: customModelInput.trim() });
+                    setModelModalVisible(false);
+                  }}
+                  style={styles.modalApplyBtn}>
+                  <Text style={[styles.modalApplyText, { fontSize: px(12) }]}>Apply</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: px(340) }}>
               {POPULAR_VEHICLE_MODELS.map((model) => {
                 const isSelected = driverVehicle.vehicleModel === model;
                 return (
                   <Pressable
                     key={model}
                     onPress={() => {
-                      setDriverVehicle({ vehicleModel: model });
-                      setModelModalVisible(false);
+                      if (model === 'Other / Custom Vehicle Model') {
+                        setCustomModelInput(driverVehicle.vehicleModel || '');
+                      } else {
+                        setDriverVehicle({ vehicleModel: model });
+                        setModelModalVisible(false);
+                      }
                     }}
                     style={({ pressed }) => [
                       styles.cityRow,
-                      { paddingVertical: px(10) },
+                      { paddingVertical: px(10), paddingHorizontal: px(14) },
                       isSelected && styles.cityRowSelected,
                       pressed && styles.pressed,
                     ]}>
@@ -1791,8 +2095,17 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               </Pressable>
             </View>
 
+            {/* Android Permission & Privacy Assurance Banner */}
+            <View style={styles.permissionInfoBanner}>
+              <ShieldCheck size={px(14)} color="#059669" />
+              <Text style={styles.permissionInfoText}>
+                Android permissions are requested only to capture and verify official documents securely.
+              </Text>
+            </View>
+
+            {/* Option 1: Camera */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Camera')}
+              onPress={() => activeDocForUpload && handlePickFromCamera(activeDocForUpload)}
               style={({ pressed }) => [styles.uploadOptionRow, { paddingVertical: px(10) }, pressed && styles.pressed]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#FEF3C7' }]}>
                 <Camera size={px(18)} color="#D97706" />
@@ -1800,14 +2113,15 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               <View style={styles.uploadOptionTextWrap}>
                 <Text style={[styles.uploadOptionTitle, { fontSize: px(13) }]}>Take photo</Text>
                 <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11) }]}>
-                  Use device camera for clear photo
+                  Camera • Photo capture with auto-crop
                 </Text>
               </View>
               <ChevronRight size={px(16)} color="#9CA3AF" />
             </Pressable>
 
+            {/* Option 2: Gallery */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Gallery')}
+              onPress={() => activeDocForUpload && handlePickFromGallery(activeDocForUpload)}
               style={({ pressed }) => [styles.uploadOptionRow, { paddingVertical: px(10) }, pressed && styles.pressed]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#EFF6FF' }]}>
                 <ImageIcon size={px(18)} color="#2563EB" />
@@ -1815,14 +2129,15 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               <View style={styles.uploadOptionTextWrap}>
                 <Text style={[styles.uploadOptionTitle, { fontSize: px(13) }]}>Choose from gallery</Text>
                 <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11) }]}>
-                  JPG or PNG from photos
+                  Photos • JPG or PNG from gallery
                 </Text>
               </View>
               <ChevronRight size={px(16)} color="#9CA3AF" />
             </Pressable>
 
+            {/* Option 3: Document File */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Files')}
+              onPress={() => activeDocForUpload && handlePickFromFiles(activeDocForUpload)}
               style={({ pressed }) => [styles.uploadOptionRow, { paddingVertical: px(10) }, pressed && styles.pressed]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#F3F4F6' }]}>
                 <FileUp size={px(18)} color="#4B5563" />
@@ -1830,14 +2145,15 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               <View style={styles.uploadOptionTextWrap}>
                 <Text style={[styles.uploadOptionTitle, { fontSize: px(13) }]}>Select PDF document</Text>
                 <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11) }]}>
-                  PDF files up to 10 MB
+                  Files • PDF files up to 10 MB
                 </Text>
               </View>
               <ChevronRight size={px(16)} color="#9CA3AF" />
             </Pressable>
 
+            {/* Option 4: Instant Sample Document for QA */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Sample')}
+              onPress={() => activeDocForUpload && handlePickSample(activeDocForUpload)}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 styles.sampleOptionRow,
@@ -1852,7 +2168,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   Use verified sample document
                 </Text>
                 <Text style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11) }]}>
-                  Instantly fills verified sample for testing
+                  Fast testing & QA preview
                 </Text>
               </View>
               <Check size={px(16)} color="#15803D" strokeWidth={2.5} />
@@ -1923,15 +2239,120 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </View>
 
             {previewDocData?.uri ? (
-              <View style={[styles.previewImageContainer, { height: px(250), marginVertical: px(10) }]}>
-                <Image source={{ uri: previewDocData.uri }} style={styles.previewImage} resizeMode="cover" />
-              </View>
+              previewDocData.mimeType === 'application/pdf' ||
+              previewDocData.name?.toLowerCase().endsWith('.pdf') ? (
+                <View style={[styles.pdfPreviewContainer, { height: px(200), marginVertical: px(10) }]}>
+                  <FileText size={px(54)} color="#EF4444" />
+                  <Text style={[styles.pdfFileName, { fontSize: px(13) }]} numberOfLines={2}>
+                    {previewDocData.name}
+                  </Text>
+                  <View style={styles.pdfVerifiedBadge}>
+                    <ShieldCheck size={px(12)} color="#15803D" />
+                    <Text style={[styles.pdfVerifiedText, { fontSize: px(11) }]}>
+                      PDF Document Ready & Verified
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.previewImageContainer, { height: px(250), marginVertical: px(10) }]}>
+                  <Image source={{ uri: previewDocData.uri }} style={styles.previewImage} resizeMode="cover" />
+                </View>
+              )
             ) : null}
 
             <Pressable
               onPress={() => setPreviewDocData(null)}
               style={[styles.closePreviewBtn, { height: px(40), borderRadius: px(8) }]}>
               <Text style={styles.closePreviewBtnText}>Close Preview</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Edit Previous Details Modal Picker */}
+      <Modal visible={editSectionModalVisible} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setEditSectionModalVisible(false)}>
+          <Pressable
+            style={[styles.editPickerModalBox, { padding: px(16), borderRadius: px(16) }]}
+            onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHeader}>
+              <View>
+                <Text style={[styles.sheetTitle, { fontSize: px(15) }]}>Edit previous details</Text>
+                <Text style={[styles.sheetSubtitle, { fontSize: px(11.5), color: '#6B7280' }]}>
+                  Select a section to modify before submission
+                </Text>
+              </View>
+              <Pressable hitSlop={12} onPress={() => setEditSectionModalVisible(false)}>
+                <X size={px(18)} color="#4B5563" />
+              </Pressable>
+            </View>
+
+            <View style={{ marginTop: px(10) }}>
+              {/* Option 1: Personal Info */}
+              <Pressable
+                onPress={() => {
+                  setEditSectionModalVisible(false);
+                  setReturnToReviewAfterEdit(true);
+                  animateToStep(1, 'backward');
+                }}
+                style={({ pressed }) => [styles.pickerOptionCard, pressed && styles.pressed]}>
+                <View style={[styles.pickerIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                  <User size={px(18)} color="#D97706" />
+                </View>
+                <View style={styles.pickerTextWrap}>
+                  <Text style={[styles.pickerTitle, { fontSize: px(13.5) }]}>1. Personal details</Text>
+                  <Text style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
+                    Full name, Mobile number, Date of birth, City, Address
+                  </Text>
+                </View>
+                <ChevronRight size={px(16)} color="#9CA3AF" />
+              </Pressable>
+
+              {/* Option 2: Vehicle Info */}
+              <Pressable
+                onPress={() => {
+                  setEditSectionModalVisible(false);
+                  setReturnToReviewAfterEdit(true);
+                  animateToStep(2, 'backward');
+                }}
+                style={({ pressed }) => [styles.pickerOptionCard, pressed && styles.pressed]}>
+                <View style={[styles.pickerIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                  <Truck size={px(18)} color="#D97706" />
+                </View>
+                <View style={styles.pickerTextWrap}>
+                  <Text style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Vehicle details</Text>
+                  <Text style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
+                    Vehicle type, Plate number, Driving licence, Vehicle model
+                  </Text>
+                </View>
+                <ChevronRight size={px(16)} color="#9CA3AF" />
+              </Pressable>
+
+              {/* Option 3: Documents */}
+              <Pressable
+                onPress={() => {
+                  setEditSectionModalVisible(false);
+                  setReturnToReviewAfterEdit(true);
+                  animateToStep(3, 'backward');
+                }}
+                style={({ pressed }) => [styles.pickerOptionCard, pressed && styles.pressed]}>
+                <View style={[styles.pickerIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                  <FileText size={px(18)} color="#D97706" />
+                </View>
+                <View style={styles.pickerTextWrap}>
+                  <Text style={[styles.pickerTitle, { fontSize: px(13.5) }]}>3. Uploaded documents</Text>
+                  <Text style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
+                    RC, Driving licence, Insurance, Fitness, Vehicle photos
+                  </Text>
+                </View>
+                <ChevronRight size={px(16)} color="#9CA3AF" />
+              </Pressable>
+            </View>
+
+            <Pressable
+              onPress={() => setEditSectionModalVisible(false)}
+              style={[styles.pickerCancelBtn, { marginTop: px(12), paddingVertical: px(10), borderRadius: px(10) }]}>
+              <Text style={[styles.pickerCancelText, { fontSize: px(13) }]}>Cancel</Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -2335,6 +2756,21 @@ const styles = StyleSheet.create({
   cardHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
+  },
+  headerCheckBadge: {
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  checkedPill: {
+    backgroundColor: '#DCFCE7',
+    marginLeft: 6,
+  },
+  checkedPillText: {
+    color: '#15803D',
+    fontWeight: '700',
   },
   editBtn: {
     flexDirection: 'row',
@@ -2345,6 +2781,17 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     fontWeight: '600',
   },
+  statusRightActionBtn: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  statusRightActionText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2352,14 +2799,29 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    gap: 10,
   },
   detailLabel: {
     color: '#6B7280',
     fontWeight: '500',
+    flexShrink: 0,
+    maxWidth: '45%',
   },
   detailValue: {
     color: '#111827',
     fontWeight: '600',
+    flex: 1,
+    textAlign: 'right',
+  },
+  inputLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  charCountText: {
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   docsSummaryText: {
     color: '#374151',
@@ -2388,6 +2850,27 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   docSummaryStatus: {
+    fontWeight: '700',
+  },
+  docRightAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  docChangeActionText: {
+    color: '#2563EB',
+    fontWeight: '600',
+  },
+  docAddActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    gap: 2,
+  },
+  docAddActionText: {
+    color: '#B45309',
     fontWeight: '700',
   },
   docStatusGreen: {
@@ -2550,6 +3033,33 @@ const styles = StyleSheet.create({
     color: '#111827',
     paddingVertical: 0,
   },
+  modalApplyBtn: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginLeft: 8,
+  },
+  modalApplyText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  labelWithActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  browseDropdownLink: {
+    color: '#D97706',
+    fontWeight: '700',
+  },
+  dropdownChevronBtn: {
+    paddingLeft: 8,
+    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   cityRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2708,6 +3218,24 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   // Upload Sheet
+  permissionInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 10,
+    gap: 8,
+  },
+  permissionInfoText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#166534',
+    lineHeight: 15,
+  },
   uploadOptionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2796,6 +3324,34 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  pdfPreviewContainer: {
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 10,
+  },
+  pdfFileName: {
+    fontWeight: '700',
+    color: '#991B1B',
+    textAlign: 'center',
+  },
+  pdfVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pdfVerifiedText: {
+    color: '#15803D',
+    fontWeight: '600',
+  },
   closePreviewBtn: {
     backgroundColor: '#F3F4F6',
     alignItems: 'center',
@@ -2805,6 +3361,116 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontWeight: '600',
     fontSize: 13,
+  },
+  step4Container: {
+    width: '100%',
+  },
+  summarySectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  summarySectionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  sectionIconWrap: {
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  summaryTextGroup: {
+    flex: 1,
+  },
+  summaryTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  summaryTitle: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  summarySubtitle: {
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  cardDividerCompact: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  editPreviousBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  editPreviousLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editPreviousLabel: {
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  editPreviousRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  editPreviousActionText: {
+    color: '#B45309',
+    fontWeight: '600',
+  },
+  editPickerModalBox: {
+    backgroundColor: '#FFFFFF',
+    width: '100%',
+    maxWidth: 360,
+  },
+  pickerOptionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    marginBottom: 8,
+  },
+  pickerIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  pickerTextWrap: {
+    flex: 1,
+    marginRight: 6,
+  },
+  pickerTitle: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  pickerSubtitle: {
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  pickerCancelBtn: {
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerCancelText: {
+    color: '#374151',
+    fontWeight: '600',
   },
   pressed: {
     opacity: 0.85,

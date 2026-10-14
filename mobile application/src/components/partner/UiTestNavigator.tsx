@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
+  UI_QA_NAVIGATOR_ENABLED,
   UI_PREVIEW_MODE,
   isUiTestPermissiveMode,
   setUiTestPermissiveMode,
@@ -31,6 +32,7 @@ import {
   loginAsMockDriver,
   loginAsMockVendor,
 } from '../../config/uiPreviewMode';
+import { ensureMockDriverActiveJob } from '../../data/mockPartnerData';
 import {
   jumpToDriverVerificationGate,
   jumpToPartnerAccountScreen,
@@ -58,7 +60,7 @@ export default function UiTestNavigator() {
     });
   }, []);
 
-  if (!UI_PREVIEW_MODE) return null;
+  if (!UI_PREVIEW_MODE || !UI_QA_NAVIGATOR_ENABLED) return null;
 
   const togglePermissive = (val: boolean) => {
     setPermissiveMode(val);
@@ -251,7 +253,10 @@ export default function UiTestNavigator() {
                   label="9. Driver Active Job"
                   sub="4-step trip execution & OTP verification"
                   onPress={() =>
-                    ensureDriverAndNavigate(() => openDriverActiveJob())
+                    ensureDriverAndNavigate(() => {
+                      ensureMockDriverActiveJob();
+                      openDriverActiveJob();
+                    })
                   }
                 />
               </View>

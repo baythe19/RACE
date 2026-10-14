@@ -32,12 +32,15 @@ import {
   useAcceptDriverJobMutation,
   useDriverActiveJobQuery,
   useDriverJobOffersQuery,
+  useDriverProfileQuery,
   useRejectDriverJobMutation,
 } from '../../services/driver/useDriverQueries';
 import type { DriverJobBooking } from '../../services/driver/driverApi';
 import { useDriverPresenceStore } from '../../store/driverPresenceStore';
 import { openDriverActiveJob } from '../../navigation/partnerNavigationRef';
 import { formatReadableAddress } from '../../utils/readableAddress';
+import { buildDriverVerification } from '../../utils/driverVerification';
+import { UI_PREVIEW_DRIVER_ALERT_ENABLED, UI_PREVIEW_MODE } from '../../constants/preview';
 import {
   driverColors as C,
   driverMetrics as M,
@@ -71,8 +74,10 @@ export default function DriverOfferAlert() {
   const isDriver = role === 'driver';
   const isOnline = useDriverPresenceStore(state => state.isOnline);
 
-  const { data: offers = [] } = useDriverJobOffersQuery(isDriver);
-  const { data: activeJob } = useDriverActiveJobQuery(isDriver);
+  const { data: profile } = useDriverProfileQuery(isDriver);
+  const isApproved = buildDriverVerification(profile).isApproved;
+  const { data: offers = [] } = useDriverJobOffersQuery(isDriver && isApproved);
+  const { data: activeJob } = useDriverActiveJobQuery(isDriver && isApproved);
   const acceptMutation = useAcceptDriverJobMutation();
   const rejectMutation = useRejectDriverJobMutation();
 
@@ -93,7 +98,13 @@ export default function DriverOfferAlert() {
 
   const offerKey = offer ? `${offer.bookingType}-${offer.id}` : null;
   const activeOutcome = outcome && offerKey && outcome.key === offerKey ? outcome : null;
-  const shouldShow = isDriver && isOnline && !activeJob && Boolean(offer);
+  const shouldShow =
+    isDriver &&
+    isApproved &&
+    isOnline &&
+    !activeJob &&
+    Boolean(offer) &&
+    (!UI_PREVIEW_MODE || UI_PREVIEW_DRIVER_ALERT_ENABLED);
 
   useEffect(() => {
     if (!shouldShow) return undefined;

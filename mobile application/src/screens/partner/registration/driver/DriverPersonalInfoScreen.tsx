@@ -246,7 +246,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
       title="Driver registration"
       onBack={handleBack}
       onContinue={handleContinue}
-      continueLabel={isFromReview ? 'Save & Return to Review →' : 'Continue →'}>
+      continueLabel={isFromReview ? 'Save & Return' : 'Continue'}>
       {/* Unified Single Card for Personal Information (No Shadow, Full Width) */}
       <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
         {/* Card Header Row */}
@@ -266,9 +266,16 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
 
         {/* Full Name */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Full name <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <View style={styles.inputLabelRow}>
+            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Full name <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+            {driverPersonal.fullName.length >= 25 ? (
+              <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                {driverPersonal.fullName.length}/40
+              </Text>
+            ) : null}
+          </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <User size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <TextInput
@@ -276,7 +283,11 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
               placeholder="As on driving licence"
               placeholderTextColor="#9CA3AF"
               value={driverPersonal.fullName}
-              onChangeText={(fullName) => setDriverPersonal({ fullName })}
+              maxLength={40}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/[^a-zA-Z\s.-]/g, '');
+                setDriverPersonal({ fullName: cleaned });
+              }}
               autoCapitalize="words"
               autoCorrect={false}
               returnKeyType="next"
@@ -363,9 +374,14 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
 
         {/* Current Address */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Current address <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <View style={styles.inputLabelRow}>
+            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Current address <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+            <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              {driverPersonal.address.length}/120
+            </Text>
+          </View>
           <View
             style={[
               styles.inputContainer,
@@ -385,6 +401,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
               multiline
               scrollEnabled={false}
               numberOfLines={2}
+              maxLength={120}
               value={driverPersonal.address}
               onChangeText={(address) => setDriverPersonal({ address })}
             />
@@ -411,8 +428,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={50}
               value={driverPersonal.email}
-              onChangeText={(email) => setDriverPersonal({ email })}
+              onChangeText={(email) => setDriverPersonal({ email: email.trim() })}
             />
           </View>
         </View>
@@ -707,18 +725,35 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
               This contact will only be called in case of road accidents or medical emergencies.
             </Text>
             <View style={{ marginBottom: px(12) }}>
-              <Text style={[styles.inputLabel, { fontSize: px(12) }]}>Contact Name</Text>
+              <View style={styles.inputLabelRow}>
+                <Text style={[styles.inputLabel, { fontSize: px(12) }]}>Contact Name</Text>
+                {(driverPersonal.emergencyContactName ?? '').length >= 20 ? (
+                  <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                    {(driverPersonal.emergencyContactName ?? '').length}/35
+                  </Text>
+                ) : null}
+              </View>
               <TextInput
                 style={[styles.simpleInput, { height: px(44) }]}
                 placeholder="e.g. Ramesh Kumar (Brother)"
+                maxLength={35}
                 value={driverPersonal.emergencyContactName ?? ''}
                 onChangeText={(emergencyContactName) =>
-                  setDriverPersonal({ emergencyContactName })
+                  setDriverPersonal({
+                    emergencyContactName: emergencyContactName.replace(/[^a-zA-Z\s().-]/g, ''),
+                  })
                 }
               />
             </View>
             <View style={{ marginBottom: px(16) }}>
-              <Text style={[styles.inputLabel, { fontSize: px(12) }]}>Mobile Number</Text>
+              <View style={styles.inputLabelRow}>
+                <Text style={[styles.inputLabel, { fontSize: px(12) }]}>Mobile Number</Text>
+                {(driverPersonal.emergencyContactNumber ?? '').length > 0 ? (
+                  <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                    {(driverPersonal.emergencyContactNumber ?? '').length}/10
+                  </Text>
+                ) : null}
+              </View>
               <TextInput
                 style={[styles.simpleInput, { height: px(44) }]}
                 keyboardType="number-pad"
@@ -727,7 +762,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                 value={driverPersonal.emergencyContactNumber ?? ''}
                 onChangeText={(emergencyContactNumber) =>
                   setDriverPersonal({
-                    emergencyContactNumber: normalizeIndianPhone(emergencyContactNumber),
+                    emergencyContactNumber: normalizeIndianPhone(
+                      emergencyContactNumber.replace(/[^0-9]/g, ''),
+                    ),
                   })
                 }
               />
@@ -784,6 +821,17 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     width: '100%',
+  },
+  inputLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  charCountText: {
+    fontSize: 10.5,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   inputLabel: {
     fontWeight: '600',

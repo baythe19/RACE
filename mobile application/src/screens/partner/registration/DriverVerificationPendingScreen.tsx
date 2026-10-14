@@ -66,11 +66,13 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
     }
   }, [accessToken, dispatch, navigation]);
 
-  /** Registration stack still has the editable review step — keep it reachable. */
-  const handleViewApplication = useCallback(() => {
+  /** Registration stack still has the editable review step — allow editing and re-submitting. */
+  const handleEditPrevious = useCallback(() => {
     navigation.navigate('DriverReview', {
       role: route.params?.role ?? 'driver',
       mobileNumber: route.params?.mobileNumber,
+      fromReview: true,
+      isResubmit: true,
     });
   }, [navigation, route.params?.mobileNumber, route.params?.role]);
 
@@ -78,7 +80,8 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
     <DriverVerificationView
       verification={verification}
       onOpenDashboard={handleGoToDashboard}
-      onOpenApplication={handleViewApplication}
+      onOpenApplication={handleEditPrevious}
+      onEditPrevious={handleEditPrevious}
       onRefresh={() => void refetch()}
       refreshing={isRefetching}
     />

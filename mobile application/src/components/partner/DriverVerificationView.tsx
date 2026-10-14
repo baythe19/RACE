@@ -27,7 +27,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Check, ChevronDown, ChevronUp, Info, RefreshCw, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp, Info, Pencil, RefreshCw, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PartnerHeaderLogo from './PartnerHeaderLogo';
@@ -67,6 +67,7 @@ type Props = {
    * button expands the submitted details inline (there is nothing to edit).
    */
   onOpenApplication?: () => void;
+  onEditPrevious?: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
 };
@@ -74,21 +75,21 @@ type Props = {
 function CircleContent({ state }: { state: DriverVerificationStep['state'] }) {
   const px = useScreenPx();
   if (state === 'rejected') {
-    return <X size={px(16)} color={C.white} strokeWidth={3} />;
+    return <X size={px(11)} color={C.white} strokeWidth={3} />;
   }
   if (state === 'current') {
     return (
       <View
         style={{
-          width: px(8),
-          height: px(8),
-          borderRadius: px(4),
+          width: px(6),
+          height: px(6),
+          borderRadius: px(3),
           backgroundColor: C.white,
         }}
       />
     );
   }
-  return <Check size={px(15)} color={C.white} strokeWidth={3} />;
+  return <Check size={px(11)} color={C.white} strokeWidth={3} />;
 }
 
 function circleStyle(state: DriverVerificationStep['state']) {
@@ -136,18 +137,20 @@ export default function DriverVerificationView({
   verification,
   onOpenDashboard,
   onOpenApplication,
+  onEditPrevious,
   onRefresh,
   refreshing = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const px = useScreenPx();
   const [applicationOpen, setApplicationOpen] = useState(false);
-  const handlePrimaryAction = () => {
-    if (onOpenApplication) {
+
+  const handleEditPrevious = () => {
+    if (onEditPrevious) {
+      onEditPrevious();
+    } else if (onOpenApplication) {
       onOpenApplication();
-      return;
     }
-    setApplicationOpen(open => !open);
   };
 
   const submittedLabel = useMemo(() => {
@@ -185,17 +188,18 @@ export default function DriverVerificationView({
 
       <ScrollView
         style={styles.flex}
-        bounces={true}
+        bounces={applicationOpen}
+        scrollEnabled={applicationOpen}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
           {
             paddingHorizontal: px(M.pagePadding),
-            paddingBottom: insets.bottom + px(24),
+            paddingBottom: insets.bottom + px(16),
           },
         ]}>
-        <View style={[styles.artWrap, { marginTop: px(8) }]}>
-          <VerificationUnderReviewArtwork size={px(175)} />
+        <View style={[styles.artWrap, { marginTop: px(4) }]}>
+          <VerificationUnderReviewArtwork size={px(108)} />
         </View>
 
         {/* Status Pill Badge */}
@@ -203,14 +207,14 @@ export default function DriverVerificationView({
           style={[
             styles.statusPillBadge,
             {
-              marginTop: px(10),
-              paddingHorizontal: px(10),
-              paddingVertical: px(3.5),
-              borderRadius: px(20),
+              marginTop: px(5),
+              paddingHorizontal: px(8),
+              paddingVertical: px(2),
+              borderRadius: px(16),
             },
           ]}>
           <View style={styles.pulsingDot} />
-          <Text style={[styles.statusPillText, { fontSize: px(10.5) }]}>
+          <Text style={[styles.statusPillText, { fontSize: px(9.5) }]}>
             VERIFICATION IN PROGRESS
           </Text>
         </View>
@@ -220,9 +224,9 @@ export default function DriverVerificationView({
           style={[
             styles.title,
             {
-              fontSize: px(19),
-              lineHeight: px(25),
-              marginTop: px(8),
+              fontSize: px(16.5),
+              lineHeight: px(22),
+              marginTop: px(5),
               fontWeight: '800',
               color: '#0F172A',
             },
@@ -235,10 +239,10 @@ export default function DriverVerificationView({
           style={[
             styles.subtitle,
             {
-              fontSize: px(12.5),
-              lineHeight: px(19),
-              marginTop: px(8),
-              maxWidth: px(335),
+              fontSize: px(11),
+              lineHeight: px(15.5),
+              marginTop: px(4),
+              maxWidth: px(330),
               color: '#475569',
             },
           ]}>
@@ -246,7 +250,7 @@ export default function DriverVerificationView({
         </Text>
 
         {/* tracker ---------------------------------------------------------- */}
-        <View style={[styles.tracker, { marginTop: px(20) }]}>
+        <View style={[styles.tracker, { marginTop: px(8) }]}>
           {verification.steps.map((step, index) => {
             const isLast = index === verification.steps.length - 1;
             const lineDone = step.state === 'completed';
@@ -263,19 +267,19 @@ export default function DriverVerificationView({
                 style={[
                   styles.stepItemContainer,
                   !isLast && styles.stepItemUnderline,
-                  { paddingBottom: isLast ? 0 : px(10), marginBottom: isLast ? 0 : px(10) },
+                  { paddingBottom: isLast ? 0 : px(5), marginBottom: isLast ? 0 : px(5) },
                 ]}>
                 <View style={styles.stepRow}>
                   <View
                     style={[
                       styles.stepRail,
-                      { width: px(26), marginLeft: px(8) },
+                      { width: px(22), marginLeft: px(4) },
                     ]}>
                     <View
                       style={[
                         styles.stepCircle,
                         circleStyle(step.state),
-                        { width: px(24), height: px(24) },
+                        { width: px(20), height: px(20), borderRadius: px(10) },
                       ]}>
                       <CircleContent state={step.state} />
                     </View>
@@ -283,10 +287,10 @@ export default function DriverVerificationView({
                       <View
                         style={{
                           width: px(2),
-                          height: px(26),
+                          height: px(13),
                           borderRadius: px(1),
                           backgroundColor: lineDone ? STEP_LINE_DONE : STEP_LINE_IDLE,
-                          marginTop: px(4),
+                          marginTop: px(2),
                         }}
                       />
                     ) : null}
@@ -294,15 +298,15 @@ export default function DriverVerificationView({
                   <View
                     style={[
                       styles.stepCopy,
-                      { marginLeft: px(12), flex: 1 },
+                      { marginLeft: px(10), flex: 1 },
                     ]}>
                     <View style={styles.stepTitleRow}>
                       <Text
                         style={[
                           styles.stepLabelText,
                           {
-                            fontSize: px(13),
-                            lineHeight: px(18),
+                            fontSize: px(12),
+                            lineHeight: px(16),
                             color: step.state === 'pending' ? '#6B7280' : '#0F172A',
                             fontWeight: step.state === 'current' ? '700' : '600',
                           },
@@ -311,12 +315,12 @@ export default function DriverVerificationView({
                       </Text>
                       {step.state === 'completed' && (
                         <View style={styles.badgeDone}>
-                          <Text style={[styles.badgeDoneText, { fontSize: px(10) }]}>Done</Text>
+                          <Text style={[styles.badgeDoneText, { fontSize: px(9.5) }]}>Done</Text>
                         </View>
                       )}
                       {step.state === 'current' && (
                         <View style={styles.badgeCurrent}>
-                          <Text style={[styles.badgeCurrentText, { fontSize: px(10) }]}>In progress</Text>
+                          <Text style={[styles.badgeCurrentText, { fontSize: px(9.5) }]}>In progress</Text>
                         </View>
                       )}
                     </View>
@@ -324,7 +328,7 @@ export default function DriverVerificationView({
                       <Text
                         style={[
                           styles.stepSubtext,
-                          { fontSize: px(11), lineHeight: px(15), color: '#64748B', marginTop: px(2) },
+                          { fontSize: px(10), lineHeight: px(13.5), color: '#64748B', marginTop: px(1) },
                         ]}>
                         {stepSubtext}
                       </Text>
@@ -341,24 +345,24 @@ export default function DriverVerificationView({
           style={[
             styles.infoCard,
             {
-              marginTop: px(14),
+              marginTop: px(6),
               borderRadius: px(8),
-              paddingVertical: px(8),
-              paddingHorizontal: px(12),
+              paddingVertical: px(5),
+              paddingHorizontal: px(10),
               borderWidth: 1,
               borderColor: '#FDE68A',
               backgroundColor: '#FEF3C7',
             },
           ]}>
-          <Info size={px(14)} color="#B45309" strokeWidth={2.2} />
+          <Info size={px(13)} color="#B45309" strokeWidth={2.2} />
           <Text
             style={[
               styles.infoCardText,
               {
                 flex: 1,
-                marginLeft: px(8),
-                fontSize: px(11.5),
-                lineHeight: px(16),
+                marginLeft: px(6),
+                fontSize: px(10.5),
+                lineHeight: px(14),
                 color: '#92400E',
                 fontWeight: '600',
               },
@@ -376,14 +380,14 @@ export default function DriverVerificationView({
                 marginTop: px(M.cardGap),
                 borderRadius: px(R.innerCard),
                 borderColor: C.hairline,
-                padding: px(14),
+                padding: px(12),
               },
             ]}>
-            <Text style={[T.sectionTitle, { fontSize: px(16), lineHeight: px(21), color: C.ink }]}>
+            <Text style={[T.sectionTitle, { fontSize: px(15), lineHeight: px(20), color: C.ink }]}>
               My application
             </Text>
 
-            <View style={{ marginTop: px(10) }}>
+            <View style={{ marginTop: px(8) }}>
               {detailRow('Driver ID', application.driverCode, px)}
               {detailRow('Driver type', application.driverType, px)}
               {detailRow('Licence number', application.licenseNo, px)}
@@ -406,10 +410,10 @@ export default function DriverVerificationView({
               style={[
                 T.cardTitle,
                 {
-                  fontSize: px(14),
-                  lineHeight: px(19),
+                  fontSize: px(13.5),
+                  lineHeight: px(18),
                   color: C.ink,
-                  marginTop: px(14),
+                  marginTop: px(10),
                 },
               ]}>
               Documents
@@ -419,23 +423,22 @@ export default function DriverVerificationView({
                 style={[
                   T.body,
                   {
-                    fontSize: px(13),
-                    lineHeight: px(19),
+                    fontSize: px(12),
+                    lineHeight: px(17),
                     color: C.grey,
-                    marginTop: px(6),
+                    marginTop: px(4),
                   },
                 ]}>
-                Your documents were submitted for review. Ask RACE support if you need to change
-                one.
+                Your documents were submitted for review.
               </Text>
             ) : (
-              <View style={{ marginTop: px(6) }}>
+              <View style={{ marginTop: px(4) }}>
                 {application.documents.map(doc => (
-                  <View key={doc.type} style={[styles.documentRow, { paddingVertical: px(8) }]}>
+                  <View key={doc.type} style={[styles.documentRow, { paddingVertical: px(6) }]}>
                     <Text
                       style={[
                         T.meta,
-                        { fontSize: px(13.5), lineHeight: px(19), color: C.inkSoft, flex: 1 },
+                        { fontSize: px(12.5), lineHeight: px(17), color: C.inkSoft, flex: 1 },
                       ]}>
                       {doc.label}
                     </Text>
@@ -443,8 +446,8 @@ export default function DriverVerificationView({
                       style={[
                         T.pill,
                         {
-                          fontSize: px(12),
-                          lineHeight: px(16),
+                          fontSize: px(11),
+                          lineHeight: px(15),
                           color:
                             doc.status === 'VERIFIED'
                               ? STEP_GREEN
@@ -462,56 +465,89 @@ export default function DriverVerificationView({
           </View>
         ) : null}
 
-        {/* actions ---------------------------------------------------------- */}
-        <Pressable
-          onPress={handlePrimaryAction}
-          accessibilityRole="button"
-          accessibilityLabel={
-            onOpenApplication
-              ? 'View my application'
-              : applicationOpen
-                ? 'Hide my application'
-                : 'View my application'
-          }
-          style={({ pressed }) => [
-            styles.primaryButton,
-            {
-              height: px(50),
-              borderRadius: px(R.button),
-              borderColor: STEP_AMBER,
-              marginTop: px(30),
-            },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[T.button, { fontSize: px(16), lineHeight: px(20), color: INK_TITLE }]}>
-            {!onOpenApplication && applicationOpen ? 'Hide my application' : 'View my application'}
-          </Text>
-          {onOpenApplication ? null : applicationOpen ? (
-            <ChevronUp size={px(18)} color={INK_TITLE} strokeWidth={2.4} />
-          ) : (
-            <ChevronDown size={px(18)} color={INK_TITLE} strokeWidth={2.4} />
+        {/* Actions Section -------------------------------------------------- */}
+        <View style={[styles.actionsSection, { marginTop: px(10), width: '100%' }]}>
+          {/* Primary CTA: Edit previous details */}
+          {(onEditPrevious || onOpenApplication) && (
+            <Pressable
+              onPress={handleEditPrevious}
+              accessibilityRole="button"
+              accessibilityLabel="Edit your previous details"
+              style={({ pressed }) => [
+                styles.editPreviousCtaBtn,
+                {
+                  height: px(42),
+                  borderRadius: px(10),
+                },
+                pressed && styles.pressed,
+              ]}>
+              <Pencil size={px(14)} color="#111827" strokeWidth={2.4} style={{ marginRight: px(7) }} />
+              <Text style={[styles.editPreviousCtaText, { fontSize: px(14) }]}>
+                Edit your previous details
+              </Text>
+            </Pressable>
           )}
-        </Pressable>
 
-        {onOpenDashboard ? (
+          {/* Secondary Action: View/Hide details */}
           <Pressable
-            onPress={onOpenDashboard}
+            onPress={() => setApplicationOpen(open => !open)}
             accessibilityRole="button"
-            accessibilityLabel="Go to Dashboard (Read only)"
+            accessibilityLabel={applicationOpen ? 'Hide submitted details' : 'View submitted details'}
             style={({ pressed }) => [
-              styles.linkButton,
-              { paddingVertical: px(12), marginTop: px(6) },
+              styles.viewDetailsToggleBtn,
+              {
+                height: px(36),
+                borderRadius: px(8),
+                marginTop: px(6),
+              },
               pressed && styles.pressed,
             ]}>
-            <Text style={[T.link, { fontSize: px(15), lineHeight: px(20), color: LINK_BLUE }]}>
-              Go to Dashboard (Read only)
+            <Text style={[styles.viewDetailsToggleText, { fontSize: px(12.5) }]}>
+              {applicationOpen ? 'Hide submitted details' : 'View submitted details'}
             </Text>
+            {applicationOpen ? (
+              <ChevronUp size={px(14)} color="#374151" strokeWidth={2.2} style={{ marginLeft: px(4) }} />
+            ) : (
+              <ChevronDown size={px(14)} color="#374151" strokeWidth={2.2} style={{ marginLeft: px(4) }} />
+            )}
           </Pressable>
-        ) : null}
 
-        {refreshing ? (
-          <ActivityIndicator size="small" color={C.amber} style={{ marginTop: px(8) }} />
-        ) : null}
+          {onOpenDashboard ? (
+            <Pressable
+              onPress={onOpenDashboard}
+              accessibilityRole="button"
+              accessibilityLabel="Go to Dashboard (Read only)"
+              style={({ pressed }) => [
+                styles.linkButton,
+                { paddingVertical: px(4), marginTop: px(2) },
+                pressed && styles.pressed,
+              ]}>
+              <Text style={[T.link, { fontSize: px(13), lineHeight: px(18), color: LINK_BLUE }]}>
+                Go to Dashboard (Read only)
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {onRefresh ? (
+            <Pressable
+              onPress={onRefresh}
+              disabled={refreshing}
+              style={({ pressed }) => [
+                styles.refreshButton,
+                { paddingVertical: px(4), marginTop: px(2) },
+                pressed && styles.pressed,
+              ]}>
+              {refreshing ? (
+                <ActivityIndicator size="small" color="#D97706" />
+              ) : (
+                <RefreshCw size={px(12)} color="#64748B" />
+              )}
+              <Text style={[styles.refreshText, { fontSize: px(11.5), marginLeft: px(5) }]}>
+                {refreshing ? 'Syncing with RACE server...' : 'Check status now'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
     </View>
   );
@@ -523,6 +559,25 @@ const styles = StyleSheet.create({
   topBar: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.white },
   scrollContent: { alignItems: 'center' },
   artWrap: { alignItems: 'center', justifyContent: 'center' },
+  statusPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  pulsingDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#D97706',
+    marginRight: 6,
+  },
+  statusPillText: {
+    fontWeight: '800',
+    color: '#B45309',
+    letterSpacing: 0.6,
+  },
   title: {
     fontWeight: '800',
     color: INK_TITLE,
@@ -531,10 +586,49 @@ const styles = StyleSheet.create({
   },
   subtitle: { color: SUBTITLE_GREY, textAlign: 'center' },
   tracker: { width: '100%' },
+  stepItemContainer: {
+    width: '100%',
+  },
+  stepItemUnderline: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
   stepRow: { flexDirection: 'row', alignItems: 'flex-start' },
   stepRail: { alignItems: 'center' },
   stepCircle: { borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
   stepCopy: { flex: 1, justifyContent: 'center' },
+  stepTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  stepLabelText: {
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  stepSubtext: {
+    color: '#64748B',
+  },
+  badgeDone: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  badgeDoneText: {
+    fontWeight: '700',
+    color: '#15803D',
+  },
+  badgeCurrent: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+  },
+  badgeCurrentText: {
+    fontWeight: '700',
+    color: '#B45309',
+  },
   infoCard: {
     width: '100%',
     flexDirection: 'row',
@@ -542,6 +636,10 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_CREAM,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: CARD_CREAM,
+  },
+  infoCardText: {
+    color: '#92400E',
+    fontWeight: '600',
   },
   applicationCard: {
     width: '100%',
@@ -560,6 +658,38 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: C.hairline,
   },
+  actionsSection: {
+    width: '100%',
+  },
+  editPreviousCtaBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F59E0B',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  editPreviousCtaText: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  viewDetailsToggleBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  viewDetailsToggleText: {
+    fontWeight: '600',
+    color: '#374151',
+  },
   primaryButton: {
     width: '100%',
     flexDirection: 'row',
@@ -570,5 +700,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
   },
   linkButton: { alignItems: 'center', justifyContent: 'center' },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshText: {
+    fontWeight: '600',
+    color: '#64748B',
+  },
   pressed: { opacity: 0.85 },
 });

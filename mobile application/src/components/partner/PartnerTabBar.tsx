@@ -20,10 +20,14 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { useDriverJobOffersQuery } from '../../services/driver/useDriverQueries';
+import {
+  useDriverJobOffersQuery,
+  useDriverProfileQuery,
+} from '../../services/driver/useDriverQueries';
 import { useAppSelector } from '../../redux/hooks';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
+import { buildDriverVerification } from '../../utils/driverVerification';
 import { driverColors as C, driverMetrics as M, driverType as T } from '../../theme/driverUi';
 
 type TabRouteName = keyof PartnerTabParamList;
@@ -49,8 +53,10 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
   const px = useScreenPx();
   const role = useAppSelector(appState => appState.auth.user?.role);
   const isDriver = role === 'driver';
-  const { data: offers = [] } = useDriverJobOffersQuery(isDriver);
-  const pendingRequests = isDriver ? offers.length : 0;
+  const { data: profile } = useDriverProfileQuery(isDriver);
+  const isApproved = buildDriverVerification(profile).isApproved;
+  const { data: offers = [] } = useDriverJobOffersQuery(isDriver && isApproved);
+  const pendingRequests = isDriver && isApproved ? offers.length : 0;
 
   const activeRoute = state.routes[state.index];
   const nestedRouteName = activeRoute ? getFocusedRouteNameFromRoute(activeRoute) : undefined;
@@ -75,10 +81,10 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
           paddingBottom: Math.max(insets.bottom, px(6)),
           paddingHorizontal: px(8),
           shadowColor: '#0B0B0B',
-          shadowOffset: { width: 0, height: -2 },
+          shadowOffset: { width: 0, height: -1 },
           shadowOpacity: 0.04,
-          shadowRadius: 12,
-          elevation: 8,
+          shadowRadius: 6,
+          elevation: 2,
         },
       ]}>
       {state.routes.map((route, index) => {

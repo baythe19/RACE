@@ -108,7 +108,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
       title="Driver registration"
       onBack={handleBack}
       onContinue={handleContinue}
-      continueLabel={isFromReview ? 'Save & Return to Review →' : 'Continue →'}>
+      continueLabel={isFromReview ? 'Save & Return' : 'Continue'}>
       {/* Unified Single Card for Vehicle Information (No Shadow, Full Width) */}
       <View style={[styles.card, { padding: px(14), marginBottom: px(14) }]}>
         {/* Card Header Row */}
@@ -169,9 +169,16 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
 
         {/* Vehicle Registration Number */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Vehicle registration number <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <View style={styles.inputLabelRow}>
+            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Vehicle registration number <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+            {driverVehicle.vehicleNumber.length >= 8 ? (
+              <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                {driverVehicle.vehicleNumber.length}/14
+              </Text>
+            ) : null}
+          </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <CreditCard size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <TextInput
@@ -180,6 +187,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
               placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
               autoCorrect={false}
+              maxLength={14}
               value={driverVehicle.vehicleNumber}
               onChangeText={(text) =>
                 setDriverVehicle({
@@ -192,9 +200,16 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
 
         {/* Driving Licence Number */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Driving licence number <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <View style={styles.inputLabelRow}>
+            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Driving licence number <Text style={styles.requiredAsterisk}>*</Text>
+            </Text>
+            {driverVehicle.licenseNumber.length >= 12 ? (
+              <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                {driverVehicle.licenseNumber.length}/18
+              </Text>
+            ) : null}
+          </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <FileText size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <TextInput
@@ -203,6 +218,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
               placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
               autoCorrect={false}
+              maxLength={18}
               value={driverVehicle.licenseNumber}
               onChangeText={(text) =>
                 setDriverVehicle({
@@ -264,28 +280,48 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Vehicle Model (Optional with Dropdown Selector) */}
+        {/* Vehicle Model (Custom Input or Dropdown) */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Vehicle model <Text style={styles.optionalText}>(Optional)</Text>
-          </Text>
-          <Pressable
-            onPress={() => {
-              setCustomModelInput(driverVehicle.vehicleModel || '');
-              setModelModalVisible(true);
-            }}
-            style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
-            <Car size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <Text
-              style={[
-                styles.textValue,
-                { fontSize: px(13.5) },
-                !driverVehicle.vehicleModel && styles.textPlaceholder,
-              ]}>
-              {driverVehicle.vehicleModel || 'Enter vehicle model (optional)'}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Vehicle model <Text style={styles.optionalText}>(Optional)</Text>
             </Text>
-            <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
-          </Pressable>
+            <Pressable
+              hitSlop={8}
+              onPress={() => {
+                setCustomModelInput(driverVehicle.vehicleModel || '');
+                setModelModalVisible(true);
+              }}>
+              <Text style={{ color: '#D97706', fontWeight: '700', fontSize: px(11.5) }}>
+                Choose from list ▾
+              </Text>
+            </Pressable>
+          </View>
+
+          <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
+            <Car size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <TextInput
+              style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
+              placeholder="Type custom model or choose from list"
+              placeholderTextColor="#9CA3AF"
+              maxLength={35}
+              value={driverVehicle.vehicleModel}
+              onChangeText={(text) =>
+                setDriverVehicle({
+                  vehicleModel: text.replace(/[^A-Za-z0-9\s\-.]/g, ''),
+                })
+              }
+            />
+            <Pressable
+              hitSlop={10}
+              onPress={() => {
+                setCustomModelInput(driverVehicle.vehicleModel || '');
+                setModelModalVisible(true);
+              }}
+              style={{ paddingLeft: 8, paddingVertical: 4, justifyContent: 'center', alignItems: 'center' }}>
+              <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
+            </Pressable>
+          </View>
         </View>
 
         {/* Bottom RC & Insurance Notice Box */}
@@ -317,8 +353,11 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                 style={[styles.modalSearchInput, { fontSize: px(14) }]}
                 placeholder="Or type custom model..."
                 placeholderTextColor="#9CA3AF"
+                maxLength={35}
                 value={customModelInput}
-                onChangeText={setCustomModelInput}
+                onChangeText={(text) =>
+                  setCustomModelInput(text.replace(/[^A-Za-z0-9\s\-.]/g, ''))
+                }
               />
               {customModelInput ? (
                 <Pressable
@@ -412,6 +451,17 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     width: '100%',
+  },
+  inputLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  charCountText: {
+    fontSize: 10.5,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   inputLabel: {
     fontWeight: '600',

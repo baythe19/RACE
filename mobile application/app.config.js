@@ -38,6 +38,12 @@ module.exports = {
           apiKey: googleMapsApiKey,
         },
       },
+      permissions: [
+        'android.permission.CAMERA',
+        'android.permission.READ_EXTERNAL_STORAGE',
+        'android.permission.WRITE_EXTERNAL_STORAGE',
+        'android.permission.READ_MEDIA_IMAGES',
+      ],
     },
     scheme: 'race-partner',
     plugins: [
@@ -48,8 +54,8 @@ module.exports = {
       [
         'expo-image-picker',
         {
-          photosPermission: 'Allow RACE Partner to access your photos for document upload.',
-          cameraPermission: 'Allow RACE Partner to use your camera for selfie verification.',
+          photosPermission: 'Allow RACE Partner to access your photos to upload driver and vehicle documents.',
+          cameraPermission: 'Allow RACE Partner to use your camera to photograph official documents and for selfie verification.',
         },
       ],
       [

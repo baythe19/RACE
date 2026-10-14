@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -12,6 +13,8 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import {
   Camera,
   Check,
@@ -61,9 +64,12 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
   const isFromReview = Boolean(route.params?.fromReview);
 
   const [activeDocForUpload, setActiveDocForUpload] = useState<DriverDocumentConfig | null>(null);
-  const [previewDocData, setPreviewDocData] = useState<{ title: string; uri: string; name: string } | null>(
-    null,
-  );
+  const [previewDocData, setPreviewDocData] = useState<{
+    title: string;
+    uri: string;
+    name: string;
+    mimeType?: string;
+  } | null>(null);
   const [expandedLater1, setExpandedLater1] = useState(false);
   const [expandedLater2, setExpandedLater2] = useState(false);
 
@@ -85,7 +91,11 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
   const getUploadedDoc = (docId: string) =>
     driverDocuments.find((d) => d.id === docId);
 
-  const startAnimatedUpload = (doc: DriverDocumentConfig, sourceLabel: string) => {
+  const startAnimatedUpload = (
+    doc: DriverDocumentConfig,
+    sourceLabel: string,
+    realFile?: { uri: string; name: string; mimeType: string },
+  ) => {
     setActiveDocForUpload(null);
     setUploadProgressState({
       doc,
@@ -117,12 +127,209 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
       addDriverDocument({
         id: doc.id,
         label: doc.title,
-        uri: `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
-        name: `${doc.id}_verified.jpg`,
-        mimeType: 'image/jpeg',
+        uri:
+          realFile?.uri ||
+          `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
+        name: realFile?.name || `${doc.id}_verified.jpg`,
+        mimeType: realFile?.mimeType || 'image/jpeg',
       });
       setUploadProgressState(null);
     }, 1500);
+  };
+
+  // -------------------------------------------------------------
+  // Native Android & Device Permission Handlers for Document Upload
+  // -------------------------------------------------------------
+  const handlePickFromCamera = async (doc: DriverDocumentConfig) => {
+    try {
+      const current = await ImagePicker.getCameraPermissionsAsync();
+      let granted = current.granted;
+
+      if (!granted) {
+        if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
+          Alert.alert(
+            'Camera Permission Required',
+            'Camera access is disabled for RACE Partner. To take clear photos of your documents (e.g. Driving License, RC, Insurance) for quick verification, please enable camera access in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  Linking.openSettings().catch(() => {});
+                },
+              },
+            ],
+          );
+          return;
+        }
+
+        const requested = await ImagePicker.requestCameraPermissionsAsync();
+        granted = requested.granted;
+
+        if (!granted) {
+          Alert.alert(
+            'Camera Permission Needed',
+            'Camera access is required to take photos of your official documents for verification.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Try Again',
+                onPress: () => handlePickFromCamera(doc),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
+      setActiveDocForUpload(null);
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const capturedName = asset.fileName || `${doc.id}_photo_${Date.now()}.jpg`;
+
+      startAnimatedUpload(doc, 'Camera', {
+        uri: asset.uri,
+        name: capturedName,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+    } catch (err: any) {
+      console.warn('[CameraPicker] Error launching camera:', err);
+      Alert.alert(
+        'Camera Error',
+        'Could not access the camera. You can also select a photo from your gallery or upload a PDF document.',
+        [{ text: 'OK' }],
+      );
+    }
+  };
+
+  const handlePickFromGallery = async (doc: DriverDocumentConfig) => {
+    try {
+      const current = await ImagePicker.getMediaLibraryPermissionsAsync();
+      let granted = current.granted;
+
+      if (!granted) {
+        if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
+          Alert.alert(
+            'Photo Library Permission Required',
+            'Photo library access is disabled for RACE Partner. To select your document photos from your device, please allow photos access in your device settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => {
+                  Linking.openSettings().catch(() => {});
+                },
+              },
+            ],
+          );
+          return;
+        }
+
+        const requested = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        granted = requested.granted;
+
+        if (!granted) {
+          Alert.alert(
+            'Gallery Permission Needed',
+            'Photo library access is needed to select and upload document photos.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Try Again',
+                onPress: () => handlePickFromGallery(doc),
+              },
+            ],
+          );
+          return;
+        }
+      }
+
+      setActiveDocForUpload(null);
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const selectedName = asset.fileName || `${doc.id}_gallery_${Date.now()}.jpg`;
+
+      startAnimatedUpload(doc, 'Gallery', {
+        uri: asset.uri,
+        name: selectedName,
+        mimeType: asset.mimeType || 'image/jpeg',
+      });
+    } catch (err: any) {
+      console.warn('[GalleryPicker] Error launching gallery:', err);
+      Alert.alert(
+        'Gallery Error',
+        'Could not open gallery. Please try again or select a PDF document.',
+        [{ text: 'OK' }],
+      );
+    }
+  };
+
+  const handlePickFromFiles = async (doc: DriverDocumentConfig) => {
+    try {
+      setActiveDocForUpload(null);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      const maxBytes = 10 * 1024 * 1024; // 10MB
+      if (asset.size && asset.size > maxBytes) {
+        Alert.alert(
+          'File Too Large',
+          'The selected file exceeds 10 MB. Please choose a smaller photo or compressed PDF.',
+          [{ text: 'OK' }],
+        );
+        return;
+      }
+
+      startAnimatedUpload(doc, 'Files', {
+        uri: asset.uri,
+        name: asset.name,
+        mimeType: asset.mimeType || 'application/pdf',
+      });
+    } catch (err: any) {
+      console.warn('[FilePicker] Error selecting document:', err);
+      Alert.alert(
+        'File Picker Error',
+        'Could not open document picker. Please try taking a photo with the camera or choosing from gallery.',
+        [{ text: 'OK' }],
+      );
+    }
+  };
+
+  const handlePickSample = (doc: DriverDocumentConfig) => {
+    setActiveDocForUpload(null);
+    startAnimatedUpload(doc, 'Sample', {
+      uri: `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
+      name: `${doc.id}_verified_sample.jpg`,
+      mimeType: 'image/jpeg',
+    });
   };
 
   const handleContinue = () => {
@@ -227,6 +434,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                     title: doc.title,
                     uri: uploadedData.uri,
                     name: uploadedData.name,
+                    mimeType: uploadedData.mimeType,
                   })
                 }
                 style={({ pressed }) => [
@@ -284,7 +492,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
       subtitle="Upload clear, readable photos or PDFs."
       onBack={handleBack}
       onContinue={handleContinue}
-      continueLabel={isFromReview ? 'Save & Return to Review →' : 'Continue →'}>
+      continueLabel={isFromReview ? 'Save & Return' : 'Continue'}>
       {/* Unified Single Card for Document Verification (Square corners, No Shadow, Compact Height) */}
       <View style={[styles.card, { padding: px(12), marginBottom: px(12) }]}>
         {/* Card Header Row */}
@@ -407,9 +615,17 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
               </Pressable>
             </View>
 
+            {/* Android Permission & Privacy Assurance Banner */}
+            <View style={styles.permissionInfoBanner}>
+              <ShieldCheck size={px(14)} color="#059669" />
+              <Text style={styles.permissionInfoText}>
+                Android permissions are requested only to capture and verify official documents securely.
+              </Text>
+            </View>
+
             {/* Option 1: Camera */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Camera')}
+              onPress={() => activeDocForUpload && handlePickFromCamera(activeDocForUpload)}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 { paddingVertical: px(12) },
@@ -421,7 +637,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
               <View style={styles.uploadOptionTextWrap}>
                 <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>Take photo</Text>
                 <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
-                  Use device camera for clear photo
+                  Camera • Photo capture with auto-crop
                 </Text>
               </View>
               <ChevronRight size={px(17)} color="#9CA3AF" />
@@ -429,7 +645,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
             {/* Option 2: Gallery */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Gallery')}
+              onPress={() => activeDocForUpload && handlePickFromGallery(activeDocForUpload)}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 { paddingVertical: px(12) },
@@ -443,7 +659,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                   Choose from gallery
                 </Text>
                 <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
-                  JPG or PNG from your photos
+                  Photos • JPG or PNG from gallery
                 </Text>
               </View>
               <ChevronRight size={px(17)} color="#9CA3AF" />
@@ -451,7 +667,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
             {/* Option 3: Document File */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Files')}
+              onPress={() => activeDocForUpload && handlePickFromFiles(activeDocForUpload)}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 { paddingVertical: px(12) },
@@ -465,7 +681,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                   Select PDF document
                 </Text>
                 <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
-                  Files up to 10 MB
+                  Files • PDF files up to 10 MB
                 </Text>
               </View>
               <ChevronRight size={px(17)} color="#9CA3AF" />
@@ -473,7 +689,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
             {/* Option 4: Instant Sample Document */}
             <Pressable
-              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Sample')}
+              onPress={() => activeDocForUpload && handlePickSample(activeDocForUpload)}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 styles.sampleOptionRow,
@@ -488,7 +704,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                   Use verified sample document
                 </Text>
                 <Text style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11.5) }]}>
-                  Instantly fills sample document for testing
+                  Fast testing & QA preview
                 </Text>
               </View>
               <Check size={px(16)} color="#15803D" strokeWidth={2.5} />
@@ -562,18 +778,34 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             </View>
 
             {previewDocData?.uri ? (
-              <View style={[styles.previewImageContainer, { height: px(260), marginVertical: px(12) }]}>
-                <Image
-                  source={{ uri: previewDocData.uri }}
-                  style={styles.previewImage}
-                  resizeMode="cover"
-                />
-              </View>
+              previewDocData.mimeType === 'application/pdf' ||
+              previewDocData.name?.toLowerCase().endsWith('.pdf') ? (
+                <View style={[styles.pdfPreviewContainer, { height: px(200), marginVertical: px(12) }]}>
+                  <FileText size={px(54)} color="#EF4444" />
+                  <Text style={[styles.pdfFileName, { fontSize: px(13) }]} numberOfLines={2}>
+                    {previewDocData.name}
+                  </Text>
+                  <View style={styles.pdfVerifiedBadge}>
+                    <ShieldCheck size={px(12)} color="#15803D" />
+                    <Text style={[styles.pdfVerifiedText, { fontSize: px(11) }]}>
+                      PDF Document Ready & Verified
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.previewImageContainer, { height: px(260), marginVertical: px(12) }]}>
+                  <Image
+                    source={{ uri: previewDocData.uri }}
+                    style={styles.previewImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              )
             ) : null}
 
             <Pressable
               onPress={() => setPreviewDocData(null)}
-              style={[styles.closePreviewBtn, { height: px(42), borderRadius: px(8) }]}>
+              style={[styles.closePreviewBtn, { height: px(44), borderRadius: px(10) }]}>
               <Text style={styles.closePreviewBtnText}>Close Preview</Text>
             </Pressable>
           </Pressable>
@@ -783,6 +1015,24 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginTop: 2,
   },
+  permissionInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 10,
+    gap: 8,
+  },
+  permissionInfoText: {
+    flex: 1,
+    fontSize: 11,
+    color: '#166534',
+    lineHeight: 15,
+  },
   uploadOptionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -870,6 +1120,34 @@ const styles = StyleSheet.create({
   previewImage: {
     width: '100%',
     height: '100%',
+  },
+  pdfPreviewContainer: {
+    borderRadius: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    gap: 10,
+  },
+  pdfFileName: {
+    fontWeight: '700',
+    color: '#991B1B',
+    textAlign: 'center',
+  },
+  pdfVerifiedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  pdfVerifiedText: {
+    color: '#15803D',
+    fontWeight: '600',
   },
   closePreviewBtn: {
     backgroundColor: '#F3F4F6',

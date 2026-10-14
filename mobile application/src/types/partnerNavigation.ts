@@ -1,10 +1,16 @@
 export type PartnerRole = 'vendor' | 'driver';
 
 export type PartnerRegistrationStackParamList = {
-  DriverPersonalInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
-  DriverVehicleInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
-  DriverDocuments: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
-  DriverReview: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
+  DriverPersonalInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean; isResubmit?: boolean };
+  DriverVehicleInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean; isResubmit?: boolean };
+  DriverDocuments: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean; isResubmit?: boolean };
+  DriverReview: {
+    role: PartnerRole;
+    mobileNumber?: string;
+    fromReview?: boolean;
+    isResubmit?: boolean;
+    initialStep?: number;
+  };
   VendorBusinessInfo: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
   VendorBusinessAddress: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };
   VendorDocuments: { role: PartnerRole; mobileNumber?: string; fromReview?: boolean };

@@ -129,6 +129,8 @@ export const driverMetrics = {
   rowPillHeight: 18,
   /** Status pill height in the verification row. */
   pillHeight: 22,
+  /** Full-width map viewport used by the active-job boards. */
+  activeMapHeight: 260,
   tabBarHeight: 62,
   activeTabUnderlineWidth: 40,
 } as const;

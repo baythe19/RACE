@@ -12,7 +12,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PartnerHeaderLogo from './PartnerHeaderLogo';
@@ -30,6 +30,7 @@ interface DriverRegistrationLayoutProps {
   children: ReactNode;
   showFooter?: boolean;
   footerOverride?: ReactNode;
+  scrollEnabled?: boolean;
 }
 
 const REF_W = 390;
@@ -46,6 +47,7 @@ export default function DriverRegistrationLayout({
   children,
   showFooter = true,
   footerOverride,
+  scrollEnabled,
 }: DriverRegistrationLayoutProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -104,67 +106,117 @@ export default function DriverRegistrationLayout({
       </View>
 
       {/* Horizontal 4-Step Stepper */}
-      <View style={[styles.stepperWrap, { paddingHorizontal: px(12), paddingTop: px(2), paddingBottom: px(6) }]}>
+      <View
+        style={[
+          styles.stepperWrap,
+          {
+            paddingHorizontal: px(8),
+            paddingTop: px(4),
+            paddingBottom: px(6),
+          },
+        ]}>
         <View style={styles.stepperRow}>
           {DRIVER_REGISTRATION_STEPS.map((label, idx) => {
             const stepNum = idx + 1;
             const isCompleted = stepNum < step;
             const isActive = stepNum === step;
-            const circleSize = px(25);
+            const circleSize = px(26);
+            const lineHeight = px(2);
 
             return (
-              <React.Fragment key={label}>
-                <View style={styles.stepNode}>
+              <View key={label} style={styles.stepColumn}>
+                {/* Connecting Line Left (from previous step center to this step center) */}
+                {idx > 0 && (
                   <View
                     style={[
-                      styles.circle,
-                      { width: circleSize, height: circleSize, borderRadius: circleSize / 2 },
-                      isCompleted && styles.circleCompleted,
-                      isActive && styles.circleActive,
-                      !isCompleted && !isActive && styles.circleIdle,
-                    ]}>
-                    {isCompleted ? (
-                      <Check size={px(12)} color="#FFFFFF" strokeWidth={3} />
-                    ) : (
-                      <Text
-                        style={[
-                          styles.circleText,
-                          { fontSize: px(11) },
-                          isActive ? styles.circleTextActive : styles.circleTextIdle,
-                        ]}>
-                        {stepNum}
-                      </Text>
-                    )}
-                  </View>
-                  <Text
-                    numberOfLines={1}
-                    style={[
-                      styles.stepLabel,
-                      { fontSize: px(9.5), marginTop: px(3) },
-                      isActive && styles.stepLabelActive,
-                      isCompleted && styles.stepLabelCompleted,
-                      !isActive && !isCompleted && styles.stepLabelIdle,
-                    ]}>
-                    {label}
-                  </Text>
-                </View>
+                      styles.connectorHalfLine,
+                      {
+                        left: 0,
+                        right: '50%',
+                        top: (circleSize - lineHeight) / 2,
+                        height: lineHeight,
+                        backgroundColor: stepNum <= step ? '#10B981' : '#E5E7EB',
+                      },
+                    ]}
+                  />
+                )}
 
-                {idx < DRIVER_REGISTRATION_STEPS.length - 1 ? (
+                {/* Connecting Line Right (from this step center to next step center) */}
+                {idx < DRIVER_REGISTRATION_STEPS.length - 1 && (
                   <View
                     style={[
-                      styles.stepperLineTrack,
-                      { height: circleSize, marginHorizontal: px(2) },
+                      styles.connectorHalfLine,
+                      {
+                        left: '50%',
+                        right: 0,
+                        top: (circleSize - lineHeight) / 2,
+                        height: lineHeight,
+                        backgroundColor: stepNum < step ? '#10B981' : '#E5E7EB',
+                      },
+                    ]}
+                  />
+                )}
+
+                {/* Centered Arrow / Directional Chevron between columns */}
+                {idx < DRIVER_REGISTRATION_STEPS.length - 1 && (
+                  <View
+                    style={[
+                      styles.arrowContainer,
+                      {
+                        right: -px(6),
+                        top: (circleSize - px(12)) / 2,
+                        width: px(12),
+                        height: px(12),
+                      },
                     ]}>
-                    <View
-                      style={[
-                        styles.stepperLine,
-                        { height: px(2) },
-                        stepNum < step ? styles.lineCompleted : styles.lineIdle,
-                      ]}
+                    <ChevronRight
+                      size={px(10)}
+                      color={stepNum < step ? '#10B981' : '#9CA3AF'}
+                      strokeWidth={2.6}
                     />
                   </View>
-                ) : null}
-              </React.Fragment>
+                )}
+
+                {/* Circle (Centered in Column, Covers the line in center) */}
+                <View
+                  style={[
+                    styles.circle,
+                    {
+                      width: circleSize,
+                      height: circleSize,
+                      borderRadius: circleSize / 2,
+                    },
+                    isCompleted && styles.circleCompleted,
+                    isActive && styles.circleActive,
+                    !isCompleted && !isActive && styles.circleIdle,
+                  ]}>
+                  {isCompleted ? (
+                    <Check size={px(13)} color="#FFFFFF" strokeWidth={3} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.circleText,
+                        { fontSize: px(11) },
+                        isActive ? styles.circleTextActive : styles.circleTextIdle,
+                      ]}>
+                      {stepNum}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Step Label (Centered directly beneath circle) */}
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.stepLabel,
+                    { fontSize: px(9.5), marginTop: px(3) },
+                    isActive && styles.stepLabelActive,
+                    isCompleted && styles.stepLabelCompleted,
+                    !isActive && !isCompleted && styles.stepLabelIdle,
+                  ]}>
+                  {label}
+                </Text>
+              </View>
             );
           })}
         </View>
@@ -177,19 +229,21 @@ export default function DriverRegistrationLayout({
         <ScrollView
           style={styles.scrollView}
           bounces={false}
+          scrollEnabled={scrollEnabled !== undefined ? scrollEnabled : step !== 4}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={[
             styles.scrollContent,
+            step === 4 && styles.scrollContentStep4,
             {
               paddingHorizontal: px(12),
               paddingTop: px(10),
-              paddingBottom: insets.bottom + px(showFooter ? 94 : 28),
+              paddingBottom: insets.bottom + px(showFooter ? (step === 4 ? 80 : 94) : 28),
             },
           ]}>
           {/* Children Screen Body */}
-          <View>{children}</View>
+          <View style={step === 4 ? styles.step4BodyWrap : undefined}>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -220,33 +274,43 @@ export default function DriverRegistrationLayout({
                 <Text style={[styles.backActionLabel, { fontSize: px(15) }]}>Back</Text>
               </Pressable>
 
-              <Pressable
-                onPress={onContinue}
-                disabled={continueDisabled || continueLoading}
-                style={({ pressed }) => [
-                  styles.continueBtn,
-                  { height: px(48), borderRadius: px(12) },
-                  continueDisabled && styles.continueBtnDisabled,
-                  pressed && styles.pressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={continueLabel}>
-                <Text
-                  style={[
-                    styles.continueLabel,
-                    { fontSize: px(15) },
-                    continueDisabled && styles.continueLabelDisabled,
-                  ]}>
-                  {continueLoading ? 'Please wait…' : continueLabel}
-                </Text>
-                {!continueLoading ? (
-                  <ArrowRight
-                    size={px(18)}
-                    color={continueDisabled ? '#9CA3AF' : '#111827'}
-                    strokeWidth={2.4}
-                  />
-                ) : null}
-              </Pressable>
+              {(() => {
+                const cleanLabel = continueLabel
+                  .replace(/→/g, '')
+                  .replace(/->/g, '')
+                  .trim();
+                return (
+                  <Pressable
+                    onPress={onContinue}
+                    disabled={continueDisabled || continueLoading}
+                    style={({ pressed }) => [
+                      styles.continueBtn,
+                      { height: px(48), borderRadius: px(12) },
+                      continueDisabled && styles.continueBtnDisabled,
+                      pressed && styles.pressed,
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={cleanLabel}>
+                    <Text
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[
+                        styles.continueLabel,
+                        { fontSize: px(cleanLabel.length > 15 ? 13.5 : 14.5) },
+                        continueDisabled && styles.continueLabelDisabled,
+                      ]}>
+                      {continueLoading ? 'Please wait…' : cleanLabel}
+                    </Text>
+                    {!continueLoading ? (
+                      <ArrowRight
+                        size={px(17)}
+                        color={continueDisabled ? '#9CA3AF' : '#111827'}
+                        strokeWidth={2.4}
+                      />
+                    ) : null}
+                  </Pressable>
+                );
+              })()}
             </View>
           </View>
         )
@@ -285,18 +349,31 @@ const styles = StyleSheet.create({
   },
   stepperRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 6,
+    alignItems: 'flex-start',
+    width: '100%',
   },
-  stepNode: {
+  stepColumn: {
+    flex: 1,
     alignItems: 'center',
-    minWidth: 54,
+    position: 'relative',
+  },
+  connectorHalfLine: {
+    position: 'absolute',
+    zIndex: 1,
+  },
+  arrowContainer: {
+    position: 'absolute',
+    zIndex: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 6,
   },
   circle: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
+    zIndex: 3,
   },
   circleActive: {
     backgroundColor: '#F59E0B',
@@ -367,6 +444,13 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
+  scrollContentStep4: {
+    flexGrow: 1,
+    justifyContent: 'flex-start',
+  },
+  step4BodyWrap: {
+    flex: 1,
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
@@ -402,10 +486,12 @@ const styles = StyleSheet.create({
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
+    width: '100%',
   },
   backActionBtn: {
-    flex: 1,
+    minWidth: 84,
+    paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
@@ -417,12 +503,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   continueBtn: {
-    flex: 2,
+    flex: 1,
     backgroundColor: '#F59E0B',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
+    paddingHorizontal: 12,
+    overflow: 'hidden',
     shadowColor: '#F59E0B',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
@@ -437,6 +525,7 @@ const styles = StyleSheet.create({
   continueLabel: {
     color: '#111827',
     fontWeight: '700',
+    flexShrink: 1,
   },
   continueLabelDisabled: {
     color: '#9CA3AF',

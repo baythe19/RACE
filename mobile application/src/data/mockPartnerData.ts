@@ -5,6 +5,9 @@ import type { VendorDashboardStats } from '../services/vendor/vendorApi';
 import type { VendorProfileResponse } from '../types/vendor';
 import type { AuthUser } from '../types/auth';
 import type { Profile } from '../types/models';
+import { UI_PREVIEW_DRIVER_STATUS } from '../constants/preview';
+
+const previewDriverApproved = UI_PREVIEW_DRIVER_STATUS === 'APPROVED';
 
 export const MOCK_DRIVER_USER: AuthUser = {
   id: 'mock-driver-001',
@@ -35,22 +38,29 @@ export const MOCK_DRIVER_PROFILE: Profile = {
     country: 'India',
   },
   // Preview-only driver record, shaped exactly like GET /api/v1/profile returns
-  // it. Kept PENDING so UI preview renders the "under verification" board.
+  // it. The reference journey is approved by default; set
+  // EXPO_PUBLIC_UI_PREVIEW_DRIVER_STATUS=PENDING to exercise the gate.
   driverProfile: {
-    status: 'PENDING',
+    status: UI_PREVIEW_DRIVER_STATUS,
     driverCode: 'DRV0042',
     driverType: 'Tow Driver',
     licenseNo: 'OD-0220190012345',
     city: 'Bhubaneswar',
     state: 'Odisha',
     vehicleRegistration: 'OD 02 AB 1234',
-    policeVerificationStatus: 'PENDING',
-    documents: [
-      { type: 'driving_license', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
-      { type: 'vehicle_insurance', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
-      { type: 'rc', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
-    ],
-    statusHistory: [{ status: 'PENDING', changedAt: '2026-10-09T09:12:00.000Z' }],
+    policeVerificationStatus: previewDriverApproved ? 'VERIFIED' : 'PENDING',
+    documents: previewDriverApproved
+      ? [
+          { type: 'driving_license', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
+          { type: 'vehicle_insurance', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
+          { type: 'rc', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
+        ]
+      : [
+          { type: 'driving_license', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
+          { type: 'vehicle_insurance', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
+          { type: 'rc', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
+        ],
+    statusHistory: [{ status: UI_PREVIEW_DRIVER_STATUS, changedAt: '2026-10-09T09:12:00.000Z' }],
     submittedAt: '2026-10-09T09:12:00.000Z',
   },
 };
@@ -153,7 +163,14 @@ export const MOCK_VENDOR_DASHBOARD: VendorDashboardStats = {
   earningsTotal: 48200,
 };
 
-export let mockActiveJobState: DriverJobBooking | null = {
+/**
+ * Preview starts on the request-first Dashboard board. The active trip is
+ * created by accepting a request (or explicitly by the UI QA jump), matching
+ * the real driver journey instead of showing an active card on first launch.
+ */
+export let mockActiveJobState: DriverJobBooking | null = null;
+
+const MOCK_ACTIVE_JOB_TEMPLATE: DriverJobBooking = {
   bookingType: 'towing',
   id: 'RACE-TOW-MOCK-001',
   bookingNumber: 'TOW-10042',
@@ -212,7 +229,6 @@ export function updateMockActiveJobStatus(nextStatus: string): DriverJobBooking 
 }
 
 export const MOCK_DRIVER_JOBS: DriverJobBooking[] = [
-  mockActiveJobState!,
   {
     bookingType: 'towing',
     id: 'RACE-TOW-MOCK-002',
@@ -315,6 +331,26 @@ export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
 ];
 
 let mockJobOffersState = [...MOCK_JOB_OFFERS];
+
+/** Seed the active board only when a QA shortcut explicitly asks for it. */
+export function ensureMockDriverActiveJob(): DriverJobBooking | null {
+  if (mockActiveJobState && !['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)) {
+    return mockActiveJobState;
+  }
+
+  const offer = mockJobOffersState[0] ?? MOCK_ACTIVE_JOB_TEMPLATE;
+  const acceptedAt = new Date().toISOString();
+  mockActiveJobState = {
+    ...offer,
+    status: 'DRIVER_EN_ROUTE',
+    statusHistory: [
+      { status: 'DRIVER_ASSIGNED', timestamp: offer.createdAt },
+      { status: 'DRIVER_EN_ROUTE', timestamp: acceptedAt },
+    ],
+  };
+  mockJobOffersState = mockJobOffersState.filter(job => job.id !== offer.id);
+  return mockActiveJobState;
+}
 
 /** Promote a preview offer into the same active-job state used by the trip flow. */
 export function acceptMockDriverJob(

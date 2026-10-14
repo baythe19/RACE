@@ -29,10 +29,16 @@ export default function DriverVerificationGateScreen() {
     navigation.replace('PartnerMain');
   }, [navigation]);
 
+  const handleEditPrevious = useCallback(() => {
+    navigation.navigate('PartnerRegistration', { role: 'driver' });
+  }, [navigation]);
+
   return (
     <DriverVerificationView
       verification={verification}
       onOpenDashboard={handleGoToDashboard}
+      onOpenApplication={handleEditPrevious}
+      onEditPrevious={handleEditPrevious}
       onRefresh={() => void refetch()}
       refreshing={isRefetching}
     />

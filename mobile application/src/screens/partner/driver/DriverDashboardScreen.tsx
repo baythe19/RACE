@@ -769,9 +769,21 @@ export default function DriverDashboardScreen() {
   const verification = useMemo(() => buildDriverVerification(profile), [profile]);
   const isApproved = verification.isApproved;
 
-  const { data: jobs = [], refetch: refetchJobs } = useDriverJobsQuery(isApproved);
-  const { data: offers = [], refetch: refetchOffers } = useDriverJobOffersQuery(isApproved);
-  const { data: activeJob, refetch: refetchActive } = useDriverActiveJobQuery(isApproved);
+  const {
+    data: jobs = [],
+    isError: jobsError,
+    refetch: refetchJobs,
+  } = useDriverJobsQuery(isApproved);
+  const {
+    data: offers = [],
+    isError: offersError,
+    refetch: refetchOffers,
+  } = useDriverJobOffersQuery(isApproved);
+  const {
+    data: activeJob,
+    isError: activeError,
+    refetch: refetchActive,
+  } = useDriverActiveJobQuery(isApproved);
   const availabilityMutation = useDriverAvailabilityMutation();
 
   const [isOnline, setIsOnline] = useState(false);
@@ -783,10 +795,13 @@ export default function DriverDashboardScreen() {
   /* Availability is read from the backend — never mutated on mount. */
   useEffect(() => {
     if (typeof profile?.isAvailable !== 'boolean') return;
-    setIsOnline(profile.isAvailable);
+    // A pending driver may carry a stale `isAvailable` value from registration,
+    // but approval is the backend gate for presence and job visibility.
+    const available = isApproved && profile.isAvailable;
+    setIsOnline(available);
     // Share availability with the request alert + location reporter.
-    useDriverPresenceStore.getState().setOnline(profile.isAvailable);
-  }, [profile?.isAvailable]);
+    useDriverPresenceStore.getState().setOnline(available);
+  }, [isApproved, profile?.isAvailable]);
 
   useDriverLocationReporting(isApproved && isOnline);
 
@@ -875,11 +890,13 @@ export default function DriverDashboardScreen() {
   const dashboardVerificationTitle = isApproved ? 'Verification approved' : verification.title;
   /** Location problem copy — null while location is healthy or not yet checked. */
   const locationIssue = locationHealthCopy(locationHealth);
+  const dataIssue = jobsError || offersError || activeError;
 
   return (
     <AppScreenLayout
       backgroundColor={C.pageBg}
       horizontalPadding={px(M.pagePadding)}
+      contentStyle={{ paddingBottom: px(M.tabBarHeight + 20) }}
       refreshing={refreshing}
       onRefresh={() => void onRefresh()}>
       {/* brand row ------------------------------------------------------- */}
@@ -891,7 +908,7 @@ export default function DriverDashboardScreen() {
           paddingTop: px(4),
           minHeight: px(38),
         }}>
-        <PartnerHeaderLogo width={px(54)} showPartnerText />
+        <PartnerHeaderLogo width={px(70)} cropZoom={1.4} showPartnerText />
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable
@@ -1014,18 +1031,8 @@ export default function DriverDashboardScreen() {
       </Text>
 
       {/* availability ---------------------------------------------------- */}
-      <Pressable
-        onPress={() => void toggleAvailability()}
-        disabled={!isApproved || availabilityMutation.isPending || loadingProfile}
-        accessibilityRole="button"
-        accessibilityLabel={
-          !isApproved
-            ? 'Availability unlocks after approval'
-            : isOnline
-              ? 'You are online'
-              : 'You are offline'
-        }
-        style={({ pressed }) => ({
+      <View
+        style={{
           height: px(M.onlineCardHeight),
           marginTop: px(14),
           borderRadius: px(R.onlineCard),
@@ -1040,8 +1047,7 @@ export default function DriverDashboardScreen() {
           alignItems: 'center',
           paddingLeft: px(16),
           paddingRight: px(10),
-          opacity: pressed ? 0.96 : 1,
-        })}>
+        }}>
         <View
           style={{
             width: px(16),
@@ -1091,7 +1097,7 @@ export default function DriverDashboardScreen() {
             <Text style={[T.pill, { fontSize: px(12), lineHeight: px(16), color: C.ink }]}>In review</Text>
           </View>
         )}
-      </Pressable>
+      </View>
 
       {/* location health -------------------------------------------------- */}
       {isOnline && locationIssue ? (
@@ -1158,6 +1164,32 @@ export default function DriverDashboardScreen() {
         </View>
       ) : null}
 
+      {isApproved && dataIssue ? (
+        <View
+          style={{
+            marginTop: px(10),
+            borderRadius: px(R.card),
+            borderWidth: 1,
+            borderColor: C.amberBorder,
+            backgroundColor: C.cream,
+            padding: px(12),
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}>
+          <TriangleAlert size={px(18)} color={C.amberText} strokeWidth={2.4} />
+          <Text
+            style={[T.cardSubtitle, { flex: 1, fontSize: px(12.5), color: C.grey, marginLeft: px(9) }]}>
+            Couldn’t refresh your latest jobs.
+          </Text>
+          <Pressable
+            onPress={() => void onRefresh()}
+            accessibilityRole="button"
+            style={{ paddingVertical: px(4), paddingHorizontal: px(5) }}>
+            <Text style={[T.link, { fontSize: px(12.5), color: C.amberText }]}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
       {/* earnings -------------------------------------------------------- */}
       <View
         style={{
@@ -1168,7 +1200,6 @@ export default function DriverDashboardScreen() {
           backgroundColor: C.card,
           paddingHorizontal: px(14),
           paddingVertical: px(13),
-          ...driverShadow,
         }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Text style={[T.metricLabel, { fontSize: px(14), lineHeight: px(19), color: C.ink }]}>
@@ -1354,7 +1385,6 @@ export default function DriverDashboardScreen() {
             borderColor: C.hairline,
             backgroundColor: C.card,
             padding: px(11),
-            ...driverShadow,
           }}>
           <View
             style={{
@@ -1403,7 +1433,6 @@ export default function DriverDashboardScreen() {
           padding: px(10),
           flexDirection: 'row',
           alignItems: 'center',
-          ...driverShadow,
         }}>
         <View
           style={{
