@@ -13,9 +13,14 @@ import { images } from '../../assets';
 interface PartnerHeaderLogoProps {
   width?: number;
   style?: StyleProp<ViewStyle>;
+  showPartnerText?: boolean;
 }
 
-export default function PartnerHeaderLogo({ width = 114, style }: PartnerHeaderLogoProps) {
+export default function PartnerHeaderLogo({
+  width = 114,
+  style,
+  showPartnerText = false,
+}: PartnerHeaderLogoProps) {
   // Ratio for splashHeader mark (484w x 300h)
   const logoHeight = Math.round(width * (108 / 180));
 
@@ -25,11 +30,13 @@ export default function PartnerHeaderLogo({ width = 114, style }: PartnerHeaderL
         source={images.splashHeader}
         style={{ width, height: logoHeight }}
         resizeMode="contain"
-        accessibilityLabel="RACE Partner"
+        accessibilityLabel="RACE"
       />
-      <Text style={[styles.partnerText, { fontSize: Math.max(9, Math.round(width * 0.088)) }]}>
-        PARTNER
-      </Text>
+      {showPartnerText ? (
+        <Text style={[styles.partnerText, { fontSize: Math.max(8, Math.round(width * 0.075)) }]}>
+          PARTNER
+        </Text>
+      ) : null}
     </View>
   );
 }

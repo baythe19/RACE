@@ -40,7 +40,7 @@ const TAB_CONFIG: Record<
   { label: string; Icon: LucideIcon; activeFill: boolean }
 > = {
   PartnerHome: { label: 'Home', Icon: House, activeFill: true },
-  PartnerJobs: { label: 'Jobs', Icon: ClipboardList, activeFill: false },
+  PartnerJobs: { label: 'Jobs', Icon: ClipboardList, activeFill: true },
   PartnerAccount: { label: 'Account', Icon: User, activeFill: true },
 };
 

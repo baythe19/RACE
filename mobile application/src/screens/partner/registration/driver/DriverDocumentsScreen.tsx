@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Modal,
@@ -14,6 +15,7 @@ import {
 import {
   Camera,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ChevronUp,
@@ -24,8 +26,10 @@ import {
   Lock,
   Plus,
   RefreshCw,
+  ShieldCheck,
   Sparkles,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -53,7 +57,6 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
   const driverDocuments = usePartnerRegistrationStore((s) => s.driverDocuments);
   const addDriverDocument = usePartnerRegistrationStore((s) => s.addDriverDocument);
   const removeDriverDocument = usePartnerRegistrationStore((s) => s.removeDriverDocument);
-  const driverVehicle = usePartnerRegistrationStore((s) => s.driverVehicle);
 
   const isFromReview = Boolean(route.params?.fromReview);
 
@@ -61,7 +64,17 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
   const [previewDocData, setPreviewDocData] = useState<{ title: string; uri: string; name: string } | null>(
     null,
   );
-  const [showLaterSection, setShowLaterSection] = useState(false);
+  const [expandedLater1, setExpandedLater1] = useState(false);
+  const [expandedLater2, setExpandedLater2] = useState(false);
+
+  // Animated upload progress state
+  const [uploadProgressState, setUploadProgressState] = useState<{
+    doc: DriverDocumentConfig;
+    sourceLabel: string;
+    progress: number;
+    statusText: string;
+    isComplete: boolean;
+  } | null>(null);
 
   const handleBack = () =>
     partnerRegistrationGoBack(navigation, 'DriverDocuments', route.params);
@@ -72,19 +85,35 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
   const getUploadedDoc = (docId: string) =>
     driverDocuments.find((d) => d.id === docId);
 
-  const handleAttachMock = (doc: DriverDocumentConfig) => {
-    addDriverDocument({
-      id: doc.id,
-      label: doc.title,
-      uri: `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
-      name: `${doc.id}_verified.jpg`,
-      mimeType: 'image/jpeg',
-    });
+  const startAnimatedUpload = (doc: DriverDocumentConfig, sourceLabel: string) => {
     setActiveDocForUpload(null);
-  };
+    setUploadProgressState({
+      doc,
+      sourceLabel,
+      progress: 18,
+      statusText: 'Connecting securely...',
+      isComplete: false,
+    });
 
-  const handleAutoFillAllCore = () => {
-    CORE_REVIEW_DOCUMENTS.forEach((doc) => {
+    setTimeout(() => {
+      setUploadProgressState((prev) =>
+        prev ? { ...prev, progress: 54, statusText: `Uploading from ${sourceLabel}...` } : null,
+      );
+    }, 320);
+
+    setTimeout(() => {
+      setUploadProgressState((prev) =>
+        prev ? { ...prev, progress: 88, statusText: 'Verifying image resolution & text...' } : null,
+      );
+    }, 700);
+
+    setTimeout(() => {
+      setUploadProgressState((prev) =>
+        prev ? { ...prev, progress: 100, statusText: 'Document verified & uploaded!', isComplete: true } : null,
+      );
+    }, 1050);
+
+    setTimeout(() => {
       addDriverDocument({
         id: doc.id,
         label: doc.title,
@@ -92,7 +121,8 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
         name: `${doc.id}_verified.jpg`,
         mimeType: 'image/jpeg',
       });
-    });
+      setUploadProgressState(null);
+    }, 1500);
   };
 
   const handleContinue = () => {
@@ -112,7 +142,140 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
     navigation.navigate('DriverReview', route.params);
   };
 
-  const coreUploadedCount = CORE_REVIEW_DOCUMENTS.filter((d) => isDocUploaded(d.id)).length;
+  const renderDocRow = (doc: DriverDocumentConfig, isConditional: boolean = false) => {
+    const uploaded = isDocUploaded(doc.id);
+    const uploadedData = getUploadedDoc(doc.id);
+    const Icon = doc.Icon;
+
+    return (
+      <View
+        key={doc.id}
+        style={[
+          styles.docRow,
+          {
+            paddingVertical: px(7),
+            paddingHorizontal: px(10),
+            marginBottom: px(6),
+            borderRadius: px(8),
+          },
+          uploaded && styles.docRowUploaded,
+        ]}>
+        {/* Left Icon Badge (Square corners) */}
+        <View
+          style={[
+            styles.docIconBox,
+            {
+              width: px(32),
+              height: px(32),
+              borderRadius: px(6),
+              backgroundColor: uploaded ? '#DCFCE7' : doc.iconBg || '#FEF3C7',
+            },
+          ]}>
+          {uploaded ? (
+            <Check size={px(16)} color="#15803D" strokeWidth={2.8} />
+          ) : (
+            <Icon size={px(16)} color={doc.iconColor || '#D97706'} strokeWidth={2.2} />
+          )}
+        </View>
+
+        {/* Title and subtle info */}
+        <View style={styles.docTextWrap}>
+          <Text numberOfLines={1} style={[styles.docTitle, { fontSize: px(12.5) }]}>
+            {doc.title}
+          </Text>
+          {uploaded ? (
+            <Text numberOfLines={1} style={[styles.docSubtitleUploaded, { fontSize: px(10.5) }]}>
+              {uploadedData?.name || `${doc.id}_verified.jpg`}
+            </Text>
+          ) : doc.id === 'government_photo_id' ? (
+            <Text numberOfLines={1} style={[styles.docSubtitle, { fontSize: px(10) }]}>
+              Aadhaar or another accepted ID
+            </Text>
+          ) : doc.id === 'owner_noc' ? (
+            <Text numberOfLines={1} style={[styles.docSubtitle, { fontSize: px(10) }]}>
+              Only when vehicle is registered to someone else
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Status Badge */}
+        <View style={styles.badgeWrap}>
+          {uploaded ? (
+            <View style={styles.badgeUploaded}>
+              <Text style={[styles.badgeUploadedText, { fontSize: px(10.5) }]}>Uploaded</Text>
+            </View>
+          ) : isConditional ? (
+            <View style={styles.badgeConditional}>
+              <Text style={[styles.badgeConditionalText, { fontSize: px(10.5) }]}>Conditional</Text>
+            </View>
+          ) : (
+            <View style={styles.badgeRequired}>
+              <Text style={[styles.badgeRequiredText, { fontSize: px(10.5) }]}>Required</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Action: Upload button or Compact View/Replace/Delete */}
+        <View style={styles.docActionWrap}>
+          {uploaded ? (
+            <View style={styles.actionButtonGroup}>
+              <Pressable
+                hitSlop={6}
+                onPress={() =>
+                  uploadedData &&
+                  setPreviewDocData({
+                    title: doc.title,
+                    uri: uploadedData.uri,
+                    name: uploadedData.name,
+                  })
+                }
+                style={({ pressed }) => [
+                  styles.iconActionBtn,
+                  { backgroundColor: '#EFF6FF' },
+                  pressed && styles.pressed,
+                ]}>
+                <Eye size={px(12)} color="#2563EB" />
+              </Pressable>
+
+              <Pressable
+                hitSlop={6}
+                onPress={() => setActiveDocForUpload(doc)}
+                style={({ pressed }) => [
+                  styles.iconActionBtn,
+                  { backgroundColor: '#F3F4F6' },
+                  pressed && styles.pressed,
+                ]}>
+                <RefreshCw size={px(12)} color="#4B5563" />
+              </Pressable>
+
+              <Pressable
+                hitSlop={6}
+                onPress={() => removeDriverDocument(doc.id)}
+                style={({ pressed }) => [
+                  styles.iconActionBtn,
+                  { backgroundColor: '#FEF2F2' },
+                  pressed && styles.pressed,
+                ]}>
+                <Trash2 size={px(12)} color="#EF4444" />
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable
+              hitSlop={8}
+              onPress={() => setActiveDocForUpload(doc)}
+              style={({ pressed }) => [
+                styles.uploadBtn,
+                { height: px(28), paddingHorizontal: px(8), borderRadius: px(6) },
+                pressed && styles.pressed,
+              ]}>
+              <Upload size={px(12)} color="#374151" strokeWidth={2.4} />
+              <Text style={[styles.uploadBtnText, { fontSize: px(11) }]}>Upload</Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <DriverRegistrationLayout
@@ -122,387 +285,103 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
       onBack={handleBack}
       onContinue={handleContinue}
       continueLabel={isFromReview ? 'Save & Return to Review →' : 'Continue →'}>
-      {/* Top Header Card */}
-      <View style={[styles.card, styles.headerCard, { padding: px(16), marginBottom: px(16) }]}>
-        <View style={styles.headerRow}>
-          <View style={[styles.headerIconBox, { width: px(40), height: px(40), borderRadius: px(10) }]}>
-            <FileText size={px(20)} color="#D97706" strokeWidth={2.4} />
+      {/* Unified Single Card for Document Verification (Square corners, No Shadow, Compact Height) */}
+      <View style={[styles.card, { padding: px(12), marginBottom: px(12) }]}>
+        {/* Card Header Row */}
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
+            <FileText size={px(17)} color="#D97706" strokeWidth={2.4} />
           </View>
           <View style={styles.headerTextWrap}>
-            <Text style={[styles.headerTitle, { fontSize: px(16) }]}>Documents for verification</Text>
-            <Text style={[styles.headerSubtitle, { fontSize: px(13) }]}>
-              Review takes 2-4 hours. You can complete later items after approval.
+            <Text style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>
+              Documents for verification
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
+              Upload clear, readable photos or PDFs.
             </Text>
           </View>
         </View>
 
-        {/* Demo Auto-Fill Shortcut */}
+        <View style={styles.cardDivider} />
+
+        {/* Section 1: Needed for review (Clean header without tags) */}
+        <View style={[styles.sectionContainer, { marginBottom: px(10) }]}>
+          <Text style={[styles.sectionTitle, { fontSize: px(13.5), marginBottom: px(8) }]}>
+            Needed for review
+          </Text>
+
+          {CORE_REVIEW_DOCUMENTS.map((doc) => renderDocRow(doc, false))}
+        </View>
+
+        {/* Section 2: Only when applicable */}
+        <View style={[styles.sectionContainer, { marginBottom: px(10) }]}>
+          <Text style={[styles.sectionTitle, { fontSize: px(13.5), marginBottom: px(8) }]}>
+            Only when applicable
+          </Text>
+
+          {CONDITIONAL_DOCUMENTS.map((doc) => renderDocRow(doc, true))}
+        </View>
+
+        {/* Collapsible Section 3: Before first payout */}
         <Pressable
-          onPress={handleAutoFillAllCore}
+          onPress={() => setExpandedLater1(!expandedLater1)}
           style={({ pressed }) => [
-            styles.demoFillBtn,
-            { marginTop: px(12), paddingVertical: px(8), paddingHorizontal: px(12) },
+            styles.collapsibleRow,
+            { paddingVertical: px(8), paddingHorizontal: px(10), borderRadius: px(8) },
             pressed && styles.pressed,
           ]}>
-          <Sparkles size={px(15)} color="#D97706" />
-          <Text style={[styles.demoFillText, { fontSize: px(12) }]}>
-            Auto-fill all 6 required documents (Instant Demo)
+          <Text numberOfLines={1} style={[styles.collapsibleRowTitle, { fontSize: px(12) }]}>
+            Before first payout — PAN and bank details
           </Text>
-        </Pressable>
-      </View>
-
-      {/* Group 1: Needed for review (6 core documents) */}
-      <View style={[styles.sectionContainer, { marginBottom: px(20) }]}>
-        <View style={[styles.sectionHeaderRow, { marginBottom: px(12) }]}>
-          <View style={styles.sectionHeaderTitleRow}>
-            <Text style={[styles.sectionTitle, { fontSize: px(15) }]}>Needed for review</Text>
-            <View style={styles.countBadge}>
-              <Text style={[styles.countBadgeText, { fontSize: px(11) }]}>
-                {coreUploadedCount}/6 Complete
-              </Text>
-            </View>
+          <View style={styles.badgeLater}>
+            <Text style={[styles.badgeLaterText, { fontSize: px(10.5) }]}>Later</Text>
           </View>
-          <Text style={[styles.sectionHint, { fontSize: px(12) }]}>
-            Required before your profile goes live
-          </Text>
-        </View>
-
-        {CORE_REVIEW_DOCUMENTS.map((doc) => {
-          const uploaded = isDocUploaded(doc.id);
-          const uploadedData = getUploadedDoc(doc.id);
-          const Icon = doc.Icon;
-
-          return (
-            <View
-              key={doc.id}
-              style={[
-                styles.docCard,
-                { padding: px(14), marginBottom: px(10), borderRadius: px(12) },
-                uploaded && styles.docCardUploaded,
-              ]}>
-              <View style={styles.docCardMainRow}>
-                <View
-                  style={[
-                    styles.docIconBox,
-                    {
-                      width: px(38),
-                      height: px(38),
-                      borderRadius: px(10),
-                      backgroundColor: uploaded ? '#DCFCE7' : '#FEF3C7',
-                    },
-                  ]}>
-                  {uploaded ? (
-                    <Check size={px(18)} color="#15803D" strokeWidth={2.8} />
-                  ) : (
-                    <Icon size={px(18)} color="#D97706" strokeWidth={2.2} />
-                  )}
-                </View>
-
-                <View style={styles.docTextWrap}>
-                  <View style={styles.docTitleRow}>
-                    <Text style={[styles.docTitle, { fontSize: px(14) }]}>{doc.title}</Text>
-                    {uploaded ? (
-                      <View style={styles.statusPillUploaded}>
-                        <Check size={px(11)} color="#15803D" strokeWidth={3} />
-                        <Text style={[styles.statusPillTextUploaded, { fontSize: px(11) }]}>
-                          Uploaded
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.statusPillRequired}>
-                        <Text style={[styles.statusPillTextRequired, { fontSize: px(11) }]}>
-                          Required
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <Text style={[styles.docSubtitle, { fontSize: px(12), marginTop: px(2) }]}>
-                    {uploaded ? uploadedData?.name || `${doc.id}_verified.jpg` : doc.subtitle}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Action Button Row */}
-              <View style={[styles.docActionRow, { marginTop: px(10) }]}>
-                {uploaded ? (
-                  <>
-                    <Pressable
-                      onPress={() =>
-                        uploadedData &&
-                        setPreviewDocData({
-                          title: doc.title,
-                          uri: uploadedData.uri,
-                          name: uploadedData.name,
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.previewBtn,
-                        { paddingVertical: px(6), paddingHorizontal: px(10) },
-                        pressed && styles.pressed,
-                      ]}>
-                      <Eye size={px(12)} color="#2563EB" />
-                      <Text style={[styles.previewBtnText, { fontSize: px(12) }]}>View</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setActiveDocForUpload(doc)}
-                      style={({ pressed }) => [
-                        styles.replaceBtn,
-                        { paddingVertical: px(6), paddingHorizontal: px(10) },
-                        pressed && styles.pressed,
-                      ]}>
-                      <RefreshCw size={px(12)} color="#4B5563" />
-                      <Text style={[styles.replaceBtnText, { fontSize: px(12) }]}>Replace</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => removeDriverDocument(doc.id)}
-                      hitSlop={10}
-                      style={styles.trashBtn}>
-                      <Trash2 size={px(16)} color="#EF4444" />
-                    </Pressable>
-                  </>
-                ) : (
-                  <Pressable
-                    onPress={() => setActiveDocForUpload(doc)}
-                    style={({ pressed }) => [
-                      styles.uploadTriggerBtn,
-                      { paddingVertical: px(8), paddingHorizontal: px(14) },
-                      pressed && styles.pressed,
-                    ]}>
-                    <Plus size={px(14)} color="#D97706" strokeWidth={2.5} />
-                    <Text style={[styles.uploadTriggerText, { fontSize: px(13) }]}>Upload</Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* Group 2: Only when applicable (Conditional) */}
-      <View style={[styles.sectionContainer, { marginBottom: px(20) }]}>
-        <View style={[styles.sectionHeaderRow, { marginBottom: px(12) }]}>
-          <View style={styles.sectionHeaderTitleRow}>
-            <Text style={[styles.sectionTitle, { fontSize: px(15) }]}>Only when applicable</Text>
-            <View style={[styles.countBadge, { backgroundColor: '#F3F4F6' }]}>
-              <Text style={[styles.countBadgeText, { color: '#4B5563', fontSize: px(11) }]}>
-                Conditional
-              </Text>
-            </View>
-          </View>
-          <Text style={[styles.sectionHint, { fontSize: px(12) }]}>
-            Upload if applicable to your vehicle or permit status
-          </Text>
-        </View>
-
-        {CONDITIONAL_DOCUMENTS.map((doc) => {
-          const uploaded = isDocUploaded(doc.id);
-          const uploadedData = getUploadedDoc(doc.id);
-          const Icon = doc.Icon;
-          const isNocNeeded =
-            doc.id === 'owner_noc' && driverVehicle.registeredTo === 'someone_else';
-
-          return (
-            <View
-              key={doc.id}
-              style={[
-                styles.docCard,
-                { padding: px(14), marginBottom: px(10), borderRadius: px(12) },
-                isNocNeeded && styles.docCardHighlighted,
-                uploaded && styles.docCardUploaded,
-              ]}>
-              <View style={styles.docCardMainRow}>
-                <View
-                  style={[
-                    styles.docIconBox,
-                    {
-                      width: px(38),
-                      height: px(38),
-                      borderRadius: px(10),
-                      backgroundColor: uploaded ? '#DCFCE7' : isNocNeeded ? '#FEF3C7' : '#F3F4F6',
-                    },
-                  ]}>
-                  {uploaded ? (
-                    <Check size={px(18)} color="#15803D" strokeWidth={2.8} />
-                  ) : (
-                    <Icon
-                      size={px(18)}
-                      color={isNocNeeded ? '#D97706' : '#6B7280'}
-                      strokeWidth={2.2}
-                    />
-                  )}
-                </View>
-
-                <View style={styles.docTextWrap}>
-                  <View style={styles.docTitleRow}>
-                    <Text style={[styles.docTitle, { fontSize: px(14) }]}>{doc.title}</Text>
-                    {uploaded ? (
-                      <View style={styles.statusPillUploaded}>
-                        <Check size={px(11)} color="#15803D" strokeWidth={3} />
-                        <Text style={[styles.statusPillTextUploaded, { fontSize: px(11) }]}>
-                          Uploaded
-                        </Text>
-                      </View>
-                    ) : isNocNeeded ? (
-                      <View style={styles.statusPillRequired}>
-                        <Text style={[styles.statusPillTextRequired, { fontSize: px(11) }]}>
-                          Needed for NOC
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={[styles.statusPillRequired, { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' }]}>
-                        <Text style={[styles.statusPillTextRequired, { color: '#6B7280', fontSize: px(11) }]}>
-                          Optional
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <Text style={[styles.docSubtitle, { fontSize: px(12), marginTop: px(2) }]}>
-                    {uploaded ? uploadedData?.name : doc.subtitle}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[styles.docActionRow, { marginTop: px(10) }]}>
-                {uploaded ? (
-                  <>
-                    <Pressable
-                      onPress={() =>
-                        uploadedData &&
-                        setPreviewDocData({
-                          title: doc.title,
-                          uri: uploadedData.uri,
-                          name: uploadedData.name,
-                        })
-                      }
-                      style={({ pressed }) => [
-                        styles.previewBtn,
-                        { paddingVertical: px(6), paddingHorizontal: px(10) },
-                        pressed && styles.pressed,
-                      ]}>
-                      <Eye size={px(12)} color="#2563EB" />
-                      <Text style={[styles.previewBtnText, { fontSize: px(12) }]}>View</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setActiveDocForUpload(doc)}
-                      style={({ pressed }) => [
-                        styles.replaceBtn,
-                        { paddingVertical: px(6), paddingHorizontal: px(10) },
-                        pressed && styles.pressed,
-                      ]}>
-                      <RefreshCw size={px(12)} color="#4B5563" />
-                      <Text style={[styles.replaceBtnText, { fontSize: px(12) }]}>Replace</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => removeDriverDocument(doc.id)}
-                      hitSlop={10}
-                      style={styles.trashBtn}>
-                      <Trash2 size={px(16)} color="#EF4444" />
-                    </Pressable>
-                  </>
-                ) : (
-                  <Pressable
-                    onPress={() => setActiveDocForUpload(doc)}
-                    style={({ pressed }) => [
-                      styles.uploadTriggerBtnNeutral,
-                      { paddingVertical: px(8), paddingHorizontal: px(14) },
-                      pressed && styles.pressed,
-                    ]}>
-                    <Plus size={px(14)} color="#4B5563" strokeWidth={2.5} />
-                    <Text style={[styles.uploadTriggerTextNeutral, { fontSize: px(13) }]}>
-                      Upload
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          );
-        })}
-      </View>
-
-      {/* Group 3: Before first payout & Additional checks (Collapsible) */}
-      <View style={[styles.card, { padding: px(16), marginBottom: px(20) }]}>
-        <Pressable
-          onPress={() => setShowLaterSection(!showLaterSection)}
-          style={styles.collapsibleHeader}>
-          <View style={styles.collapsibleTitleRow}>
-            <Text style={[styles.sectionTitle, { fontSize: px(15) }]}>
-              Before first payout & Additional checks
-            </Text>
-            <View style={[styles.countBadge, { backgroundColor: '#EFF6FF' }]}>
-              <Text style={[styles.countBadgeText, { color: '#2563EB', fontSize: px(11) }]}>
-                Can do later
-              </Text>
-            </View>
-          </View>
-          {showLaterSection ? (
-            <ChevronUp size={px(20)} color="#6B7280" />
+          {expandedLater1 ? (
+            <ChevronUp size={px(16)} color="#6B7280" />
           ) : (
-            <ChevronDown size={px(20)} color="#6B7280" />
+            <ChevronDown size={px(16)} color="#6B7280" />
           )}
         </Pressable>
+        {expandedLater1 ? (
+          <View style={{ marginTop: px(4), marginBottom: px(6) }}>
+            {renderDocRow(LATER_DOCUMENTS[0], true)}
+          </View>
+        ) : null}
 
-        {showLaterSection ? (
-          <View style={{ marginTop: px(14) }}>
-            {LATER_DOCUMENTS.map((doc) => {
-              const uploaded = isDocUploaded(doc.id);
-              const uploadedData = getUploadedDoc(doc.id);
-              const Icon = doc.Icon;
-
-              return (
-                <View
-                  key={doc.id}
-                  style={[
-                    styles.docCard,
-                    { padding: px(12), marginBottom: px(10), borderRadius: px(10) },
-                    uploaded && styles.docCardUploaded,
-                  ]}>
-                  <View style={styles.docCardMainRow}>
-                    <View
-                      style={[
-                        styles.docIconBox,
-                        {
-                          width: px(34),
-                          height: px(34),
-                          borderRadius: px(8),
-                          backgroundColor: uploaded ? '#DCFCE7' : '#EFF6FF',
-                        },
-                      ]}>
-                      {uploaded ? (
-                        <Check size={px(16)} color="#15803D" strokeWidth={2.8} />
-                      ) : (
-                        <Icon size={px(16)} color="#2563EB" strokeWidth={2.2} />
-                      )}
-                    </View>
-                    <View style={styles.docTextWrap}>
-                      <Text style={[styles.docTitle, { fontSize: px(13) }]}>{doc.title}</Text>
-                      <Text style={[styles.docSubtitle, { fontSize: px(11), marginTop: px(2) }]}>
-                        {uploaded ? uploadedData?.name : doc.subtitle}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={[styles.docActionRow, { marginTop: px(8) }]}>
-                    <Pressable
-                      onPress={() => setActiveDocForUpload(doc)}
-                      style={styles.uploadTriggerBtnNeutral}>
-                      <Text style={[styles.uploadTriggerTextNeutral, { fontSize: px(12) }]}>
-                        {uploaded ? 'Update' : 'Add now (Optional)'}
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
+        {/* Collapsible Section 4: Additional checks */}
+        <Pressable
+          onPress={() => setExpandedLater2(!expandedLater2)}
+          style={({ pressed }) => [
+            styles.collapsibleRow,
+            { paddingVertical: px(8), paddingHorizontal: px(10), borderRadius: px(8), marginTop: px(6) },
+            pressed && styles.pressed,
+          ]}>
+          <Text numberOfLines={1} style={[styles.collapsibleRowTitle, { fontSize: px(12) }]}>
+            Additional checks — Police verification / medical fitness
+          </Text>
+          <View style={styles.badgeLater}>
+            <Text style={[styles.badgeLaterText, { fontSize: px(10.5) }]}>If requested</Text>
+          </View>
+          {expandedLater2 ? (
+            <ChevronUp size={px(16)} color="#6B7280" />
+          ) : (
+            <ChevronDown size={px(16)} color="#6B7280" />
+          )}
+        </Pressable>
+        {expandedLater2 ? (
+          <View style={{ marginTop: px(4) }}>
+            {renderDocRow(LATER_DOCUMENTS[1], true)}
           </View>
         ) : null}
       </View>
 
       {/* Bottom Privacy/Security Note */}
-      <View style={[styles.securityNote, { padding: px(14), marginBottom: px(20), borderRadius: px(12) }]}>
-        <Lock size={px(16)} color="#6B7280" strokeWidth={2} style={{ marginRight: px(8) }} />
-        <Text style={[styles.securityNoteText, { fontSize: px(12) }]}>
-          Your documents are encrypted and only accessible by RACE verification team.
+      <View style={[styles.securityNoteRow, { marginBottom: px(16) }]}>
+        <ShieldCheck size={px(16)} color="#D97706" strokeWidth={2.2} style={{ marginRight: px(6) }} />
+        <Text style={[styles.securityNoteText, { fontSize: px(11.5) }]}>
+          We only use your documents for partner verification.
         </Text>
       </View>
 
@@ -512,14 +391,14 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
           style={styles.modalOverlay}
           onPress={() => setActiveDocForUpload(null)}>
           <Pressable
-            style={[styles.modalSheet, { paddingBottom: px(28) }]}
+            style={[styles.modalSheet, { paddingBottom: px(28), borderRadius: px(16) }]}
             onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={[styles.sheetTitle, { fontSize: px(16) }]}>
+                <Text style={[styles.sheetTitle, { fontSize: px(15.5) }]}>
                   Upload {activeDocForUpload?.title}
                 </Text>
-                <Text style={[styles.sheetSubtitle, { fontSize: px(12) }]}>
+                <Text style={[styles.sheetSubtitle, { fontSize: px(11.5) }]}>
                   Choose photo or document file
                 </Text>
               </View>
@@ -530,92 +409,134 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
             {/* Option 1: Camera */}
             <Pressable
-              onPress={() => activeDocForUpload && handleAttachMock(activeDocForUpload)}
+              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Camera')}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 { paddingVertical: px(12) },
                 pressed && styles.pressed,
               ]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#FEF3C7' }]}>
-                <Camera size={px(20)} color="#D97706" />
+                <Camera size={px(19)} color="#D97706" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { fontSize: px(14) }]}>Take photo</Text>
-                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(12) }]}>
+                <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>Take photo</Text>
+                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
                   Use device camera for clear photo
                 </Text>
               </View>
-              <ChevronRight size={px(18)} color="#9CA3AF" />
+              <ChevronRight size={px(17)} color="#9CA3AF" />
             </Pressable>
 
             {/* Option 2: Gallery */}
             <Pressable
-              onPress={() => activeDocForUpload && handleAttachMock(activeDocForUpload)}
+              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Gallery')}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 { paddingVertical: px(12) },
                 pressed && styles.pressed,
               ]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#EFF6FF' }]}>
-                <ImageIcon size={px(20)} color="#2563EB" />
+                <ImageIcon size={px(19)} color="#2563EB" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { fontSize: px(14) }]}>
+                <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>
                   Choose from gallery
                 </Text>
-                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(12) }]}>
+                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
                   JPG or PNG from your photos
                 </Text>
               </View>
-              <ChevronRight size={px(18)} color="#9CA3AF" />
+              <ChevronRight size={px(17)} color="#9CA3AF" />
             </Pressable>
 
             {/* Option 3: Document File */}
             <Pressable
-              onPress={() => activeDocForUpload && handleAttachMock(activeDocForUpload)}
+              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Files')}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 { paddingVertical: px(12) },
                 pressed && styles.pressed,
               ]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#F3F4F6' }]}>
-                <FileUp size={px(20)} color="#4B5563" />
+                <FileUp size={px(19)} color="#4B5563" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { fontSize: px(14) }]}>
+                <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>
                   Select PDF document
                 </Text>
-                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(12) }]}>
+                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
                   Files up to 10 MB
                 </Text>
               </View>
-              <ChevronRight size={px(18)} color="#9CA3AF" />
+              <ChevronRight size={px(17)} color="#9CA3AF" />
             </Pressable>
 
             {/* Option 4: Instant Sample Document */}
             <Pressable
-              onPress={() => activeDocForUpload && handleAttachMock(activeDocForUpload)}
+              onPress={() => activeDocForUpload && startAnimatedUpload(activeDocForUpload, 'Sample')}
               style={({ pressed }) => [
                 styles.uploadOptionRow,
                 styles.sampleOptionRow,
-                { paddingVertical: px(12), marginTop: px(8), borderRadius: px(12) },
+                { paddingVertical: px(12), marginTop: px(8), borderRadius: px(10) },
                 pressed && styles.pressed,
               ]}>
               <View style={[styles.uploadOptionIconBox, { backgroundColor: '#DCFCE7' }]}>
-                <Sparkles size={px(20)} color="#15803D" />
+                <Sparkles size={px(18)} color="#15803D" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { color: '#166534', fontSize: px(14) }]}>
+                <Text style={[styles.uploadOptionTitle, { color: '#166534', fontSize: px(13.5) }]}>
                   Use verified sample document
                 </Text>
-                <Text style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(12) }]}>
+                <Text style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11.5) }]}>
                   Instantly fills sample document for testing
                 </Text>
               </View>
-              <Check size={px(18)} color="#15803D" strokeWidth={2.5} />
+              <Check size={px(16)} color="#15803D" strokeWidth={2.5} />
             </Pressable>
           </Pressable>
         </Pressable>
+      </Modal>
+
+      {/* Upload Progress Animation Modal */}
+      <Modal visible={!!uploadProgressState} transparent animationType="fade">
+        <View style={styles.progressModalOverlay}>
+          <View style={[styles.progressModalBox, { padding: px(20), borderRadius: px(14) }]}>
+            {uploadProgressState?.isComplete ? (
+              <View style={styles.progressSuccessCircle}>
+                <CheckCircle2 size={px(42)} color="#15803D" strokeWidth={2.4} />
+              </View>
+            ) : (
+              <View style={styles.progressSpinnerWrap}>
+                <ActivityIndicator size="large" color="#D97706" />
+              </View>
+            )}
+
+            <Text style={[styles.progressDocTitle, { fontSize: px(15) }]}>
+              {uploadProgressState?.doc.title}
+            </Text>
+
+            <Text style={[styles.progressStatusText, { fontSize: px(12) }]}>
+              {uploadProgressState?.statusText}
+            </Text>
+
+            {/* Progress Bar Track */}
+            <View style={styles.progressBarTrack}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${uploadProgressState?.progress || 0}%`,
+                    backgroundColor: uploadProgressState?.isComplete ? '#15803D' : '#D97706',
+                  },
+                ]}
+              />
+            </View>
+
+            <Text style={[styles.progressPercentText, { fontSize: px(11) }]}>
+              {uploadProgressState?.progress}%
+            </Text>
+          </View>
+        </View>
       </Modal>
 
       {/* Document Preview Modal */}
@@ -624,14 +545,14 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
           style={styles.modalOverlay}
           onPress={() => setPreviewDocData(null)}>
           <Pressable
-            style={[styles.modalSheet, { paddingBottom: px(28), maxHeight: px(520) }]}
+            style={[styles.modalSheet, { paddingBottom: px(28), maxHeight: px(520), borderRadius: px(16) }]}
             onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={[styles.sheetTitle, { fontSize: px(16) }]}>
+                <Text style={[styles.sheetTitle, { fontSize: px(15.5) }]}>
                   {previewDocData?.title}
                 </Text>
-                <Text style={[styles.sheetSubtitle, { fontSize: px(12) }]}>
+                <Text style={[styles.sheetSubtitle, { fontSize: px(11.5) }]}>
                   {previewDocData?.name}
                 </Text>
               </View>
@@ -641,7 +562,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             </View>
 
             {previewDocData?.uri ? (
-              <View style={[styles.previewImageContainer, { height: px(280), marginVertical: px(14) }]}>
+              <View style={[styles.previewImageContainer, { height: px(260), marginVertical: px(12) }]}>
                 <Image
                   source={{ uri: previewDocData.uri }}
                   style={styles.previewImage}
@@ -652,7 +573,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
             <Pressable
               onPress={() => setPreviewDocData(null)}
-              style={[styles.closePreviewBtn, { height: px(44) }]}>
+              style={[styles.closePreviewBtn, { height: px(42), borderRadius: px(8) }]}>
               <Text style={styles.closePreviewBtnText}>Close Preview</Text>
             </Pressable>
           </Pressable>
@@ -665,253 +586,187 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowColor: 'transparent',
   },
-  headerCard: {
-    backgroundColor: '#FFFFFF',
-  },
-  headerRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 6,
   },
   headerIconBox: {
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   headerTextWrap: {
     flex: 1,
   },
-  headerTitle: {
+  cardHeaderTitle: {
     fontWeight: '700',
     color: '#111827',
-    marginBottom: 2,
   },
-  headerSubtitle: {
+  cardHeaderSubtitle: {
     color: '#6B7280',
-    lineHeight: 18,
+    marginTop: 1,
   },
-  demoFillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFBEB',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    gap: 6,
-  },
-  demoFillText: {
-    color: '#B45309',
-    fontWeight: '700',
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 10,
   },
   sectionContainer: {
     width: '100%',
-  },
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: 4,
-  },
-  sectionHeaderTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   sectionTitle: {
     fontWeight: '700',
     color: '#111827',
   },
-  countBadge: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  countBadgeText: {
-    color: '#B45309',
-    fontWeight: '700',
-  },
-  sectionHint: {
-    color: '#6B7280',
-  },
-  docCard: {
+  // Document Single Slim Row Item
+  docRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  docCardUploaded: {
+  docRowUploaded: {
     borderColor: '#BBF7D0',
     backgroundColor: '#F0FDF4',
-  },
-  docCardHighlighted: {
-    borderColor: '#FDE68A',
-    backgroundColor: '#FFFBEB',
-  },
-  docCardMainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   docIconBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
   docTextWrap: {
     flex: 1,
-  },
-  docTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    marginRight: 6,
   },
   docTitle: {
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#111827',
-    flex: 1,
   },
   docSubtitle: {
     color: '#6B7280',
+    marginTop: 1,
   },
-  statusPillUploaded: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    gap: 4,
-  },
-  statusPillTextUploaded: {
+  docSubtitleUploaded: {
     color: '#15803D',
-    fontWeight: '700',
+    fontWeight: '500',
+    marginTop: 1,
   },
-  statusPillRequired: {
+  badgeWrap: {
+    marginRight: 8,
+  },
+  badgeRequired: {
     backgroundColor: '#FEF3C7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
   },
-  statusPillTextRequired: {
+  badgeRequiredText: {
     color: '#B45309',
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  docActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
+  badgeUploaded: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
   },
-  previewBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  badgeUploadedText: {
+    color: '#15803D',
+    fontWeight: '600',
+  },
+  badgeConditional: {
     backgroundColor: '#EFF6FF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
   },
-  previewBtnText: {
+  badgeConditionalText: {
     color: '#2563EB',
     fontWeight: '600',
   },
-  uploadTriggerBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    gap: 4,
+  badgeLater: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 5,
+    marginRight: 6,
   },
-  uploadTriggerText: {
-    color: '#D97706',
-    fontWeight: '700',
-  },
-  uploadTriggerBtnNeutral: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    gap: 4,
-  },
-  uploadTriggerTextNeutral: {
-    color: '#4B5563',
+  badgeLaterText: {
+    color: '#2563EB',
     fontWeight: '600',
   },
-  replaceBtn: {
+  docActionWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: 6,
+    borderColor: '#D1D5DB',
+    gap: 4,
   },
-  replaceBtnText: {
+  uploadBtnText: {
     color: '#374151',
     fontWeight: '600',
   },
-  trashBtn: {
-    padding: 6,
+  actionButtonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  collapsibleHeader: {
+  iconActionBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // Collapsible Bottom Row
+  collapsibleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  collapsibleTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  securityNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#F9FAFB',
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
+  collapsibleRowTitle: {
+    fontWeight: '500',
+    color: '#374151',
+    flex: 1,
+    marginRight: 6,
+  },
+  // Bottom security note
+  securityNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   securityNoteText: {
     color: '#6B7280',
-    flex: 1,
-    lineHeight: 18,
+    fontWeight: '500',
   },
+  // Bottom Sheet Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
     padding: 20,
   },
   sheetHeader: {
@@ -935,9 +790,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F3F4F6',
   },
   uploadOptionIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -946,7 +801,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   uploadOptionTitle: {
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#111827',
   },
   uploadOptionSubtitle: {
@@ -960,8 +815,55 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderBottomWidth: 1,
   },
+  // Progress Modal
+  progressModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  progressModalBox: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+  },
+  progressSpinnerWrap: {
+    marginBottom: 14,
+  },
+  progressSuccessCircle: {
+    marginBottom: 14,
+  },
+  progressDocTitle: {
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  progressStatusText: {
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  progressBarTrack: {
+    width: '100%',
+    height: 6,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  progressPercentText: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  // Preview Modal
   previewImageContainer: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     backgroundColor: '#F3F4F6',
   },
@@ -971,14 +873,13 @@ const styles = StyleSheet.create({
   },
   closePreviewBtn: {
     backgroundColor: '#F3F4F6',
-    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closePreviewBtnText: {
     color: '#374151',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: 13.5,
   },
   pressed: {
     opacity: 0.85,

@@ -3,9 +3,11 @@ import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import { UI_PREVIEW_MODE } from '../../constants/preview';
 import {
+  acceptMockDriverJob,
+  getMockDriverJobOffers,
   MOCK_DRIVER_JOBS,
-  MOCK_JOB_OFFERS,
   mockActiveJobState,
+  rejectMockDriverJob,
   updateMockActiveJobStatus,
 } from '../../data/mockPartnerData';
 
@@ -88,9 +90,19 @@ export async function listDriverJobs(params?: {
   } catch (error) {
     if (UI_PREVIEW_MODE) {
       if (params?.status === 'COMPLETED') {
-        return MOCK_DRIVER_JOBS.filter(j => j.status === 'COMPLETED');
+        const completedActive =
+          mockActiveJobState?.status === 'COMPLETED' ? [mockActiveJobState] : [];
+        return [
+          ...completedActive,
+          ...MOCK_DRIVER_JOBS.filter(
+            job => job.status === 'COMPLETED' && job.id !== mockActiveJobState?.id,
+          ),
+        ];
       }
-      return MOCK_DRIVER_JOBS;
+      const active = mockActiveJobState;
+      return active
+        ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
+        : MOCK_DRIVER_JOBS;
     }
     throw error;
   }
@@ -104,7 +116,7 @@ export async function listDriverJobOffers(): Promise<DriverJobBooking[]> {
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      return MOCK_JOB_OFFERS;
+      return getMockDriverJobOffers();
     }
     throw error;
   }
@@ -123,6 +135,9 @@ export async function getDriverActiveJob(): Promise<DriverJobBooking | null> {
     return payload as DriverJobBooking;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      if (!mockActiveJobState || ['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)) {
+        return null;
+      }
       return mockActiveJobState;
     }
     throw error;
@@ -161,6 +176,9 @@ export async function updateDriverBookingStatus(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      if (status === 'IN_PROGRESS' && tripOtp !== '1234') {
+        throw new Error('Incorrect trip OTP. Check the customer app and try again.');
+      }
       updateMockActiveJobStatus(status);
       return { success: true, status };
     }
@@ -177,6 +195,9 @@ export async function acceptDriverJob(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      if (!acceptMockDriverJob(bookingId, bookingType)) {
+        throw new Error('This trip is no longer available. Refresh the Jobs tab.');
+      }
       return { success: true, message: 'Job accepted' };
     }
     throw error;
@@ -192,6 +213,7 @@ export async function rejectDriverJob(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      rejectMockDriverJob(bookingId);
       return { success: true, message: 'Job rejected' };
     }
     throw error;

@@ -6,6 +6,7 @@ import DriverDocumentsScreen from '../screens/partner/registration/driver/Driver
 import DriverPersonalInfoScreen from '../screens/partner/registration/driver/DriverPersonalInfoScreen';
 import DriverReviewScreen from '../screens/partner/registration/driver/DriverReviewScreen';
 import DriverVehicleInfoScreen from '../screens/partner/registration/driver/DriverVehicleInfoScreen';
+import DriverRegistrationFlowScreen from '../screens/partner/registration/driver/DriverRegistrationFlowScreen';
 import DriverVerificationPendingScreen from '../screens/partner/registration/DriverVerificationPendingScreen';
 import VendorBusinessAddressScreen from '../screens/partner/registration/vendor/VendorBusinessAddressScreen';
 import VendorBusinessInfoScreen from '../screens/partner/registration/vendor/VendorBusinessInfoScreen';
@@ -17,6 +18,42 @@ import type {
   PartnerRootStackParamList,
 } from '../types/partnerNavigation';
 import { colors } from '../theme';
+
+function DriverPersonalInfoFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 1 } }}
+    />
+  );
+}
+
+function DriverVehicleInfoFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 2 } }}
+    />
+  );
+}
+
+function DriverDocumentsFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 3 } }}
+    />
+  );
+}
+
+function DriverReviewFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 4 } }}
+    />
+  );
+}
 
 const Stack = createNativeStackNavigator<PartnerRegistrationStackParamList>();
 
@@ -52,22 +89,22 @@ export default function PartnerRegistrationNavigator({ route }: Props) {
       }}>
       <Stack.Screen
         name="DriverPersonalInfo"
-        component={DriverPersonalInfoScreen}
+        component={DriverPersonalInfoFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen
         name="DriverVehicleInfo"
-        component={DriverVehicleInfoScreen}
+        component={DriverVehicleInfoFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen
         name="DriverDocuments"
-        component={DriverDocumentsScreen}
+        component={DriverDocumentsFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen
         name="DriverReview"
-        component={DriverReviewScreen}
+        component={DriverReviewFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen

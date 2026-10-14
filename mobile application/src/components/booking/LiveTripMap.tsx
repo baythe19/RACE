@@ -25,6 +25,10 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   borderRadius?: number;
   showsUserLocation?: boolean;
+  routeColor?: string;
+  pickupColor?: string;
+  dropoffColor?: string;
+  recenterTrigger?: number;
 };
 
 function isValidPoint(point?: MapPoint | null): point is MapPoint {
@@ -72,6 +76,10 @@ export default function LiveTripMap({
   style,
   borderRadius = 16,
   showsUserLocation = true,
+  routeColor = colors.primary,
+  pickupColor = '#16A34A',
+  dropoffColor = colors.error,
+  recenterTrigger,
 }: Props) {
   const mapRef = useRef<MapView>(null);
 
@@ -100,6 +108,11 @@ export default function LiveTripMap({
     mapRef.current?.animateToRegion(regionForPoints(points), 450);
   }, [points]);
 
+  useEffect(() => {
+    if (recenterTrigger == null || points.length === 0) return;
+    mapRef.current?.animateToRegion(region, 350);
+  }, [points.length, recenterTrigger, region]);
+
   return (
     <View style={[styles.wrap, { borderRadius }, style]}>
       <MapView
@@ -114,14 +127,14 @@ export default function LiveTripMap({
         pitchEnabled={false}
         rotateEnabled={false}>
         {routeCoords.length >= 2 ? (
-          <Polyline coordinates={routeCoords} strokeColor={colors.primary} strokeWidth={4} />
+          <Polyline coordinates={routeCoords} strokeColor={routeColor} strokeWidth={4} />
         ) : null}
 
         {isValidPoint(pickup) ? (
           <Marker
             coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}
             title={pickup.label || 'Pickup'}
-            pinColor="#16A34A"
+            pinColor={pickupColor}
           />
         ) : null}
 
@@ -129,7 +142,7 @@ export default function LiveTripMap({
           <Marker
             coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}
             title={dropoff.label || 'Drop-off'}
-            pinColor={colors.error}
+            pinColor={dropoffColor}
           />
         ) : null}
       </MapView>

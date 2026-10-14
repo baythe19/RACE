@@ -496,12 +496,12 @@ function RequestCard({
   return (
     <View
       style={{
-        marginTop: px(8),
+        marginTop: px(6),
         backgroundColor: C.card,
         borderRadius: px(R.innerCard),
         borderWidth: 1,
         borderColor: C.amberBorder,
-        padding: px(12),
+        padding: px(8),
       }}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
@@ -558,7 +558,7 @@ function RequestCard({
       </View>
 
       {showRoute ? (
-        <View style={{ marginTop: px(12) }}>
+        <View style={{ marginTop: px(6) }}>
           {pickup ? (
             <RouteRow address={pickup} tone="start" px={px} dotSize={11} />
           ) : null}
@@ -571,8 +571,8 @@ function RequestCard({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginTop: px(12),
-            paddingLeft: px(24),
+            marginTop: px(4),
+            paddingLeft: px(22),
           }}>
           <CalendarDays size={px(15)} color={C.greySoft} strokeWidth={2.2} />
           <Text
@@ -590,20 +590,20 @@ function RequestCard({
           flexDirection: 'row',
           alignItems: 'flex-end',
           justifyContent: 'space-between',
-          marginTop: px(14),
+          marginTop: px(6),
         }}>
         <View style={{ flex: 1 }}>
           <Text
             style={[
               T.small,
-              { fontSize: px(12.5), lineHeight: px(17), color: C.greySoft },
+              { fontSize: px(12), lineHeight: px(16), color: C.greySoft },
             ]}>
             Estimated earnings
           </Text>
           <Text
             style={[
               T.metricValue,
-              { fontSize: px(25), lineHeight: px(30), color: C.ink, marginTop: px(1) },
+              { fontSize: px(24), lineHeight: px(28), color: C.ink, marginTop: px(1) },
             ]}>
             {offer.estimatedFare != null ? formatInr(offer.estimatedFare) : '—'}
           </Text>
@@ -614,18 +614,18 @@ function RequestCard({
           accessibilityRole="button"
           accessibilityLabel="View request details"
           style={({ pressed }) => ({
-            height: px(M.ctaHeight),
-            paddingHorizontal: px(24),
+            height: px(40),
+            paddingHorizontal: px(20),
             borderRadius: px(R.button),
             backgroundColor: C.amber,
             flexDirection: 'row',
             alignItems: 'center',
             opacity: pressed ? 0.9 : 1,
           })}>
-          <Text style={[T.button, { fontSize: px(16), lineHeight: px(20), color: C.ink }]}>
+          <Text style={[T.button, { fontSize: px(14), lineHeight: px(18), color: C.ink }]}>
             View details
           </Text>
-          <ArrowRight size={px(18)} color={C.ink} strokeWidth={2.6} style={{ marginLeft: px(10) }} />
+          <ArrowRight size={px(16)} color={C.ink} strokeWidth={2.6} style={{ marginLeft: px(8) }} />
         </Pressable>
       </View>
     </View>
@@ -656,15 +656,15 @@ function RecentJobRow({
         borderWidth: 1,
         borderColor: C.hairline,
         borderRadius: px(R.tileSm),
-        padding: px(12),
+        padding: px(7),
         backgroundColor: C.card,
         opacity: pressed ? 0.94 : 1,
       })}>
       <View
         style={{
-          width: px(M.rowIcon),
-          height: px(M.rowIcon),
-          borderRadius: px(M.rowIcon / 2),
+          width: px(34),
+          height: px(34),
+          borderRadius: px(17),
           backgroundColor: C.creamRow,
           alignItems: 'center',
           justifyContent: 'center',
@@ -681,28 +681,34 @@ function RecentJobRow({
       </View>
 
       <View style={{ flex: 1, marginLeft: px(12) }}>
-        <Text numberOfLines={1} style={[T.jobTitle, { fontSize: px(14.5), color: C.ink }]}>
+        <Text
+          numberOfLines={1}
+          style={[T.jobTitle, { fontSize: px(14.5), lineHeight: px(18), color: C.ink }]}>
           #{job.bookingNumber}
         </Text>
         {pickup || drop ? (
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
             {pickup ? (
-              <Text numberOfLines={1} style={[T.meta, { flexShrink: 1, color: C.greySoft }]}>
+              <Text
+                numberOfLines={1}
+                style={[T.meta, { flexShrink: 1, fontSize: px(12), lineHeight: px(15), color: C.greySoft }]}>
                 {pickup}
               </Text>
             ) : null}
             {pickup && drop ? (
-              <Text style={[T.meta, { marginHorizontal: px(5), color: C.greySoft }]}>→</Text>
+              <Text style={[T.meta, { fontSize: px(12), lineHeight: px(15), marginHorizontal: px(5), color: C.greySoft }]}>→</Text>
             ) : null}
             {drop ? (
-              <Text numberOfLines={1} style={[T.meta, { flexShrink: 1, color: C.greySoft }]}>
+              <Text
+                numberOfLines={1}
+                style={[T.meta, { flexShrink: 1, fontSize: px(12), lineHeight: px(15), color: C.greySoft }]}>
                 {drop}
               </Text>
             ) : null}
           </View>
         ) : null}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
-          <Text style={[T.meta, { fontSize: px(12), lineHeight: px(16), color: C.greySoft }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(1) }}>
+          <Text style={[T.meta, { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft }]}>
             {formatShortWhen(job.createdAt)}
           </Text>
           {jobEarnings(job) != null ? (
@@ -710,11 +716,11 @@ function RecentJobRow({
               <Text
                 style={[
                   T.meta,
-                  { fontSize: px(12), lineHeight: px(16), marginHorizontal: px(5), color: C.greySoft },
+                  { fontSize: px(11.5), lineHeight: px(15), marginHorizontal: px(5), color: C.greySoft },
                 ]}>
                 •
               </Text>
-              <Text style={[T.meta, { fontSize: px(12), lineHeight: px(16), color: C.greySoft }]}>
+              <Text style={[T.meta, { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft }]}>
                 {formatInr(jobEarnings(job) as number)}
               </Text>
             </>
@@ -728,15 +734,15 @@ function RecentJobRow({
           borderRadius: px(R.pill),
           height: px(M.rowPillHeight),
           justifyContent: 'center',
-          paddingHorizontal: px(10),
-          marginLeft: px(8),
+          paddingHorizontal: px(8),
+          marginLeft: px(6),
         }}>
-        <Text style={[T.pill, { fontSize: px(12), lineHeight: px(15), color: pill.fg }]}>
+        <Text style={[T.pill, { fontSize: px(10.5), lineHeight: px(14), color: pill.fg }]}>
           {pill.label}
         </Text>
       </View>
       <ChevronRight
-        size={px(16)}
+        size={px(14)}
         color={C.greySoft}
         strokeWidth={2.4}
         style={{ marginLeft: px(6) }}
@@ -866,6 +872,7 @@ export default function DriverDashboardScreen() {
 
   const name = firstName(user?.fullName);
   const availableBars = bars.some(bar => bar.value > 0);
+  const dashboardVerificationTitle = isApproved ? 'Verification approved' : verification.title;
   /** Location problem copy — null while location is healthy or not yet checked. */
   const locationIssue = locationHealthCopy(locationHealth);
 
@@ -881,10 +888,10 @@ export default function DriverDashboardScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          paddingTop: px(6),
-          minHeight: px(40),
+          paddingTop: px(4),
+          minHeight: px(38),
         }}>
-        <PartnerHeaderLogo width={px(56)} />
+        <PartnerHeaderLogo width={px(54)} showPartnerText />
 
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <Pressable
@@ -992,7 +999,7 @@ export default function DriverDashboardScreen() {
             fontSize: px(27),
             lineHeight: px(34),
             color: C.ink,
-            marginTop: px(10),
+            marginTop: px(7),
             letterSpacing: -0.4,
           },
         ]}>
@@ -1288,29 +1295,29 @@ export default function DriverDashboardScreen() {
             marginTop: px(M.cardGap),
             borderRadius: px(R.card),
             backgroundColor: C.cream,
-            padding: px(7),
+            padding: px(6),
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View
               style={{
-                width: px(52),
-                height: px(52),
+                width: px(44),
+                height: px(44),
                 borderRadius: px(R.tile),
                 backgroundColor: C.amberTile,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Bell size={px(24)} color={C.amber} strokeWidth={2} fill={C.amber} />
+              <Bell size={px(22)} color={C.amber} strokeWidth={2} fill={C.amber} />
             </View>
             <View style={{ flex: 1, marginLeft: px(8) }}>
-              <Text style={[T.sectionTitle, { fontSize: px(17), lineHeight: px(22), color: C.ink }]}>
+              <Text style={[T.sectionTitle, { fontSize: px(16), lineHeight: px(21), color: C.ink }]}>
                 {pendingRequests} new {pendingRequests === 1 ? 'request' : 'requests'}
               </Text>
               <Text
                 numberOfLines={1}
                 style={[
                   T.sectionSubtitle,
-                  { fontSize: px(13), lineHeight: px(18), color: C.grey, marginTop: px(1) },
+                  { fontSize: px(12), lineHeight: px(16), color: C.grey, marginTop: px(1) },
                 ]}>
                 New towing &amp; roadside requests nearby
               </Text>
@@ -1320,12 +1327,12 @@ export default function DriverDashboardScreen() {
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="View all requests"
-              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: px(6) }}>
-              <Text style={[T.link, { fontSize: px(14), lineHeight: px(18), color: C.amberText }]}>
+              style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: px(4) }}>
+              <Text style={[T.link, { fontSize: px(13), lineHeight: px(17), color: C.amberText }]}>
                 View all
               </Text>
               <ChevronRight
-                size={px(16)}
+                size={px(15)}
                 color={C.amberText}
                 strokeWidth={2.8}
                 style={{ marginLeft: px(2) }}
@@ -1346,7 +1353,7 @@ export default function DriverDashboardScreen() {
             borderWidth: 1,
             borderColor: C.hairline,
             backgroundColor: C.card,
-            padding: px(M.cardPadding),
+            padding: px(11),
             ...driverShadow,
           }}>
           <View
@@ -1354,9 +1361,9 @@ export default function DriverDashboardScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              marginBottom: px(10),
+              marginBottom: px(8),
             }}>
-            <Text style={[T.sectionTitle, { fontSize: px(17), lineHeight: px(22), color: C.ink }]}>
+            <Text style={[T.sectionTitle, { fontSize: px(16), lineHeight: px(21), color: C.ink }]}>
               Recent jobs
             </Text>
             <Pressable
@@ -1365,11 +1372,11 @@ export default function DriverDashboardScreen() {
               accessibilityRole="button"
               accessibilityLabel="View all jobs"
               style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={[T.link, { fontSize: px(14), lineHeight: px(18), color: C.amberText }]}>
+              <Text style={[T.link, { fontSize: px(13), lineHeight: px(17), color: C.amberText }]}>
                 View all
               </Text>
               <ChevronRight
-                size={px(16)}
+                size={px(15)}
                 color={C.amberText}
                 strokeWidth={2.8}
                 style={{ marginLeft: px(2) }}
@@ -1377,7 +1384,7 @@ export default function DriverDashboardScreen() {
             </Pressable>
           </View>
 
-          <View style={{ gap: px(8) }}>
+          <View style={{ gap: px(6) }}>
             {recentJobs.map(job => (
               <RecentJobRow key={`${job.bookingType}-${job.id}`} job={job} onOpen={openJobs} px={px} />
             ))}
@@ -1393,16 +1400,16 @@ export default function DriverDashboardScreen() {
           borderWidth: 1,
           borderColor: C.hairline,
           backgroundColor: C.card,
-          padding: px(14),
+          padding: px(10),
           flexDirection: 'row',
           alignItems: 'center',
           ...driverShadow,
         }}>
         <View
           style={{
-            width: px(M.rowIcon),
-            height: px(M.rowIcon),
-            borderRadius: px(R.tileSm),
+            width: px(34),
+            height: px(34),
+            borderRadius: px(10),
             backgroundColor: isApproved ? C.greenTile : C.amberTileSoft,
             alignItems: 'center',
             justifyContent: 'center',
@@ -1413,24 +1420,24 @@ export default function DriverDashboardScreen() {
             strokeWidth={2.4}
           />
         </View>
-        <View style={{ flex: 1, marginLeft: px(12) }}>
-          <Text style={[T.cardTitle, { fontSize: px(16), lineHeight: px(20), color: C.ink }]}>
-            {verification.title}
+        <View style={{ flex: 1, marginLeft: px(10) }}>
+          <Text style={[T.cardTitle, { fontSize: px(14.5), lineHeight: px(19), color: C.ink }]}>
+            {dashboardVerificationTitle}
           </Text>
           <Text
             numberOfLines={1}
             style={[
               T.cardSubtitle,
-              { fontSize: px(13), lineHeight: px(18), color: C.greySoft, marginTop: px(2) },
+              { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(1) },
             ]}>
             {verification.hint}
           </Text>
         </View>
         <View
           style={{
-            height: px(M.pillHeight),
+            height: px(20),
             borderRadius: px(R.pill),
-            paddingHorizontal: px(12),
+            paddingHorizontal: px(10),
             justifyContent: 'center',
             marginLeft: px(8),
             backgroundColor: isApproved ? C.greenPill : C.amberTile,
@@ -1438,7 +1445,7 @@ export default function DriverDashboardScreen() {
           <Text
             style={[
               T.pill,
-              { fontSize: px(12.5), lineHeight: px(16), color: isApproved ? C.green : C.ink },
+              { fontSize: px(11.5), lineHeight: px(15), color: isApproved ? C.green : C.ink },
             ]}>
             {verification.badge}
           </Text>

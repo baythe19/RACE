@@ -185,28 +185,34 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
   return (
     <DriverRegistrationLayout
       step={4}
-      title="Review your application"
+      title="Driver registration"
       subtitle="Please review your details before submitting."
       onBack={handleBack}
-      showFooter={false}>
-      {/* Dynamic Status Card */}
+      onContinue={() => {
+        if (!submitting && confirmAgreed) void handleSubmit();
+      }}
+      continueLabel={submitting ? 'Submitting...' : 'Submit application'}
+      continueDisabled={!confirmAgreed || submitting}
+      continueLoading={submitting}
+      showFooter={true}>
+      {/* Dynamic Status Card (Compact height) */}
       {isAllCoreComplete ? (
         <View
           style={[
             styles.statusSuccessCard,
-            { padding: px(16), marginBottom: px(16), borderRadius: px(14) },
+            { paddingVertical: px(8), paddingHorizontal: px(12), marginBottom: px(8), borderRadius: px(8) },
           ]}>
           <View style={styles.statusRow}>
             <View
               style={[
                 styles.successIconCircle,
-                { width: px(36), height: px(36), borderRadius: px(18) },
+                { width: px(26), height: px(26), borderRadius: px(13) },
               ]}>
-              <CheckCircle2 size={px(22)} color="#15803D" strokeWidth={2.4} />
+              <CheckCircle2 size={px(16)} color="#15803D" strokeWidth={2.4} />
             </View>
             <View style={styles.statusTextWrap}>
-              <Text style={[styles.statusSuccessTitle, { fontSize: px(15) }]}>Ready to submit</Text>
-              <Text style={[styles.statusSuccessSubtitle, { fontSize: px(12) }]}>
+              <Text style={[styles.statusSuccessTitle, { fontSize: px(13) }]}>Ready to submit</Text>
+              <Text style={[styles.statusSuccessSubtitle, { fontSize: px(11) }]}>
                 All required information and documents are complete.
               </Text>
             </View>
@@ -216,29 +222,28 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
         <View
           style={[
             styles.statusWarningCard,
-            { padding: px(16), marginBottom: px(16), borderRadius: px(14) },
+            { paddingVertical: px(8), paddingHorizontal: px(12), marginBottom: px(8), borderRadius: px(8) },
           ]}>
           <View style={styles.statusRow}>
             <View
               style={[
                 styles.warningIconCircle,
-                { width: px(36), height: px(36), borderRadius: px(18) },
+                { width: px(26), height: px(26), borderRadius: px(13) },
               ]}>
-              <AlertCircle size={px(22)} color="#D97706" strokeWidth={2.4} />
+              <AlertCircle size={px(16)} color="#D97706" strokeWidth={2.4} />
             </View>
             <View style={styles.statusTextWrap}>
-              <Text style={[styles.statusWarningTitle, { fontSize: px(15) }]}>
+              <Text style={[styles.statusWarningTitle, { fontSize: px(13) }]}>
                 {coreUploadedCount} of 6 review items complete
               </Text>
-              <Text style={[styles.statusWarningSubtitle, { fontSize: px(12) }]}>
-                {missingCoreDocs.length} required document{missingCoreDocs.length > 1 ? 's' : ''}{' '}
-                pending review.
+              <Text style={[styles.statusWarningSubtitle, { fontSize: px(11) }]}>
+                {missingCoreDocs.length} required document{missingCoreDocs.length > 1 ? 's' : ''} pending.
               </Text>
             </View>
           </View>
 
           {/* Missing document action chips */}
-          <View style={[styles.missingChipsRow, { marginTop: px(10) }]}>
+          <View style={[styles.missingChipsRow, { marginTop: px(5) }]}>
             {missingCoreDocs.slice(0, 3).map((d) => (
               <Pressable
                 key={d.id}
@@ -248,8 +253,8 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                     fromReview: true,
                   })
                 }
-                style={styles.missingChip}>
-                <Text style={styles.missingChipText}>+ Add {d.title}</Text>
+                style={[styles.missingChip, { paddingVertical: px(3), paddingHorizontal: px(8) }]}>
+                <Text style={[styles.missingChipText, { fontSize: px(10.5) }]}>+ Add {d.title}</Text>
               </Pressable>
             ))}
           </View>
@@ -257,11 +262,11 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
       )}
 
       {/* Summary Card 1: Personal Details */}
-      <View style={[styles.summaryCard, { padding: px(16), marginBottom: px(14), borderRadius: px(14) }]}>
-        <View style={[styles.cardHeaderRow, { marginBottom: px(12) }]}>
+      <View style={[styles.summaryCard, { padding: px(12), marginBottom: px(10), borderRadius: px(12) }]}>
+        <View style={[styles.cardHeaderRow, { marginBottom: px(8) }]}>
           <View style={styles.cardHeaderLeft}>
-            <User size={px(18)} color="#D97706" style={{ marginRight: px(8) }} />
-            <Text style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Personal details</Text>
+            <User size={px(16)} color="#D97706" style={{ marginRight: px(6) }} />
+            <Text style={[styles.cardHeaderTitle, { fontSize: px(13.5) }]}>Personal details</Text>
           </View>
           <Pressable
             hitSlop={12}
@@ -272,186 +277,190 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
               })
             }
             style={styles.editBtn}>
-            <Text style={[styles.editText, { fontSize: px(13) }]}>Edit</Text>
-            <ChevronRight size={px(14)} color="#2563EB" />
+            <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+            <ChevronRight size={px(13)} color="#2563EB" />
           </Pressable>
         </View>
 
         <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Full name</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13) }]}>
+          <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Full name</Text>
+          <Text style={[styles.detailValue, { fontSize: px(12) }]}>
             {driverPersonal.fullName || 'Rajesh Kumar'}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Mobile number</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13) }]}>
+          <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Mobile number</Text>
+          <Text style={[styles.detailValue, { fontSize: px(12) }]}>
             +91 {driverPersonal.mobileNumber || '9876543210'}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Date of birth</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13) }]}>
-            {driverPersonal.dateOfBirth || '15 May 1992'}
+          <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Date of birth</Text>
+          <Text style={[styles.detailValue, { fontSize: px(12) }]}>
+            {driverPersonal.dateOfBirth || '15/05/1992'}
           </Text>
         </View>
         <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Operating city</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13) }]}>
+          <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Operating city</Text>
+          <Text style={[styles.detailValue, { fontSize: px(12) }]}>
             {driverPersonal.city || 'Bhubaneswar'}
           </Text>
         </View>
         <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Current address</Text>
+          <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Current address</Text>
           <Text
-            style={[styles.detailValue, { fontSize: px(13), flex: 1, textAlign: 'right' }]}
-            numberOfLines={2}>
+            style={[styles.detailValue, { fontSize: px(12), flex: 1, textAlign: 'right' }]}
+            numberOfLines={1}>
             {driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}
           </Text>
         </View>
-      </View>
 
-      {/* Summary Card 2: Vehicle Details */}
-      <View style={[styles.summaryCard, { padding: px(16), marginBottom: px(14), borderRadius: px(14) }]}>
-        <View style={[styles.cardHeaderRow, { marginBottom: px(12) }]}>
-          <View style={styles.cardHeaderLeft}>
-            <Truck size={px(18)} color="#D97706" style={{ marginRight: px(8) }} />
-            <Text style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Vehicle details</Text>
+        <View style={styles.cardDivider} />
+
+        {/* Section 2: Vehicle Details */}
+        <View>
+          <View style={[styles.cardHeaderRow, { marginBottom: px(8) }]}>
+            <View style={styles.cardHeaderLeft}>
+              <Truck size={px(16)} color="#D97706" style={{ marginRight: px(6) }} />
+              <Text style={[styles.cardHeaderTitle, { fontSize: px(13.5) }]}>Vehicle details</Text>
+            </View>
+            <Pressable
+              hitSlop={12}
+              onPress={() =>
+                navigation.navigate('DriverVehicleInfo', {
+                  ...route.params,
+                  fromReview: true,
+                })
+              }
+              style={styles.editBtn}>
+              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+              <ChevronRight size={px(13)} color="#2563EB" />
+            </Pressable>
           </View>
-          <Pressable
-            hitSlop={12}
-            onPress={() =>
-              navigation.navigate('DriverVehicleInfo', {
-                ...route.params,
-                fromReview: true,
-              })
-            }
-            style={styles.editBtn}>
-            <Text style={[styles.editText, { fontSize: px(13) }]}>Edit</Text>
-            <ChevronRight size={px(14)} color="#2563EB" />
-          </Pressable>
-        </View>
 
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Vehicle type</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13), fontWeight: '700', color: '#B45309' }]}>
-            {driverVehicle.vehicleType || 'Flatbed Tow Truck'}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Registration number</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13), fontWeight: '700' }]}>
-            {driverVehicle.vehicleNumber || 'OD 02 AB 1234'}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Driving licence number</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13) }]}>
-            {driverVehicle.licenseNumber || 'OD-0220190012345'}
-          </Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Registered to</Text>
-          <Text style={[styles.detailValue, { fontSize: px(13) }]}>
-            {driverVehicle.registeredTo === 'someone_else'
-              ? 'Someone else (Owner NOC)'
-              : 'Me / I own this vehicle'}
-          </Text>
-        </View>
-        {driverVehicle.vehicleModel ? (
-          <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-            <Text style={[styles.detailLabel, { fontSize: px(13) }]}>Vehicle model</Text>
-            <Text style={[styles.detailValue, { fontSize: px(13) }]}>
-              {driverVehicle.vehicleModel}
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Vehicle type</Text>
+            <Text style={[styles.detailValue, { fontSize: px(12), fontWeight: '700', color: '#B45309' }]}>
+              {driverVehicle.vehicleType || 'Flatbed'}
             </Text>
           </View>
-        ) : null}
-      </View>
-
-      {/* Summary Card 3: Documents */}
-      <View style={[styles.summaryCard, { padding: px(16), marginBottom: px(14), borderRadius: px(14) }]}>
-        <View style={[styles.cardHeaderRow, { marginBottom: px(12) }]}>
-          <View style={styles.cardHeaderLeft}>
-            <FileText size={px(18)} color="#D97706" style={{ marginRight: px(8) }} />
-            <Text style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Documents</Text>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Registration number</Text>
+            <Text style={[styles.detailValue, { fontSize: px(12), fontWeight: '700' }]}>
+              {driverVehicle.vehicleNumber || 'OD 02 AB 1234'}
+            </Text>
           </View>
-          <Pressable
-            hitSlop={12}
-            onPress={() =>
-              navigation.navigate('DriverDocuments', {
-                ...route.params,
-                fromReview: true,
-              })
-            }
-            style={styles.editBtn}>
-            <Text style={[styles.editText, { fontSize: px(13) }]}>Edit</Text>
-            <ChevronRight size={px(14)} color="#2563EB" />
-          </Pressable>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Driving licence number</Text>
+            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
+              {driverVehicle.licenseNumber || 'OD-0220190012345'}
+            </Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Registered to</Text>
+            <Text style={[styles.detailValue, { fontSize: px(12) }]}>
+              {driverVehicle.registeredTo === 'someone_else'
+                ? 'Someone else (Owner NOC)'
+                : 'Me / I own this vehicle'}
+            </Text>
+          </View>
+          {driverVehicle.vehicleModel ? (
+            <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
+              <Text style={[styles.detailLabel, { fontSize: px(12) }]}>Vehicle model</Text>
+              <Text style={[styles.detailValue, { fontSize: px(12) }]}>
+                {driverVehicle.vehicleModel}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        <Text style={[styles.docsSummaryText, { fontSize: px(13), marginBottom: px(10) }]}>
-          {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core review documents uploaded
-        </Text>
+        <View style={styles.cardDivider} />
 
-        <View style={styles.docsList}>
-          {CORE_REVIEW_DOCUMENTS.map((doc) => {
-            const uploaded = isDocUploaded(doc.id);
-            return (
-              <View key={doc.id} style={[styles.docSummaryRow, { paddingVertical: px(6) }]}>
-                <View
-                  style={[
-                    styles.docCheckCircle,
-                    {
-                      width: px(18),
-                      height: px(18),
-                      borderRadius: px(9),
-                      backgroundColor: uploaded ? '#DCFCE7' : '#F3F4F6',
-                    },
-                  ]}>
-                  {uploaded ? (
-                    <Check size={px(11)} color="#15803D" strokeWidth={3} />
-                  ) : (
-                    <Text style={{ fontSize: 10, color: '#9CA3AF' }}>—</Text>
-                  )}
+        {/* Section 3: Documents */}
+        <View>
+          <View style={[styles.cardHeaderRow, { marginBottom: px(8) }]}>
+            <View style={styles.cardHeaderLeft}>
+              <FileText size={px(16)} color="#D97706" style={{ marginRight: px(6) }} />
+              <Text style={[styles.cardHeaderTitle, { fontSize: px(13.5) }]}>Documents</Text>
+            </View>
+            <Pressable
+              hitSlop={12}
+              onPress={() =>
+                navigation.navigate('DriverDocuments', {
+                  ...route.params,
+                  fromReview: true,
+                })
+              }
+              style={styles.editBtn}>
+              <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+              <ChevronRight size={px(13)} color="#2563EB" />
+            </Pressable>
+          </View>
+
+          <Text style={[styles.docsSummaryText, { fontSize: px(11.5), marginBottom: px(6) }]}>
+            {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core review documents uploaded
+          </Text>
+
+          <View style={styles.docsList}>
+            {CORE_REVIEW_DOCUMENTS.map((doc) => {
+              const uploaded = isDocUploaded(doc.id);
+              return (
+                <View key={doc.id} style={[styles.docSummaryRow, { paddingVertical: px(4) }]}>
+                  <View
+                    style={[
+                      styles.docCheckCircle,
+                      {
+                        width: px(16),
+                        height: px(16),
+                        borderRadius: px(8),
+                        backgroundColor: uploaded ? '#DCFCE7' : '#F3F4F6',
+                      },
+                    ]}>
+                    {uploaded ? (
+                      <Check size={px(10)} color="#15803D" strokeWidth={3} />
+                    ) : (
+                      <Text style={{ fontSize: 9, color: '#9CA3AF' }}>—</Text>
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.docSummaryName,
+                      { fontSize: px(12) },
+                      !uploaded && styles.docSummaryNameMissing,
+                    ]}>
+                    {doc.title}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.docSummaryStatus,
+                      { fontSize: px(10.5) },
+                      uploaded ? styles.docStatusGreen : styles.docStatusAmber,
+                    ]}>
+                    {uploaded ? 'Verified' : 'Pending'}
+                  </Text>
                 </View>
-                <Text
-                  style={[
-                    styles.docSummaryName,
-                    { fontSize: px(13) },
-                    !uploaded && styles.docSummaryNameMissing,
-                  ]}>
-                  {doc.title}
-                </Text>
-                <Text
-                  style={[
-                    styles.docSummaryStatus,
-                    { fontSize: px(11) },
-                    uploaded ? styles.docStatusGreen : styles.docStatusAmber,
-                  ]}>
-                  {uploaded ? 'Verified' : 'Pending'}
-                </Text>
-              </View>
-            );
-          })}
+              );
+            })}
+          </View>
         </View>
       </View>
 
-      {/* Blue Informational Banner */}
+      {/* Blue Informational Banner (Compact) */}
       <View
         style={[
           styles.blueNoticeBanner,
-          { padding: px(14), marginBottom: px(16), borderRadius: px(12) },
+          { paddingVertical: px(6), paddingHorizontal: px(10), marginBottom: px(8), borderRadius: px(8) },
         ]}>
         <View style={styles.noticeBannerRow}>
           <View
             style={[
               styles.noticeIconBox,
-              { width: px(28), height: px(28), borderRadius: px(14) },
+              { width: px(22), height: px(22), borderRadius: px(11) },
             ]}>
-            <Info size={px(16)} color="#2563EB" strokeWidth={2.2} />
+            <Info size={px(13)} color="#2563EB" strokeWidth={2.2} />
           </View>
-          <Text style={[styles.noticeBannerText, { fontSize: px(12) }]}>
-            You can go online after required documents are approved. Verification typically takes 2 to 4 hours.
+          <Text style={[styles.noticeBannerText, { fontSize: px(11) }]}>
+            Verification typically takes 2 to 4 hours after submission.
           </Text>
         </View>
       </View>
@@ -459,56 +468,31 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
       {/* Confirmation Checkbox */}
       <Pressable
         onPress={() => setConfirmAgreed(!confirmAgreed)}
-        style={[styles.checkboxContainer, { marginBottom: px(20) }]}>
+        style={[styles.checkboxContainer, { marginBottom: px(10) }]}>
         <View
           style={[
             styles.checkboxBox,
-            { width: px(20), height: px(20), borderRadius: px(5) },
+            { width: px(18), height: px(18), borderRadius: px(4) },
             confirmAgreed && styles.checkboxBoxChecked,
           ]}>
-          {confirmAgreed ? <Check size={px(14)} color="#FFFFFF" strokeWidth={3} /> : null}
+          {confirmAgreed ? <Check size={px(12)} color="#FFFFFF" strokeWidth={3} /> : null}
         </View>
-        <Text style={[styles.checkboxLabel, { fontSize: px(12) }]}>
-          I confirm that all the information provided is accurate and genuine. I agree to RACE's{' '}
-          <Text style={styles.linkText}>Terms of Service</Text> &{' '}
-          <Text style={styles.linkText}>Privacy Policy</Text>.
+        <Text style={[styles.checkboxLabel, { fontSize: px(11.5) }]}>
+          I confirm that all details provided are genuine and agree to RACE's{' '}
+          <Text style={styles.linkText}>Terms</Text> & <Text style={styles.linkText}>Privacy</Text>.
         </Text>
       </Pressable>
 
-      {/* Action Buttons */}
-      <View style={{ marginBottom: px(24), gap: px(10) }}>
-        <Pressable
-          onPress={() => {
-            if (!submitting) void handleSubmit();
-          }}
-          disabled={submitting}
-          style={({ pressed }) => [
-            styles.submitButton,
-            { height: px(50), borderRadius: px(12) },
-            pressed && styles.pressed,
-          ]}>
-          {submitting ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Text style={[styles.submitButtonText, { fontSize: px(15) }]}>
-                Submit for verification
-              </Text>
-              <ArrowRight size={px(18)} color="#FFFFFF" strokeWidth={2.4} />
-            </>
-          )}
-        </Pressable>
-
-        <Pressable
-          onPress={handleBack}
-          style={({ pressed }) => [
-            styles.saveLaterButton,
-            { height: px(44), borderRadius: px(10) },
-            pressed && styles.pressed,
-          ]}>
-          <Text style={[styles.saveLaterText, { fontSize: px(13) }]}>Save and finish later</Text>
-        </Pressable>
-      </View>
+      {/* Save and finish later link */}
+      <Pressable
+        onPress={handleBack}
+        style={({ pressed }) => [
+          styles.saveLaterLink,
+          { marginBottom: px(8) },
+          pressed && styles.pressed,
+        ]}>
+        <Text style={[styles.saveLaterText, { fontSize: px(12) }]}>Save and finish later</Text>
+      </Pressable>
     </DriverRegistrationLayout>
   );
 }
@@ -516,19 +500,17 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   summaryCard: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowColor: 'transparent',
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginVertical: 8,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -556,7 +538,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 9,
+    paddingVertical: 5,
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
   },
@@ -734,6 +716,11 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  saveLaterLink: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 4,
   },
   saveLaterButton: {
     alignItems: 'center',

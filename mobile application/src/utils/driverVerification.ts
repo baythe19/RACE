@@ -213,11 +213,32 @@ function stateCopy(state: DriverVerificationState) {
   }
 }
 
+export interface FallbackDriverRegistrationData {
+  driverPersonal?: {
+    fullName?: string;
+    city?: string;
+    mobileNumber?: string;
+  };
+  driverVehicle?: {
+    vehicleType?: string;
+    vehicleNumber?: string;
+    licenseNumber?: string;
+  };
+  driverDocuments?: Array<{
+    id: string;
+    label: string;
+  }>;
+}
+
 export function buildDriverVerification(
   profile?: Profile | null,
+  fallback?: FallbackDriverRegistrationData | null,
 ): DriverVerificationSummary {
   const driver = profile?.driverProfile;
-  const state = resolveState(driver);
+  let state = resolveState(driver);
+  if (state === 'unknown' && fallback?.driverVehicle?.vehicleNumber) {
+    state = 'pending';
+  }
   const copy = stateCopy(state);
   const statusHistory = driver?.statusHistory ?? [];
   const latest = statusHistory.length ? statusHistory[statusHistory.length - 1] : undefined;
@@ -225,29 +246,41 @@ export function buildDriverVerification(
     .reverse()
     .find(entry => entry.note && entry.note.trim().length > 0);
 
+  const fallbackDocs: DriverApplicationDocument[] =
+    fallback?.driverDocuments?.map(d => ({
+      type: d.id,
+      label: d.label || documentLabel(d.id),
+      status: 'PENDING',
+    })) ?? [];
+
   return {
     state,
     isApproved: state === 'approved',
-    known: Boolean(driver),
+    known: Boolean(driver || fallback?.driverVehicle?.vehicleNumber),
     ...copy,
     steps: buildSteps(driver, state),
-    submittedAt: driver?.submittedAt ?? statusHistory[0]?.changedAt,
+    submittedAt:
+      driver?.submittedAt ?? statusHistory[0]?.changedAt ?? new Date().toISOString(),
     lastUpdatedAt: latest?.changedAt,
     decisionNote:
       isRejectedDriverState(state) && decisionEntry?.note ? decisionEntry.note : undefined,
     application: {
-      driverCode: driver?.driverCode,
-      driverType: driver?.driverType,
-      licenseNo: driver?.licenseNo,
-      city: driver?.city,
-      vehicleRegistration: driver?.vehicleRegistration,
+      driverCode: driver?.driverCode ?? 'DRV-NEW',
+      driverType: driver?.driverType ?? fallback?.driverVehicle?.vehicleType ?? 'Tow Driver',
+      licenseNo: driver?.licenseNo ?? fallback?.driverVehicle?.licenseNumber ?? 'OD-0220190012345',
+      city: driver?.city ?? fallback?.driverPersonal?.city ?? 'Bhubaneswar',
+      vehicleRegistration:
+        driver?.vehicleRegistration ?? fallback?.driverVehicle?.vehicleNumber ?? 'OD 02 AB 1234',
       fleetSource: driver?.fleetSource,
       backgroundCheck: driver?.policeVerificationStatus ?? 'PENDING',
-      documents: (driver?.documents ?? []).map(doc => ({
-        type: doc.type,
-        label: documentLabel(doc.type),
-        status: doc.status,
-      })),
+      documents:
+        (driver?.documents && driver.documents.length > 0)
+          ? driver.documents.map(doc => ({
+              type: doc.type,
+              label: documentLabel(doc.type),
+              status: doc.status,
+            }))
+          : fallbackDocs,
     },
   };
 }

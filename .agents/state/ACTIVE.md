@@ -110,6 +110,21 @@ See `.agents/state/DECISIONS_INDEX.md` for all decisions.
 - `PartnerAppNavigator` starts an unapproved driver on the gate instead of the live tabs; "Go to Dashboard (Read only)" opens them. The dashboard skips jobs/offers/availability/location requests until approved (they would 403).
 - Removed fabricated `mock-driver-token` / placeholder user from the verification screen; `DriverReviewScreen` still contains its own mock fallbacks (untouched, separate task).
 
+## Recent Work — Driver dashboard visual alignment (2026-10-14)
+
+- Tightened `DriverDashboardScreen.tsx` to match the supplied compact 390dp reference: restored the Partner logo mark, reduced top/header and card spacing, compacted request and recent-job rows, reduced secondary typography, and used the concise approved-state dashboard label.
+- Front-end presentation only; API queries, approval gating, availability, and navigation behavior were not changed.
+- Partner TypeScript check and `git diff --check` pass. Physical/device screenshot comparison remains to be run when a preview target is available.
+
+## Reference review — Partner driver boards (2026-10-14)
+
+- Additional design source: `/workspaces/RACE/partner app/` contains the dashboard reference, three cropped journey references, one repeated five-board composite, and `more context for deisng .md`.
+- The intended driver sequence is `DRIVER_EN_ROUTE → DRIVER_ARRIVED → IN_PROGRESS → COMPLETED`; Dashboard, Jobs, and Account keep the three-tab bar, while active-job, OTP, and completion screens hide it.
+- Implemented the next visual/behavior pass: Jobs branding/counts/segments, full-bleed active map, route callouts and marker colors, en-route action order, OTP dimming and manual focus, completion success layout, confirmation before completing, and in-card Back to Home.
+- Preview acceptance now promotes the selected offer into the active trip, removes accepted/declined offers, validates the preview trip OTP (`1234`), records status history/final fare, and treats completed trips as no longer active.
+- Completion preserves a local snapshot so the board remains visible after the real backend releases the active booking. Account/verification visual references were not present in the additional folder.
+- Verified with partner TypeScript, `git diff --check`, Expo Android bundle export, and a preview lifecycle handoff script. Device screenshot comparison remains pending because no emulator/ADB is available.
+
 ## Deep audit — 2026-10-12 (documentation only, no code changed)
 
 Full audit lives in `docs/audit/2026-10-12-deep-audit/` (README index + scorecard + per-surface docs + bug register + test catalogue).
@@ -122,10 +137,9 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 
 ## Next Action (When User Returns)
 
-1. User names the next customer screen.
-2. Read that screen plus shared UI/theme before editing.
-3. Apply `.agents/uiux` rules: one goal, one primary CTA, reuse existing components, no invented backend.
-4. Cloud/APK work stays paused until the user asks. Runbook: `docs/ops/CLOUD_PRODUCTION_RUNBOOK.md`.
+1. Run a real-device screenshot pass for the partner driver boards and tune remaining spacing/map rendering against the supplied references.
+2. If the driver boards are accepted, continue with any missing partner Account references/screens.
+3. Cloud/APK work stays paused until the user asks. Runbook: `docs/ops/CLOUD_PRODUCTION_RUNBOOK.md`.
 
 ## Do Not
 

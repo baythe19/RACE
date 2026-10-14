@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import {
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -9,16 +11,15 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import {
-  Award,
   Car,
   Check,
+  ChevronDown,
   CreditCard,
   FileText,
   Info,
-  ShieldCheck,
+  Search,
   Truck,
-  User,
-  Users,
+  X,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -31,6 +32,18 @@ import { partnerRegistrationGoBack } from '../../../../utils/partnerRegistration
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, 'DriverVehicleInfo'>;
 
+const POPULAR_VEHICLE_MODELS = [
+  'Tata 407 Recovery Spec',
+  'Ashok Leyland Ecomet Tow',
+  'Mahindra Bolero Pik-Up Recovery',
+  'Eicher Pro 2049 Tow Truck',
+  'Isuzu D-Max Flatbed',
+  'Force Motors Recovery Van',
+  'Maruti Suzuki Super Carry Tow',
+  'BharatBenz 1217C Commercial',
+  'Other / Custom Vehicle Model',
+];
+
 const REF_W = 390;
 
 export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
@@ -42,6 +55,10 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
   const setDriverVehicle = usePartnerRegistrationStore((s) => s.setDriverVehicle);
 
   const isFromReview = Boolean(route.params?.fromReview);
+
+  // Model selection modal
+  const [modelModalVisible, setModelModalVisible] = useState(false);
+  const [customModelInput, setCustomModelInput] = useState(driverVehicle.vehicleModel || '');
 
   // Match selected card id
   const selectedVehicleCardId =
@@ -89,93 +106,74 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
     <DriverRegistrationLayout
       step={2}
       title="Driver registration"
-      subtitle="Tell us about your vehicle."
       onBack={handleBack}
       onContinue={handleContinue}
       continueLabel={isFromReview ? 'Save & Return to Review →' : 'Continue →'}>
-      {/* Top Header Card */}
-      <View style={[styles.card, styles.headerCard, { padding: px(16), marginBottom: px(16) }]}>
-        <View style={styles.headerRow}>
-          <View style={[styles.headerIconBox, { width: px(40), height: px(40), borderRadius: px(10) }]}>
-            <Truck size={px(20)} color="#D97706" strokeWidth={2.4} />
+      {/* Unified Single Card for Vehicle Information (No Shadow, Full Width) */}
+      <View style={[styles.card, { padding: px(14), marginBottom: px(14) }]}>
+        {/* Card Header Row */}
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.headerIconBox, { width: px(36), height: px(36), borderRadius: px(10) }]}>
+            <Truck size={px(18)} color="#D97706" strokeWidth={2.4} />
           </View>
           <View style={styles.headerTextWrap}>
-            <Text style={[styles.headerTitle, { fontSize: px(16) }]}>Vehicle Information</Text>
-            <Text style={[styles.headerSubtitle, { fontSize: px(13) }]}>
-              Select vehicle type and enter registration details
+            <Text style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Vehicle information</Text>
+            <Text style={[styles.cardHeaderSubtitle, { fontSize: px(12) }]}>
+              Tell us about your vehicle.
             </Text>
           </View>
         </View>
-      </View>
 
-      {/* Vehicle Type Selection Cards */}
-      <View style={[styles.card, { padding: px(16), marginBottom: px(16) }]}>
-        <Text style={[styles.sectionHeading, { fontSize: px(14), marginBottom: px(4) }]}>
-          Vehicle Type <Text style={styles.requiredAsterisk}>*</Text>
-        </Text>
-        <Text style={[styles.sectionSubtitle, { fontSize: px(12), marginBottom: px(14) }]}>
-          Choose the primary vehicle configuration you operate
-        </Text>
+        <View style={styles.cardDivider} />
 
-        <View style={styles.gridContainer}>
-          {DRIVER_VEHICLE_TYPE_CARDS.map((item) => {
-            const isSelected = selectedVehicleCardId === item.id;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => handleSelectCard(item.id)}
-                style={({ pressed }) => [
-                  styles.vehicleCard,
-                  { padding: px(12), borderRadius: px(12) },
-                  isSelected ? styles.vehicleCardSelected : styles.vehicleCardIdle,
-                  pressed && styles.pressed,
-                ]}>
-                <View style={styles.vehicleCardTop}>
-                  <VehicleTypeArtwork
-                    type={item.illustrationType}
-                    size={px(42)}
-                    selected={isSelected}
-                  />
-                  {isSelected ? (
-                    <View style={[styles.checkCircle, { width: px(18), height: px(18), borderRadius: px(9) }]}>
-                      <Check size={px(12)} color="#FFFFFF" strokeWidth={3} />
-                    </View>
-                  ) : null}
-                </View>
-
-                <Text
-                  style={[
-                    styles.vehicleCardLabel,
-                    { fontSize: px(14), marginTop: px(8) },
-                    isSelected && styles.vehicleCardLabelSelected,
-                  ]}>
-                  {item.label}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.vehicleCardDesc,
-                    { fontSize: px(11), marginTop: px(2) },
-                    isSelected && styles.vehicleCardDescSelected,
-                  ]}
-                  numberOfLines={2}>
-                  {item.description}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Vehicle Registration & Licence Form Fields Card */}
-      <View style={[styles.card, { padding: px(16), marginBottom: px(16) }]}>
-        {/* Vehicle Registration Number */}
+        {/* Vehicle Type * (Single Row of 4 Compact Cards Side-by-Side) */}
         <View style={[styles.inputGroup, { marginBottom: px(16) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(13) }]}>
+          <Text style={[styles.inputLabel, { fontSize: px(12.5), marginBottom: px(8) }]}>
+            Vehicle type <Text style={styles.requiredAsterisk}>*</Text>
+          </Text>
+
+          <View style={styles.vehicleRow}>
+            {DRIVER_VEHICLE_TYPE_CARDS.map((item) => {
+              const isSelected = selectedVehicleCardId === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => handleSelectCard(item.id)}
+                  style={({ pressed }) => [
+                    styles.vehicleCard,
+                    { paddingVertical: px(10), paddingHorizontal: px(4), borderRadius: px(10) },
+                    isSelected ? styles.vehicleCardSelected : styles.vehicleCardIdle,
+                    pressed && styles.pressed,
+                  ]}>
+                  <View style={styles.artworkContainer}>
+                    <VehicleTypeArtwork
+                      type={item.illustrationType}
+                      size={px(36)}
+                      selected={isSelected}
+                    />
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.vehicleCardLabel,
+                      { fontSize: px(11), marginTop: px(6) },
+                      isSelected ? styles.vehicleCardLabelSelected : styles.vehicleCardLabelIdle,
+                    ]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Vehicle Registration Number */}
+        <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
+          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
             Vehicle registration number <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
-          <View style={[styles.inputContainer, { height: px(48), paddingHorizontal: px(12) }]}>
-            <CreditCard size={px(18)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
+            <CreditCard size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <TextInput
               style={[styles.textInput, { fontSize: px(14), fontWeight: '600' }]}
               placeholder="e.g. OD 02 AB 1234"
@@ -190,18 +188,15 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
               }
             />
           </View>
-          <Text style={[styles.helperCaption, { fontSize: px(11), marginTop: px(4) }]}>
-            Must match the vehicle RC document
-          </Text>
         </View>
 
         {/* Driving Licence Number */}
-        <View style={[styles.inputGroup, { marginBottom: px(16) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(13) }]}>
+        <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
+          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
             Driving licence number <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
-          <View style={[styles.inputContainer, { height: px(48), paddingHorizontal: px(12) }]}>
-            <Award size={px(18)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
+            <FileText size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <TextInput
               style={[styles.textInput, { fontSize: px(14), fontWeight: '600' }]}
               placeholder="Enter Driving License (DL) number"
@@ -218,110 +213,161 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Vehicle Registered To (Ownership Radio Group) */}
-        <View style={[styles.inputGroup, { marginBottom: px(16) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(13) }]}>
+        {/* Vehicle Registered To (Clean Radio Buttons - No Bulky Cards) */}
+        <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
+          <Text style={[styles.inputLabel, { fontSize: px(12.5), marginBottom: px(6) }]}>
             Vehicle registered to <Text style={styles.requiredAsterisk}>*</Text>
           </Text>
+
           <View style={styles.radioGroup}>
             {/* Option 1: Me */}
             <Pressable
               onPress={() => setDriverVehicle({ registeredTo: 'me' })}
-              style={({ pressed }) => [
-                styles.radioOptionCard,
-                { padding: px(12), borderRadius: px(10) },
-                registeredTo === 'me' ? styles.radioSelected : styles.radioIdle,
-                pressed && styles.pressed,
-              ]}>
-              <View style={styles.radioTopRow}>
-                <View
-                  style={[
-                    styles.radioDotOuter,
-                    registeredTo === 'me' && styles.radioDotOuterSelected,
-                  ]}>
-                  {registeredTo === 'me' ? <View style={styles.radioDotInner} /> : null}
-                </View>
-                <View style={styles.radioTextWrap}>
-                  <Text style={[styles.radioLabel, { fontSize: px(13) }]}>
-                    Me / I own this vehicle
-                  </Text>
-                  <Text style={[styles.radioSubLabel, { fontSize: px(11) }]}>
-                    Registered in your name
-                  </Text>
-                </View>
-                <User size={px(16)} color={registeredTo === 'me' ? '#D97706' : '#9CA3AF'} />
+              style={({ pressed }) => [styles.radioRow, pressed && styles.pressed]}>
+              <View
+                style={[
+                  styles.radioCircle,
+                  registeredTo === 'me' && styles.radioCircleActive,
+                ]}>
+                {registeredTo === 'me' ? <View style={styles.radioDot} /> : null}
               </View>
+              <Text style={[styles.radioLabel, { fontSize: px(13) }]}>
+                Me / I own this vehicle
+              </Text>
             </Pressable>
 
             {/* Option 2: Someone else */}
             <Pressable
               onPress={() => setDriverVehicle({ registeredTo: 'someone_else' })}
               style={({ pressed }) => [
-                styles.radioOptionCard,
-                { padding: px(12), borderRadius: px(10), marginTop: px(8) },
-                registeredTo === 'someone_else' ? styles.radioSelected : styles.radioIdle,
+                styles.radioRow,
+                { marginTop: px(8), alignItems: 'flex-start' },
                 pressed && styles.pressed,
               ]}>
-              <View style={styles.radioTopRow}>
-                <View
-                  style={[
-                    styles.radioDotOuter,
-                    registeredTo === 'someone_else' && styles.radioDotOuterSelected,
-                  ]}>
-                  {registeredTo === 'someone_else' ? <View style={styles.radioDotInner} /> : null}
-                </View>
-                <View style={styles.radioTextWrap}>
-                  <Text style={[styles.radioLabel, { fontSize: px(13) }]}>
-                    Someone else
-                  </Text>
-                  <Text style={[styles.radioSubLabel, { fontSize: px(11) }]}>
-                    Owner authorisation may be needed
-                  </Text>
-                </View>
-                <Users
-                  size={px(16)}
-                  color={registeredTo === 'someone_else' ? '#D97706' : '#9CA3AF'}
-                />
+              <View
+                style={[
+                  styles.radioCircle,
+                  { marginTop: px(2) },
+                  registeredTo === 'someone_else' && styles.radioCircleActive,
+                ]}>
+                {registeredTo === 'someone_else' ? <View style={styles.radioDot} /> : null}
+              </View>
+              <View style={styles.radioTextWrap}>
+                <Text style={[styles.radioLabel, { fontSize: px(13) }]}>
+                  Someone else
+                </Text>
+                <Text style={[styles.radioSubLabel, { fontSize: px(11) }]}>
+                  Owner authorisation may be needed
+                </Text>
               </View>
             </Pressable>
           </View>
         </View>
 
-        {/* Vehicle Model (Optional) */}
-        <View style={styles.inputGroup}>
-          <Text style={[styles.inputLabel, { fontSize: px(13) }]}>
+        {/* Vehicle Model (Optional with Dropdown Selector) */}
+        <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
+          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
             Vehicle model <Text style={styles.optionalText}>(Optional)</Text>
           </Text>
-          <View style={[styles.inputContainer, { height: px(48), paddingHorizontal: px(12) }]}>
-            <Car size={px(18)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
-              style={[styles.textInput, { fontSize: px(14) }]}
-              placeholder="e.g. Tata 407 Recovery Spec / Isuzu D-Max"
-              placeholderTextColor="#9CA3AF"
-              autoCapitalize="words"
-              autoCorrect={false}
-              value={driverVehicle.vehicleModel}
-              onChangeText={(vehicleModel) => setDriverVehicle({ vehicleModel })}
-            />
+          <Pressable
+            onPress={() => {
+              setCustomModelInput(driverVehicle.vehicleModel || '');
+              setModelModalVisible(true);
+            }}
+            style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
+            <Car size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <Text
+              style={[
+                styles.textValue,
+                { fontSize: px(13.5) },
+                !driverVehicle.vehicleModel && styles.textPlaceholder,
+              ]}>
+              {driverVehicle.vehicleModel || 'Enter vehicle model (optional)'}
+            </Text>
+            <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
+          </Pressable>
+        </View>
+
+        {/* Bottom RC & Insurance Notice Box */}
+        <View style={[styles.noticeBox, { padding: px(12), borderRadius: px(10) }]}>
+          <View style={[styles.noticeIconCircle, { width: px(22), height: px(22), borderRadius: px(11) }]}>
+            <Info size={px(13)} color="#FFFFFF" strokeWidth={2.4} />
           </View>
+          <Text style={[styles.noticeText, { fontSize: px(11.5) }]}>
+            RC and insurance details will be checked from uploaded documents.
+          </Text>
         </View>
       </View>
 
-      {/* Bottom Info Banner */}
-      <View
-        style={[
-          styles.infoBanner,
-          { padding: px(14), marginBottom: px(24), borderRadius: px(12) },
-        ]}>
-        <View style={styles.infoBannerRow}>
-          <View style={[styles.infoIconCircle, { width: px(28), height: px(28), borderRadius: px(14) }]}>
-            <Info size={px(16)} color="#2563EB" strokeWidth={2.2} />
-          </View>
-          <Text style={[styles.infoBannerText, { fontSize: px(12) }]}>
-            RC and insurance details will be checked from uploaded documents in the next step.
-          </Text>
-        </View>
-      </View>
+      {/* Vehicle Model Dropdown / Picker Modal */}
+      <Modal visible={modelModalVisible} transparent animationType="slide">
+        <Pressable style={styles.modalOverlay} onPress={() => setModelModalVisible(false)}>
+          <Pressable style={[styles.modalSheet, { paddingBottom: px(28) }]} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { fontSize: px(16) }]}>Select Vehicle Model</Text>
+              <Pressable hitSlop={12} onPress={() => setModelModalVisible(false)}>
+                <X size={px(20)} color="#4B5563" />
+              </Pressable>
+            </View>
+
+            {/* Custom Input */}
+            <View style={[styles.modalSearchContainer, { height: px(44), marginBottom: px(12) }]}>
+              <Car size={px(18)} color="#9CA3AF" style={{ marginRight: px(8) }} />
+              <TextInput
+                style={[styles.modalSearchInput, { fontSize: px(14) }]}
+                placeholder="Or type custom model..."
+                placeholderTextColor="#9CA3AF"
+                value={customModelInput}
+                onChangeText={setCustomModelInput}
+              />
+              {customModelInput ? (
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    setDriverVehicle({ vehicleModel: customModelInput });
+                    setModelModalVisible(false);
+                  }}>
+                  <Text style={styles.applyText}>Save</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <ScrollView bounces={false} showsVerticalScrollIndicator={false} style={{ maxHeight: 300 }}>
+              {POPULAR_VEHICLE_MODELS.map((m) => {
+                const isSelected = driverVehicle.vehicleModel === m;
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => {
+                      if (m === 'Other / Custom Vehicle Model') {
+                        setCustomModelInput('');
+                      } else {
+                        setDriverVehicle({ vehicleModel: m });
+                        setModelModalVisible(false);
+                      }
+                    }}
+                    style={({ pressed }) => [
+                      styles.modelRow,
+                      { paddingVertical: px(12) },
+                      isSelected && styles.modelRowSelected,
+                      pressed && styles.pressed,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.modelText,
+                        { fontSize: px(13.5) },
+                        isSelected && styles.modelTextSelected,
+                      ]}>
+                      {m}
+                    </Text>
+                    {isSelected ? <Check size={px(18)} color="#D97706" strokeWidth={2.5} /> : null}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </DriverRegistrationLayout>
   );
 }
@@ -329,94 +375,40 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.04,
-        shadowRadius: 3,
-      },
-      android: {
-        elevation: 1,
-      },
-    }),
+    // NO SHADOW
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowColor: 'transparent',
   },
-  headerCard: {
-    backgroundColor: '#FFFFFF',
-  },
-  headerRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  cardHeaderTitle: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  cardHeaderSubtitle: {
+    color: '#6B7280',
+    marginTop: 1,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 14,
   },
   headerIconBox: {
     backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   headerTextWrap: {
     flex: 1,
-  },
-  headerTitle: {
-    fontWeight: '700',
-    color: '#111827',
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    color: '#6B7280',
-    lineHeight: 18,
-  },
-  sectionHeading: {
-    fontWeight: '700',
-    color: '#111827',
-  },
-  sectionSubtitle: {
-    color: '#6B7280',
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  vehicleCard: {
-    width: '48%',
-    borderWidth: 1.5,
-  },
-  vehicleCardSelected: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#F59E0B',
-  },
-  vehicleCardIdle: {
-    backgroundColor: '#FAFAFA',
-    borderColor: '#E5E7EB',
-  },
-  vehicleCardTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 38,
-  },
-  checkCircle: {
-    backgroundColor: '#F59E0B',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  vehicleCardLabel: {
-    fontWeight: '700',
-    color: '#111827',
-  },
-  vehicleCardLabelSelected: {
-    color: '#B45309',
-  },
-  vehicleCardDesc: {
-    color: '#6B7280',
-    lineHeight: 15,
-  },
-  vehicleCardDescSelected: {
-    color: '#78350F',
   },
   inputGroup: {
     width: '100%',
@@ -424,7 +416,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontWeight: '600',
     color: '#374151',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   requiredAsterisk: {
     color: '#DC2626',
@@ -434,11 +426,47 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color: '#9CA3AF',
   },
+  // 4 Vehicle Cards Row
+  vehicleRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  vehicleCard: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    backgroundColor: '#FFFFFF',
+  },
+  vehicleCardSelected: {
+    borderColor: '#F59E0B',
+    backgroundColor: '#FFFBEB',
+  },
+  vehicleCardIdle: {
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  artworkContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
+  },
+  vehicleCardLabel: {
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  vehicleCardLabelSelected: {
+    color: '#B45309',
+  },
+  vehicleCardLabelIdle: {
+    color: '#374151',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -449,80 +477,139 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#111827',
     paddingVertical: 0,
+    fontWeight: '500',
   },
-  helperCaption: {
+  textValue: {
+    flex: 1,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  textPlaceholder: {
     color: '#9CA3AF',
   },
+  // Radio Buttons
   radioGroup: {
-    width: '100%',
+    paddingVertical: 2,
   },
-  radioOptionCard: {
-    borderWidth: 1.5,
-  },
-  radioSelected: {
-    backgroundColor: '#FFFBEB',
-    borderColor: '#F59E0B',
-  },
-  radioIdle: {
-    backgroundColor: '#F9FAFB',
-    borderColor: '#E5E7EB',
-  },
-  radioTopRow: {
+  radioRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
   },
-  radioDotOuter: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
     borderColor: '#D1D5DB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    backgroundColor: '#FFFFFF',
   },
-  radioDotOuterSelected: {
+  radioCircleActive: {
     borderColor: '#D97706',
   },
-  radioDotInner: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: '#D97706',
   },
   radioTextWrap: {
     flex: 1,
   },
   radioLabel: {
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '600',
+    color: '#1F2937',
   },
   radioSubLabel: {
     color: '#6B7280',
     marginTop: 1,
   },
-  infoBanner: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#DBEAFE',
-  },
-  infoBannerRow: {
+  // Notice Box
+  noticeBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+    marginTop: 4,
   },
-  infoIconCircle: {
-    backgroundColor: '#DBEAFE',
+  noticeIconCircle: {
+    backgroundColor: '#334155',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
   },
-  infoBannerText: {
+  noticeText: {
     flex: 1,
-    color: '#1E40AF',
-    lineHeight: 18,
+    color: '#334155',
     fontWeight: '500',
+    lineHeight: 16,
   },
   pressed: {
     opacity: 0.85,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sheetTitle: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  modalSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 10,
+  },
+  modalSearchInput: {
+    flex: 1,
+    color: '#111827',
+    paddingVertical: 0,
+  },
+  applyText: {
+    color: '#D97706',
+    fontWeight: '700',
+    fontSize: 13,
+    paddingHorizontal: 4,
+  },
+  modelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modelRowSelected: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderBottomColor: 'transparent',
+  },
+  modelText: {
+    color: '#374151',
+    fontWeight: '500',
+  },
+  modelTextSelected: {
+    color: '#D97706',
+    fontWeight: '700',
   },
 });

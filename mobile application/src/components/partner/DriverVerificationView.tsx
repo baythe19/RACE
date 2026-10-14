@@ -27,7 +27,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Check, ChevronDown, ChevronUp, Info, X } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp, Info, RefreshCw, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import PartnerHeaderLogo from './PartnerHeaderLogo';
@@ -169,13 +169,23 @@ export default function DriverVerificationView({
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={C.white} />
 
-      <View style={[styles.topBar, { paddingTop: insets.top + px(6), paddingBottom: px(6) }]}>
-        <PartnerHeaderLogo width={px(104)} />
+      <View
+        style={[
+          styles.topBar,
+          {
+            paddingTop: Math.max(insets.top, px(4)),
+            paddingBottom: px(4),
+            borderBottomWidth: 1,
+            borderBottomColor: '#F3F4F6',
+            backgroundColor: C.white,
+          },
+        ]}>
+        <PartnerHeaderLogo width={px(68)} />
       </View>
 
       <ScrollView
         style={styles.flex}
-        bounces={false}
+        bounces={true}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
@@ -184,79 +194,142 @@ export default function DriverVerificationView({
             paddingBottom: insets.bottom + px(24),
           },
         ]}>
-        <View style={[styles.artWrap, { marginTop: px(4) }]}>
-          <VerificationUnderReviewArtwork size={px(148)} />
+        <View style={[styles.artWrap, { marginTop: px(8) }]}>
+          <VerificationUnderReviewArtwork size={px(175)} />
         </View>
 
+        {/* Status Pill Badge */}
+        <View
+          style={[
+            styles.statusPillBadge,
+            {
+              marginTop: px(10),
+              paddingHorizontal: px(10),
+              paddingVertical: px(3.5),
+              borderRadius: px(20),
+            },
+          ]}>
+          <View style={styles.pulsingDot} />
+          <Text style={[styles.statusPillText, { fontSize: px(10.5) }]}>
+            VERIFICATION IN PROGRESS
+          </Text>
+        </View>
+
+        {/* Highlighted Title */}
         <Text
           style={[
             styles.title,
-            { fontSize: px(21), lineHeight: px(29), marginTop: px(14) },
+            {
+              fontSize: px(19),
+              lineHeight: px(25),
+              marginTop: px(8),
+              fontWeight: '800',
+              color: '#0F172A',
+            },
           ]}>
-          {verification.title}
+          {verification.title || 'Your account is under verification'}
         </Text>
+
+        {/* Engaging ~4 lines summary paragraph */}
         <Text
           style={[
             styles.subtitle,
             {
-              fontSize: px(14.5),
-              lineHeight: px(23),
+              fontSize: px(12.5),
+              lineHeight: px(19),
               marginTop: px(8),
-              maxWidth: px(310),
+              maxWidth: px(335),
+              color: '#475569',
             },
           ]}>
-          {verification.subtitle}
+          Thank you for registering with RACE! Our compliance team is actively reviewing your profile details, vehicle records, and uploaded documents. Once verified, your roadside partner account will be activated immediately to receive jobs.
         </Text>
 
         {/* tracker ---------------------------------------------------------- */}
-        <View style={[styles.tracker, { marginTop: px(26) }]}>
+        <View style={[styles.tracker, { marginTop: px(20) }]}>
           {verification.steps.map((step, index) => {
             const isLast = index === verification.steps.length - 1;
             const lineDone = step.state === 'completed';
+
+            let stepSubtext = '';
+            if (step.id === 'submitted') stepSubtext = 'Personal, vehicle & document forms submitted';
+            else if (step.id === 'under_review') stepSubtext = 'Compliance team actively checking records';
+            else if (step.id === 'background_check') stepSubtext = 'Identity verification & police records';
+            else if (step.id === 'approved') stepSubtext = 'Account activation & job dispatch access';
+
             return (
-              <View key={step.id} style={styles.stepRow}>
-                <View
-                  style={[
-                    styles.stepRail,
-                    { width: px(30), marginLeft: px(12) },
-                  ]}>
+              <View
+                key={step.id}
+                style={[
+                  styles.stepItemContainer,
+                  !isLast && styles.stepItemUnderline,
+                  { paddingBottom: isLast ? 0 : px(10), marginBottom: isLast ? 0 : px(10) },
+                ]}>
+                <View style={styles.stepRow}>
                   <View
                     style={[
-                      styles.stepCircle,
-                      circleStyle(step.state),
-                      { width: px(30), height: px(30) },
+                      styles.stepRail,
+                      { width: px(26), marginLeft: px(8) },
                     ]}>
-                    <CircleContent state={step.state} />
-                  </View>
-                  {!isLast ? (
                     <View
-                      style={{
-                        width: px(2.5),
-                        height: px(18),
-                        borderRadius: px(2),
-                        backgroundColor: lineDone ? STEP_LINE_DONE : STEP_LINE_IDLE,
-                      }}
-                    />
-                  ) : null}
-                </View>
-                <View
-                  style={[
-                    styles.stepCopy,
-                    { marginLeft: px(14), paddingTop: px(5), paddingBottom: px(6) },
-                  ]}>
-                  <Text
+                      style={[
+                        styles.stepCircle,
+                        circleStyle(step.state),
+                        { width: px(24), height: px(24) },
+                      ]}>
+                      <CircleContent state={step.state} />
+                    </View>
+                    {!isLast ? (
+                      <View
+                        style={{
+                          width: px(2),
+                          height: px(26),
+                          borderRadius: px(1),
+                          backgroundColor: lineDone ? STEP_LINE_DONE : STEP_LINE_IDLE,
+                          marginTop: px(4),
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                  <View
                     style={[
-                      T.cardTitle,
-                      {
-                        fontSize: px(15),
-                        lineHeight: px(20),
-                        color:
-                          step.state === 'pending' ? SUBTITLE_GREY : INK_TITLE,
-                        fontWeight: step.state === 'current' ? '700' : '600',
-                      },
+                      styles.stepCopy,
+                      { marginLeft: px(12), flex: 1 },
                     ]}>
-                    {step.label}
-                  </Text>
+                    <View style={styles.stepTitleRow}>
+                      <Text
+                        style={[
+                          styles.stepLabelText,
+                          {
+                            fontSize: px(13),
+                            lineHeight: px(18),
+                            color: step.state === 'pending' ? '#6B7280' : '#0F172A',
+                            fontWeight: step.state === 'current' ? '700' : '600',
+                          },
+                        ]}>
+                        {step.label}
+                      </Text>
+                      {step.state === 'completed' && (
+                        <View style={styles.badgeDone}>
+                          <Text style={[styles.badgeDoneText, { fontSize: px(10) }]}>Done</Text>
+                        </View>
+                      )}
+                      {step.state === 'current' && (
+                        <View style={styles.badgeCurrent}>
+                          <Text style={[styles.badgeCurrentText, { fontSize: px(10) }]}>In progress</Text>
+                        </View>
+                      )}
+                    </View>
+                    {stepSubtext ? (
+                      <Text
+                        style={[
+                          styles.stepSubtext,
+                          { fontSize: px(11), lineHeight: px(15), color: '#64748B', marginTop: px(2) },
+                        ]}>
+                        {stepSubtext}
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               </View>
             );
@@ -268,26 +341,29 @@ export default function DriverVerificationView({
           style={[
             styles.infoCard,
             {
-              marginTop: px(30),
-              borderRadius: px(R.innerCard),
-              paddingVertical: px(14),
-              paddingHorizontal: px(14),
+              marginTop: px(14),
+              borderRadius: px(8),
+              paddingVertical: px(8),
+              paddingHorizontal: px(12),
+              borderWidth: 1,
+              borderColor: '#FDE68A',
+              backgroundColor: '#FEF3C7',
             },
           ]}>
-          <Info size={px(20)} color={CARD_CREAM_INK} strokeWidth={2.2} />
+          <Info size={px(14)} color="#B45309" strokeWidth={2.2} />
           <Text
             style={[
-              T.body,
+              styles.infoCardText,
               {
                 flex: 1,
-                marginLeft: px(10),
-                fontSize: px(13.5),
-                lineHeight: px(20),
-                color: CARD_CREAM_INK,
+                marginLeft: px(8),
+                fontSize: px(11.5),
+                lineHeight: px(16),
+                color: '#92400E',
                 fontWeight: '600',
               },
             ]}>
-            {verification.decisionNote ?? verification.note}
+            {verification.decisionNote ?? "This usually takes 24 hours. We'll notify you via SMS & app notification."}
           </Text>
         </View>
 

@@ -21,6 +21,7 @@ import type {
   PartnerRegistrationStackParamList,
   PartnerRootStackParamList,
 } from '../../../types/partnerNavigation';
+import { usePartnerRegistrationStore } from '../../../store/partnerRegistrationStore';
 import { buildDriverVerification } from '../../../utils/driverVerification';
 
 type Props = NativeStackScreenProps<
@@ -32,8 +33,17 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector(state => state.auth.accessToken);
   const { data: profile, refetch, isRefetching } = useDriverProfileQuery();
+  const { driverPersonal, driverVehicle, driverDocuments } = usePartnerRegistrationStore();
 
-  const verification = useMemo(() => buildDriverVerification(profile), [profile]);
+  const verification = useMemo(
+    () =>
+      buildDriverVerification(profile, {
+        driverPersonal,
+        driverVehicle,
+        driverDocuments,
+      }),
+    [profile, driverPersonal, driverVehicle, driverDocuments],
+  );
 
   const handleGoToDashboard = useCallback(() => {
     if (!accessToken) {

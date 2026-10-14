@@ -54,8 +54,7 @@ export default function DriverRegistrationLayout({
   const scale = Math.min(1.22, Math.max(0.88, width / REF_W));
   const px = (val: number) => Math.max(1, Math.round(val * scale));
 
-  const resolvedTitle =
-    title ?? (step === 4 ? 'Review your application' : 'Driver registration');
+  const resolvedTitle = title ?? 'Driver registration';
   const resolvedSubtitle =
     subtitle ??
     (step === 1
@@ -75,9 +74,9 @@ export default function DriverRegistrationLayout({
         style={[
           styles.topBar,
           {
-            paddingTop: insets.top + px(4),
-            minHeight: insets.top + px(58),
-            paddingHorizontal: px(16),
+            paddingTop: Math.max(insets.top, px(2)),
+            paddingBottom: px(2),
+            paddingHorizontal: px(12),
           },
         ]}>
         <Pressable
@@ -86,24 +85,32 @@ export default function DriverRegistrationLayout({
           style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
           accessibilityRole="button"
           accessibilityLabel="Go back">
-          <ArrowLeft size={px(22)} color="#111827" strokeWidth={2.4} />
+          <ArrowLeft size={px(20)} color="#111827" strokeWidth={2.4} />
         </Pressable>
 
         <View style={styles.logoCenter}>
-          <PartnerHeaderLogo width={px(104)} />
+          <PartnerHeaderLogo width={px(68)} showPartnerText={false} />
         </View>
 
         {/* Symmetrical placeholder for centering */}
         <View style={styles.topSpacer} />
       </View>
 
+      {/* Centered Driver Registration Title */}
+      <View style={[styles.titleHeaderWrap, { paddingVertical: px(2) }]}>
+        <Text style={[styles.headerRegistrationTitle, { fontSize: px(15.5) }]}>
+          {resolvedTitle}
+        </Text>
+      </View>
+
       {/* Horizontal 4-Step Stepper */}
-      <View style={[styles.stepperWrap, { paddingHorizontal: px(16), paddingBottom: px(12) }]}>
+      <View style={[styles.stepperWrap, { paddingHorizontal: px(12), paddingTop: px(2), paddingBottom: px(6) }]}>
         <View style={styles.stepperRow}>
           {DRIVER_REGISTRATION_STEPS.map((label, idx) => {
             const stepNum = idx + 1;
             const isCompleted = stepNum < step;
             const isActive = stepNum === step;
+            const circleSize = px(25);
 
             return (
               <React.Fragment key={label}>
@@ -111,18 +118,18 @@ export default function DriverRegistrationLayout({
                   <View
                     style={[
                       styles.circle,
-                      { width: px(30), height: px(30), borderRadius: px(15) },
+                      { width: circleSize, height: circleSize, borderRadius: circleSize / 2 },
                       isCompleted && styles.circleCompleted,
                       isActive && styles.circleActive,
                       !isCompleted && !isActive && styles.circleIdle,
                     ]}>
                     {isCompleted ? (
-                      <Check size={px(15)} color="#FFFFFF" strokeWidth={3} />
+                      <Check size={px(12)} color="#FFFFFF" strokeWidth={3} />
                     ) : (
                       <Text
                         style={[
                           styles.circleText,
-                          { fontSize: px(13) },
+                          { fontSize: px(11) },
                           isActive ? styles.circleTextActive : styles.circleTextIdle,
                         ]}>
                         {stepNum}
@@ -133,7 +140,7 @@ export default function DriverRegistrationLayout({
                     numberOfLines={1}
                     style={[
                       styles.stepLabel,
-                      { fontSize: px(11), marginTop: px(4) },
+                      { fontSize: px(9.5), marginTop: px(3) },
                       isActive && styles.stepLabelActive,
                       isCompleted && styles.stepLabelCompleted,
                       !isActive && !isCompleted && styles.stepLabelIdle,
@@ -145,11 +152,17 @@ export default function DriverRegistrationLayout({
                 {idx < DRIVER_REGISTRATION_STEPS.length - 1 ? (
                   <View
                     style={[
-                      styles.stepperLine,
-                      { height: px(2.5), marginTop: px(14) },
-                      stepNum < step ? styles.lineCompleted : styles.lineIdle,
-                    ]}
-                  />
+                      styles.stepperLineTrack,
+                      { height: circleSize, marginHorizontal: px(2) },
+                    ]}>
+                    <View
+                      style={[
+                        styles.stepperLine,
+                        { height: px(2) },
+                        stepNum < step ? styles.lineCompleted : styles.lineIdle,
+                      ]}
+                    />
+                  </View>
                 ) : null}
               </React.Fragment>
             );
@@ -170,26 +183,13 @@ export default function DriverRegistrationLayout({
           contentContainerStyle={[
             styles.scrollContent,
             {
-              paddingHorizontal: px(20),
-              paddingTop: px(16),
+              paddingHorizontal: px(12),
+              paddingTop: px(10),
               paddingBottom: insets.bottom + px(showFooter ? 94 : 28),
             },
           ]}>
-          {/* Main Title & Step Indicator Row */}
-          <View style={styles.titleRow}>
-            <Text style={[styles.mainTitle, { fontSize: px(22) }]}>
-              {resolvedTitle}
-            </Text>
-            <Text style={[styles.stepBadge, { fontSize: px(15) }]}>
-              Step {step} of 4
-            </Text>
-          </View>
-          <Text style={[styles.mainSubtitle, { fontSize: px(13.5), marginTop: px(4) }]}>
-            {resolvedSubtitle}
-          </Text>
-
           {/* Children Screen Body */}
-          <View style={{ marginTop: px(16) }}>{children}</View>
+          <View>{children}</View>
         </ScrollView>
       </KeyboardAvoidingView>
 
@@ -265,8 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomWidth: 0,
   },
   backBtn: {
     padding: 6,
@@ -282,7 +281,7 @@ const styles = StyleSheet.create({
   stepperWrap: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#F3F4F6',
   },
   stepperRow: {
     flexDirection: 'row',
@@ -333,9 +332,24 @@ const styles = StyleSheet.create({
   stepLabelIdle: {
     color: '#9CA3AF',
   },
-  stepperLine: {
+  titleHeaderWrap: {
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  headerRegistrationTitle: {
+    color: '#111827',
+    fontWeight: '800',
+    letterSpacing: -0.2,
+    textAlign: 'center',
+  },
+  stepperLineTrack: {
     flex: 1,
-    marginHorizontal: 4,
+    justifyContent: 'center',
+  },
+  stepperLine: {
+    width: '100%',
     borderRadius: 2,
   },
   lineCompleted: {

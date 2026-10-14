@@ -251,7 +251,7 @@ export default function UiTestNavigator() {
                   label="9. Driver Active Job"
                   sub="4-step trip execution & OTP verification"
                   onPress={() =>
-                    ensureDriverAndNavigate(() => openDriverActiveJob('mock-job-01', 'towing'))
+                    ensureDriverAndNavigate(() => openDriverActiveJob())
                   }
                 />
               </View>

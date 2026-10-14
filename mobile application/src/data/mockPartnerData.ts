@@ -171,8 +171,22 @@ export let mockActiveJobState: DriverJobBooking | null = {
     latitude: 20.3588,
     longitude: 85.8166,
   },
+  customer: {
+    name: 'Rohit Sharma',
+    mobileNumber: '+919876543210',
+  },
   estimatedFare: 1850,
   distanceKm: 12.4,
+  statusHistory: [
+    {
+      status: 'DRIVER_ASSIGNED',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 44).toISOString(),
+    },
+    {
+      status: 'DRIVER_EN_ROUTE',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 42).toISOString(),
+    },
+  ],
   createdAt: new Date(now.getTime() - 1000 * 60 * 30).toISOString(),
   vendorId: 'mock-vendor-001',
   assignedFleetVehicleLabel: 'Tata 407 (OD-02-TOW-1001)',
@@ -181,9 +195,17 @@ export let mockActiveJobState: DriverJobBooking | null = {
 
 export function updateMockActiveJobStatus(nextStatus: string): DriverJobBooking | null {
   if (mockActiveJobState) {
+    const statusHistory = [
+      ...(mockActiveJobState.statusHistory ?? []),
+      { status: nextStatus, timestamp: new Date().toISOString() },
+    ];
     mockActiveJobState = {
       ...mockActiveJobState,
       status: nextStatus,
+      statusHistory,
+      ...(nextStatus === 'COMPLETED'
+        ? { finalFare: mockActiveJobState.finalFare ?? mockActiveJobState.estimatedFare }
+        : {}),
     };
   }
   return mockActiveJobState;
@@ -258,6 +280,10 @@ export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
       latitude: 20.3204,
       longitude: 85.8678,
     },
+    customer: {
+      name: 'Rohit Sharma',
+      mobileNumber: '+919876543210',
+    },
     estimatedFare: 1650,
     distanceKm: 9.1,
     createdAt: new Date(now.getTime() - 1000 * 60 * 5).toISOString(),
@@ -287,6 +313,39 @@ export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
     vendorApproved: false,
   },
 ];
+
+let mockJobOffersState = [...MOCK_JOB_OFFERS];
+
+/** Promote a preview offer into the same active-job state used by the trip flow. */
+export function acceptMockDriverJob(
+  bookingId: string,
+  bookingType: DriverJobBooking['bookingType'],
+): DriverJobBooking | null {
+  const offer = mockJobOffersState.find(
+    job => job.id === bookingId && job.bookingType === bookingType,
+  );
+  if (!offer) return null;
+
+  const acceptedAt = new Date().toISOString();
+  mockActiveJobState = {
+    ...offer,
+    status: 'DRIVER_EN_ROUTE',
+    statusHistory: [
+      { status: 'DRIVER_ASSIGNED', timestamp: offer.createdAt },
+      { status: 'DRIVER_EN_ROUTE', timestamp: acceptedAt },
+    ],
+  };
+  mockJobOffersState = mockJobOffersState.filter(job => job.id !== bookingId);
+  return mockActiveJobState;
+}
+
+export function rejectMockDriverJob(bookingId: string): void {
+  mockJobOffersState = mockJobOffersState.filter(job => job.id !== bookingId);
+}
+
+export function getMockDriverJobOffers(): DriverJobBooking[] {
+  return mockJobOffersState;
+}
 
 export const MOCK_VENDOR_VEHICLES: FleetVehicle[] = [
   {

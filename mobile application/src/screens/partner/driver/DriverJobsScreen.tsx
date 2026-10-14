@@ -218,7 +218,7 @@ function RequestJobCard({
             </View>
             <Text
               numberOfLines={1}
-              style={[T.jobTitle, { flex: 1, fontSize: px(14.5), color: C.blue }]}>
+              style={[T.jobTitle, { flex: 1, fontSize: px(14.5), color: C.inkSoft }]}>
               #{job.bookingNumber}
             </Text>
           </View>
@@ -486,6 +486,47 @@ function DoneJobRow({
   );
 }
 
+function JobsCount({
+  count,
+  label,
+  px,
+}: {
+  count: number;
+  label: string;
+  px: (value: number) => number;
+}) {
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: px(8) }}>
+      <View
+        style={{
+          width: px(28),
+          height: px(28),
+          borderRadius: px(10),
+          backgroundColor: C.amberTile,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <View
+          style={{
+            width: px(8),
+            height: px(8),
+            borderRadius: px(4),
+            backgroundColor: C.amber,
+          }}
+        />
+      </View>
+      <View style={{ marginLeft: px(8) }}>
+        <Text style={[T.metricValue, { fontSize: px(20), lineHeight: px(23), color: C.ink }]}>
+          {count}
+        </Text>
+        <Text style={[T.small, { fontSize: px(11.5), lineHeight: px(15), color: C.grey }]}>
+          {label}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function DriverJobsScreen({ navigation }: Props) {
   const px = useScreenPx();
   const insets = useSafeAreaInsets();
@@ -592,7 +633,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ flex: 1 }} />
-            <PartnerHeaderLogo width={px(56)} />
+            <PartnerHeaderLogo width={px(56)} showPartnerText />
             <View style={{ flex: 1, alignItems: 'flex-end' }}>
               <Pressable
                 onPress={openPartnerNotifications}
@@ -654,53 +695,15 @@ export default function DriverJobsScreen({ navigation }: Props) {
             marginTop: px(14),
             marginHorizontal: px(M.pagePadding),
             borderRadius: px(R.card),
-            backgroundColor: C.cream,
-            paddingVertical: px(14),
+            borderWidth: 1,
+            borderColor: C.hairline,
+            backgroundColor: C.card,
+            paddingVertical: px(10),
+            paddingHorizontal: px(8),
+            ...driverShadow,
           }}>
-          <View style={{ flex: 1, paddingLeft: px(16) }}>
-            <View
-              style={{
-                width: px(9),
-                height: px(9),
-                borderRadius: px(5),
-                backgroundColor: C.amber,
-                marginBottom: px(6),
-              }}
-            />
-            <Text
-              style={[T.metricValue, { fontSize: px(20), lineHeight: px(25), color: C.ink }]}>
-              {offers.length}
-            </Text>
-            <Text
-              style={[
-                T.small,
-                { fontSize: px(12.5), lineHeight: px(17), color: C.grey, marginTop: px(2) },
-              ]}>
-              ready to accept
-            </Text>
-          </View>
-          <View style={{ flex: 1, paddingLeft: px(8) }}>
-            <View
-              style={{
-                width: px(9),
-                height: px(9),
-                borderRadius: px(5),
-                backgroundColor: C.amber,
-                marginBottom: px(6),
-              }}
-            />
-            <Text
-              style={[T.metricValue, { fontSize: px(20), lineHeight: px(25), color: C.ink }]}>
-              {activeJobs.length}
-            </Text>
-            <Text
-              style={[
-                T.small,
-                { fontSize: px(12.5), lineHeight: px(17), color: C.grey, marginTop: px(2) },
-              ]}>
-              active trip
-            </Text>
-          </View>
+          <JobsCount label="ready to accept" count={offers.length} px={px} />
+          <JobsCount label="active trip" count={activeJobs.length} px={px} />
         </View>
 
         {/* segments ----------------------------------------------------- */}
@@ -723,7 +726,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
                   height: px(34),
                   paddingHorizontal: px(16),
                   borderRadius: px(R.pill),
-                  backgroundColor: selected ? C.amber : 'transparent',
+                  backgroundColor: selected ? C.amber : C.light,
                   alignItems: 'center',
                   justifyContent: 'center',
                   opacity: pressed ? 0.9 : 1,

@@ -29,6 +29,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   View,
@@ -38,7 +39,9 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  House,
   Info,
+  LocateFixed,
   MapPin,
   MoreVertical,
   Navigation,
@@ -56,6 +59,7 @@ import {
   useUpdateDriverBookingStatusMutation,
 } from '../../../services/driver/useDriverQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
+import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
 import {
@@ -125,6 +129,46 @@ function formatWhen(iso?: string) {
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+function completedAt(job?: DriverJobBooking | null) {
+  const entry = [...(job?.statusHistory ?? [])]
+    .reverse()
+    .find(item => item.status === 'COMPLETED');
+  return entry ? formatWhen(entry.timestamp) : '';
+}
+
+function finalFareFromResponse(result: unknown): number | undefined {
+  if (!result || typeof result !== 'object') return undefined;
+  const response = result as {
+    finalFare?: unknown;
+    data?: { finalFare?: unknown };
+  };
+  const fare = response.finalFare ?? response.data?.finalFare;
+  return typeof fare === 'number' ? fare : undefined;
+}
+
+function statusHistoryFromResponse(
+  result: unknown,
+  fallback: Array<{ status: string; timestamp: string }>,
+) {
+  if (!result || typeof result !== 'object') return fallback;
+  const response = result as {
+    statusHistory?: unknown;
+    data?: { statusHistory?: unknown };
+  };
+  const history = response.statusHistory ?? response.data?.statusHistory;
+  if (!Array.isArray(history)) return fallback;
+  const normalized = history.filter(
+    (entry): entry is { status: string; timestamp: string } =>
+      Boolean(
+        entry &&
+          typeof entry === 'object' &&
+          typeof (entry as { status?: unknown }).status === 'string' &&
+          typeof (entry as { timestamp?: unknown }).timestamp === 'string',
+      ),
+  );
+  return normalized.length > 0 ? normalized : fallback;
 }
 
 /* ------------------------------------------------------------ small pieces */
@@ -219,6 +263,76 @@ function StatusChip({
   );
 }
 
+function MapCallout({
+  title,
+  detail,
+  px,
+}: {
+  title: string;
+  detail?: string;
+  px: (value: number) => number;
+}) {
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: px(56),
+        right: px(14),
+        minWidth: px(112),
+        maxWidth: px(154),
+        paddingHorizontal: px(12),
+        paddingVertical: px(9),
+        borderRadius: px(12),
+        backgroundColor: C.white,
+        ...driverShadow,
+      }}>
+      <Text style={[T.small, { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft }]}>
+        {title}
+      </Text>
+      {detail ? (
+        <Text
+          numberOfLines={2}
+          style={[T.jobTitle, { fontSize: px(12.5), lineHeight: px(16), color: C.ink, marginTop: px(2) }]}>
+          {detail}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function DestinationRoute({
+  dropoff,
+  distanceKm,
+  px,
+}: {
+  dropoff: string;
+  distanceKm?: number;
+  px: (value: number) => number;
+}) {
+  return (
+    <View style={{ marginTop: px(14), flexDirection: 'row', alignItems: 'flex-start' }}>
+      <View style={{ width: px(18), alignItems: 'center' }}>
+        <RouteDot tone="end" last px={px} />
+      </View>
+      <View style={{ flex: 1, marginLeft: px(10) }}>
+        <Text style={[T.small, { fontSize: px(12), lineHeight: px(16), color: C.greySoft }]}>
+          Drop
+        </Text>
+        <Text
+          numberOfLines={2}
+          style={[T.jobTitle, { fontSize: px(14.5), lineHeight: px(19), color: C.ink, marginTop: px(1) }]}>
+          {dropoff || 'Drop location'}
+        </Text>
+        {distanceKm != null ? (
+          <Text style={[T.meta, { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(2) }]}>
+            {distanceKm} km trip
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 /* -------------------------------------------------------------------- screen */
 
 export default function DriverActiveJobScreen({ navigation, route }: Props) {
@@ -229,9 +343,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const statusMutation = useUpdateDriverBookingStatusMutation();
 
   const [acting, setActing] = useState(false);
+  const [completedJob, setCompletedJob] = useState<DriverJobBooking | null>(null);
   const [tripOtp, setTripOtp] = useState('');
   const [otpError, setOtpError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [recenterTrigger, setRecenterTrigger] = useState(0);
   const otpInputRef = useRef<TextInput>(null);
 
   /**
@@ -246,7 +362,12 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     return () => subscription.remove();
   }, [refetch]);
 
-  const job = activeJob && (!bookingId || activeJob.id === bookingId) ? activeJob : null;
+  const job =
+    activeJob && (!bookingId || activeJob.id === bookingId)
+      ? activeJob
+      : completedJob && (!bookingId || completedJob.id === bookingId)
+        ? completedJob
+        : null;
   const step: Step = job ? stepForStatus(job.status) : 'en_route';
 
   const reportingEnabled = Boolean(
@@ -270,12 +391,24 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       if (!job) return;
       setActing(true);
       try {
-        await statusMutation.mutateAsync({
+        const result = await statusMutation.mutateAsync({
           bookingId: job.id,
           bookingType: job.bookingType,
           status,
           tripOtp: otp,
         });
+        if (status === 'COMPLETED') {
+          const fallbackHistory = [
+            ...(job.statusHistory ?? []),
+            { status: 'COMPLETED', timestamp: new Date().toISOString() },
+          ];
+          setCompletedJob({
+            ...job,
+            status: 'COMPLETED',
+            finalFare: finalFareFromResponse(result) ?? job.finalFare ?? job.estimatedFare,
+            statusHistory: statusHistoryFromResponse(result, fallbackHistory),
+          });
+        }
         await refetch();
         setOtpError('');
         setTripOtp('');
@@ -312,7 +445,14 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       return;
     }
     if (step === 'in_progress') {
-      void runStatusUpdate('COMPLETED');
+      Alert.alert(
+        'Complete job?',
+        'Confirm that the service is finished at the destination.',
+        [
+          { text: 'Keep working', style: 'cancel' },
+          { text: 'Complete job', onPress: () => void runStatusUpdate('COMPLETED') },
+        ],
+      );
       return;
     }
     navigation.getParent()?.navigate('PartnerHome' as never);
@@ -422,11 +562,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   );
 
   const mapBlock = (
-    <View style={{ marginHorizontal: px(M.pagePadding) }}>
+    <View style={{ marginHorizontal: 0 }}>
       <LiveTripMap
-        borderRadius={px(18)}
+        borderRadius={0}
         style={{ height: px(300) }}
         showsUserLocation
+        routeColor={C.blue}
+        pickupColor={step === 'in_progress' ? C.blue : C.amber}
+        dropoffColor={C.red}
+        recenterTrigger={recenterTrigger}
         pickup={
           hasPickupCoords
             ? {
@@ -447,6 +591,30 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         }
       />
 
+      {step === 'verify_otp' ? (
+        <View
+          pointerEvents="none"
+          style={{
+            ...StyleSheet.absoluteFill,
+            backgroundColor: 'rgba(12, 16, 24, 0.42)',
+          }}
+        />
+      ) : null}
+
+      {step === 'en_route' ? (
+        <MapCallout
+          title="Pickup"
+          detail={job!.distanceKm != null ? `${job!.distanceKm} km away` : pickup || undefined}
+          px={px}
+        />
+      ) : step === 'in_progress' ? (
+        <MapCallout
+          title="Destination"
+          detail={job!.distanceKm != null ? `${job!.distanceKm} km trip` : dropoff || undefined}
+          px={px}
+        />
+      ) : null}
+
       <View
         style={{
           position: 'absolute',
@@ -463,15 +631,13 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             <StatusChip label="SERVICE IN PROGRESS" tone="green" px={px} />
             <StatusChip label="Live" tone="white" dot px={px} />
           </>
-        ) : step === 'verify_otp' ? (
-          <StatusChip label="EN ROUTE TO PICKUP" tone="green" px={px} />
         ) : null}
       </View>
 
       <Pressable
-        onPress={openNavigation}
+        onPress={() => setRecenterTrigger(value => value + 1)}
         accessibilityRole="button"
-        accessibilityLabel="Recenter map"
+        accessibilityLabel="Center route"
         style={{
           position: 'absolute',
           right: px(12),
@@ -484,7 +650,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           justifyContent: 'center',
           ...driverShadow,
         }}>
-        <Navigation size={px(18)} color={C.ink} strokeWidth={2.2} />
+        <LocateFixed size={px(18)} color={C.ink} strokeWidth={2.2} />
       </Pressable>
     </View>
   );
@@ -556,12 +722,12 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
-      {header}
+      {step === 'completed' ? null : header}
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: px(150) }}>
+        contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, px(24)) }}>
         {showMap ? mapBlock : null}
 
         {/* ---------------------------------------------------- step content */}
@@ -578,6 +744,22 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               paddingBottom: px(4),
               minHeight: px(220),
             }}>
+            {step === 'en_route' ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: px(12),
+                }}>
+                <StatusChip label="EN ROUTE TO PICKUP" tone="green" px={px} />
+                {job.distanceKm != null ? (
+                  <Text style={[T.small, { fontSize: px(12), color: C.greySoft }]}>
+                    {job.distanceKm} km away
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
             <View
               style={{
                 flexDirection: 'row',
@@ -599,6 +781,9 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             </Text>
 
             {/* route block */}
+            {step === 'in_progress' ? (
+              <DestinationRoute dropoff={dropoff} distanceKm={job.distanceKm} px={px} />
+            ) : (
             <View style={{ marginTop: px(14), flexDirection: 'row', alignItems: 'flex-start' }}>
               <View style={{ width: px(18), alignItems: 'center' }}>
                 <RouteDot tone="start" px={px} />
@@ -653,6 +838,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
+            )}
 
             {/* customer row — rendered only when the booking carries a contact */}
             {job.customer?.name || job.customer?.mobileNumber ? (
@@ -746,6 +932,92 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 </View>
               </View>
             ) : null}
+
+            <View style={{ marginTop: px(16), paddingBottom: px(12) }}>
+              {step === 'en_route' ? (
+                <>
+                  <Pressable
+                    onPress={openNavigation}
+                    accessibilityRole="button"
+                    style={{
+                      height: px(46),
+                      borderRadius: px(R.button),
+                      borderWidth: 1,
+                      borderColor: C.amberBorder,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'row',
+                    }}>
+                    <Navigation size={px(17)} color={C.ink} strokeWidth={2.4} />
+                    <Text
+                      style={[T.button, { fontSize: px(15), color: C.ink, marginLeft: px(8) }]}>
+                      Navigate
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={onPrimaryPress}
+                    disabled={acting}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: acting }}
+                    style={({ pressed }) => ({
+                      height: px(52),
+                      marginTop: px(10),
+                      borderRadius: px(R.button),
+                      backgroundColor: acting ? C.amberBorder : C.amber,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.94 : 1,
+                    })}>
+                    {acting ? (
+                      <ActivityIndicator color={C.ink} />
+                    ) : (
+                      <Text style={[T.button, { fontSize: px(16), color: C.ink }]}>
+                        Arrived at pickup
+                      </Text>
+                    )}
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={onPrimaryPress}
+                    disabled={acting}
+                    accessibilityRole="button"
+                    accessibilityState={{ disabled: acting }}
+                    style={({ pressed }) => ({
+                      height: px(52),
+                      borderRadius: px(R.button),
+                      backgroundColor: acting ? C.amberBorder : C.amber,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      opacity: pressed ? 0.94 : 1,
+                    })}>
+                    {acting ? (
+                      <ActivityIndicator color={C.ink} />
+                    ) : (
+                      <Text style={[T.button, { fontSize: px(16), color: C.ink }]}>
+                        Complete job
+                      </Text>
+                    )}
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void Linking.openURL(SUPPORT_NUMBER)}
+                    accessibilityRole="button"
+                    style={{
+                      paddingVertical: px(13),
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexDirection: 'row',
+                    }}>
+                    <Phone size={px(15)} color={C.amberText} strokeWidth={2.6} />
+                    <Text
+                      style={[T.link, { fontSize: px(13.5), color: C.amberText, marginLeft: px(6) }]}>
+                      Call support
+                    </Text>
+                  </Pressable>
+                </>
+              )}
+            </View>
           </View>
         ) : null}
 
@@ -845,7 +1117,6 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               }}
               keyboardType="number-pad"
               maxLength={OTP_LENGTH}
-              autoFocus
               style={{ position: 'absolute', opacity: 0, height: 1, width: 1 }}
             />
 
@@ -927,7 +1198,28 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         {/* board 05 — job completed summary */}
         {step === 'completed' ? (
           <View style={{ paddingHorizontal: px(M.pagePadding), paddingTop: px(10) }}>
-            <View style={{ alignItems: 'center', paddingVertical: px(18) }}>
+            <View style={{ alignItems: 'center', paddingVertical: px(18), position: 'relative' }}>
+              {[
+                { left: px(48), top: px(18), color: C.amber, size: 5 },
+                { left: px(72), top: px(4), color: C.green, size: 4 },
+                { left: px(190), top: px(8), color: C.amber, size: 4 },
+                { left: px(232), top: px(30), color: C.blue, size: 3 },
+                { left: px(42), top: px(68), color: C.blue, size: 3 },
+                { left: px(246), top: px(78), color: C.amber, size: 5 },
+              ].map((dot, index) => (
+                <View
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    left: dot.left,
+                    top: dot.top,
+                    width: px(dot.size),
+                    height: px(dot.size),
+                    borderRadius: px(dot.size / 2),
+                    backgroundColor: dot.color,
+                  }}
+                />
+              ))}
               <View
                 style={{
                   width: px(84),
@@ -1037,6 +1329,24 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                     ]}>
                     {dropoff || 'Drop location'}
                   </Text>
+                  {completedAt(job) ? (
+                    <View
+                      style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
+                      <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
+                      <Text
+                        style={[
+                          T.meta,
+                          {
+                            fontSize: px(12),
+                            lineHeight: px(16),
+                            color: C.greySoft,
+                            marginLeft: px(5),
+                          },
+                        ]}>
+                        {completedAt(job)}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
 
@@ -1136,6 +1446,28 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   ) : null}
                 </View>
               ) : null}
+
+              <Pressable
+                onPress={onPrimaryPress}
+                disabled={acting}
+                accessibilityRole="button"
+                accessibilityLabel="Back to Home"
+                accessibilityState={{ disabled: acting }}
+                style={({ pressed }) => ({
+                  height: px(52),
+                  marginTop: px(16),
+                  borderRadius: px(R.button),
+                  backgroundColor: acting ? C.amberBorder : C.amber,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: pressed ? 0.94 : 1,
+                })}>
+                <House size={px(17)} color={C.ink} strokeWidth={2.6} />
+                <Text style={[T.button, { fontSize: px(16), color: C.ink, marginLeft: px(8) }]}>
+                  Back to Home
+                </Text>
+              </Pressable>
             </View>
 
             <Pressable
@@ -1158,82 +1490,6 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           </View>
         ) : null}
       </ScrollView>
-
-      {/* ------------------------------------------------------- sticky CTA */}
-      {step === 'verify_otp' ? null : (
-      <View
-        style={{
-          paddingHorizontal: px(M.pagePadding),
-          paddingTop: px(10),
-          paddingBottom: Math.max(insets.bottom, px(12)),
-          backgroundColor: C.card,
-          borderTopWidth: 1,
-          borderTopColor: C.hairline,
-        }}>
-        <Pressable
-          onPress={onPrimaryPress}
-          disabled={acting}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: acting }}
-          style={({ pressed }) => ({
-            height: px(52),
-            borderRadius: px(R.button),
-            backgroundColor: acting ? C.amberBorder : C.amber,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: pressed ? 0.94 : 1,
-          })}>
-          {acting ? (
-            <ActivityIndicator color={C.ink} />
-          ) : (
-            <Text style={[T.button, { fontSize: px(16), color: C.ink }]}>{primaryLabel}</Text>
-          )}
-        </Pressable>
-
-        {step === 'en_route' ? (
-          <Pressable
-            onPress={openNavigation}
-            accessibilityRole="button"
-            style={{
-              height: px(46),
-              marginTop: px(10),
-              borderRadius: px(R.button),
-              borderWidth: 1,
-              borderColor: C.hairline,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-            }}>
-            <Navigation size={px(17)} color={C.ink} strokeWidth={2.4} />
-            <Text
-              style={[T.button, { fontSize: px(15), color: C.ink, marginLeft: px(8) }]}>
-              Navigate
-            </Text>
-          </Pressable>
-        ) : null}
-
-        {step === 'in_progress' ? (
-          <Pressable
-            onPress={() => void Linking.openURL(SUPPORT_NUMBER)}
-            accessibilityRole="button"
-            style={{
-              paddingVertical: px(13),
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-            }}>
-            <Phone size={px(15)} color={C.amberText} strokeWidth={2.6} />
-            <Text
-              style={[
-                T.link,
-                { fontSize: px(13.5), color: C.amberText, marginLeft: px(6) },
-              ]}>
-              Call support
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
-      )}
 
       {/* options sheet ---------------------------------------------------- */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
