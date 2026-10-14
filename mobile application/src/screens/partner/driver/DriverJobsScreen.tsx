@@ -1,3 +1,4 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 /**
  * RACE Partner — Driver Jobs (board 01 "JOBS / AVAILABLE").
  *
@@ -14,16 +15,9 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, View } from 'react-native';
 import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import {
+  ArrowRight,
   Bell,
   CalendarDays,
   Car,
@@ -34,6 +28,7 @@ import {
   Inbox,
   MapPin,
   Navigation,
+  Phone,
   RefreshCw,
   Route,
   TriangleAlert,
@@ -55,6 +50,7 @@ import {
   useDriverProfileQuery,
   useRejectDriverJobMutation,
 } from '../../../services/driver/useDriverQueries';
+import { useNotificationsQuery } from '../../../services/useNotificationQueries';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
@@ -179,6 +175,7 @@ function RequestJobCard({
   px,
   accepting,
   declining,
+  hasActiveJob = false,
   onAccept,
   onDecline,
 }: {
@@ -186,6 +183,7 @@ function RequestJobCard({
   px: (value: number) => number;
   accepting: boolean;
   declining: boolean;
+  hasActiveJob?: boolean;
   onAccept: () => void;
   onDecline: () => void;
 }) {
@@ -227,58 +225,58 @@ function RequestJobCard({
                   paddingVertical: px(2),
                   marginRight: px(6),
                 }}>
-                <Text style={[T.pill, { fontSize: px(10), lineHeight: px(13), color: C.blue }]}>
+                <PartnerText style={[T.pill, { fontSize: px(10), lineHeight: px(13), color: C.blue }]}>
                   NEW
-                </Text>
+                </PartnerText>
               </View>
-              <Text
+              <PartnerText
                 numberOfLines={1}
                 style={[T.jobTitle, { fontSize: px(13.5), color: C.inkSoft }]}>
                 #{job.bookingNumber}
-              </Text>
+              </PartnerText>
             </View>
             {job.distanceKm != null ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <MapPin size={px(12)} color={C.green} strokeWidth={2.6} />
-                <Text
+                <PartnerText
                   style={[
                     T.distance,
                     { fontSize: px(12.5), lineHeight: px(16), color: C.green, marginLeft: px(3) },
                   ]}>
                   {job.distanceKm} km away
-                </Text>
+                </PartnerText>
               </View>
             ) : null}
           </View>
         </View>
       </View>
 
-      <Text
+      <PartnerText
         numberOfLines={1}
         style={[
           T.jobTitle,
           { fontSize: px(14.5), lineHeight: px(19), color: C.ink, marginTop: px(8) },
         ]}>
         {serviceTitle(job)}
-      </Text>
+      </PartnerText>
 
       {pickup || drop ? (
         <View style={{ flexDirection: 'row', marginTop: px(7) }}>
           <RouteSpine px={px} />
           <View style={{ flex: 1, marginLeft: px(9) }}>
             {pickup ? (
-              <Text
+              <PartnerText
                 numberOfLines={1}
                 style={[T.body, { fontSize: px(13), color: C.inkSoft }]}>
                 {pickup}
-              </Text>
+              </PartnerText>
             ) : null}
             {drop ? (
-              <Text
+              <PartnerText
                 numberOfLines={1}
                 style={[T.body, { fontSize: px(13), color: C.inkSoft, marginTop: px(6) }]}>
                 {drop}
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
         </View>
@@ -293,28 +291,28 @@ function RequestJobCard({
             paddingLeft: px(24),
           }}>
           <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
-          <Text
+          <PartnerText
             style={[
               T.meta,
               { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginLeft: px(6) },
             ]}>
             {formatWhen(job.createdAt)}
-          </Text>
+          </PartnerText>
         </View>
       ) : null}
 
       {job.estimatedFare != null ? (
         <View style={{ marginTop: px(8), paddingLeft: px(24) }}>
-          <Text style={[T.metricValue, { fontSize: px(22), lineHeight: px(26), color: C.ink }]}>
+          <PartnerText style={[T.metricValue, { fontSize: px(22), lineHeight: px(26), color: C.ink }]}>
             {formatInr(job.estimatedFare)}
-          </Text>
-          <Text
+          </PartnerText>
+          <PartnerText
             style={[
               T.small,
               { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft, marginTop: px(1) },
             ]}>
             Estimated earnings
-          </Text>
+          </PartnerText>
         </View>
       ) : null}
 
@@ -338,13 +336,13 @@ function RequestJobCard({
           {declining ? (
             <ActivityIndicator size="small" color={C.grey} />
           ) : (
-            <Text
+            <PartnerText
               style={[
                 T.button,
                 { fontSize: px(14.5), fontWeight: '600', color: busy ? C.greySoft : C.grey },
               ]}>
               Decline
-            </Text>
+            </PartnerText>
           )}
         </Pressable>
 
@@ -352,12 +350,16 @@ function RequestJobCard({
           onPress={onAccept}
           disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel={`Accept trip ${job.bookingNumber}`}
+          accessibilityLabel={
+            hasActiveJob
+              ? `Trip in progress. Finish current trip before accepting #${job.bookingNumber}`
+              : `Accept trip ${job.bookingNumber}`
+          }
           style={({ pressed }) => ({
             flex: 1.5,
             height: px(40),
             borderRadius: px(R.button),
-            backgroundColor: busy ? C.amberBorder : C.amber,
+            backgroundColor: hasActiveJob ? '#E2E8F0' : busy ? C.amberBorder : C.amber,
             alignItems: 'center',
             justifyContent: 'center',
             opacity: pressed ? 0.9 : 1,
@@ -365,9 +367,17 @@ function RequestJobCard({
           {accepting ? (
             <ActivityIndicator size="small" color={C.ink} />
           ) : (
-            <Text style={[T.button, { fontSize: px(15), fontWeight: '700', color: C.ink }]}>
-              Accept trip
-            </Text>
+            <PartnerText
+              style={[
+                T.button,
+                {
+                  fontSize: px(14),
+                  fontWeight: '700',
+                  color: hasActiveJob ? '#64748B' : C.ink,
+                },
+              ]}>
+              {hasActiveJob ? 'Trip In Progress' : 'Accept trip'}
+            </PartnerText>
           )}
         </Pressable>
       </View>
@@ -386,58 +396,358 @@ function ActiveJobRow({
 }) {
   const pickup = addressOf(job.pickup?.address || job.pickup?.label);
   const drop = addressOf(job.dropoff?.address || job.dropoff?.label);
+  const fare = jobEarnings(job);
+
   return (
     <Pressable
       onPress={onOpen}
       accessibilityRole="button"
-      accessibilityLabel={`Open active job ${job.bookingNumber}`}
+      accessibilityLabel={`Open active job #${job.bookingNumber}`}
       style={({ pressed }) => ({
-        backgroundColor: C.card,
+        backgroundColor: '#FFFFFF',
         borderRadius: px(R.card),
-        borderWidth: 1,
-        borderColor: C.greenCardBorder,
+        borderWidth: 1.5,
+        borderColor: '#86EFAC',
         padding: px(14),
         marginBottom: px(12),
-        opacity: pressed ? 0.95 : 1,
+        shadowColor: '#10B981',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 3,
+        opacity: pressed ? 0.96 : 1,
       })}>
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      {/* Header Row: Live Badge, Booking # & Fare */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: px(10),
+          borderBottomWidth: 1,
+          borderBottomColor: '#F1F5F9',
+        }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#ECFDF5',
+              paddingHorizontal: px(8),
+              paddingVertical: px(3),
+              borderRadius: px(12),
+              borderWidth: 1,
+              borderColor: '#A7F3D0',
+            }}>
+            <View
+              style={{
+                width: px(6),
+                height: px(6),
+                borderRadius: px(3),
+                backgroundColor: '#10B981',
+                marginRight: px(5),
+              }}
+            />
+            <PartnerText
+              style={{
+                fontSize: px(10.5),
+                fontWeight: '800',
+                color: '#059669',
+                letterSpacing: 0.4,
+              }}>
+              {activeStatusLabel(job.status).toUpperCase()}
+            </PartnerText>
+          </View>
+
+          <PartnerText
+            style={{
+              fontSize: px(13),
+              fontWeight: '700',
+              color: '#475569',
+              marginLeft: px(8),
+            }}>
+            #{job.bookingNumber}
+          </PartnerText>
+        </View>
+
+        {fare != null ? (
+          <View style={{ alignItems: 'flex-end' }}>
+            <PartnerText
+              style={{
+                fontSize: px(17),
+                lineHeight: px(21),
+                fontWeight: '800',
+                color: '#0F172A',
+              }}>
+              {formatInr(fare)}
+            </PartnerText>
+            <PartnerText
+              style={{
+                fontSize: px(10),
+                color: '#64748B',
+                fontWeight: '600',
+              }}>
+              Est. fare
+            </PartnerText>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Service Title & Glyphs */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(10) }}>
         <View
           style={{
-            width: px(46),
-            height: px(46),
-            borderRadius: px(23),
-            backgroundColor: C.greenTile,
+            width: px(36),
+            height: px(36),
+            borderRadius: px(10),
+            backgroundColor: '#F0FDF4',
+            borderWidth: 1,
+            borderColor: '#DCFCE7',
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <JobGlyph job={job} px={px} size={26} />
+          <Navigation size={px(18)} color="#15803D" strokeWidth={2.4} />
         </View>
-        <View style={{ flex: 1, marginLeft: px(12) }}>
-          <Text
+        <View style={{ flex: 1, marginLeft: px(10) }}>
+          <PartnerText
             numberOfLines={1}
-            style={[T.jobTitle, { fontSize: px(14.5), color: C.ink }]}>
-            #{job.bookingNumber}
-          </Text>
-          <Text
-            numberOfLines={1}
-            style={[T.meta, { fontSize: px(12.5), color: C.green, marginTop: px(2) }]}>
-            {activeStatusLabel(job.status)}
-          </Text>
+            style={{
+              fontSize: px(14.5),
+              fontWeight: '800',
+              color: '#0F172A',
+            }}>
+            {serviceTitle(job)}
+          </PartnerText>
+          {job.distanceKm != null ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
+              <MapPin size={px(11)} color="#059669" strokeWidth={2.4} />
+              <PartnerText
+                style={{
+                  fontSize: px(11.5),
+                  fontWeight: '600',
+                  color: '#059669',
+                  marginLeft: px(3),
+                }}>
+                {job.distanceKm} km trip
+              </PartnerText>
+              {job.assignedFleetVehicleLabel ? (
+                <PartnerText style={{ fontSize: px(11.5), color: '#94A3B8', marginLeft: px(4) }}>
+                  • {job.assignedFleetVehicleLabel}
+                </PartnerText>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
-      <Text
-        numberOfLines={1}
-        style={[
-          T.jobTitle,
-          { fontSize: px(15), lineHeight: px(20), color: C.ink, marginTop: px(10) },
-        ]}>
-        {serviceTitle(job)}
-      </Text>
+
+      {/* Route Section: Pickup & Drop */}
       {pickup || drop ? (
-        <Text numberOfLines={1} style={[T.body, { fontSize: px(13), color: C.greySoft, marginTop: px(4) }]}>
-          {[pickup, drop].filter(Boolean).join('  →  ')}
-        </Text>
+        <View
+          style={{
+            marginTop: px(10),
+            backgroundColor: '#F8FAFC',
+            borderRadius: px(12),
+            padding: px(10),
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+          }}>
+          {pickup ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: px(18),
+                  height: px(18),
+                  borderRadius: px(9),
+                  backgroundColor: '#DCFCE7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: px(8),
+                }}>
+                <View
+                  style={{
+                    width: px(7),
+                    height: px(7),
+                    borderRadius: px(3.5),
+                    backgroundColor: '#16A34A',
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <PartnerText
+                  style={{
+                    fontSize: px(10),
+                    fontWeight: '700',
+                    color: '#15803D',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.3,
+                  }}>
+                  Pickup Location
+                </PartnerText>
+                <PartnerText
+                  numberOfLines={1}
+                  style={{
+                    fontSize: px(12.5),
+                    fontWeight: '600',
+                    color: '#1E293B',
+                    marginTop: px(1),
+                  }}>
+                  {pickup}
+                </PartnerText>
+              </View>
+            </View>
+          ) : null}
+
+          {pickup && drop ? (
+            <View
+              style={{
+                marginLeft: px(8.5),
+                height: px(10),
+                width: px(1.5),
+                backgroundColor: '#CBD5E1',
+                marginVertical: px(2),
+              }}
+            />
+          ) : null}
+
+          {drop ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View
+                style={{
+                  width: px(18),
+                  height: px(18),
+                  borderRadius: px(9),
+                  backgroundColor: '#FEF3C7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: px(8),
+                }}>
+                <View
+                  style={{
+                    width: px(7),
+                    height: px(7),
+                    borderRadius: px(3.5),
+                    backgroundColor: '#D97706',
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <PartnerText
+                  style={{
+                    fontSize: px(10),
+                    fontWeight: '700',
+                    color: '#B45309',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.3,
+                  }}>
+                  Drop Location
+                </PartnerText>
+                <PartnerText
+                  numberOfLines={1}
+                  style={{
+                    fontSize: px(12.5),
+                    fontWeight: '600',
+                    color: '#1E293B',
+                    marginTop: px(1),
+                  }}>
+                  {drop}
+                </PartnerText>
+              </View>
+            </View>
+          ) : null}
+        </View>
       ) : null}
+
+      {/* Customer info (if available) */}
+      {job.customer?.name || job.customer?.mobileNumber ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: px(10),
+            paddingHorizontal: px(4),
+          }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: px(26),
+                height: px(26),
+                borderRadius: px(13),
+                backgroundColor: '#E2E8F0',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <User size={px(14)} color="#475569" strokeWidth={2.2} />
+            </View>
+            <View style={{ marginLeft: px(8) }}>
+              <PartnerText style={{ fontSize: px(12), fontWeight: '700', color: '#1E293B' }}>
+                {job.customer?.name || 'Customer'}
+              </PartnerText>
+              {job.customer?.mobileNumber ? (
+                <PartnerText style={{ fontSize: px(11), color: '#64748B' }}>
+                  {job.customer.mobileNumber}
+                </PartnerText>
+              ) : null}
+            </View>
+          </View>
+
+          {job.customer?.mobileNumber ? (
+            <Pressable
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                void Linking.openURL(`tel:${job.customer?.mobileNumber}`);
+              }}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: pressed ? '#DCFCE7' : '#F0FDF4',
+                borderWidth: 1,
+                borderColor: '#86EFAC',
+                paddingHorizontal: px(10),
+                paddingVertical: px(4.5),
+                borderRadius: px(14),
+              })}>
+              <Phone size={px(12)} color="#15803D" strokeWidth={2.4} />
+              <PartnerText style={{ fontSize: px(11.5), fontWeight: '700', color: '#15803D', marginLeft: px(4) }}>
+                Call
+              </PartnerText>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
+      {/* Primary Action Button (Clear CTA so user knows to click to get access) */}
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={`Continue active trip #${job.bookingNumber}`}
+        style={({ pressed }) => ({
+          marginTop: px(12),
+          height: px(42),
+          borderRadius: px(12),
+          backgroundColor: pressed ? '#047857' : '#059669',
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#059669',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.18,
+          shadowRadius: 4,
+          elevation: 2,
+        })}>
+        <Navigation size={px(15)} color="#FFFFFF" strokeWidth={2.6} style={{ marginRight: px(7) }} />
+        <PartnerText
+          style={{
+            fontSize: px(14),
+            fontWeight: '800',
+            color: '#FFFFFF',
+            letterSpacing: 0.3,
+          }}>
+          Continue Active Trip
+        </PartnerText>
+        <ArrowRight size={px(15)} color="#FFFFFF" strokeWidth={2.6} style={{ marginLeft: px(6) }} />
+      </Pressable>
     </Pressable>
   );
 }
@@ -447,13 +757,11 @@ function DoneJobRow({
   px,
   expanded,
   onOpen,
-  onViewSummary,
 }: {
   job: DriverJobBooking;
   px: (value: number) => number;
   expanded: boolean;
   onOpen: () => void;
-  onViewSummary: () => void;
 }) {
   const pickup = addressOf(job.pickup?.address || job.pickup?.label) || 'Pickup point';
   const drop = addressOf(job.dropoff?.address || job.dropoff?.label) || 'Drop location';
@@ -496,9 +804,9 @@ function DoneJobRow({
           </View>
           <View style={{ flex: 1, marginLeft: px(12) }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={[T.jobTitle, { fontSize: px(14.5), color: C.ink }]}>
+              <PartnerText style={[T.jobTitle, { fontSize: px(14.5), color: C.ink }]}>
                 #{job.bookingNumber}
-              </Text>
+              </PartnerText>
               <View
                 style={{
                   height: px(M.rowPillHeight),
@@ -507,39 +815,39 @@ function DoneJobRow({
                   backgroundColor: cancelled ? C.redPill : C.greenPill,
                   justifyContent: 'center',
                 }}>
-                <Text
+                <PartnerText
                   style={[
                     T.pill,
                     { fontSize: px(11.5), color: cancelled ? C.red : C.green, fontWeight: '700' },
                   ]}>
                   {cancelled ? 'Cancelled' : 'Completed'}
-                </Text>
+                </PartnerText>
               </View>
             </View>
-            <Text
+            <PartnerText
               numberOfLines={1}
               style={[T.meta, { fontSize: px(12.5), color: C.greySoft, marginTop: px(2) }]}>
               {serviceTitle(job)} • {formatWhen(job.createdAt) || 'Recent'}
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
         {/* Route preview snippet */}
         <View style={{ marginTop: px(10), flexDirection: 'row', alignItems: 'center' }}>
           <MapPin size={px(13)} color={C.blue} strokeWidth={2.4} />
-          <Text
+          <PartnerText
             numberOfLines={1}
             style={[T.body, { flex: 1, fontSize: px(12.5), color: C.inkSoft, marginLeft: px(6) }]}>
             {pickup}
-          </Text>
+          </PartnerText>
           {drop && drop !== 'Drop location' ? (
             <>
-              <Text style={{ marginHorizontal: px(4), color: C.greySoft, fontSize: px(12) }}>→</Text>
-              <Text
+              <PartnerText style={{ marginHorizontal: px(4), color: C.greySoft, fontSize: px(12) }}>→</PartnerText>
+              <PartnerText
                 numberOfLines={1}
                 style={[T.body, { flex: 1, fontSize: px(12.5), color: C.inkSoft }]}>
                 {drop}
-              </Text>
+              </PartnerText>
             </>
           ) : null}
         </View>
@@ -557,25 +865,25 @@ function DoneJobRow({
           }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             {earned != null ? (
-              <Text style={[T.jobTitle, { fontSize: px(15), color: C.green, fontWeight: '700' }]}>
+              <PartnerText style={[T.jobTitle, { fontSize: px(15), color: C.green, fontWeight: '700' }]}>
                 {formatInr(earned)}
-              </Text>
+              </PartnerText>
             ) : null}
             {job.distanceKm != null ? (
-              <Text
+              <PartnerText
                 style={[
                   T.meta,
                   { fontSize: px(12), color: C.greySoft, marginLeft: earned != null ? px(8) : 0 },
                 ]}>
                 {job.distanceKm} km
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={[T.link, { fontSize: px(12), color: C.grey }]}>
+            <PartnerText style={[T.link, { fontSize: px(12), color: C.grey }]}>
               {expanded ? 'Hide details' : 'Trip details'}
-            </Text>
+            </PartnerText>
             {expanded ? (
               <ChevronUp size={px(16)} color={C.grey} strokeWidth={2.2} style={{ marginLeft: px(4) }} />
             ) : (
@@ -601,10 +909,10 @@ function DoneJobRow({
                 <MapPin size={px(14)} color={C.blue} strokeWidth={2.4} />
               </View>
               <View style={{ flex: 1, marginLeft: px(8) }}>
-                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Pickup point</Text>
-                <Text style={[T.body, { fontSize: px(13), color: C.ink, marginTop: px(1) }]}>
+                <PartnerText style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Pickup point</PartnerText>
+                <PartnerText style={[T.body, { fontSize: px(13), color: C.ink, marginTop: px(1) }]}>
                   {pickup}
-                </Text>
+                </PartnerText>
               </View>
             </View>
 
@@ -613,10 +921,10 @@ function DoneJobRow({
                 <MapPin size={px(14)} color={C.amberText} strokeWidth={2.4} />
               </View>
               <View style={{ flex: 1, marginLeft: px(8) }}>
-                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Drop-off point</Text>
-                <Text style={[T.body, { fontSize: px(13), color: C.ink, marginTop: px(1) }]}>
+                <PartnerText style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Drop-off point</PartnerText>
+                <PartnerText style={[T.body, { fontSize: px(13), color: C.ink, marginTop: px(1) }]}>
                   {drop}
-                </Text>
+                </PartnerText>
               </View>
             </View>
 
@@ -625,9 +933,9 @@ function DoneJobRow({
                 <View style={{ width: px(18), alignItems: 'center' }}>
                   <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
                 </View>
-                <Text style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
+                <PartnerText style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
                   Requested: {formatWhen(job.createdAt)}
-                </Text>
+                </PartnerText>
               </View>
             ) : null}
 
@@ -636,9 +944,9 @@ function DoneJobRow({
                 <View style={{ width: px(18), alignItems: 'center' }}>
                   <Clock3 size={px(13)} color={C.green} strokeWidth={2.2} />
                 </View>
-                <Text style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
+                <PartnerText style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
                   Finished: {formatWhen(completedEntry.timestamp)}
-                </Text>
+                </PartnerText>
               </View>
             ) : null}
 
@@ -647,9 +955,9 @@ function DoneJobRow({
                 <View style={{ width: px(18), alignItems: 'center' }}>
                   <User size={px(13)} color={C.greySoft} strokeWidth={2.2} />
                 </View>
-                <Text style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
+                <PartnerText style={[T.body, { fontSize: px(12.5), color: C.grey, marginLeft: px(8) }]}>
                   Customer: {job.customer.name}
-                </Text>
+                </PartnerText>
               </View>
             ) : null}
           </View>
@@ -667,50 +975,31 @@ function DoneJobRow({
             }}>
             {job.distanceKm != null ? (
               <View style={{ flex: 1 }}>
-                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Distance</Text>
-                <Text style={[T.jobTitle, { fontSize: px(14), color: C.ink, marginTop: px(2) }]}>
+                <PartnerText style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Distance</PartnerText>
+                <PartnerText style={[T.jobTitle, { fontSize: px(14), color: C.ink, marginTop: px(2) }]}>
                   {job.distanceKm} km
-                </Text>
+                </PartnerText>
               </View>
             ) : null}
             {earned != null ? (
               <View style={{ flex: 1 }}>
-                <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Earnings</Text>
-                <Text style={[T.jobTitle, { fontSize: px(14), color: C.green, marginTop: px(2) }]}>
+                <PartnerText style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Earnings</PartnerText>
+                <PartnerText style={[T.jobTitle, { fontSize: px(14), color: C.green, marginTop: px(2) }]}>
                   {formatInr(earned)}
-                </Text>
+                </PartnerText>
               </View>
             ) : null}
             <View style={{ flex: 1 }}>
-              <Text style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Status</Text>
-              <Text
+              <PartnerText style={[T.small, { fontSize: px(11), color: C.greySoft }]}>Status</PartnerText>
+              <PartnerText
                 style={[
                   T.jobTitle,
                   { fontSize: px(14), color: cancelled ? C.red : C.green, marginTop: px(2) },
                 ]}>
                 {cancelled ? 'Cancelled' : 'Completed'}
-              </Text>
+              </PartnerText>
             </View>
           </View>
-
-          {/* Full view button */}
-          <Pressable
-            onPress={onViewSummary}
-            accessibilityRole="button"
-            accessibilityLabel={`View full summary for trip ${job.bookingNumber}`}
-            style={({ pressed }) => ({
-              height: px(38),
-              borderRadius: px(R.button),
-              backgroundColor: C.amber,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginTop: px(12),
-              opacity: pressed ? 0.9 : 1,
-            })}>
-            <Text style={[T.button, { fontSize: px(13.5), fontWeight: '700', color: C.ink }]}>
-              View trip receipt & summary
-            </Text>
-          </Pressable>
         </View>
       ) : null}
     </View>
@@ -752,10 +1041,10 @@ function JobsCount({
         <Icon size={px(17)} color={iconColor} strokeWidth={2.4} />
       </View>
       <View style={{ marginLeft: px(10) }}>
-        <Text style={[T.metricValue, { fontSize: px(18), lineHeight: px(22), color: C.ink }]}>
+        <PartnerText style={[T.metricValue, { fontSize: px(18), lineHeight: px(22), color: C.ink }]}>
           {count}
-        </Text>
-        <Text
+        </PartnerText>
+        <PartnerText
           style={[
             T.small,
             {
@@ -769,7 +1058,7 @@ function JobsCount({
             },
           ]}>
           {label}
-        </Text>
+        </PartnerText>
       </View>
     </View>
   );
@@ -800,6 +1089,8 @@ export default function DriverJobsScreen({ navigation }: Props) {
   } = useDriverActiveJobQuery(isApproved);
   const acceptMutation = useAcceptDriverJobMutation();
   const rejectMutation = useRejectDriverJobMutation();
+  const { data: notifData } = useNotificationsQuery();
+  const unreadNotifCount = notifData?.unreadCount ?? 0;
 
   const [segment, setSegment] = useState<Segment>('available');
   const [pendingAcceptId, setPendingAcceptId] = useState<string | null>(null);
@@ -819,6 +1110,16 @@ export default function DriverJobsScreen({ navigation }: Props) {
     }
     return list;
   }, [activeJob, jobs]);
+
+  const hasActiveJob = Boolean(activeJob) || activeJobs.length > 0;
+  // While driver has an active job, open offers are not counted in the notification badge
+  const badgeCount = Math.max(unreadNotifCount, hasActiveJob ? 0 : offers.length);
+
+  const sortedOffers = useMemo(
+    () =>
+      [...offers].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)),
+    [offers],
+  );
 
   const doneJobs = useMemo(
     () =>
@@ -841,6 +1142,25 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const onAccept = useCallback(
     async (job: DriverJobBooking) => {
       if (pendingAcceptId || pendingDeclineId) return;
+      if (hasActiveJob) {
+        Alert.alert(
+          'Active Trip in Progress',
+          'You already have an active trip in progress. Please complete or cancel your current trip before accepting a new request.',
+          [
+            {
+              text: 'View Active Trip',
+              onPress: () => {
+                const currentJob = activeJob || activeJobs[0];
+                if (currentJob) {
+                  openActiveJob(currentJob);
+                }
+              },
+            },
+            { text: 'OK', style: 'cancel' },
+          ],
+        );
+        return;
+      }
       setPendingAcceptId(job.id);
       try {
         // The active job opens only after the API confirms the accept.
@@ -856,7 +1176,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         setPendingAcceptId(null);
       }
     },
-    [acceptMutation, navigation, pendingAcceptId, pendingDeclineId, refetchJobs],
+    [acceptMutation, activeJob, activeJobs, hasActiveJob, navigation, openActiveJob, pendingAcceptId, pendingDeclineId, refetchJobs],
   );
 
   const onDecline = useCallback(
@@ -908,7 +1228,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           zIndex: 10,
         }}>
         <View>
-          <Text
+          <PartnerText
             style={[
               T.greeting,
               {
@@ -919,21 +1239,23 @@ export default function DriverJobsScreen({ navigation }: Props) {
               },
             ]}>
             Jobs
-          </Text>
-          <Text
+          </PartnerText>
+          <PartnerText
             style={[
               T.subtitle,
               { fontSize: px(12.5), lineHeight: px(16), color: C.grey, marginTop: px(1) },
             ]}>
             Trips approved for you
-          </Text>
+          </PartnerText>
         </View>
 
         <Pressable
           onPress={openPartnerNotifications}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel="Notifications"
+          accessibilityLabel={
+            badgeCount > 0 ? `Notifications, ${badgeCount} unread` : 'Notifications'
+          }
           style={{
             width: px(36),
             height: px(36),
@@ -945,20 +1267,34 @@ export default function DriverJobsScreen({ navigation }: Props) {
             justifyContent: 'center',
           }}>
           <Bell size={px(18)} color={C.ink} strokeWidth={2} />
-          {offers.length > 0 ? (
+          {badgeCount > 0 ? (
             <View
               style={{
                 position: 'absolute',
-                top: px(6),
-                right: px(7),
-                width: px(8),
-                height: px(8),
-                borderRadius: px(4),
+                top: -px(3),
+                right: -px(3),
+                minWidth: px(17),
+                height: px(17),
+                borderRadius: px(8.5),
                 backgroundColor: C.red,
-                borderWidth: px(1.5),
-                borderColor: C.card,
-              }}
-            />
+                borderWidth: 1.5,
+                borderColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: px(2),
+              }}>
+              <PartnerText
+                style={{
+                  fontSize: px(9),
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                  lineHeight: px(11),
+                  textAlign: 'center',
+                  includeFontPadding: false,
+                }}>
+                {badgeCount > 9 ? '9+' : badgeCount}
+              </PartnerText>
+            </View>
           ) : null}
         </Pressable>
       </View>
@@ -1027,7 +1363,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
                     : {}),
                   opacity: pressed ? 0.9 : 1,
                 })}>
-                <Text
+                <PartnerText
                   style={{
                     fontSize: px(13),
                     lineHeight: px(17),
@@ -1035,7 +1371,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
                     color: selected ? C.ink : '#64748B',
                   }}>
                   {item.label}
-                </Text>
+                </PartnerText>
                 <View
                   style={{
                     marginLeft: px(5),
@@ -1044,7 +1380,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
                     borderRadius: px(10),
                     backgroundColor: selected ? C.amberTile : 'rgba(100, 116, 139, 0.12)',
                   }}>
-                  <Text
+                  <PartnerText
                     style={{
                       fontSize: px(10.5),
                       lineHeight: px(13),
@@ -1052,7 +1388,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
                       color: selected ? C.amberText : '#64748B',
                     }}>
                     {item.count}
-                  </Text>
+                  </PartnerText>
                 </View>
               </Pressable>
             );
@@ -1068,7 +1404,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           ) : hasQueryError ? (
             <JobsErrorState px={px} onRetry={retryQueries} />
           ) : segment === 'available' ? (
-            offers.length === 0 ? (
+            sortedOffers.length === 0 ? (
               <EmptyState
                 type="available"
                 title="No open requests"
@@ -1077,17 +1413,58 @@ export default function DriverJobsScreen({ navigation }: Props) {
                 onRefresh={retryQueries}
               />
             ) : (
-              offers.map(job => (
-                <RequestJobCard
-                  key={`${job.bookingType}-${job.id}`}
-                  job={job}
-                  px={px}
-                  accepting={pendingAcceptId === job.id}
-                  declining={pendingDeclineId === job.id}
-                  onAccept={() => void onAccept(job)}
-                  onDecline={() => onDecline(job)}
-                />
-              ))
+              <>
+                {hasActiveJob && (activeJob || activeJobs[0]) ? (
+                  <Pressable
+                    onPress={() => openActiveJob(activeJob || activeJobs[0])}
+                    accessibilityRole="button"
+                    accessibilityLabel="Active trip in progress. Tap to open trip details"
+                    style={({ pressed }) => ({
+                      backgroundColor: pressed ? '#EFF6FF' : '#F0F9FF',
+                      borderRadius: px(14),
+                      borderWidth: 1,
+                      borderColor: '#BAE6FD',
+                      padding: px(12),
+                      marginBottom: px(12),
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    })}>
+                    <View
+                      style={{
+                        width: px(36),
+                        height: px(36),
+                        borderRadius: px(18),
+                        backgroundColor: '#E0F2FE',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: px(10),
+                      }}>
+                      <Navigation size={px(18)} color="#0284C7" strokeWidth={2.4} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <PartnerText style={{ fontSize: px(13), fontWeight: '700', color: '#0369A1' }}>
+                        Active Trip in Progress (#{activeJob?.bookingNumber || activeJobs[0]?.bookingNumber})
+                      </PartnerText>
+                      <PartnerText style={{ fontSize: px(11.5), color: '#475569', marginTop: px(2) }}>
+                        Complete your active trip before accepting new requests.
+                      </PartnerText>
+                    </View>
+                    <ArrowRight size={px(16)} color="#0284C7" strokeWidth={2.2} />
+                  </Pressable>
+                ) : null}
+                {sortedOffers.map(job => (
+                  <RequestJobCard
+                    key={`${job.bookingType}-${job.id}`}
+                    job={job}
+                    px={px}
+                    accepting={pendingAcceptId === job.id}
+                    declining={pendingDeclineId === job.id}
+                    hasActiveJob={hasActiveJob}
+                    onAccept={() => void onAccept(job)}
+                    onDecline={() => onDecline(job)}
+                  />
+                ))}
+              </>
             )
           ) : segment === 'active' ? (
             activeJobs.length === 0 ? (
@@ -1123,7 +1500,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
                 px={px}
                 expanded={expandedDoneId === job.id}
                 onOpen={() => setExpandedDoneId(current => (current === job.id ? null : job.id))}
-                onViewSummary={() => openActiveJob(job)}
               />
             ))
           )}
@@ -1153,16 +1529,16 @@ function JobsErrorState({
         }}>
         <TriangleAlert size={px(24)} color={C.amberText} strokeWidth={2.2} />
       </View>
-      <Text style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
+      <PartnerText style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
         Couldn’t load jobs
-      </Text>
-      <Text
+      </PartnerText>
+      <PartnerText
         style={[
           T.cardSubtitle,
           { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
         ]}>
         Check your connection and try again.
-      </Text>
+      </PartnerText>
       <Pressable
         onPress={onRetry}
         accessibilityRole="button"
@@ -1175,7 +1551,7 @@ function JobsErrorState({
           justifyContent: 'center',
           marginTop: px(16),
         }}>
-        <Text style={[T.button, { fontSize: px(14), color: C.ink }]}>Try again</Text>
+        <PartnerText style={[T.button, { fontSize: px(14), color: C.ink }]}>Try again</PartnerText>
       </Pressable>
     </View>
   );
@@ -1195,16 +1571,16 @@ function JobsApprovalState({ px }: { px: (value: number) => number }) {
         }}>
         <TriangleAlert size={px(24)} color={C.amberText} strokeWidth={2.2} />
       </View>
-      <Text style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
+      <PartnerText style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
         Jobs unlock after approval
-      </Text>
-      <Text
+      </PartnerText>
+      <PartnerText
         style={[
           T.cardSubtitle,
           { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
         ]}>
         Your account is still under review. You can view the dashboard while RACE verifies your documents.
-      </Text>
+      </PartnerText>
     </View>
   );
 }
@@ -1250,14 +1626,14 @@ function EmptyState({
         }}>
         <Icon size={px(26)} color={iconColor} strokeWidth={2.2} />
       </View>
-      <Text
+      <PartnerText
         style={[
           T.sectionTitle,
           { fontSize: px(16.5), lineHeight: px(21), color: C.ink, textAlign: 'center' },
         ]}>
         {title}
-      </Text>
-      <Text
+      </PartnerText>
+      <PartnerText
         style={[
           T.cardSubtitle,
           {
@@ -1270,7 +1646,7 @@ function EmptyState({
           },
         ]}>
         {subtitle}
-      </Text>
+      </PartnerText>
       {onRefresh ? (
         <Pressable
           onPress={onRefresh}
@@ -1289,9 +1665,9 @@ function EmptyState({
             opacity: pressed ? 0.85 : 1,
           })}>
           <RefreshCw size={px(13)} color={C.grey} strokeWidth={2.4} />
-          <Text style={[T.link, { fontSize: px(13), color: C.ink, marginLeft: px(6) }]}>
+          <PartnerText style={[T.link, { fontSize: px(13), color: C.ink, marginLeft: px(6) }]}>
             Check for requests
-          </Text>
+          </PartnerText>
         </Pressable>
       ) : null}
     </View>

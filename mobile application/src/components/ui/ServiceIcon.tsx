@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { Image, StyleSheet, Text } from 'react-native';
+import { Image, StyleSheet } from 'react-native';
 
 import { categoryIcons } from '../../assets';
 import type { CategoryId } from '../../types/models';
@@ -27,7 +28,7 @@ export default function ServiceIcon({
     );
   }
 
-  return <Text style={[styles.emoji, { fontSize: size * 0.85 }]}>{emoji}</Text>;
+  return <PartnerText style={[styles.emoji, { fontSize: size * 0.85 }]}>{emoji}</PartnerText>;
 }
 
 const styles = StyleSheet.create({

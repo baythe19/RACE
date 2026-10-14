@@ -1,12 +1,6 @@
+import { PartnerText } from '../PartnerText';
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { Bell, Briefcase, UserCheck, DollarSign, Tag } from 'lucide-react-native';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import {
@@ -122,8 +116,8 @@ export default function PartnerNotificationPreferencesModal({
         <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
           <View style={styles.handleBar} />
           
-          <Text style={styles.title}>Notifications</Text>
-          <Text style={styles.subtitle}>Manage notification types</Text>
+          <PartnerText style={styles.title}>Notifications</PartnerText>
+          <PartnerText style={styles.subtitle}>Manage notification types</PartnerText>
 
           <View style={styles.list}>
             {ITEMS.map(item => {
@@ -135,8 +129,8 @@ export default function PartnerNotificationPreferencesModal({
                   </View>
 
                   <View style={styles.textCol}>
-                    <Text style={styles.rowTitle}>{item.title}</Text>
-                    <Text style={styles.rowDesc}>{item.desc}</Text>
+                    <PartnerText style={styles.rowTitle}>{item.title}</PartnerText>
+                    <PartnerText style={styles.rowDesc}>{item.desc}</PartnerText>
                   </View>
 
                   <Switch
@@ -156,7 +150,7 @@ export default function PartnerNotificationPreferencesModal({
               getPressableFeedback(pressed),
             ]}
             onPress={onClose}>
-            <Text style={styles.doneButtonText}>Done</Text>
+            <PartnerText style={styles.doneButtonText}>Done</PartnerText>
           </Pressable>
         </Pressable>
       </Pressable>

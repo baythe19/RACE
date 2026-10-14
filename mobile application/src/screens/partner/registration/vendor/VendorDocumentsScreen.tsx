@@ -1,17 +1,6 @@
+import { PartnerText } from '../../../../components/partner/PartnerText';
 import React from 'react';
-import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { ArrowLeft, ArrowRight, Lock, ShieldCheck } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -84,10 +73,10 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
         </Pressable>
 
         <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
+          <PartnerText style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
             PARTNER
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={styles.backButton} />
@@ -108,16 +97,16 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
               paddingBottom: insets.bottom + px(spacing.xl),
             },
           ]}>
-          <Text style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
+          <PartnerText style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
             Just a few documents left!
-          </Text>
-          <Text
+          </PartnerText>
+          <PartnerText
             style={[
               styles.heroSubtitle,
               { fontSize: px(14), lineHeight: px(21), marginTop: px(6) },
             ]}>
             Upload the required documents to verify your business and start receiving jobs.
-          </Text>
+          </PartnerText>
 
           <Image
             source={images.homeHeroTruck}
@@ -142,16 +131,16 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
               activeStep={3}
             />
 
-            <Text style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
+            <PartnerText style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
               Upload documents
-            </Text>
-            <Text
+            </PartnerText>
+            <PartnerText
               style={[
                 styles.formSubtitle,
                 { fontSize: px(13), lineHeight: px(19), marginTop: px(4), marginBottom: px(spacing.lg) },
               ]}>
               These documents are required to verify your business.
-            </Text>
+            </PartnerText>
 
             <PartnerDocumentUploadList
               documents={VENDOR_DOCUMENTS}
@@ -166,7 +155,7 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
 
             <View style={[styles.encryptRow, { marginTop: px(spacing.lg) }]}>
               <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
-              <Text style={styles.encryptText}>All files are encrypted and stored securely.</Text>
+              <PartnerText style={styles.encryptText}>All files are encrypted and stored securely.</PartnerText>
             </View>
 
             <Pressable
@@ -176,7 +165,7 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
                 { marginTop: px(spacing.xl), minHeight: px(54), borderRadius: px(14) },
                 pressed && styles.pressed,
               ]}>
-              <Text style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</Text>
+              <PartnerText style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</PartnerText>
               <ArrowRight size={px(18)} color={colors.dark} strokeWidth={2.5} />
             </Pressable>
           </View>
@@ -186,10 +175,10 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
               <Lock size={16} color={colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.secureCopy}>
-              <Text style={styles.secureTitle}>Your data is secure</Text>
-              <Text style={styles.secureText}>
+              <PartnerText style={styles.secureTitle}>Your data is secure</PartnerText>
+              <PartnerText style={styles.secureText}>
                 We use enterprise-grade encryption to keep your documents safe.
-              </Text>
+              </PartnerText>
             </View>
           </View>
         </ScrollView>

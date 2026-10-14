@@ -1,21 +1,13 @@
+import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
-import Svg, { Circle, Defs, LinearGradient, Path, Stop, Text as SvgText } from 'react-native-svg';
+import { Pressable, StyleSheet, View } from 'react-native';
 import {
   Bell,
   Briefcase,
-  ChevronDown,
   ChevronRight,
   ClipboardList,
   CloudUpload,
   FileSearch,
-  Info,
   Landmark,
   ShieldCheck,
   Truck,
@@ -42,7 +34,6 @@ const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 const INFO_BLUE = '#2563EB';
 const PURPLE = '#7C3AED';
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 const STAGE_LABELS: Record<VerificationStage, string> = {
   submitted: 'Submitted',
@@ -68,14 +59,6 @@ function greetingForNow() {
 
 function formatInr(amount: number) {
   return `₹${Math.round(amount).toLocaleString('en-IN')}`;
-}
-
-function formatCompactInr(amount: number) {
-  if (amount >= 1000) {
-    const k = amount / 1000;
-    return `₹${k >= 10 ? Math.round(k) : k.toFixed(1)}K`;
-  }
-  return formatInr(amount);
 }
 
 function formatActivityTime(iso?: string) {
@@ -138,18 +121,6 @@ function verificationCopy(vendor?: VendorProfileResponse | null) {
   };
 }
 
-function weekdayIndex(date = new Date()) {
-  return (date.getDay() + 6) % 7;
-}
-
-function buildWeekSeries(earningsToday: number) {
-  const todayIdx = weekdayIndex();
-  return DAY_LABELS.map((label, index) => ({
-    label,
-    value: index === todayIdx ? Math.max(0, earningsToday) : 0,
-  }));
-}
-
 type ActivityItem = {
   id: string;
   title: string;
@@ -162,7 +133,6 @@ type ActivityItem = {
 
 function buildActivity(args: {
   vendor?: VendorProfileResponse | null;
-  offers: Array<{ id: string; bookingNumber?: string; createdAt: string; pickup?: { address?: string; label?: string } }>;
   drivers: Array<{ id: string; name: string }>;
 }): ActivityItem[] {
   const items: ActivityItem[] = [];
@@ -203,20 +173,6 @@ function buildActivity(args: {
     });
   }
 
-  for (const offer of args.offers.slice(0, 3)) {
-    items.push({
-      id: `offer-${offer.id}`,
-      title: 'New job request received',
-      description: `Request #${offer.bookingNumber ?? offer.id.slice(-6)} received from ${
-        formatReadableAddress(offer.pickup?.address || offer.pickup?.label) || 'nearby'
-      }`,
-      at: offer.createdAt,
-      status: 'New',
-      tone: 'blue',
-      Icon: Briefcase,
-    });
-  }
-
   for (const driver of args.drivers.slice(0, 2)) {
     items.push({
       id: `driver-${driver.id}`,
@@ -231,74 +187,6 @@ function buildActivity(args: {
   return items
     .sort((a, b) => +new Date(b.at ?? 0) - +new Date(a.at ?? 0))
     .slice(0, 4);
-}
-
-function EarningsChart({
-  points,
-  width,
-  height = 150,
-}: {
-  points: Array<{ label: string; value: number }>;
-  width: number;
-  height?: number;
-}) {
-  const padX = 18;
-  const padTop = 28;
-  const padBottom = 28;
-  const chartW = Math.max(1, width - padX * 2);
-  const chartH = Math.max(1, height - padTop - padBottom);
-  const maxValue = Math.max(...points.map(p => p.value), 1);
-  const coords = points.map((point, index) => {
-    const x = padX + (index / Math.max(points.length - 1, 1)) * chartW;
-    const y = padTop + chartH - (point.value / maxValue) * chartH;
-    return { ...point, x, y };
-  });
-
-  const line = coords
-    .map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x.toFixed(1)} ${c.y.toFixed(1)}`)
-    .join(' ');
-  const area = `${line} L ${coords[coords.length - 1]?.x ?? padX} ${(padTop + chartH).toFixed(1)} L ${
-    coords[0]?.x ?? padX
-  } ${(padTop + chartH).toFixed(1)} Z`;
-
-  return (
-    <Svg width={width} height={height}>
-      <Defs>
-        <LinearGradient id="earnFill" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor={colors.primary} stopOpacity="0.35" />
-          <Stop offset="100%" stopColor={colors.primary} stopOpacity="0.02" />
-        </LinearGradient>
-      </Defs>
-      <Path d={area} fill="url(#earnFill)" />
-      <Path d={line} stroke={colors.primary} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-      {coords.map(point => (
-        <React.Fragment key={point.label}>
-          <Circle cx={point.x} cy={point.y} r={5} fill={colors.primary} />
-          <Circle cx={point.x} cy={point.y} r={2.5} fill="#FFFFFF" />
-          {point.value > 0 ? (
-            <SvgText
-              x={point.x}
-              y={point.y - 10}
-              fill={colors.dark}
-              fontSize="10"
-              fontWeight="700"
-              textAnchor="middle">
-              {formatCompactInr(point.value)}
-            </SvgText>
-          ) : null}
-          <SvgText
-            x={point.x}
-            y={height - 8}
-            fill={colors.grey}
-            fontSize="10"
-            fontWeight="600"
-            textAnchor="middle">
-            {point.label}
-          </SvgText>
-        </React.Fragment>
-      ))}
-    </Svg>
-  );
 }
 
 function QuickAction({
@@ -322,8 +210,8 @@ function QuickAction({
         <Icon size={18} color={colors.primaryDark} strokeWidth={2.2} />
       </View>
       <View style={styles.actionCopy}>
-        <Text style={styles.actionTitle}>{title}</Text>
-        <Text style={styles.actionSubtitle}>{subtitle}</Text>
+        <PartnerText style={styles.actionTitle}>{title}</PartnerText>
+        <PartnerText style={styles.actionSubtitle}>{subtitle}</PartnerText>
       </View>
       <ChevronRight size={18} color={colors.grey} strokeWidth={2.2} />
     </Pressable>
@@ -349,7 +237,6 @@ function activityTone(tone: ActivityItem['tone']) {
 
 export default function PartnerHomeScreen() {
   const navigation = useNavigation<BottomTabNavigationProp<PartnerTabParamList>>();
-  const { width } = useWindowDimensions();
   const user = useAppSelector(state => state.auth.user);
   const isVendor = true;
 
@@ -369,24 +256,17 @@ export default function PartnerHomeScreen() {
   const earningsToday = vendorDashboard?.earningsToday ?? 0;
   const earningsTotal = vendorDashboard?.earningsTotal ?? earningsToday;
 
-  const weekPoints = useMemo(() => buildWeekSeries(earningsToday), [earningsToday]);
-  const chartWidth = Math.max(260, width - layout.screenPadding * 2 - spacing.lg * 2);
-
-  const jobsTodayCount = vendorDashboard?.jobsToday ?? offers.length;
-  const openJobs = offers.length;
-  const inProgressJobs = drivers.filter(d => d.isBusy).length;
-
-  const activeDrivers = drivers.length;
+  const openJobs = offers.filter(offer => !offer.vendorApproved).length;
+  const awaitingClaimJobs = offers.length - openJobs;
   const onJobDrivers = drivers.filter(d => d.isBusy).length;
   const availableDrivers = drivers.filter(d => d.isAvailable && !d.isBusy).length;
 
-  const activeVehicles = vehicles.filter(v => v.status === 'active' || !v.status).length;
-  const maintenanceVehicles = vehicles.filter(v => v.status === 'maintenance').length;
+  const activeVehicles = vehicles.filter(v => v.status === 'ACTIVE').length;
 
   const verification = verificationCopy(vendorLoading ? null : vendor);
   const activity = useMemo(
-    () => buildActivity({ vendor, offers, drivers }),
-    [vendor, offers, drivers],
+    () => buildActivity({ vendor, drivers }),
+    [vendor, drivers],
   );
 
   const name = firstName(user?.fullName);
@@ -422,8 +302,8 @@ export default function PartnerHomeScreen() {
         <View style={styles.headerPad}>
           <View style={styles.headerTop}>
             <View>
-              <Text style={styles.brandRace}>RACE</Text>
-              <Text style={styles.brandPartner}>PARTNER</Text>
+              <PartnerText style={styles.brandRace}>RACE</PartnerText>
+              <PartnerText style={styles.brandPartner}>PARTNER</PartnerText>
             </View>
             <View style={styles.headerRight}>
               <Pressable
@@ -435,23 +315,23 @@ export default function PartnerHomeScreen() {
                 <Bell size={19} color={colors.dark} strokeWidth={2.2} />
               </Pressable>
               <View style={styles.partnerPill}>
-                <Text style={styles.partnerPillText}>Vendor Fleet</Text>
+                <PartnerText style={styles.partnerPillText}>Vendor Fleet</PartnerText>
               </View>
               <View style={styles.avatarRow}>
                 <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{initial}</Text>
+                  <PartnerText style={styles.avatarText}>{initial}</PartnerText>
                 </View>
-                <Text style={styles.avatarName} numberOfLines={1}>
+                <PartnerText style={styles.avatarName} numberOfLines={1}>
                   {user?.fullName ?? 'Vendor'}
-                </Text>
+                </PartnerText>
               </View>
             </View>
           </View>
 
-          <Text style={styles.greeting}>
+          <PartnerText style={styles.greeting}>
             {greetingForNow()}, {name} 👋
-          </Text>
-          <Text style={styles.subtitle}>Here's what's happening with your fleet today.</Text>
+          </PartnerText>
+          <PartnerText style={styles.subtitle}>Here's what's happening with your fleet today.</PartnerText>
         </View>
       }>
       {offers.length > 0 ? (
@@ -459,30 +339,30 @@ export default function PartnerHomeScreen() {
           <View style={styles.leadsHeaderRow}>
             <View style={styles.leadsTitleGroup}>
               <View style={styles.pulseDot} />
-              <Text style={styles.leadsTitle}>
+              <PartnerText style={styles.leadsTitle}>
                 Incoming leads ({offers.length})
-              </Text>
+              </PartnerText>
             </View>
             <Pressable onPress={() => navigation.navigate('PartnerJobs')}>
-              <Text style={styles.leadsViewAll}>View all</Text>
+              <PartnerText style={styles.leadsViewAll}>View all</PartnerText>
             </Pressable>
           </View>
           {offers.slice(0, 2).map(lead => (
             <View key={lead.id} style={styles.leadCard}>
               <View style={styles.leadTopRow}>
                 <View style={styles.leadBadge}>
-                  <Text style={styles.leadBadgeText}>
+                  <PartnerText style={styles.leadBadgeText}>
                     {lead.serviceLabel || (lead.bookingType === 'towing' ? 'Towing' : 'Driver')}
-                  </Text>
+                  </PartnerText>
                 </View>
-                <Text style={styles.leadFare}>
+                <PartnerText style={styles.leadFare}>
                   {typeof lead.estimatedFare === 'number' ? formatInr(lead.estimatedFare) : '₹—'}
-                </Text>
+                </PartnerText>
               </View>
-              <Text style={styles.leadNumber}>#{lead.bookingNumber || lead.id.slice(-6)}</Text>
-              <Text style={styles.leadAddress} numberOfLines={1}>
+              <PartnerText style={styles.leadNumber}>#{lead.bookingNumber || lead.id.slice(-6)}</PartnerText>
+              <PartnerText style={styles.leadAddress} numberOfLines={1}>
                 {formatReadableAddress(lead.pickup?.address || lead.pickup?.label) || 'Pickup nearby'}
-              </Text>
+              </PartnerText>
               <Pressable
                 style={styles.assignCta}
                 onPress={() => {
@@ -499,42 +379,90 @@ export default function PartnerHomeScreen() {
                   } as never);
                 }}>
                 <Truck size={15} color="#FFFFFF" strokeWidth={2.4} />
-                <Text style={styles.assignCtaText}>Assign vehicle & driver</Text>
+                <PartnerText style={styles.assignCtaText}>Assign vehicle</PartnerText>
               </Pressable>
             </View>
           ))}
         </View>
-      ) : null}
+      ) : (
+        <View style={styles.leadsEmptyCard}>
+          <View style={styles.leadsEmptyIcon}>
+            <ClipboardList size={18} color={colors.primaryDark} strokeWidth={2.2} />
+          </View>
+          <View style={styles.leadsEmptyCopy}>
+            <PartnerText style={styles.leadsEmptyTitle}>No new booking leads</PartnerText>
+            <PartnerText style={styles.leadsEmptySub}>
+              Open customer requests will land here for your fleet.
+            </PartnerText>
+          </View>
+          <Pressable onPress={() => navigation.navigate('PartnerJobs')} hitSlop={8}>
+            <PartnerText style={styles.leadsViewAll}>View all</PartnerText>
+          </Pressable>
+        </View>
+      )}
 
       <View style={styles.earningsCard}>
         <View style={styles.earningsHeader}>
           <View style={styles.earningsTitleRow}>
-            <Text style={styles.earningsTitle}>Total earnings (this week)</Text>
-            <Info size={14} color={colors.grey} strokeWidth={2.2} />
-          </View>
-          <View style={styles.periodPill}>
-            <Text style={styles.periodText}>This week</Text>
-            <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
+            <PartnerText style={styles.earningsTitle}>Earnings</PartnerText>
           </View>
         </View>
-        <Text style={styles.earningsValue}>{formatInr(earningsToday)}</Text>
-        <Text style={styles.earningsGrowth}>
-          {earningsToday > 0
-            ? `Today's completed earnings · Total ${formatInr(earningsTotal)}`
-            : 'No completed earnings yet this week'}
-        </Text>
-        <View style={styles.chartWrap}>
-          <EarningsChart points={weekPoints} width={chartWidth} />
+        <View style={styles.earningsRow}>
+          <View style={styles.earningsCol}>
+            <PartnerText style={styles.earningsValue}>{formatInr(earningsToday)}</PartnerText>
+            <PartnerText style={styles.earningsColLabel}>Today (completed)</PartnerText>
+          </View>
+          <View style={styles.earningsDivider} />
+          <View style={styles.earningsCol}>
+            <PartnerText style={styles.earningsValue}>{formatInr(earningsTotal)}</PartnerText>
+            <PartnerText style={styles.earningsColLabel}>All time</PartnerText>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.fleetCard}>
+        <PartnerText style={styles.fleetTitle}>Fleet overview</PartnerText>
+        <View style={styles.fleetMetricsRow}>
+          <Pressable
+            onPress={() => navigation.navigate('PartnerJobs')}
+            style={styles.fleetMetricCol}
+            accessibilityRole="button">
+            <View style={[styles.fleetMetricIcon, { backgroundColor: '#DBEAFE' }]}>
+              <Briefcase size={16} color={INFO_BLUE} strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.fleetMetricValue}>{String(offers.length)}</PartnerText>
+            <PartnerText style={styles.fleetMetricLabel}>
+              {openJobs} open · {awaitingClaimJobs} awaiting
+            </PartnerText>
+          </Pressable>
+          <View style={styles.fleetDivider} />
+          <Pressable
+            onPress={() => goAccountScreen('VendorDrivers')}
+            style={styles.fleetMetricCol}
+            accessibilityRole="button">
+            <View style={[styles.fleetMetricIcon, { backgroundColor: '#DCFCE7' }]}>
+              <Users size={16} color={SUCCESS_GREEN} strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.fleetMetricValue}>{String(availableDrivers)}</PartnerText>
+            <PartnerText style={styles.fleetMetricLabel}>
+              of {drivers.length} available
+            </PartnerText>
+          </Pressable>
+          <View style={styles.fleetDivider} />
+          <Pressable
+            onPress={() => goAccountScreen('VendorVehicles')}
+            style={styles.fleetMetricCol}
+            accessibilityRole="button">
+            <View style={[styles.fleetMetricIcon, { backgroundColor: colors.goldLight }]}>
+              <Truck size={16} color={colors.primaryDark} strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.fleetMetricValue}>{String(activeVehicles)}</PartnerText>
+            <PartnerText style={styles.fleetMetricLabel}>of {vehicles.length} active</PartnerText>
+          </Pressable>
         </View>
       </View>
 
       <View style={styles.actionsGrid}>
-        <QuickAction
-          title="Booking leads"
-          subtitle={`${offers.length} lead(s) waiting for fleet assignment`}
-          Icon={ClipboardList}
-          onPress={() => navigation.navigate('PartnerJobs')}
-        />
         <QuickAction
           title="Manage drivers"
           subtitle={`${drivers.length} registered driver(s) · ${availableDrivers} available`}
@@ -553,12 +481,6 @@ export default function PartnerHomeScreen() {
           Icon={Landmark}
           onPress={() => goAccountScreen('PartnerBankDetails')}
         />
-        <QuickAction
-          title="Verification & KYC"
-          subtitle="Track business approval & document status"
-          Icon={ShieldCheck}
-          onPress={() => goAccountScreen('VendorVerificationStatus')}
-        />
       </View>
 
       <View style={styles.statusStack}>
@@ -570,9 +492,9 @@ export default function PartnerHomeScreen() {
           </View>
           <View style={styles.statusCopy}>
             <View style={styles.statusTitleRow}>
-              <Text style={styles.statusTitle} numberOfLines={1}>
+              <PartnerText style={styles.statusTitle} numberOfLines={1}>
                 {verification.title}
-              </Text>
+              </PartnerText>
               <View
                 style={[
                   styles.badge,
@@ -581,7 +503,7 @@ export default function PartnerHomeScreen() {
                   verification.tone === 'progress' && styles.badgeProgress,
                   verification.tone === 'pending' && styles.badgePending,
                 ]}>
-                <Text
+                <PartnerText
                   style={[
                     styles.badgeText,
                     verification.tone === 'completed' && styles.badgeCompletedText,
@@ -590,81 +512,24 @@ export default function PartnerHomeScreen() {
                     verification.tone === 'pending' && styles.badgePendingText,
                   ]}>
                   {verification.badge}
-                </Text>
+                </PartnerText>
               </View>
             </View>
-            <Text style={styles.statusHint}>{verification.hint}</Text>
-          </View>
-        </Pressable>
-
-        <Pressable
-          onPress={() => navigation.navigate('PartnerJobs')}
-          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
-          <View style={[styles.statusIcon, { backgroundColor: '#DBEAFE' }]}>
-            <Briefcase size={18} color={INFO_BLUE} strokeWidth={2.2} />
-          </View>
-          <View style={styles.statusCopy}>
-            <Text style={styles.statusEyebrow}>Jobs today</Text>
-            <Text style={styles.statusBig}>{String(jobsTodayCount)}</Text>
-            <View style={styles.dotRow}>
-              <View style={[styles.dot, { backgroundColor: INFO_BLUE }]} />
-              <Text style={styles.dotText}>{openJobs} Open</Text>
-              <Text style={styles.dotSep}>•</Text>
-              <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-              <Text style={styles.dotText}>{inProgressJobs} In progress</Text>
-            </View>
-          </View>
-        </Pressable>
-
-        <Pressable
-          onPress={() => goAccountScreen('VendorDrivers')}
-          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
-          <View style={[styles.statusIcon, { backgroundColor: '#DCFCE7' }]}>
-            <Users size={18} color={SUCCESS_GREEN} strokeWidth={2.2} />
-          </View>
-          <View style={styles.statusCopy}>
-            <Text style={styles.statusEyebrow}>Active drivers</Text>
-            <Text style={styles.statusBig}>{String(activeDrivers)}</Text>
-            <View style={styles.dotRow}>
-              <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-              <Text style={styles.dotText}>{onJobDrivers} On job</Text>
-              <Text style={styles.dotSep}>•</Text>
-              <View style={[styles.dot, { backgroundColor: SUCCESS_GREEN }]} />
-              <Text style={styles.dotText}>{availableDrivers} Available</Text>
-            </View>
-          </View>
-        </Pressable>
-
-        <Pressable
-          onPress={() => goAccountScreen('VendorVehicles')}
-          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
-          <View style={[styles.statusIcon, { backgroundColor: '#FEF3C7' }]}>
-            <Truck size={18} color={colors.primaryDark} strokeWidth={2.2} />
-          </View>
-          <View style={styles.statusCopy}>
-            <Text style={styles.statusEyebrow}>Fleet vehicles</Text>
-            <Text style={styles.statusBig}>{String(vehicles.length)}</Text>
-            <View style={styles.dotRow}>
-              <View style={[styles.dot, { backgroundColor: SUCCESS_GREEN }]} />
-              <Text style={styles.dotText}>{activeVehicles} Active</Text>
-              <Text style={styles.dotSep}>•</Text>
-              <View style={[styles.dot, { backgroundColor: colors.error }]} />
-              <Text style={styles.dotText}>{maintenanceVehicles} Maintenance</Text>
-            </View>
+            <PartnerText style={styles.statusHint}>{verification.hint}</PartnerText>
           </View>
         </Pressable>
       </View>
 
       <View style={styles.activityCard}>
         <View style={styles.activityHeader}>
-          <Text style={styles.activityTitle}>Recent activity</Text>
+          <PartnerText style={styles.activityTitle}>Recent activity</PartnerText>
           <Pressable onPress={() => navigation.navigate('PartnerJobs')} hitSlop={8}>
-            <Text style={styles.viewAll}>View all</Text>
+            <PartnerText style={styles.viewAll}>View all</PartnerText>
           </Pressable>
         </View>
 
         {activity.length === 0 ? (
-          <Text style={styles.emptyActivity}>No recent activity yet.</Text>
+          <PartnerText style={styles.emptyActivity}>No recent activity yet.</PartnerText>
         ) : (
           activity.map(item => {
             const tone = activityTone(item.tone);
@@ -676,14 +541,14 @@ export default function PartnerHomeScreen() {
                   <Icon size={16} color={tone.color} strokeWidth={2.2} />
                 </View>
                 <View style={styles.activityCopy}>
-                  <Text style={styles.activityItemTitle}>{item.title}</Text>
-                  <Text style={styles.activityDesc} numberOfLines={2}>
+                  <PartnerText style={styles.activityItemTitle}>{item.title}</PartnerText>
+                  <PartnerText style={styles.activityDesc} numberOfLines={2}>
                     {item.description}
-                  </Text>
-                  <Text style={styles.activityTime}>{formatActivityTime(item.at) || '—'}</Text>
+                  </PartnerText>
+                  <PartnerText style={styles.activityTime}>{formatActivityTime(item.at) || '—'}</PartnerText>
                 </View>
                 <View style={pill.wrap}>
-                  <Text style={pill.text}>{item.status}</Text>
+                  <PartnerText style={pill.text}>{item.status}</PartnerText>
                 </View>
               </View>
             );
@@ -1198,5 +1063,100 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  leadsEmptyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  leadsEmptyIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.goldLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leadsEmptyCopy: { flex: 1 },
+  leadsEmptyTitle: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+  },
+  leadsEmptySub: {
+    marginTop: 2,
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
+  },
+  earningsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  earningsCol: { flex: 1 },
+  earningsColLabel: {
+    marginTop: 4,
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+  },
+  earningsDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 36,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.lg,
+  },
+  fleetCard: {
+    backgroundColor: colors.background,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    ...shadows.card,
+  },
+  fleetTitle: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+  },
+  fleetMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginTop: spacing.md,
+  },
+  fleetMetricCol: {
+    flex: 1,
+    alignItems: 'flex-start',
+    gap: 4,
+  },
+  fleetMetricIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fleetMetricValue: {
+    color: colors.dark,
+    fontSize: 24,
+    fontWeight: typography.weights.extrabold,
+  },
+  fleetMetricLabel: {
+    color: colors.grey,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  fleetDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.md,
   },
 });

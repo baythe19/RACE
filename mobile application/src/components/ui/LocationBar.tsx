@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -10,8 +11,8 @@ interface LocationBarProps {
 export default function LocationBar({ location }: LocationBarProps) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>Service location</Text>
-      <Text style={styles.value}>{location}</Text>
+      <PartnerText style={styles.label}>Service location</PartnerText>
+      <PartnerText style={styles.value}>{location}</PartnerText>
     </View>
   );
 }

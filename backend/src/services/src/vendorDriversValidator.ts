@@ -30,3 +30,11 @@ export const uploadVendorDriverDocumentSchema = z.object({
 export type CreateVendorDriverDto = z.infer<typeof createVendorDriverSchema>;
 export type ClaimVendorDriverDto = z.infer<typeof claimVendorDriverSchema>;
 export type UploadVendorDriverDocumentDto = z.infer<typeof uploadVendorDriverDocumentSchema>;
+
+export const assignVendorDriverVehicleSchema = z.object({
+  /** Empty string / null unlinks the driver from their current fleet vehicle. */
+  vehicleRegistration: z.string().max(20).optional().nullable(),
+});
+
+export type AssignVendorDriverVehicleDto = z.infer<typeof assignVendorDriverVehicleSchema>;
+export type CreateFleetDriverDto = CreateVendorDriverDto;

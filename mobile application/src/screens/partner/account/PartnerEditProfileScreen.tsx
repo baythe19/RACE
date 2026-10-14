@@ -1,15 +1,7 @@
+import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Camera, Calendar, MapPin, CheckCircle, ChevronDown, Plus, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,10 +11,13 @@ import { useAppSelector } from '../../../redux/hooks';
 import { useDriverProfileQuery, driverQueryKeys } from '../../../services/driver/useDriverQueries';
 import { updateProfile } from '../../../services/profileService';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
+import { usePartnerPayoutStore } from '../../../store/partnerPayoutStore';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuccessDialog';
 import PartnerUploadSheet from '../../../components/partner/dialogs/PartnerUploadSheet';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+
+import PartnerPermissionDialog, { type PermissionType } from '../../../components/partner/dialogs/PartnerPermissionDialog';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerEditProfile'>;
 
@@ -47,6 +42,96 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [permissionModal, setPermissionModal] = useState<{
+    visible: boolean;
+    type: PermissionType;
+    onAllow: () => void;
+  }>({
+    visible: false,
+    type: 'camera',
+    onAllow: () => {},
+  });
+
+  const avatarUri = usePartnerPayoutStore(state => state.avatarUri);
+  const setAvatarUri = usePartnerPayoutStore(state => state.setAvatarUri);
+
+  const triggerCameraLaunch = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
+      if (!result.canceled && result.assets[0]?.uri) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch {
+      Alert.alert('Error', 'Unable to capture photo. Please try again.');
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const status = await ImagePicker.getCameraPermissionsAsync();
+      if (!status.granted) {
+        setPermissionModal({
+          visible: true,
+          type: 'camera',
+          onAllow: async () => {
+            setPermissionModal(prev => ({ ...prev, visible: false }));
+            const req = await ImagePicker.requestCameraPermissionsAsync();
+            if (req.granted) {
+              await triggerCameraLaunch();
+            }
+          },
+        });
+        return;
+      }
+      await triggerCameraLaunch();
+    } catch {
+      Alert.alert('Error', 'Unable to capture photo. Please try again.');
+    }
+  };
+
+  const triggerGalleryLaunch = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+        allowsEditing: true,
+        aspect: [1, 1],
+      });
+      if (!result.canceled && result.assets[0]?.uri) {
+        setAvatarUri(result.assets[0].uri);
+      }
+    } catch {
+      Alert.alert('Error', 'Unable to select image. Please try again.');
+    }
+  };
+
+  const handlePickGallery = async () => {
+    try {
+      const status = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (!status.granted) {
+        setPermissionModal({
+          visible: true,
+          type: 'photos',
+          onAllow: async () => {
+            setPermissionModal(prev => ({ ...prev, visible: false }));
+            const req = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (req.granted) {
+              await triggerGalleryLaunch();
+            }
+          },
+        });
+        return;
+      }
+      await triggerGalleryLaunch();
+    } catch {
+      Alert.alert('Error', 'Unable to select image. Please try again.');
+    }
+  };
 
   const mobileNumber = profile?.mobileNumber || user?.mobileNumber || '+91 99765 43210';
 
@@ -128,7 +213,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
           {saving ? (
             <ActivityIndicator size="small" color={driverColors.white} />
           ) : (
-            <Text style={styles.saveButtonText}>Save Changes</Text>
+            <PartnerText style={styles.saveButtonText}>Save Changes</PartnerText>
           )}
         </Pressable>
       }>
@@ -136,14 +221,18 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       <View style={styles.avatarContainer}>
         <View style={styles.avatarWrapper}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarInitials}>
-              {fullName
-                .split(' ')
-                .map(n => n[0])
-                .join('')
-                .slice(0, 2)
-                .toUpperCase() || 'OS'}
-            </Text>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+            ) : (
+              <PartnerText style={styles.avatarInitials}>
+                {fullName
+                  .split(' ')
+                  .map(n => n[0])
+                  .join('')
+                  .slice(0, 2)
+                  .toUpperCase() || 'OS'}
+              </PartnerText>
+            )}
           </View>
           <Pressable
             style={styles.cameraBadge}
@@ -156,7 +245,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
       {errorMessage ? (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
+          <PartnerText style={styles.errorText}>{errorMessage}</PartnerText>
         </View>
       ) : null}
 
@@ -164,10 +253,10 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       <View style={styles.formCard}>
         {/* Full Name */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            Full Name <Text style={styles.requiredStar}>*</Text>
-          </Text>
-          <TextInput
+          <PartnerText style={styles.label}>
+            Full Name <PartnerText style={styles.requiredStar}>*</PartnerText>
+          </PartnerText>
+          <PartnerTextInput
             style={styles.textInput}
             value={fullName}
             onChangeText={setFullName}
@@ -178,21 +267,21 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
         {/* Mobile Number (Read-only verified) */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Mobile Number</Text>
+          <PartnerText style={styles.label}>Mobile Number</PartnerText>
           <View style={styles.readOnlyRow}>
-            <Text style={styles.readOnlyText}>{mobileNumber}</Text>
+            <PartnerText style={styles.readOnlyText}>{mobileNumber}</PartnerText>
             <View style={styles.verifiedBadge}>
               <CheckCircle size={14} color={driverColors.green} strokeWidth={2.5} />
-              <Text style={styles.verifiedText}>Verified</Text>
+              <PartnerText style={styles.verifiedText}>Verified</PartnerText>
             </View>
           </View>
-          <Text style={styles.helperText}>Mobile number cannot be changed</Text>
+          <PartnerText style={styles.helperText}>Mobile number cannot be changed</PartnerText>
         </View>
 
         {/* Email Address */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email Address (Optional)</Text>
-          <TextInput
+          <PartnerText style={styles.label}>Email Address (Optional)</PartnerText>
+          <PartnerTextInput
             style={styles.textInput}
             value={email}
             onChangeText={setEmail}
@@ -205,12 +294,12 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
         {/* Date of Birth */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            Date of Birth <Text style={styles.requiredStar}>*</Text>
-          </Text>
+          <PartnerText style={styles.label}>
+            Date of Birth <PartnerText style={styles.requiredStar}>*</PartnerText>
+          </PartnerText>
           <View style={styles.inputWithIcon}>
             <Calendar size={18} color={driverColors.grey} strokeWidth={2} />
-            <TextInput
+            <PartnerTextInput
               style={styles.inputIconText}
               value={dob}
               onChangeText={setDob}
@@ -222,10 +311,10 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
         {/* City */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>City</Text>
+          <PartnerText style={styles.label}>City</PartnerText>
           <View style={styles.inputWithIcon}>
             <MapPin size={18} color={driverColors.grey} strokeWidth={2} />
-            <TextInput
+            <PartnerTextInput
               style={styles.inputIconText}
               value={city}
               onChangeText={setCity}
@@ -238,10 +327,10 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
         {/* Address */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>
-            Address <Text style={styles.requiredStar}>*</Text>
-          </Text>
-          <TextInput
+          <PartnerText style={styles.label}>
+            Address <PartnerText style={styles.requiredStar}>*</PartnerText>
+          </PartnerText>
+          <PartnerTextInput
             style={[styles.textInput, styles.multilineInput]}
             value={address}
             onChangeText={setAddress}
@@ -254,11 +343,11 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
         {/* Languages Known */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Languages Known (Optional)</Text>
+          <PartnerText style={styles.label}>Languages Known (Optional)</PartnerText>
           <View style={styles.chipsRow}>
             {languages.map(lang => (
               <View key={lang} style={styles.langChip}>
-                <Text style={styles.langChipText}>{lang}</Text>
+                <PartnerText style={styles.langChipText}>{lang}</PartnerText>
                 <Pressable
                   hitSlop={6}
                   onPress={() => handleRemoveLanguage(lang)}>
@@ -269,7 +358,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
             {showAddLang ? (
               <View style={styles.addLangInputBox}>
-                <TextInput
+                <PartnerTextInput
                   style={styles.addLangTextInput}
                   value={newLangInput}
                   onChangeText={setNewLangInput}
@@ -287,7 +376,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
                 style={styles.addChip}
                 onPress={() => setShowAddLang(true)}>
                 <Plus size={14} color={driverColors.grey} strokeWidth={2.4} />
-                <Text style={styles.addChipText}>Add</Text>
+                <PartnerText style={styles.addChipText}>Add</PartnerText>
               </Pressable>
             )}
           </View>
@@ -297,9 +386,16 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       {/* Supporting Dialogs */}
       <PartnerUploadSheet
         visible={uploadSheetVisible}
-        onTakePhoto={() => setUploadSheetVisible(false)}
-        onPickGallery={() => setUploadSheetVisible(false)}
+        onTakePhoto={() => void handleTakePhoto()}
+        onPickGallery={() => void handlePickGallery()}
         onClose={() => setUploadSheetVisible(false)}
+      />
+
+      <PartnerPermissionDialog
+        visible={permissionModal.visible}
+        type={permissionModal.type}
+        onAllow={permissionModal.onAllow}
+        onDeny={() => setPermissionModal(prev => ({ ...prev, visible: false }))}
       />
 
       <PartnerSuccessDialog
@@ -334,6 +430,12 @@ const styles = StyleSheet.create({
     borderColor: driverColors.amberTile,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
   },
   avatarInitials: {
     fontSize: 28,

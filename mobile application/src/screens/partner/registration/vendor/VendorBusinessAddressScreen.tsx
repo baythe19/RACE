@@ -1,17 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -150,10 +139,10 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
         </Pressable>
 
         <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
+          <PartnerText style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
             PARTNER
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={styles.backButton} />
@@ -174,16 +163,16 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
               paddingBottom: insets.bottom + px(spacing.xl),
             },
           ]}>
-          <Text style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
+          <PartnerText style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
             Almost there!
-          </Text>
-          <Text
+          </PartnerText>
+          <PartnerText
             style={[
               styles.heroSubtitle,
               { fontSize: px(14), lineHeight: px(21), marginTop: px(6) },
             ]}>
             Add your business address so customers and RACE can reach you easily.
-          </Text>
+          </PartnerText>
 
           <Image
             source={images.homeHeroTruck}
@@ -208,16 +197,16 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
               activeStep={2}
             />
 
-            <Text style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
+            <PartnerText style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
               Where customers can find your business
-            </Text>
-            <Text
+            </PartnerText>
+            <PartnerText
               style={[
                 styles.formSubtitle,
                 { fontSize: px(13), lineHeight: px(19), marginTop: px(4) },
               ]}>
               We'll use this address for service and booking.
-            </Text>
+            </PartnerText>
 
             <Pressable
               onPress={() => setShowLocationPicker(true)}
@@ -227,25 +216,25 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 pressed && styles.pressed,
               ]}>
               <MapPin size={18} color={colors.primary} strokeWidth={2.2} />
-              <Text
+              <PartnerText
                 style={[styles.mapPickerText, searchDisplayValue ? styles.mapPickerFilled : null]}
                 numberOfLines={2}>
                 {searchDisplayValue || 'Search / select address on map'}
-              </Text>
+              </PartnerText>
               <ChevronRight size={18} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
 
             <View style={{ marginTop: px(spacing.lg) }}>
-              <Text style={styles.fieldLabel}>
-                Address line 1 <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={styles.fieldLabel}>
+                Address line 1 <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   errors.addressLine1 ? styles.inputError : null,
                   fieldValid.addressLine1 ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorAddress.addressLine1}
                   onChangeText={(addressLine1) => {
                     setVendorAddress({ addressLine1 });
@@ -257,15 +246,15 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 />
                 <ValidCheck visible={fieldValid.addressLine1 && !errors.addressLine1} />
               </View>
-              {errors.addressLine1 ? <Text style={styles.error}>{errors.addressLine1}</Text> : null}
+              {errors.addressLine1 ? <PartnerText style={styles.error}>{errors.addressLine1}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Address line 2</Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Address line 2</PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   fieldValid.addressLine2 ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorAddress.addressLine2}
                   onChangeText={(addressLine2) => setVendorAddress({ addressLine2 })}
                   placeholder="Near Khandagiri Square"
@@ -275,16 +264,16 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 <ValidCheck visible={fieldValid.addressLine2} />
               </View>
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                City <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                City <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   errors.city ? styles.inputError : null,
                   fieldValid.city ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorAddress.city}
                   onChangeText={(city) => {
                     setVendorAddress({ city });
@@ -296,11 +285,11 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 />
                 <ValidCheck visible={fieldValid.city && !errors.city} />
               </View>
-              {errors.city ? <Text style={styles.error}>{errors.city}</Text> : null}
+              {errors.city ? <PartnerText style={styles.error}>{errors.city}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                State <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                State <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <Pressable
                 onPress={() =>
                   showSelectOptions(
@@ -318,29 +307,29 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                   errors.state ? styles.inputError : null,
                   fieldValid.state ? styles.inputValid : null,
                 ]}>
-                <Text
+                <PartnerText
                   style={[styles.input, !vendorAddress.state && styles.placeholder]}
                   numberOfLines={1}>
                   {vendorAddress.state || 'Select state'}
-                </Text>
+                </PartnerText>
                 {fieldValid.state && !errors.state ? (
                   <ValidCheck visible />
                 ) : (
                   <ChevronDown size={18} color={colors.grey} strokeWidth={2.4} />
                 )}
               </Pressable>
-              {errors.state ? <Text style={styles.error}>{errors.state}</Text> : null}
+              {errors.state ? <PartnerText style={styles.error}>{errors.state}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                PIN code <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                PIN code <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   errors.pinCode ? styles.inputError : null,
                   fieldValid.pinCode ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorAddress.pinCode}
                   onChangeText={(pinCode) => {
                     setVendorAddress({ pinCode: pinCode.replace(/\D/g, '').slice(0, 6) });
@@ -354,17 +343,17 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 />
                 <ValidCheck visible={fieldValid.pinCode && !errors.pinCode} />
               </View>
-              {errors.pinCode ? <Text style={styles.error}>{errors.pinCode}</Text> : null}
+              {errors.pinCode ? <PartnerText style={styles.error}>{errors.pinCode}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Landmark <Text style={styles.optional}>(optional)</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Landmark <PartnerText style={styles.optional}>(optional)</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   fieldValid.landmark ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorAddress.landmark}
                   onChangeText={(landmark) => setVendorAddress({ landmark })}
                   placeholder="Opp. Airport Fire Station"
@@ -375,17 +364,17 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
               </View>
 
               <View style={{ marginTop: px(spacing.xl) }}>
-                <Text style={[styles.formTitle, { fontSize: px(17) }]}>Bank details for payouts</Text>
-                <Text style={[styles.formSubtitle, { fontSize: px(13), marginTop: px(2) }]}>
+                <PartnerText style={[styles.formTitle, { fontSize: px(17) }]}>Bank details for payouts</PartnerText>
+                <PartnerText style={[styles.formSubtitle, { fontSize: px(13), marginTop: px(2) }]}>
                   Direct deposit for completed service jobs
-                </Text>
+                </PartnerText>
               </View>
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Account holder name <Text style={styles.optional}>(optional)</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Account holder name <PartnerText style={styles.optional}>(optional)</PartnerText>
+              </PartnerText>
               <View style={styles.inputWrap}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorBusiness.accountHolderName ?? ''}
                   onChangeText={(accountHolderName) => setVendorBusiness({ accountHolderName })}
                   placeholder="e.g. Ramesh Kumar Sahoo"
@@ -394,11 +383,11 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 />
               </View>
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Bank account number <Text style={styles.optional}>(optional)</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Bank account number <PartnerText style={styles.optional}>(optional)</PartnerText>
+              </PartnerText>
               <View style={styles.inputWrap}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorBusiness.accountNumber ?? ''}
                   onChangeText={(accountNumber) => setVendorBusiness({ accountNumber: accountNumber.replace(/\D/g, '') })}
                   keyboardType="number-pad"
@@ -408,11 +397,11 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 />
               </View>
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                IFSC code <Text style={styles.optional}>(optional)</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                IFSC code <PartnerText style={styles.optional}>(optional)</PartnerText>
+              </PartnerText>
               <View style={styles.inputWrap}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorBusiness.ifsc ?? ''}
                   onChangeText={(ifsc) => setVendorBusiness({ ifsc: ifsc.toUpperCase() })}
                   autoCapitalize="characters"
@@ -431,16 +420,16 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 { marginTop: px(spacing.xl), minHeight: px(54), borderRadius: px(14) },
                 pressed && styles.pressed,
               ]}>
-              <Text style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</Text>
+              <PartnerText style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</PartnerText>
               <ArrowRight size={px(18)} color={colors.dark} strokeWidth={2.5} />
             </Pressable>
           </View>
 
           <View style={[styles.secureCard, { marginTop: px(spacing.lg), borderRadius: px(14) }]}>
             <ShieldCheck size={16} color={colors.primary} strokeWidth={2.2} />
-            <Text style={styles.secureText}>
+            <PartnerText style={styles.secureText}>
               Your information is safe. We use enterprise-grade security to protect your data.
-            </Text>
+            </PartnerText>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -1,11 +1,6 @@
+import { PartnerText } from '../PartnerText';
 import React from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Camera, Image as ImageIcon, Eye } from 'lucide-react-native';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 
@@ -36,7 +31,7 @@ export default function PartnerUploadSheet({
         <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
           <View style={styles.handleBar} />
           
-          <Text style={styles.sheetTitle}>Upload Document</Text>
+          <PartnerText style={styles.sheetTitle}>Upload Document</PartnerText>
 
           <View style={styles.optionsList}>
             <Pressable
@@ -51,7 +46,7 @@ export default function PartnerUploadSheet({
               <View style={[styles.iconCircle, { backgroundColor: '#F0F9FF' }]}>
                 <Camera size={20} color="#0284C7" strokeWidth={2.2} />
               </View>
-              <Text style={styles.optionText}>Take Photo</Text>
+              <PartnerText style={styles.optionText}>Take Photo</PartnerText>
             </Pressable>
 
             <Pressable
@@ -66,7 +61,7 @@ export default function PartnerUploadSheet({
               <View style={[styles.iconCircle, { backgroundColor: '#F5F3FF' }]}>
                 <ImageIcon size={20} color="#7C3AED" strokeWidth={2.2} />
               </View>
-              <Text style={styles.optionText}>Choose from Gallery</Text>
+              <PartnerText style={styles.optionText}>Choose from Gallery</PartnerText>
             </Pressable>
 
             {hasExistingPreview && onPreview ? (
@@ -82,7 +77,7 @@ export default function PartnerUploadSheet({
                 <View style={[styles.iconCircle, { backgroundColor: '#F0FDF4' }]}>
                   <Eye size={20} color="#16A34A" strokeWidth={2.2} />
                 </View>
-                <Text style={styles.optionText}>Preview Document</Text>
+                <PartnerText style={styles.optionText}>Preview Document</PartnerText>
               </Pressable>
             ) : null}
           </View>
@@ -93,7 +88,7 @@ export default function PartnerUploadSheet({
               getPressableFeedback(pressed),
             ]}
             onPress={onClose}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <PartnerText style={styles.cancelButtonText}>Cancel</PartnerText>
           </Pressable>
         </Pressable>
       </Pressable>

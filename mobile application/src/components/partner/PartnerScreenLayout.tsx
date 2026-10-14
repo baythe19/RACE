@@ -1,16 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React, { type ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -78,13 +68,13 @@ export default function PartnerScreenLayout({
           )}
 
           <View style={styles.titleBlock}>
-            <Text style={styles.title} numberOfLines={2}>
+            <PartnerText style={styles.title} numberOfLines={2}>
               {title}
-            </Text>
+            </PartnerText>
             {subtitle ? (
-              <Text style={styles.subtitle} numberOfLines={3}>
+              <PartnerText style={styles.subtitle} numberOfLines={3}>
                 {subtitle}
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
 
@@ -170,13 +160,13 @@ const styles = StyleSheet.create({
   },
   stickyHeader: {
     backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E8ECF0',
     paddingBottom: spacing.lg,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
   backButton: {
     width: HEADER_SIDE,
@@ -187,16 +177,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGrey,
     borderWidth: 1,
     borderColor: colors.border,
+    flexShrink: 0,
   },
   sideSlot: {
-    width: HEADER_SIDE,
+    minWidth: HEADER_SIDE,
     height: HEADER_SIDE,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   sideSpacer: {
     width: HEADER_SIDE,
     height: HEADER_SIDE,
+    flexShrink: 0,
   },
   titleBlock: {
     flex: 1,

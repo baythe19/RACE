@@ -6,6 +6,7 @@ import { vendorDocumentUpload } from '../../middleware/src/upload';
 import { validate } from '../../middleware/src/validation';
 import { vendorController } from './vendor';
 import {
+  assignVendorDriverVehicleSchema,
   claimVendorDriverSchema,
   createVendorDriverSchema,
   uploadVendorDriverDocumentSchema,
@@ -62,6 +63,12 @@ router.post(
   validate(claimVendorDriverSchema),
   vendorController.claimDriver,
 );
+router.post(
+  '/drivers/:id/assign-vehicle',
+  requireRole('vendor'),
+  validate(assignVendorDriverVehicleSchema),
+  vendorController.assignDriverVehicle,
+);
 router.delete('/drivers/:id', requireRole('vendor'), vendorController.removeDriver);
 
 router.get('/vehicles', requireRole('vendor'), vendorController.listVehicles);
@@ -79,6 +86,7 @@ router.put(
 );
 router.delete('/vehicles/:id', requireRole('vendor'), vendorController.removeVehicle);
 
+router.get('/bookings', requireRole('vendor'), vendorController.listBookings);
 router.get('/bookings/offers', requireRole('vendor'), vendorController.listBookingOffers);
 router.post(
   '/bookings/:id/approve',

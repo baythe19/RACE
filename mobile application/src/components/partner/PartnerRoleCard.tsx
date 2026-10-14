@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
@@ -48,19 +49,19 @@ export default function PartnerRoleCard({
           <Icon size={28} color={selected ? accent : colors.grey} strokeWidth={2} />
         </View>
 
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.description}>{description}</Text>
+        <PartnerText style={styles.title}>{title}</PartnerText>
+        <PartnerText style={styles.description}>{description}</PartnerText>
       </View>
 
       <View style={[styles.featureBar, selected ? styles.featureBarSelected : styles.featureBarIdle]}>
         {features.map(({ label, Icon: FeatureIcon }) => (
           <View key={label} style={styles.featureItem}>
             <FeatureIcon size={13} color={mutedIcon} strokeWidth={2.2} />
-            <Text
+            <PartnerText
               style={[styles.featureLabel, selected ? styles.featureLabelSelected : null]}
               numberOfLines={1}>
               {label}
-            </Text>
+            </PartnerText>
           </View>
         ))}
       </View>

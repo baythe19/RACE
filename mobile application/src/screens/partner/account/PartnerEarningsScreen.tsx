@@ -1,10 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   TrendingUp,
@@ -14,11 +10,14 @@ import {
   CreditCard,
   Building,
   CheckCircle,
+  Zap,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { usePartnerPayoutStore } from '../../../store/partnerPayoutStore';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerEarnings'>;
 
@@ -46,6 +45,9 @@ const RECENT_PAYOUTS = [
 
 export default function PartnerEarningsScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<'earnings' | 'payouts'>('earnings');
+  const payoutMethod = usePartnerPayoutStore(state => state.payoutMethod);
+  const bankDetails = usePartnerPayoutStore(state => state.bankDetails);
+  const upiDetails = usePartnerPayoutStore(state => state.upiDetails);
 
   return (
     <PartnerScreenLayout
@@ -56,25 +58,25 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
         <Pressable
           style={[styles.segmentTab, activeTab === 'earnings' && styles.segmentTabActive]}
           onPress={() => setActiveTab('earnings')}>
-          <Text
+          <PartnerText
             style={[
               styles.segmentText,
               activeTab === 'earnings' && styles.segmentTextActive,
             ]}>
             Earnings
-          </Text>
+          </PartnerText>
         </Pressable>
 
         <Pressable
           style={[styles.segmentTab, activeTab === 'payouts' && styles.segmentTabActive]}
           onPress={() => setActiveTab('payouts')}>
-          <Text
+          <PartnerText
             style={[
               styles.segmentText,
               activeTab === 'payouts' && styles.segmentTextActive,
             ]}>
             Payouts
-          </Text>
+          </PartnerText>
         </Pressable>
       </View>
 
@@ -83,18 +85,18 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
           {/* Total Earnings Card */}
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
-              <Text style={styles.heroLabel}>Total Earnings (This Week)</Text>
+              <PartnerText style={styles.heroLabel}>Total Earnings (This Week)</PartnerText>
               <View style={styles.periodPill}>
-                <Text style={styles.periodText}>This Week</Text>
+                <PartnerText style={styles.periodText}>This Week</PartnerText>
                 <ChevronDown size={14} color={driverColors.ink} />
               </View>
             </View>
 
-            <Text style={styles.heroAmount}>₹8,450</Text>
+            <PartnerText style={styles.heroAmount}>₹8,450</PartnerText>
 
             <View style={styles.trendRow}>
               <TrendingUp size={14} color={driverColors.green} strokeWidth={2.4} />
-              <Text style={styles.trendText}>+12% from last week</Text>
+              <PartnerText style={styles.trendText}>+12% from last week</PartnerText>
             </View>
 
             {/* Bar Chart */}
@@ -104,7 +106,7 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
                   <View key={item.day} style={styles.barCol}>
                     {item.isHighlight ? (
                       <View style={styles.tooltipPill}>
-                        <Text style={styles.tooltipText}>₹{item.amount}</Text>
+                        <PartnerText style={styles.tooltipText}>₹{item.amount}</PartnerText>
                       </View>
                     ) : null}
                     <View style={styles.barTrack}>
@@ -116,13 +118,13 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
                         ]}
                       />
                     </View>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.barLabel,
                         item.isHighlight && styles.barLabelHighlight,
                       ]}>
                       {item.day}
-                    </Text>
+                    </PartnerText>
                   </View>
                 ))}
               </View>
@@ -131,33 +133,33 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
             {/* Metrics Strip */}
             <View style={styles.metricsStrip}>
               <View style={styles.metricItem}>
-                <Text style={styles.metricVal}>18</Text>
-                <Text style={styles.metricCap}>Trips Completed</Text>
+                <PartnerText style={styles.metricVal}>18</PartnerText>
+                <PartnerText style={styles.metricCap}>Trips Completed</PartnerText>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricItem}>
-                <Text style={styles.metricVal}>32 h</Text>
-                <Text style={styles.metricCap}>Online Time</Text>
+                <PartnerText style={styles.metricVal}>32 h</PartnerText>
+                <PartnerText style={styles.metricCap}>Online Time</PartnerText>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricItem}>
-                <Text style={styles.metricVal}>₹468</Text>
-                <Text style={styles.metricCap}>Avg. per trip</Text>
+                <PartnerText style={styles.metricVal}>₹468</PartnerText>
+                <PartnerText style={styles.metricCap}>Avg. per trip</PartnerText>
               </View>
             </View>
           </View>
 
           {/* Recent Trips Section */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Recent Trips</Text>
+            <PartnerText style={styles.sectionTitle}>Recent Trips</PartnerText>
             <Pressable
               hitSlop={8}
               onPress={() => navigation.navigate('PartnerTripHistory')}>
-              <Text style={styles.viewAllText}>View all</Text>
+              <PartnerText style={styles.viewAllText}>View all</PartnerText>
             </Pressable>
           </View>
 
@@ -175,14 +177,14 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
                 </View>
 
                 <View style={styles.tripMetaCol}>
-                  <Text style={styles.tripNumber}>{trip.bookingNumber}</Text>
-                  <Text style={styles.tripTime}>{trip.time}</Text>
+                  <PartnerText style={styles.tripNumber}>{trip.bookingNumber}</PartnerText>
+                  <PartnerText style={styles.tripTime}>{trip.time}</PartnerText>
                 </View>
 
                 <View style={styles.tripFareCol}>
-                  <Text style={styles.tripFare}>{trip.fare}</Text>
+                  <PartnerText style={styles.tripFare}>{trip.fare}</PartnerText>
                   <View style={styles.completedPill}>
-                    <Text style={styles.completedText}>{trip.status}</Text>
+                    <PartnerText style={styles.completedText}>{trip.status}</PartnerText>
                   </View>
                 </View>
 
@@ -196,17 +198,42 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
           {/* Payouts Tab View */}
           <View style={styles.bankCard}>
             <View style={styles.bankTopRow}>
-              <View style={styles.bankIconCircle}>
-                <Building size={20} color={driverColors.amber} strokeWidth={2.2} />
+              <View
+                style={[
+                  styles.bankIconCircle,
+                  payoutMethod === 'upi' && { backgroundColor: '#FEF3C7' },
+                ]}>
+                {payoutMethod === 'upi' ? (
+                  <Zap size={20} color="#D97706" strokeWidth={2.4} />
+                ) : (
+                  <Building size={20} color={driverColors.amber} strokeWidth={2.2} />
+                )}
               </View>
               <View style={styles.bankTextCol}>
-                <Text style={styles.bankName}>State Bank of India</Text>
-                <Text style={styles.bankAcc}>•••• •••• 7890 • IFSC: SBIN0001234</Text>
+                <PartnerText style={styles.bankName}>
+                  {payoutMethod === 'upi'
+                    ? `UPI ID: ${upiDetails.holderName}`
+                    : bankDetails.bankName || 'State Bank of India'}
+                </PartnerText>
+                <PartnerText style={styles.bankAcc}>
+                  {payoutMethod === 'upi'
+                    ? upiDetails.upiId
+                    : `•••• •••• ${bankDetails.accountNumber.slice(-4) || '7890'} • IFSC: ${bankDetails.ifsc}`}
+                </PartnerText>
               </View>
               <View style={styles.verifiedBadge}>
                 <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
-                <Text style={styles.verifiedText}>Verified</Text>
+                <PartnerText style={styles.verifiedText}>
+                  {payoutMethod === 'upi' ? 'Linked' : 'Verified'}
+                </PartnerText>
               </View>
+            </View>
+
+            <View style={styles.scheduleRow}>
+              <ShieldCheck size={14} color="#059669" strokeWidth={2.2} />
+              <PartnerText style={styles.scheduleText}>
+                Next automated payout: Monday, 6:00 AM (0 transfer fee)
+              </PartnerText>
             </View>
 
             <Pressable
@@ -216,13 +243,15 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
               ]}
               onPress={() => navigation.navigate('PartnerBankDetails')}>
               <CreditCard size={14} color={driverColors.amber} strokeWidth={2.2} />
-              <Text style={styles.editBankText}>Manage Bank Details</Text>
+              <PartnerText style={styles.editBankText}>
+                Manage {payoutMethod === 'upi' ? 'UPI & Bank Details' : 'Bank & UPI Details'}
+              </PartnerText>
             </Pressable>
           </View>
 
-          <Text style={[styles.sectionTitle, { marginTop: 16, marginBottom: 12 }]}>
+          <PartnerText style={[styles.sectionTitle, { marginTop: 16, marginBottom: 12 }]}>
             Recent Payouts
-          </Text>
+          </PartnerText>
 
           <View style={styles.tripList}>
             {RECENT_PAYOUTS.map(p => (
@@ -232,12 +261,12 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
                 </View>
 
                 <View style={styles.tripMetaCol}>
-                  <Text style={styles.payoutAmount}>{p.amount}</Text>
-                  <Text style={styles.tripTime}>{p.date}</Text>
+                  <PartnerText style={styles.payoutAmount}>{p.amount}</PartnerText>
+                  <PartnerText style={styles.tripTime}>{p.date}</PartnerText>
                 </View>
 
                 <View style={styles.completedPill}>
-                  <Text style={styles.completedText}>{p.status}</Text>
+                  <PartnerText style={styles.completedText}>{p.status}</PartnerText>
                 </View>
               </View>
             ))}
@@ -494,12 +523,34 @@ const styles = StyleSheet.create({
     borderRadius: driverRadius.card,
     padding: 16,
     borderWidth: 1,
-    borderColor: driverColors.hairline,
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    elevation: 0.5,
   },
   bankTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+  },
+  scheduleText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#15803D',
   },
   bankIconCircle: {
     width: 42,

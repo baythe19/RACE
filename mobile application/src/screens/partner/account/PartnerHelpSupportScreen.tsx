@@ -1,13 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Alert,
-  Linking,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Search,
@@ -64,7 +57,7 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
       {/* Search Bar */}
       <View style={styles.searchBar}>
         <Search size={18} color={driverColors.grey} strokeWidth={2} />
-        <TextInput
+        <PartnerTextInput
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -84,8 +77,8 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
           <View style={[styles.quickIconCircle, { backgroundColor: '#FFFBEB' }]}>
             <Phone size={22} color={driverColors.amber} strokeWidth={2.4} />
           </View>
-          <Text style={styles.quickTitle}>Call Support</Text>
-          <Text style={styles.quickSubtitle}>24x7 assistance</Text>
+          <PartnerText style={styles.quickTitle}>Call Support</PartnerText>
+          <PartnerText style={styles.quickSubtitle}>24x7 assistance</PartnerText>
         </Pressable>
 
         <Pressable
@@ -97,13 +90,13 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
           <View style={[styles.quickIconCircle, { backgroundColor: '#ECFDF5' }]}>
             <MessageCircle size={22} color={driverColors.green} strokeWidth={2.4} />
           </View>
-          <Text style={styles.quickTitle}>WhatsApp</Text>
-          <Text style={styles.quickSubtitle}>Chat with us</Text>
+          <PartnerText style={styles.quickTitle}>WhatsApp</PartnerText>
+          <PartnerText style={styles.quickSubtitle}>Chat with us</PartnerText>
         </Pressable>
       </View>
 
       {/* Common Topics */}
-      <Text style={styles.sectionTitle}>Common Topics</Text>
+      <PartnerText style={styles.sectionTitle}>Common Topics</PartnerText>
       <View style={styles.topicsCard}>
         {filteredTopics.map((topic, index) => {
           const IconComp = topic.icon;
@@ -125,8 +118,8 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
                 </View>
 
                 <View style={styles.textCol}>
-                  <Text style={styles.topicTitle}>{topic.title}</Text>
-                  <Text style={styles.topicSubtitle}>{topic.subtitle}</Text>
+                  <PartnerText style={styles.topicTitle}>{topic.title}</PartnerText>
+                  <PartnerText style={styles.topicSubtitle}>{topic.subtitle}</PartnerText>
                 </View>
 
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
@@ -142,8 +135,8 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
         <View style={styles.bannerIconCircle}>
           <Headphones size={24} color={driverColors.amber} strokeWidth={2.2} />
         </View>
-        <Text style={styles.bannerTitle}>Still need help?</Text>
-        <Text style={styles.bannerSubtitle}>Contact our specialized partner support team</Text>
+        <PartnerText style={styles.bannerTitle}>Still need help?</PartnerText>
+        <PartnerText style={styles.bannerSubtitle}>Contact our specialized partner support team</PartnerText>
 
         <Pressable
           style={({ pressed }) => [
@@ -151,7 +144,7 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
             getPressableFeedback(pressed),
           ]}
           onPress={handleCall}>
-          <Text style={styles.contactButtonText}>Contact Us</Text>
+          <PartnerText style={styles.contactButtonText}>Contact Us</PartnerText>
         </Pressable>
       </View>
     </PartnerScreenLayout>

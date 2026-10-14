@@ -1,11 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   CheckCircle,
@@ -62,7 +57,7 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
       return (
         <View style={styles.approvedBadge}>
           <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
-          <Text style={styles.approvedText}>Approved</Text>
+          <PartnerText style={styles.approvedText}>Approved</PartnerText>
         </View>
       );
     }
@@ -70,14 +65,14 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
       return (
         <View style={styles.reviewBadge}>
           <AlertCircle size={12} color="#D97706" strokeWidth={2.4} />
-          <Text style={styles.reviewText}>Under Review</Text>
+          <PartnerText style={styles.reviewText}>Under Review</PartnerText>
         </View>
       );
     }
     return (
       <View style={styles.actionRequiredBadge}>
         <AlertCircle size={12} color={driverColors.red} strokeWidth={2.4} />
-        <Text style={styles.actionRequiredText}>Action Required</Text>
+        <PartnerText style={styles.actionRequiredText}>Action Required</PartnerText>
       </View>
     );
   };
@@ -92,10 +87,10 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
           <CheckCircle size={22} color={driverColors.green} strokeWidth={2.5} />
         </View>
         <View style={styles.statusTextCol}>
-          <Text style={styles.statusTitle}>All required documents approved</Text>
-          <Text style={styles.statusSubtitle}>
+          <PartnerText style={styles.statusTitle}>All required documents approved</PartnerText>
+          <PartnerText style={styles.statusSubtitle}>
             You are eligible to go online and accept jobs.
-          </Text>
+          </PartnerText>
         </View>
       </View>
 
@@ -104,25 +99,25 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
         <Pressable
           style={[styles.tabButton, activeTab === 'required' && styles.tabButtonActive]}
           onPress={() => setActiveTab('required')}>
-          <Text
+          <PartnerText
             style={[
               styles.tabText,
               activeTab === 'required' && styles.tabTextActive,
             ]}>
             Required ({REQUIRED_DOCS.length})
-          </Text>
+          </PartnerText>
         </Pressable>
 
         <Pressable
           style={[styles.tabButton, activeTab === 'optional' && styles.tabButtonActive]}
           onPress={() => setActiveTab('optional')}>
-          <Text
+          <PartnerText
             style={[
               styles.tabText,
               activeTab === 'optional' && styles.tabTextActive,
             ]}>
             Optional ({OPTIONAL_DOCS.length})
-          </Text>
+          </PartnerText>
         </Pressable>
       </View>
 
@@ -147,7 +142,7 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.docDetailsCol}>
-              <Text style={styles.docName}>{doc.name}</Text>
+              <PartnerText style={styles.docName}>{doc.name}</PartnerText>
               <View style={styles.badgeWrapper}>{getStatusBadge(doc.status)}</View>
             </View>
 

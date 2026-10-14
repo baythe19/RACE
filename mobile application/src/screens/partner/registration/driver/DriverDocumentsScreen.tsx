@@ -1,18 +1,6 @@
+import { PartnerText } from '../../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Linking,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -387,21 +375,21 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
         {/* Title and subtle info */}
         <View style={styles.docTextWrap}>
-          <Text numberOfLines={1} style={[styles.docTitle, { fontSize: px(12.5) }]}>
+          <PartnerText numberOfLines={1} style={[styles.docTitle, { fontSize: px(12.5) }]}>
             {doc.title}
-          </Text>
+          </PartnerText>
           {uploaded ? (
-            <Text numberOfLines={1} style={[styles.docSubtitleUploaded, { fontSize: px(10.5) }]}>
+            <PartnerText numberOfLines={1} style={[styles.docSubtitleUploaded, { fontSize: px(10.5) }]}>
               {uploadedData?.name || `${doc.id}_verified.jpg`}
-            </Text>
+            </PartnerText>
           ) : doc.id === 'government_photo_id' ? (
-            <Text numberOfLines={1} style={[styles.docSubtitle, { fontSize: px(10) }]}>
+            <PartnerText numberOfLines={1} style={[styles.docSubtitle, { fontSize: px(10) }]}>
               Aadhaar or another accepted ID
-            </Text>
+            </PartnerText>
           ) : doc.id === 'owner_noc' ? (
-            <Text numberOfLines={1} style={[styles.docSubtitle, { fontSize: px(10) }]}>
+            <PartnerText numberOfLines={1} style={[styles.docSubtitle, { fontSize: px(10) }]}>
               Only when vehicle is registered to someone else
-            </Text>
+            </PartnerText>
           ) : null}
         </View>
 
@@ -409,15 +397,15 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
         <View style={styles.badgeWrap}>
           {uploaded ? (
             <View style={styles.badgeUploaded}>
-              <Text style={[styles.badgeUploadedText, { fontSize: px(10.5) }]}>Uploaded</Text>
+              <PartnerText style={[styles.badgeUploadedText, { fontSize: px(10.5) }]}>Uploaded</PartnerText>
             </View>
           ) : isConditional ? (
             <View style={styles.badgeConditional}>
-              <Text style={[styles.badgeConditionalText, { fontSize: px(10.5) }]}>Conditional</Text>
+              <PartnerText style={[styles.badgeConditionalText, { fontSize: px(10.5) }]}>Conditional</PartnerText>
             </View>
           ) : (
             <View style={styles.badgeRequired}>
-              <Text style={[styles.badgeRequiredText, { fontSize: px(10.5) }]}>Required</Text>
+              <PartnerText style={[styles.badgeRequiredText, { fontSize: px(10.5) }]}>Required</PartnerText>
             </View>
           )}
         </View>
@@ -477,7 +465,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                 pressed && styles.pressed,
               ]}>
               <Upload size={px(12)} color="#374151" strokeWidth={2.4} />
-              <Text style={[styles.uploadBtnText, { fontSize: px(11) }]}>Upload</Text>
+              <PartnerText style={[styles.uploadBtnText, { fontSize: px(11) }]}>Upload</PartnerText>
             </Pressable>
           )}
         </View>
@@ -501,14 +489,14 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             <FileText size={px(17)} color="#D97706" strokeWidth={2.4} />
           </View>
           <View style={styles.headerTextWrap}>
-            <Text style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>
+            <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>
               Documents for verification
-            </Text>
-            <Text
+            </PartnerText>
+            <PartnerText
               numberOfLines={1}
               style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
               Upload clear, readable photos or PDFs.
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
@@ -516,18 +504,18 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
 
         {/* Section 1: Needed for review (Clean header without tags) */}
         <View style={[styles.sectionContainer, { marginBottom: px(10) }]}>
-          <Text style={[styles.sectionTitle, { fontSize: px(13.5), marginBottom: px(8) }]}>
+          <PartnerText style={[styles.sectionTitle, { fontSize: px(13.5), marginBottom: px(8) }]}>
             Needed for review
-          </Text>
+          </PartnerText>
 
           {CORE_REVIEW_DOCUMENTS.map((doc) => renderDocRow(doc, false))}
         </View>
 
         {/* Section 2: Only when applicable */}
         <View style={[styles.sectionContainer, { marginBottom: px(10) }]}>
-          <Text style={[styles.sectionTitle, { fontSize: px(13.5), marginBottom: px(8) }]}>
+          <PartnerText style={[styles.sectionTitle, { fontSize: px(13.5), marginBottom: px(8) }]}>
             Only when applicable
-          </Text>
+          </PartnerText>
 
           {CONDITIONAL_DOCUMENTS.map((doc) => renderDocRow(doc, true))}
         </View>
@@ -540,11 +528,11 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             { paddingVertical: px(8), paddingHorizontal: px(10), borderRadius: px(8) },
             pressed && styles.pressed,
           ]}>
-          <Text numberOfLines={1} style={[styles.collapsibleRowTitle, { fontSize: px(12) }]}>
+          <PartnerText numberOfLines={1} style={[styles.collapsibleRowTitle, { fontSize: px(12) }]}>
             Before first payout — PAN and bank details
-          </Text>
+          </PartnerText>
           <View style={styles.badgeLater}>
-            <Text style={[styles.badgeLaterText, { fontSize: px(10.5) }]}>Later</Text>
+            <PartnerText style={[styles.badgeLaterText, { fontSize: px(10.5) }]}>Later</PartnerText>
           </View>
           {expandedLater1 ? (
             <ChevronUp size={px(16)} color="#6B7280" />
@@ -566,11 +554,11 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             { paddingVertical: px(8), paddingHorizontal: px(10), borderRadius: px(8), marginTop: px(6) },
             pressed && styles.pressed,
           ]}>
-          <Text numberOfLines={1} style={[styles.collapsibleRowTitle, { fontSize: px(12) }]}>
+          <PartnerText numberOfLines={1} style={[styles.collapsibleRowTitle, { fontSize: px(12) }]}>
             Additional checks — Police verification / medical fitness
-          </Text>
+          </PartnerText>
           <View style={styles.badgeLater}>
-            <Text style={[styles.badgeLaterText, { fontSize: px(10.5) }]}>If requested</Text>
+            <PartnerText style={[styles.badgeLaterText, { fontSize: px(10.5) }]}>If requested</PartnerText>
           </View>
           {expandedLater2 ? (
             <ChevronUp size={px(16)} color="#6B7280" />
@@ -588,9 +576,9 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
       {/* Bottom Privacy/Security Note */}
       <View style={[styles.securityNoteRow, { marginBottom: px(16) }]}>
         <ShieldCheck size={px(16)} color="#D97706" strokeWidth={2.2} style={{ marginRight: px(6) }} />
-        <Text style={[styles.securityNoteText, { fontSize: px(11.5) }]}>
+        <PartnerText style={[styles.securityNoteText, { fontSize: px(11.5) }]}>
           We only use your documents for partner verification.
-        </Text>
+        </PartnerText>
       </View>
 
       {/* Upload Action Sheet Modal */}
@@ -603,12 +591,12 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={[styles.sheetTitle, { fontSize: px(15.5) }]}>
+                <PartnerText style={[styles.sheetTitle, { fontSize: px(15.5) }]}>
                   Upload {activeDocForUpload?.title}
-                </Text>
-                <Text style={[styles.sheetSubtitle, { fontSize: px(11.5) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.sheetSubtitle, { fontSize: px(11.5) }]}>
                   Choose photo or document file
-                </Text>
+                </PartnerText>
               </View>
               <Pressable hitSlop={12} onPress={() => setActiveDocForUpload(null)}>
                 <X size={px(20)} color="#4B5563" />
@@ -618,9 +606,9 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             {/* Android Permission & Privacy Assurance Banner */}
             <View style={styles.permissionInfoBanner}>
               <ShieldCheck size={px(14)} color="#059669" />
-              <Text style={styles.permissionInfoText}>
+              <PartnerText style={styles.permissionInfoText}>
                 Android permissions are requested only to capture and verify official documents securely.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Option 1: Camera */}
@@ -635,10 +623,10 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                 <Camera size={px(19)} color="#D97706" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>Take photo</Text>
-                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
+                <PartnerText style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>Take photo</PartnerText>
+                <PartnerText style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
                   Camera • Photo capture with auto-crop
-                </Text>
+                </PartnerText>
               </View>
               <ChevronRight size={px(17)} color="#9CA3AF" />
             </Pressable>
@@ -655,12 +643,12 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                 <ImageIcon size={px(19)} color="#2563EB" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>
+                <PartnerText style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>
                   Choose from gallery
-                </Text>
-                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
                   Photos • JPG or PNG from gallery
-                </Text>
+                </PartnerText>
               </View>
               <ChevronRight size={px(17)} color="#9CA3AF" />
             </Pressable>
@@ -677,12 +665,12 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                 <FileUp size={px(19)} color="#4B5563" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>
+                <PartnerText style={[styles.uploadOptionTitle, { fontSize: px(13.5) }]}>
                   Select PDF document
-                </Text>
-                <Text style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.uploadOptionSubtitle, { fontSize: px(11.5) }]}>
                   Files • PDF files up to 10 MB
-                </Text>
+                </PartnerText>
               </View>
               <ChevronRight size={px(17)} color="#9CA3AF" />
             </Pressable>
@@ -700,12 +688,12 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
                 <Sparkles size={px(18)} color="#15803D" />
               </View>
               <View style={styles.uploadOptionTextWrap}>
-                <Text style={[styles.uploadOptionTitle, { color: '#166534', fontSize: px(13.5) }]}>
+                <PartnerText style={[styles.uploadOptionTitle, { color: '#166534', fontSize: px(13.5) }]}>
                   Use verified sample document
-                </Text>
-                <Text style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11.5) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11.5) }]}>
                   Fast testing & QA preview
-                </Text>
+                </PartnerText>
               </View>
               <Check size={px(16)} color="#15803D" strokeWidth={2.5} />
             </Pressable>
@@ -727,13 +715,13 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
               </View>
             )}
 
-            <Text style={[styles.progressDocTitle, { fontSize: px(15) }]}>
+            <PartnerText style={[styles.progressDocTitle, { fontSize: px(15) }]}>
               {uploadProgressState?.doc.title}
-            </Text>
+            </PartnerText>
 
-            <Text style={[styles.progressStatusText, { fontSize: px(12) }]}>
+            <PartnerText style={[styles.progressStatusText, { fontSize: px(12) }]}>
               {uploadProgressState?.statusText}
-            </Text>
+            </PartnerText>
 
             {/* Progress Bar Track */}
             <View style={styles.progressBarTrack}>
@@ -748,9 +736,9 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <Text style={[styles.progressPercentText, { fontSize: px(11) }]}>
+            <PartnerText style={[styles.progressPercentText, { fontSize: px(11) }]}>
               {uploadProgressState?.progress}%
-            </Text>
+            </PartnerText>
           </View>
         </View>
       </Modal>
@@ -765,12 +753,12 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={[styles.sheetTitle, { fontSize: px(15.5) }]}>
+                <PartnerText style={[styles.sheetTitle, { fontSize: px(15.5) }]}>
                   {previewDocData?.title}
-                </Text>
-                <Text style={[styles.sheetSubtitle, { fontSize: px(11.5) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.sheetSubtitle, { fontSize: px(11.5) }]}>
                   {previewDocData?.name}
-                </Text>
+                </PartnerText>
               </View>
               <Pressable hitSlop={12} onPress={() => setPreviewDocData(null)}>
                 <X size={px(20)} color="#4B5563" />
@@ -782,14 +770,14 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
               previewDocData.name?.toLowerCase().endsWith('.pdf') ? (
                 <View style={[styles.pdfPreviewContainer, { height: px(200), marginVertical: px(12) }]}>
                   <FileText size={px(54)} color="#EF4444" />
-                  <Text style={[styles.pdfFileName, { fontSize: px(13) }]} numberOfLines={2}>
+                  <PartnerText style={[styles.pdfFileName, { fontSize: px(13) }]} numberOfLines={2}>
                     {previewDocData.name}
-                  </Text>
+                  </PartnerText>
                   <View style={styles.pdfVerifiedBadge}>
                     <ShieldCheck size={px(12)} color="#15803D" />
-                    <Text style={[styles.pdfVerifiedText, { fontSize: px(11) }]}>
+                    <PartnerText style={[styles.pdfVerifiedText, { fontSize: px(11) }]}>
                       PDF Document Ready & Verified
-                    </Text>
+                    </PartnerText>
                   </View>
                 </View>
               ) : (
@@ -806,7 +794,7 @@ export default function DriverDocumentsScreen({ navigation, route }: Props) {
             <Pressable
               onPress={() => setPreviewDocData(null)}
               style={[styles.closePreviewBtn, { height: px(44), borderRadius: px(10) }]}>
-              <Text style={styles.closePreviewBtnText}>Close Preview</Text>
+              <PartnerText style={styles.closePreviewBtnText}>Close Preview</PartnerText>
             </Pressable>
           </Pressable>
         </Pressable>

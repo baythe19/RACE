@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -171,15 +162,15 @@ export default function LocationPickerMap({
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
             <ArrowLeft size={24} color={colors.dark} strokeWidth={2.5} />
           </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>
+          <PartnerText style={styles.headerTitle} numberOfLines={1}>
             {title}
-          </Text>
+          </PartnerText>
           <View style={styles.headerSide} />
         </View>
 
         <View style={styles.searchRow}>
           <Search size={18} color={colors.grey} />
-          <TextInput
+          <PartnerTextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search location..."
@@ -225,16 +216,16 @@ export default function LocationPickerMap({
         </View>
 
         <View style={[styles.bottomSheet, shadows.card]}>
-          <Text style={styles.addressLabel}>Selected address</Text>
+          <PartnerText style={styles.addressLabel}>Selected address</PartnerText>
           {isGeocoding ? (
             <View style={styles.addressLoading}>
               <ActivityIndicator size="small" color={accentColor} />
-              <Text style={styles.addressLoadingText}>Getting address...</Text>
+              <PartnerText style={styles.addressLoadingText}>Getting address...</PartnerText>
             </View>
           ) : (
-            <Text style={styles.addressText} numberOfLines={3}>
+            <PartnerText style={styles.addressText} numberOfLines={3}>
               {address ? formatLocationDisplay(address) : 'Move the map to select a location'}
-            </Text>
+            </PartnerText>
           )}
 
           <Pressable
@@ -244,7 +235,7 @@ export default function LocationPickerMap({
               styles.confirmBtn,
               { backgroundColor: isGeocoding ? colors.grey : accentColor },
             ]}>
-            <Text style={styles.confirmLabel}>Use this location</Text>
+            <PartnerText style={styles.confirmLabel}>Use this location</PartnerText>
           </Pressable>
         </View>
       </SafeAreaView>

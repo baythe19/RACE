@@ -1,12 +1,6 @@
+import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Check, Plus, Truck, MapPin, DollarSign, Info } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -15,6 +9,8 @@ import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import {
   useApproveVendorBookingMutation,
+  useVendorBookingOffersQuery,
+  useVendorFleetDriversQuery,
   useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
 import { formatReadableAddress } from '../../utils/readableAddress';
@@ -23,12 +19,35 @@ import { driverColors, driverRadius, getPressableFeedback } from '../../theme/dr
 
 type Props = NativeStackScreenProps<PartnerJobsStackParamList, 'VendorAssignJob'>;
 
+function artworkKindFor(type: string): 'flatbed' | 'wheel_lift' | 'heavy_tow' | 'car' {
+  const lower = type.toLowerCase();
+  if (lower.includes('flat')) return 'flatbed';
+  if (lower.includes('wheel') || lower.includes('lift')) return 'wheel_lift';
+  if (lower.includes('truck') || lower.includes('recovery') || lower.includes('heavy')) {
+    return 'heavy_tow';
+  }
+  return 'car';
+}
+
 export default function VendorAssignJobScreen({ navigation, route }: Props) {
   const { bookingId, bookingType, bookingNumber, serviceLabel, pickupAddress, estimatedFare } =
     route.params;
 
-  const { data: vehicles = [], isLoading: vehiclesLoading } = useVendorFleetVehiclesQuery(true);
+  const {
+    data: vehicles = [],
+    isLoading: vehiclesLoading,
+    refetch: refetchVehicles,
+  } = useVendorFleetVehiclesQuery(true);
+  const { data: drivers = [] } = useVendorFleetDriversQuery(true);
+  const { refetch: refetchOffers } = useVendorBookingOffersQuery(true);
   const approveMutation = useApproveVendorBookingMutation();
+
+  // Driver↔vehicle association lives on the driver profile (vehicleRegistration).
+  const driverByReg = new Map<string, { name: string; status: string }>();
+  for (const driver of drivers) {
+    const key = (driver.vehicleRegistration ?? '').replace(/\s+/g, '').toUpperCase();
+    if (key) driverByReg.set(key, { name: driver.name, status: driver.status });
+  }
 
   const [vehicleId, setVehicleId] = useState<string | null>(null);
 
@@ -51,6 +70,9 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       );
     } catch (error) {
       Alert.alert('Approval failed', getApiErrorMessage(error, 'Could not approve job'));
+      // The lead may already be gone (taken/expired) — refresh to show reality.
+      void refetchOffers();
+      void refetchVehicles();
     }
   };
 
@@ -71,7 +93,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           {approveMutation.isPending ? (
             <ActivityIndicator size="small" color={driverColors.white} />
           ) : (
-            <Text style={styles.primaryButtonText}>Approve & Assign Vehicle</Text>
+            <PartnerText style={styles.primaryButtonText}>Approve & Assign Vehicle</PartnerText>
           )}
         </Pressable>
       }>
@@ -82,17 +104,17 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
             <MapPin size={18} color={driverColors.amber} strokeWidth={2.4} />
           </View>
           <View style={styles.summaryCopy}>
-            <Text style={styles.summaryLabel}>Pickup Location</Text>
-            <Text style={styles.summaryAddress}>
+            <PartnerText style={styles.summaryLabel}>Pickup Location</PartnerText>
+            <PartnerText style={styles.summaryAddress}>
               {formatReadableAddress(pickupAddress) || 'Pickup location'}
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
         {typeof estimatedFare === 'number' ? (
           <View style={styles.fareStrip}>
-            <Text style={styles.fareLabel}>Estimated Fare</Text>
-            <Text style={styles.fareValue}>₹{Math.round(estimatedFare)}</Text>
+            <PartnerText style={styles.fareLabel}>Estimated Fare</PartnerText>
+            <PartnerText style={styles.fareValue}>₹{Math.round(estimatedFare)}</PartnerText>
           </View>
         ) : null}
       </View>
@@ -100,20 +122,20 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       {/* Info notice */}
       <View style={styles.infoBanner}>
         <Info size={16} color="#0284C7" strokeWidth={2.2} />
-        <Text style={styles.infoText}>
+        <PartnerText style={styles.infoText}>
           Assigning a vehicle broadcasts this request to your fleet drivers. Once assigned, your active drivers can accept and start the trip.
-        </Text>
+        </PartnerText>
       </View>
 
       {/* Vehicle Selection Header */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Select Fleet Vehicle</Text>
+        <PartnerText style={styles.sectionTitle}>Select Fleet Vehicle</PartnerText>
         <Pressable
           onPress={() => navigation.navigate('VendorVehicles')}
           style={styles.addLink}
           hitSlop={8}>
           <Plus size={15} color={driverColors.amberText} strokeWidth={2.5} />
-          <Text style={styles.addLinkText}>Add vehicle</Text>
+          <PartnerText style={styles.addLinkText}>Add vehicle</PartnerText>
         </Pressable>
       </View>
 
@@ -125,20 +147,23 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       ) : vehicles.length === 0 ? (
         <View style={styles.emptyCard}>
           <Truck size={32} color={driverColors.greySoft} strokeWidth={1.8} />
-          <Text style={styles.emptyTitle}>No active fleet vehicles</Text>
-          <Text style={styles.emptySub}>
+          <PartnerText style={styles.emptyTitle}>No active fleet vehicles</PartnerText>
+          <PartnerText style={styles.emptySub}>
             You must add and activate at least one vehicle before assigning jobs.
-          </Text>
+          </PartnerText>
           <Pressable
             style={styles.addVehicleBtn}
             onPress={() => navigation.navigate('VendorVehicles')}>
-            <Text style={styles.addVehicleBtnText}>Add Vehicle to Fleet</Text>
+            <PartnerText style={styles.addVehicleBtnText}>Add Vehicle to Fleet</PartnerText>
           </Pressable>
         </View>
       ) : (
         <View style={styles.vehiclesList}>
           {vehicles.map(vehicle => {
             const selected = vehicleId === vehicle.id;
+            const linkedDriver = driverByReg.get(
+              vehicle.registrationNo.replace(/\s+/g, '').toUpperCase(),
+            );
             return (
               <Pressable
                 key={vehicle.id}
@@ -150,17 +175,22 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
                 ]}>
                 <View style={styles.artworkCircle}>
                   <VehicleTypeArtwork
-                    type="flatbed"
+                    type={artworkKindFor(vehicle.type)}
                     size={40}
                     selected={selected}
                   />
                 </View>
 
                 <View style={styles.optionCopy}>
-                  <Text style={styles.optionPlate}>{vehicle.registrationNo}</Text>
-                  <Text style={styles.optionMeta}>
+                  <PartnerText style={styles.optionPlate}>{vehicle.registrationNo}</PartnerText>
+                  <PartnerText style={styles.optionMeta}>
                     {vehicle.type} • {vehicle.model}
-                  </Text>
+                  </PartnerText>
+                  <PartnerText style={styles.optionDriver} numberOfLines={1}>
+                    {linkedDriver
+                      ? `${linkedDriver.status === 'APPROVED' ? '' : 'Pending · '}${linkedDriver.name}`
+                      : 'No linked driver — drivers can accept via Jobs'}
+                  </PartnerText>
                 </View>
 
                 <View
@@ -348,6 +378,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: driverColors.grey,
     marginTop: 2,
+  },
+  optionDriver: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0284C7',
+    marginTop: 3,
   },
   radioOuter: {
     width: 22,

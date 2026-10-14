@@ -139,11 +139,11 @@ export const driverMetrics = {
 
 /** Soft card elevation used across the driver boards. */
 export const driverShadow = {
-  shadowColor: '#0B0B0B',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.05,
-  shadowRadius: 10,
-  elevation: 2,
+  shadowColor: '#000000',
+  shadowOffset: { width: 0, height: 1 },
+  shadowOpacity: 0.02,
+  shadowRadius: 3,
+  elevation: 0.5,
 } as const;
 
 export { motionTokens, getPressableFeedback } from './motion';

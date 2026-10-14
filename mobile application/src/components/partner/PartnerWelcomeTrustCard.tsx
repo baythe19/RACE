@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { ShieldCheck, Clock, Users, type LucideIcon } from 'lucide-react-native';
 
 import { colors, radius, shadows, spacing, typography } from '../../theme';
@@ -22,7 +23,7 @@ export default function PartnerWelcomeTrustCard() {
             <View style={styles.iconWrap}>
               <Icon size={22} color={colors.primary} strokeWidth={2.2} />
             </View>
-            <Text style={styles.label}>{feature.label}</Text>
+            <PartnerText style={styles.label}>{feature.label}</PartnerText>
           </View>
         );
       })}

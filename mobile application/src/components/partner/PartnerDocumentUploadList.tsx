@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Check, CloudUpload, MoreHorizontal, type LucideIcon } from 'lucide-react-native';
@@ -52,11 +53,11 @@ export default function PartnerDocumentUploadList({
               </View>
 
               <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>
+                <PartnerText style={styles.cardTitle}>
                   {doc.label}
-                  {doc.required ? <Text style={styles.required}> *</Text> : null}
-                </Text>
-                {doc.hint ? <Text style={styles.cardHint}>{doc.hint}</Text> : null}
+                  {doc.required ? <PartnerText style={styles.required}> *</PartnerText> : null}
+                </PartnerText>
+                {doc.hint ? <PartnerText style={styles.cardHint}>{doc.hint}</PartnerText> : null}
               </View>
 
               {uploaded ? (
@@ -64,14 +65,14 @@ export default function PartnerDocumentUploadList({
                   onPress={() => void pickDocument(doc, uploaded, onUpload)}
                   style={({ pressed }) => [styles.uploadedStatus, pressed && styles.pressed]}>
                   <Check size={14} color={SUCCESS_GREEN} strokeWidth={3} />
-                  <Text style={styles.uploadedLabel}>Uploaded</Text>
+                  <PartnerText style={styles.uploadedLabel}>Uploaded</PartnerText>
                 </Pressable>
               ) : (
                 <Pressable
                   onPress={() => void pickDocument(doc, uploaded, onUpload)}
                   style={({ pressed }) => [styles.uploadPill, pressed && styles.pressed]}>
                   <CloudUpload size={14} color={colors.dark} strokeWidth={2.4} />
-                  <Text style={styles.uploadPillLabel}>Upload</Text>
+                  <PartnerText style={styles.uploadPillLabel}>Upload</PartnerText>
                 </Pressable>
               )}
 
@@ -90,7 +91,7 @@ export default function PartnerDocumentUploadList({
 
   return (
     <View>
-      {hideTitle ? null : <Text style={styles.listTitle}>Required Documents</Text>}
+      {hideTitle ? null : <PartnerText style={styles.listTitle}>Required Documents</PartnerText>}
       {documents.map(doc => {
         const uploaded = uploadedIds.includes(doc.id);
         const Icon = doc.Icon;
@@ -101,20 +102,20 @@ export default function PartnerDocumentUploadList({
               <Icon size={18} color={colors.partnerRed} strokeWidth={2} />
             </View>
             <View style={styles.copy}>
-              <Text style={styles.docTitle}>{doc.label}</Text>
-              {doc.hint ? <Text style={styles.docHint}>{doc.hint}</Text> : null}
+              <PartnerText style={styles.docTitle}>{doc.label}</PartnerText>
+              {doc.hint ? <PartnerText style={styles.docHint}>{doc.hint}</PartnerText> : null}
               <View
                 style={[
                   styles.badge,
                   doc.required ? styles.badgeRequired : styles.badgeOptional,
                 ]}>
-                <Text
+                <PartnerText
                   style={[
                     styles.badgeText,
                     doc.required ? styles.badgeTextRequired : styles.badgeTextOptional,
                   ]}>
                   {doc.required ? 'Required' : 'Optional'}
-                </Text>
+                </PartnerText>
               </View>
             </View>
             <Pressable
@@ -129,19 +130,19 @@ export default function PartnerDocumentUploadList({
                 color={uploaded ? colors.partnerRed : colors.grey}
                 strokeWidth={2}
               />
-              <Text style={[styles.uploadLabel, uploaded && styles.uploadLabelDone]}>
+              <PartnerText style={[styles.uploadLabel, uploaded && styles.uploadLabelDone]}>
                 {uploaded ? 'Uploaded' : 'Upload'}
-              </Text>
+              </PartnerText>
             </Pressable>
           </View>
         );
       })}
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoText}>
+        <PartnerText style={styles.infoText}>
           Ensure all documents are clear and information is readable. Supported formats: JPG, PNG,
           PDF (Max 5MB each)
-        </Text>
+        </PartnerText>
       </View>
     </View>
   );

@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, shadows, spacing, typography } from '../../theme';
 
@@ -14,10 +15,10 @@ export default function PartnerWelcomeFeatureChip({
 }: PartnerWelcomeFeatureChipProps) {
   return (
     <View style={styles.chip}>
-      <Text style={styles.emoji}>{emoji}</Text>
-      <Text style={styles.label} numberOfLines={2}>
+      <PartnerText style={styles.emoji}>{emoji}</PartnerText>
+      <PartnerText style={styles.label} numberOfLines={2}>
         {label}
-      </Text>
+      </PartnerText>
     </View>
   );
 }

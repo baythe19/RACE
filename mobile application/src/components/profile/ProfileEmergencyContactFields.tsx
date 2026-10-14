@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
 import { ChevronDown, Phone, User } from 'lucide-react-native';
 
 import FormField from '../auth/FormField';
@@ -50,14 +51,14 @@ export default function ProfileEmergencyContactFields({
   return (
     <View>
       <View style={{ marginBottom: px(12) }}>
-        <Text
+        <PartnerText
           style={{
             fontSize: px(14),
             fontWeight: typography.weights.bold,
             color: colors.dark,
           }}>
           Emergency Contact
-        </Text>
+        </PartnerText>
       </View>
 
       <FormField

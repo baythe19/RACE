@@ -1,12 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import {
-  FlatList,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Check, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,7 +20,7 @@ export default function PartnerSelectSheet() {
           <View style={styles.handle} />
 
           <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
+            <PartnerText style={styles.title}>{title}</PartnerText>
             <Pressable
               onPress={close}
               hitSlop={10}
@@ -54,9 +48,9 @@ export default function PartnerSelectSheet() {
                     selected && styles.optionSelected,
                     pressed && styles.optionPressed,
                   ]}>
-                  <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                  <PartnerText style={[styles.optionText, selected && styles.optionTextSelected]}>
                     {item}
-                  </Text>
+                  </PartnerText>
                   {selected ? <Check size={20} color={colors.primary} strokeWidth={2.5} /> : null}
                 </Pressable>
               );

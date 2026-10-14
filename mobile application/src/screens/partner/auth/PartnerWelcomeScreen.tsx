@@ -1,20 +1,12 @@
 import React, { useState } from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight, Building2 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { images } from '../../../assets';
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
+import { PartnerText } from '../../../components/partner/PartnerText';
 import { useAppDispatch } from '../../../redux/hooks';
 import { setSignupPath } from '../../../redux/onboarding/onboardingSlice';
 import {
@@ -23,6 +15,7 @@ import {
 } from '../../../store/partnerOnboardingStore';
 import type { PartnerAuthStackParamList } from '../../../types/partnerNavigation';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerWelcome'>;
 
@@ -100,17 +93,17 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
             paddingBottom: insets.bottom + px(16),
           },
         ]}>
-        {/* Welcome Headlines with Bold Typography */}
+        {/* Welcome headlines with restrained typography */}
         <View style={[styles.headingBlock, { marginTop: px(8), paddingHorizontal: px(20) }]}>
-          <Text style={[styles.welcomeTitle, { fontSize: px(28), lineHeight: px(34) }]}>
+          <PartnerText style={[styles.welcomeTitle, { fontSize: px(28), lineHeight: px(34) }]}>
             Welcome to
-          </Text>
-          <Text style={[styles.brandHighlight, { fontSize: px(28), lineHeight: px(34) }]}>
+          </PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(28), lineHeight: px(34) }]}>
             RACE Partner
-          </Text>
-          <Text style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(6) }]}>
+          </PartnerText>
+          <PartnerText style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(6) }]}>
             Choose how you work with RACE.
-          </Text>
+          </PartnerText>
         </View>
 
         {/* Hero Artwork Image — Full Width Edge-to-Edge Fit */}
@@ -127,7 +120,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
         <View style={[styles.contentSection, { paddingHorizontal: px(20) }]}>
           {/* "I'm joining as" Section */}
           <View style={[styles.roleSection, { marginTop: px(16) }]}>
-            <Text style={[styles.sectionTitle, { fontSize: px(17) }]}>I'm joining as</Text>
+            <PartnerText style={[styles.sectionTitle, { fontSize: px(17) }]}>I'm joining as</PartnerText>
 
             {/* Option 1: Driver */}
             <Pressable
@@ -161,10 +154,10 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               </View>
 
               <View style={styles.roleTextContainer}>
-                <Text style={[styles.roleTitle, { fontSize: px(16.5) }]}>Driver</Text>
-                <Text style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
+                <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Driver</PartnerText>
+                <PartnerText style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
                   Accept jobs and manage your trips
-                </Text>
+                </PartnerText>
               </View>
 
               {/* Radio Circle */}
@@ -212,10 +205,10 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               </View>
 
               <View style={styles.roleTextContainer}>
-                <Text style={[styles.roleTitle, { fontSize: px(16.5) }]}>Vendor / Fleet</Text>
-                <Text style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
+                <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Vendor / Fleet</PartnerText>
+                <PartnerText style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
                   Manage vehicles, drivers and bookings
-                </Text>
+                </PartnerText>
               </View>
 
               {/* Radio Circle */}
@@ -247,34 +240,34 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
             ]}
             accessibilityRole="button"
             accessibilityLabel={`Continue as ${isVendor ? 'Vendor' : 'Driver'}`}>
-            <Text style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
+            <PartnerText style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
               {isVendor ? 'Continue as Vendor' : 'Continue as Driver'}
-            </Text>
+            </PartnerText>
             <ArrowRight size={px(20)} color="#111827" strokeWidth={2.6} style={{ marginLeft: px(8) }} />
           </Pressable>
 
           {/* Terms & Privacy Policy Footer */}
           <View style={[styles.termsFooter, { marginTop: px(14) }]}>
-            <Text style={[styles.termsText, { fontSize: px(12.5) }]}>
+            <PartnerText style={[styles.termsText, { fontSize: px(12.5) }]}>
               By continuing, you agree to our{' '}
-              <Text style={styles.termsLink}>Terms & Privacy Policy</Text>
-            </Text>
+              <PartnerText style={styles.termsLink}>Terms & Privacy Policy</PartnerText>
+            </PartnerText>
           </View>
 
           {/* Discreet Dev Demo Mode (for offline QA testing) */}
           {(__DEV__ || UI_PREVIEW_MODE) && (
             <View style={[styles.demoRow, { marginTop: px(12) }]}>
-              <Text style={[styles.demoLabel, { fontSize: px(10) }]}>Demo View:</Text>
+              <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Demo View:</PartnerText>
               <Pressable
                 onPress={() => void loginAsMockDriver(dispatch)}
                 style={styles.demoLink}>
-                <Text style={styles.demoLinkText}>Driver</Text>
+                <PartnerText style={styles.demoLinkText}>Driver</PartnerText>
               </Pressable>
-              <Text style={styles.demoDivider}>•</Text>
+              <PartnerText style={styles.demoDivider}>•</PartnerText>
               <Pressable
                 onPress={() => void loginAsMockVendor(dispatch)}
                 style={styles.demoLink}>
-                <Text style={styles.demoLinkText}>Vendor</Text>
+                <PartnerText style={styles.demoLinkText}>Vendor</PartnerText>
               </Pressable>
             </View>
           )}
@@ -310,19 +303,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   welcomeTitle: {
-    fontWeight: '800',
     color: '#111827',
     textAlign: 'center',
+    fontWeight: typography.weights.medium,
   },
-  brandHighlight: {
-    fontWeight: '800',
-    color: '#F59E0B',
+  brandPartner: {
+    color: '#111827',
     textAlign: 'center',
+    fontWeight: typography.weights.semibold,
   },
   subtitle: {
-    fontWeight: '400',
     color: '#6B7280',
     textAlign: 'center',
+    fontWeight: typography.weights.regular,
   },
   artworkContainer: {
     width: '100%',
@@ -341,8 +334,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   sectionTitle: {
-    fontWeight: '800',
     color: '#111827',
+    fontWeight: typography.weights.semibold,
   },
   roleCard: {
     flexDirection: 'row',
@@ -368,12 +361,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   roleTitle: {
-    fontWeight: '800',
     color: '#111827',
+    fontWeight: typography.weights.semibold,
   },
   roleSubtitle: {
-    fontWeight: '400',
     color: '#6B7280',
+    fontWeight: typography.weights.regular,
   },
   radioOuter: {
     alignItems: 'center',
@@ -401,8 +394,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   primaryButtonText: {
-    fontWeight: '800',
     color: '#111827',
+    fontWeight: typography.weights.semibold,
   },
   termsFooter: {
     alignItems: 'center',
@@ -411,10 +404,11 @@ const styles = StyleSheet.create({
   termsText: {
     color: '#6B7280',
     textAlign: 'center',
+    fontWeight: typography.weights.regular,
   },
   termsLink: {
     color: '#D97706',
-    fontWeight: '600',
+    fontWeight: typography.weights.semibold,
   },
   demoRow: {
     flexDirection: 'row',
@@ -425,7 +419,7 @@ const styles = StyleSheet.create({
   },
   demoLabel: {
     color: '#9CA3AF',
-    fontWeight: '600',
+    fontWeight: typography.weights.semibold,
   },
   demoLink: {
     paddingVertical: 2,
@@ -434,12 +428,13 @@ const styles = StyleSheet.create({
   demoLinkText: {
     fontSize: 11,
     color: '#6B7280',
-    fontWeight: '600',
     textDecorationLine: 'underline',
+    fontWeight: typography.weights.semibold,
   },
   demoDivider: {
     color: '#D1D5DB',
     fontSize: 10,
+    fontWeight: typography.weights.regular,
   },
   pressed: {
     opacity: 0.88,

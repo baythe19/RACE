@@ -1,3 +1,4 @@
+import { PartnerText } from './PartnerText';
 /**
  * RACE Partner — Driver verification screen (board: "Your account is under verification").
  *
@@ -18,15 +19,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import { Check, ChevronDown, ChevronUp, Info, Pencil, RefreshCw, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -163,14 +156,14 @@ function detailRow(
   if (!value) return null;
   return (
     <View key={key ?? label} style={styles.detailRow}>
-      <Text
+      <PartnerText
         style={[
           T.meta,
           { fontSize: px(13), lineHeight: px(18), color: C.greySoft, flex: 1 },
         ]}>
         {label}
-      </Text>
-      <Text
+      </PartnerText>
+      <PartnerText
         style={[
           T.meta,
           {
@@ -183,7 +176,7 @@ function detailRow(
           },
         ]}>
         {value}
-      </Text>
+      </PartnerText>
     </View>
   );
 }
@@ -272,13 +265,13 @@ export default function DriverVerificationView({
             },
           ]}>
           <View style={[styles.pulsingDot, { backgroundColor: statusCopy.color }]} />
-          <Text style={[styles.statusPillText, { fontSize: px(9.5), color: statusCopy.color }]}>
+          <PartnerText style={[styles.statusPillText, { fontSize: px(9.5), color: statusCopy.color }]}>
             {statusCopy.label}
-          </Text>
+          </PartnerText>
         </View>
 
         {/* Highlighted Title */}
-        <Text
+        <PartnerText
           style={[
             styles.title,
             {
@@ -290,10 +283,10 @@ export default function DriverVerificationView({
             },
           ]}>
           {verification.title || 'Your account is under verification'}
-        </Text>
+        </PartnerText>
 
         {/* State-specific summary paragraph */}
-        <Text
+        <PartnerText
           style={[
             styles.subtitle,
             {
@@ -305,7 +298,7 @@ export default function DriverVerificationView({
             },
           ]}>
           {verificationSummary(verification.state)}
-        </Text>
+        </PartnerText>
 
         {/* tracker ---------------------------------------------------------- */}
         <View style={[styles.tracker, { marginTop: px(8) }]}>
@@ -359,7 +352,7 @@ export default function DriverVerificationView({
                       { marginLeft: px(10), flex: 1 },
                     ]}>
                     <View style={styles.stepTitleRow}>
-                      <Text
+                      <PartnerText
                         style={[
                           styles.stepLabelText,
                           {
@@ -370,26 +363,26 @@ export default function DriverVerificationView({
                           },
                         ]}>
                         {step.label}
-                      </Text>
+                      </PartnerText>
                       {step.state === 'completed' && (
                         <View style={styles.badgeDone}>
-                          <Text style={[styles.badgeDoneText, { fontSize: px(9.5) }]}>Done</Text>
+                          <PartnerText style={[styles.badgeDoneText, { fontSize: px(9.5) }]}>Done</PartnerText>
                         </View>
                       )}
                       {step.state === 'current' && (
                         <View style={styles.badgeCurrent}>
-                          <Text style={[styles.badgeCurrentText, { fontSize: px(9.5) }]}>In progress</Text>
+                          <PartnerText style={[styles.badgeCurrentText, { fontSize: px(9.5) }]}>In progress</PartnerText>
                         </View>
                       )}
                     </View>
                     {stepSubtext ? (
-                      <Text
+                      <PartnerText
                         style={[
                           styles.stepSubtext,
                           { fontSize: px(10), lineHeight: px(13.5), color: '#64748B', marginTop: px(1) },
                         ]}>
                         {stepSubtext}
-                      </Text>
+                      </PartnerText>
                     ) : null}
                   </View>
                 </View>
@@ -413,7 +406,7 @@ export default function DriverVerificationView({
             },
           ]}>
           <Info size={px(13)} color="#B45309" strokeWidth={2.2} />
-          <Text
+          <PartnerText
             style={[
               styles.infoCardText,
               {
@@ -426,7 +419,7 @@ export default function DriverVerificationView({
               },
             ]}>
             {verification.decisionNote ?? verification.note}
-          </Text>
+          </PartnerText>
         </View>
 
         {/* application details (View my application) ------------------------ */}
@@ -441,9 +434,9 @@ export default function DriverVerificationView({
                 padding: px(12),
               },
             ]}>
-            <Text style={[T.sectionTitle, { fontSize: px(15), lineHeight: px(20), color: C.ink }]}>
+            <PartnerText style={[T.sectionTitle, { fontSize: px(15), lineHeight: px(20), color: C.ink }]}>
               My application
-            </Text>
+            </PartnerText>
 
             <View style={{ marginTop: px(8) }}>
               {detailRow('Driver ID', application.driverCode, px)}
@@ -464,7 +457,7 @@ export default function DriverVerificationView({
               )}
             </View>
 
-            <Text
+            <PartnerText
               style={[
                 T.cardTitle,
                 {
@@ -475,9 +468,9 @@ export default function DriverVerificationView({
                 },
               ]}>
               Documents
-            </Text>
+            </PartnerText>
             {application.documents.length === 0 ? (
-              <Text
+              <PartnerText
                 style={[
                   T.body,
                   {
@@ -488,19 +481,19 @@ export default function DriverVerificationView({
                   },
                 ]}>
                 Your documents were submitted for review.
-              </Text>
+              </PartnerText>
             ) : (
               <View style={{ marginTop: px(4) }}>
                 {application.documents.map(doc => (
                   <View key={doc.type} style={[styles.documentRow, { paddingVertical: px(6) }]}>
-                    <Text
+                    <PartnerText
                       style={[
                         T.meta,
                         { fontSize: px(12.5), lineHeight: px(17), color: C.inkSoft, flex: 1 },
                       ]}>
                       {doc.label}
-                    </Text>
-                    <Text
+                    </PartnerText>
+                    <PartnerText
                       style={[
                         T.pill,
                         {
@@ -515,7 +508,7 @@ export default function DriverVerificationView({
                         },
                       ]}>
                       {documentStatusLabel(doc.status)}
-                    </Text>
+                    </PartnerText>
                   </View>
                 ))}
               </View>
@@ -540,9 +533,9 @@ export default function DriverVerificationView({
                 pressed && styles.pressed,
               ]}>
               <Pencil size={px(14)} color="#111827" strokeWidth={2.4} style={{ marginRight: px(7) }} />
-              <Text style={[styles.editPreviousCtaText, { fontSize: px(14) }]}>
+              <PartnerText style={[styles.editPreviousCtaText, { fontSize: px(14) }]}>
                 Edit your previous details
-              </Text>
+              </PartnerText>
             </Pressable>
           )}
 
@@ -560,9 +553,9 @@ export default function DriverVerificationView({
               },
               pressed && styles.pressed,
             ]}>
-            <Text style={[styles.viewDetailsToggleText, { fontSize: px(12.5) }]}>
+            <PartnerText style={[styles.viewDetailsToggleText, { fontSize: px(12.5) }]}>
               {applicationOpen ? 'Hide submitted details' : 'View submitted details'}
-            </Text>
+            </PartnerText>
             {applicationOpen ? (
               <ChevronUp size={px(14)} color="#374151" strokeWidth={2.2} style={{ marginLeft: px(4) }} />
             ) : (
@@ -580,9 +573,9 @@ export default function DriverVerificationView({
                 { paddingVertical: px(4), marginTop: px(2) },
                 pressed && styles.pressed,
               ]}>
-              <Text style={[T.link, { fontSize: px(13), lineHeight: px(18), color: LINK_BLUE }]}>
+              <PartnerText style={[T.link, { fontSize: px(13), lineHeight: px(18), color: LINK_BLUE }]}>
                 {verification.isApproved ? 'Go to Dashboard' : 'Go to Dashboard (Read only)'}
-              </Text>
+              </PartnerText>
             </Pressable>
           ) : null}
 
@@ -600,9 +593,9 @@ export default function DriverVerificationView({
               ) : (
                 <RefreshCw size={px(12)} color="#64748B" />
               )}
-              <Text style={[styles.refreshText, { fontSize: px(11.5), marginLeft: px(5) }]}>
+              <PartnerText style={[styles.refreshText, { fontSize: px(11.5), marginLeft: px(5) }]}>
                 {refreshing ? 'Syncing with RACE server...' : 'Check status now'}
-              </Text>
+              </PartnerText>
             </Pressable>
           ) : null}
         </View>

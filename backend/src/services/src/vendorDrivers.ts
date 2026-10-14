@@ -8,8 +8,9 @@ import {
 } from '../../utils/src/driverPassword';
 import { storageService } from '../../storage/src/index';
 import { UserModel, type IUser } from '../../models/src/user';
+import { VendorVehicleModel } from '../../models/src/vendorVehicle';
 import { driverRepository } from './driverRepository';
-import type { CreateVendorDriverDto } from './vendorDriversValidator';
+import type { AssignVendorDriverVehicleDto, CreateVendorDriverDto } from './vendorDriversValidator';
 
 function mapVendorDriver(user: IUser) {
   const profile = user.driverProfile;
@@ -180,6 +181,45 @@ export class VendorDriversService {
     driver.driverProfile.passwordHash = undefined;
     await driver.save();
     return { removed: true, driverId };
+  }
+
+  /**
+   * Link a fleet driver to one of this vendor's vehicle registrations
+   * (the driver↔vehicle relationship is stored on the driver profile),
+   * or unlink with an empty/null registration.
+   */
+  async assignVehicle(
+    vendorUserId: string,
+    driverId: string,
+    dto: AssignVendorDriverVehicleDto,
+  ) {
+    await this.assertVendorApproved(vendorUserId);
+
+    const driver = await UserModel.findOne({ _id: driverId, role: 'driver' }).exec();
+    if (!driver?.driverProfile) throw new NotFoundError('Driver not found');
+    if (driver.driverProfile.vendorUserId?.toString() !== vendorUserId) {
+      throw new ForbiddenError('Driver is not on your vendor team');
+    }
+
+    const registrationRaw = (dto.vehicleRegistration ?? '').trim().toUpperCase();
+    if (registrationRaw) {
+      const vehicle = await VendorVehicleModel.findOne({
+        vendorId: vendorUserId,
+        registrationNo: registrationRaw,
+      }).exec();
+      if (!vehicle) {
+        throw new BadRequestError('Registration number does not match a vehicle in your fleet');
+      }
+      if (vehicle.status === 'INACTIVE') {
+        throw new BadRequestError('This vehicle is inactive — set it to ACTIVE before assigning');
+      }
+      driver.driverProfile.vehicleRegistration = registrationRaw;
+    } else {
+      driver.driverProfile.vehicleRegistration = undefined;
+    }
+
+    await driver.save();
+    return mapVendorDriver(driver);
   }
 
   async uploadDocument(

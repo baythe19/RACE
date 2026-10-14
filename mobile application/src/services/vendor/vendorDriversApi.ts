@@ -99,6 +99,33 @@ export async function claimVendorDriver(phone: string): Promise<VendorDriver> {
   }
 }
 
+/**
+ * Link (or unlink with an empty registration) a vendor driver to one of the
+ * vendor's fleet vehicles. Mirrors POST /vendor/drivers/:id/assign-vehicle.
+ */
+export async function linkVendorDriverVehicle(
+  driverId: string,
+  vehicleRegistration?: string | null,
+): Promise<VendorDriver> {
+  try {
+    const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
+      API_ENDPOINTS.vendorDriverAssignVehicle(driverId),
+      { vehicleRegistration: vehicleRegistration ?? null },
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      const driver =
+        MOCK_VENDOR_DRIVERS.find(d => d.id === driverId) ?? MOCK_VENDOR_DRIVERS[0];
+      if (driver) {
+        driver.vehicleRegistration = vehicleRegistration ?? undefined;
+        return driver;
+      }
+    }
+    throw error;
+  }
+}
+
 export async function removeVendorDriver(driverId: string): Promise<void> {
   try {
     await api.delete(API_ENDPOINTS.vendorDriver(driverId));

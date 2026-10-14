@@ -1,11 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { useCallback, useRef, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete, type GooglePlacesAutocompleteRef } from 'react-native-google-places-autocomplete';
 
@@ -61,7 +56,7 @@ export default function LocationPicker({
             focused && styles.inputRowFocused,
           ]}>
           <Ionicons name="search" size={18} color={colors.grey} />
-          <TextInput
+          <PartnerTextInput
             value={displayValue}
             onChangeText={setDisplayValue}
             placeholder={placeholder}
@@ -76,9 +71,9 @@ export default function LocationPicker({
             </Pressable>
           ) : null}
         </View>
-        <Text style={styles.fallbackHint}>
+        <PartnerText style={styles.fallbackHint}>
           Enter your address manually. Google search is unavailable.
-        </Text>
+        </PartnerText>
       </View>
     );
   }
@@ -138,15 +133,15 @@ export default function LocationPicker({
         }
         renderRow={rowData => (
           <View style={styles.suggestionRow}>
-            <Text style={styles.suggestionIcon}>📍</Text>
+            <PartnerText style={styles.suggestionIcon}>📍</PartnerText>
             <View style={styles.suggestionTextWrap}>
-              <Text style={styles.suggestionMain} numberOfLines={1}>
+              <PartnerText style={styles.suggestionMain} numberOfLines={1}>
                 {rowData.structured_formatting?.main_text ?? rowData.description}
-              </Text>
+              </PartnerText>
               {rowData.structured_formatting?.secondary_text ? (
-                <Text style={styles.suggestionSecondary} numberOfLines={1}>
+                <PartnerText style={styles.suggestionSecondary} numberOfLines={1}>
                   {rowData.structured_formatting.secondary_text}
-                </Text>
+                </PartnerText>
               ) : null}
             </View>
           </View>

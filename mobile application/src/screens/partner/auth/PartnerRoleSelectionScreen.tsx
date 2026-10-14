@@ -1,14 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -124,10 +116,10 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
         </Pressable>
 
         <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
+          <PartnerText style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
             PARTNER
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={styles.backButton} />
@@ -151,13 +143,13 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
             resizeMode="contain"
             accessibilityLabel="RACE Partner tow truck"
           />
-          <Text style={[styles.headline, { fontSize: px(28), lineHeight: px(34), marginTop: px(8) }]}>
+          <PartnerText style={[styles.headline, { fontSize: px(28), lineHeight: px(34), marginTop: px(8) }]}>
             Select your role
-          </Text>
-          <Text style={[styles.subtitle, { fontSize: px(14), lineHeight: px(21), marginTop: px(8) }]}>
+          </PartnerText>
+          <PartnerText style={[styles.subtitle, { fontSize: px(14), lineHeight: px(21), marginTop: px(8) }]}>
             This decides which registration and dashboard you see. You can change this anytime
             later.
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={{ marginTop: px(spacing.xl), gap: px(4) }}>
@@ -188,14 +180,14 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
             !selectedRole && styles.continueButtonDisabled,
             pressed && selectedRole && styles.pressed,
           ]}>
-          <Text
+          <PartnerText
             style={[
               styles.continueLabel,
               { fontSize: px(17) },
               !selectedRole && styles.continueLabelDisabled,
             ]}>
             Continue
-          </Text>
+          </PartnerText>
           <ArrowRight
             size={px(18)}
             color={!selectedRole ? colors.grey : colors.dark}
@@ -203,10 +195,10 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
           />
         </Pressable>
 
-        <Text style={[styles.helpText, { fontSize: px(13), lineHeight: px(20), marginTop: px(14) }]}>
+        <PartnerText style={[styles.helpText, { fontSize: px(13), lineHeight: px(20), marginTop: px(14) }]}>
           Not sure? You can change your role anytime from{' '}
-          <Text style={styles.helpLink}>Account settings.</Text>
-        </Text>
+          <PartnerText style={styles.helpLink}>Account settings.</PartnerText>
+        </PartnerText>
       </ScrollView>
     </View>
   );

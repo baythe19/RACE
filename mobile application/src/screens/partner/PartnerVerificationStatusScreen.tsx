@@ -1,15 +1,6 @@
+import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   Calendar,
@@ -239,14 +230,14 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
             <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
           </Pressable>
-          <Text style={styles.topTitle}>Verification status</Text>
+          <PartnerText style={styles.topTitle}>Verification status</PartnerText>
           <View style={styles.backButton} />
         </View>
         <View style={styles.centered}>
-          <Text style={styles.emptyTitle}>No application found</Text>
-          <Text style={styles.emptySubtitle}>
+          <PartnerText style={styles.emptyTitle}>No application found</PartnerText>
+          <PartnerText style={styles.emptySubtitle}>
             Complete vendor registration to track verification.
-          </Text>
+          </PartnerText>
         </View>
       </View>
     );
@@ -271,14 +262,14 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Go back">
           <ArrowLeft size={18} color={colors.dark} strokeWidth={2.5} />
-          <Text style={styles.backLabel}>Back</Text>
+          <PartnerText style={styles.backLabel}>Back</PartnerText>
         </Pressable>
 
         <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(16), lineHeight: px(20) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(10), lineHeight: px(13) }]}>
+          <PartnerText style={[styles.brandRace, { fontSize: px(16), lineHeight: px(20) }]}>RACE</PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(10), lineHeight: px(13) }]}>
             PARTNER
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={styles.backChipSpacer} />
@@ -295,34 +286,34 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
             paddingBottom: insets.bottom + px(spacing.xl),
           },
         ]}>
-        <Text style={[styles.pageTitle, { fontSize: px(26), lineHeight: px(32) }]}>
+        <PartnerText style={[styles.pageTitle, { fontSize: px(26), lineHeight: px(32) }]}>
           Verification status
-        </Text>
-        <Text style={[styles.pageSubtitle, { fontSize: px(14), lineHeight: px(21), marginTop: px(6) }]}>
+        </PartnerText>
+        <PartnerText style={[styles.pageSubtitle, { fontSize: px(14), lineHeight: px(21), marginTop: px(6) }]}>
           Track your registration progress. We'll notify you as you move forward.
-        </Text>
+        </PartnerText>
 
         <View style={[styles.stageCard, { marginTop: px(spacing.xl), borderRadius: px(16) }]}>
           <View style={styles.stageIcon}>
             <ShieldCheck size={28} color={colors.primary} strokeWidth={2.2} />
           </View>
           <View style={styles.stageCopy}>
-            <Text style={styles.stageEyebrow}>Current stage</Text>
-            <Text style={[styles.stageTitle, { fontSize: px(20) }]}>
+            <PartnerText style={styles.stageEyebrow}>Current stage</PartnerText>
+            <PartnerText style={[styles.stageTitle, { fontSize: px(20) }]}>
               {rejected ? 'Rejected' : currentStageMeta.label}
-            </Text>
-            <Text style={styles.stageHint}>
+            </PartnerText>
+            <PartnerText style={styles.stageHint}>
               {rejected
                 ? vendor.reviewNotes || 'Contact RACE support if you need help.'
                 : currentStageMeta.activeHint}
-            </Text>
+            </PartnerText>
             <View style={styles.metaRow}>
               <View style={styles.metaItem}>
                 <Calendar size={13} color={colors.grey} strokeWidth={2.2} />
-                <Text style={styles.metaText}>Submitted on: {submittedLabel || '—'}</Text>
+                <PartnerText style={styles.metaText}>Submitted on: {submittedLabel || '—'}</PartnerText>
               </View>
               <View style={styles.refPill}>
-                <Text style={styles.refText}>{refId}</Text>
+                <PartnerText style={styles.refText}>{refId}</PartnerText>
               </View>
             </View>
           </View>
@@ -351,13 +342,13 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
                     {status === 'completed' ? (
                       <Check size={12} color="#FFFFFF" strokeWidth={3} />
                     ) : (
-                      <Text
+                      <PartnerText
                         style={[
                           styles.timelineNum,
                           status === 'in_progress' && styles.timelineNumActive,
                         ]}>
                         {index + 1}
-                      </Text>
+                      </PartnerText>
                     )}
                   </View>
                   {index < STAGES.length - 1 ? (
@@ -373,11 +364,11 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
                 <View style={styles.timelineContent}>
                   <View style={styles.timelineHeader}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.timelineLabel}>{stage.label}</Text>
-                      <Text style={styles.timelineWhen}>{when || 'Pending'}</Text>
+                      <PartnerText style={styles.timelineLabel}>{stage.label}</PartnerText>
+                      <PartnerText style={styles.timelineWhen}>{when || 'Pending'}</PartnerText>
                     </View>
                     <View style={badge.wrap}>
-                      <Text style={badge.text}>{badge.label}</Text>
+                      <PartnerText style={badge.text}>{badge.label}</PartnerText>
                     </View>
                   </View>
                 </View>
@@ -387,18 +378,18 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
 
           <View style={styles.notifyBox}>
             <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
-            <Text style={styles.notifyText}>
+            <PartnerText style={styles.notifyText}>
               You'll be notified at each step via SMS and email.
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
         <View style={[styles.historyCard, { marginTop: px(spacing.lg), borderRadius: px(16) }]}>
           <View style={styles.historyHeader}>
-            <Text style={[styles.sectionHeading, styles.historyHeading]}>History</Text>
+            <PartnerText style={[styles.sectionHeading, styles.historyHeading]}>History</PartnerText>
             <View style={styles.filterPill}>
               <Calendar size={13} color={colors.grey} strokeWidth={2.2} />
-              <Text style={styles.filterText}>All events</Text>
+              <PartnerText style={styles.filterText}>All events</PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </View>
           </View>
@@ -412,9 +403,9 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
                   <Icon size={16} color={tone.color} strokeWidth={2.2} />
                 </View>
                 <View style={styles.historyCopy}>
-                  <Text style={styles.historyTitle}>{item.title}</Text>
-                  <Text style={styles.historyDesc}>{item.description}</Text>
-                  <Text style={styles.historyTime}>{formatDateTime(item.at) || '—'}</Text>
+                  <PartnerText style={styles.historyTitle}>{item.title}</PartnerText>
+                  <PartnerText style={styles.historyDesc}>{item.description}</PartnerText>
+                  <PartnerText style={styles.historyTime}>{formatDateTime(item.at) || '—'}</PartnerText>
                 </View>
               </View>
             );
@@ -424,9 +415,9 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
             <Pressable
               onPress={() => setHistoryExpanded(v => !v)}
               style={({ pressed }) => [styles.viewToggle, pressed && styles.pressed]}>
-              <Text style={styles.viewToggleText}>
+              <PartnerText style={styles.viewToggleText}>
                 {historyExpanded ? 'View less' : 'View more'}
-              </Text>
+              </PartnerText>
               {historyExpanded ? (
                 <ChevronUp size={16} color={colors.primaryDark} strokeWidth={2.4} />
               ) : (
@@ -438,8 +429,8 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
 
         {vendor.reviewNotes ? (
           <View style={[styles.notesCard, { marginTop: px(spacing.lg), borderRadius: px(14) }]}>
-            <Text style={styles.sectionHeading}>Admin notes</Text>
-            <Text style={styles.notesText}>{vendor.reviewNotes}</Text>
+            <PartnerText style={styles.sectionHeading}>Admin notes</PartnerText>
+            <PartnerText style={styles.notesText}>{vendor.reviewNotes}</PartnerText>
           </View>
         ) : null}
 
@@ -450,28 +441,28 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
             { marginTop: px(spacing.lg), minHeight: px(48), borderRadius: px(12) },
             pressed && styles.pressed,
           ]}>
-          <Text style={styles.refreshLabel}>
+          <PartnerText style={styles.refreshLabel}>
             {isRefetching ? 'Refreshing…' : 'Refresh status'}
-          </Text>
+          </PartnerText>
         </Pressable>
 
         <View style={[styles.supportBar, { marginTop: px(spacing.lg), borderRadius: px(14) }]}>
           <View style={styles.supportLeft}>
             <Headphones size={18} color={colors.primaryDark} strokeWidth={2.2} />
-            <Text style={styles.supportCopy}>Need help? Our support team is here for you.</Text>
+            <PartnerText style={styles.supportCopy}>Need help? Our support team is here for you.</PartnerText>
           </View>
           <View style={styles.supportActions}>
             <Pressable
               onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
               style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}>
               <Phone size={14} color={colors.primaryDark} strokeWidth={2.4} />
-              <Text style={styles.supportLinkText}>{brand.phone}</Text>
+              <PartnerText style={styles.supportLinkText}>{brand.phone}</PartnerText>
             </Pressable>
             <Pressable
               onPress={() => void Linking.openURL(`mailto:${brand.email}`)}
               style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}>
               <MessageCircle size={14} color={colors.primaryDark} strokeWidth={2.4} />
-              <Text style={styles.supportLinkText}>Chat with support</Text>
+              <PartnerText style={styles.supportLinkText}>Chat with support</PartnerText>
             </Pressable>
           </View>
         </View>

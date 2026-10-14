@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import type { BookingStatus } from '../../types/booking';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -30,7 +31,7 @@ export default function StatusChip({ status, compact }: StatusChipProps) {
   return (
     <View style={[styles.chip, { backgroundColor: config.background }, compact && styles.compact]}>
       <View style={[styles.dot, { backgroundColor: config.color }]} />
-      <Text style={[styles.label, { color: config.color }]}>{config.label}</Text>
+      <PartnerText style={[styles.label, { color: config.color }]}>{config.label}</PartnerText>
     </View>
   );
 }

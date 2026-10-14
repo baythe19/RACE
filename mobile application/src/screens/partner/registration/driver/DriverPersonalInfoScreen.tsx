@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   Calendar,
   Check,
@@ -255,10 +246,10 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             <User size={px(18)} color="#D97706" strokeWidth={2.4} />
           </View>
           <View style={styles.headerTextWrap}>
-            <Text style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Personal Information</Text>
-            <Text style={[styles.cardHeaderSubtitle, { fontSize: px(12) }]}>
+            <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Personal Information</PartnerText>
+            <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(12) }]}>
               Enter your personal details to get started
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
@@ -267,18 +258,18 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
         {/* Full Name */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
           <View style={styles.inputLabelRow}>
-            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-              Full name <Text style={styles.requiredAsterisk}>*</Text>
-            </Text>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Full name <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
             {driverPersonal.fullName.length >= 25 ? (
-              <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
                 {driverPersonal.fullName.length}/40
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <User size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, { fontSize: px(14) }]}
               placeholder="As on driving licence"
               placeholderTextColor="#9CA3AF"
@@ -297,9 +288,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
 
         {/* Mobile Number (Locked & Verified - Read-Only) */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Mobile number <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+            Mobile number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
           <View
             style={[
               styles.inputContainer,
@@ -307,8 +298,8 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
               { height: px(46), paddingHorizontal: px(12) },
             ]}>
             <Phone size={px(17)} color="#6B7280" strokeWidth={2} style={styles.leftInputIcon} />
-            <Text style={[styles.countryPrefix, { fontSize: px(14) }]}>+91</Text>
-            <TextInput
+            <PartnerText style={[styles.countryPrefix, { fontSize: px(14) }]}>+91</PartnerText>
+            <PartnerTextInput
               style={[styles.textInput, styles.lockedTextInput, { fontSize: px(14) }]}
               value={verifiedPhoneDisplay}
               editable={false}
@@ -316,19 +307,19 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             />
             <View style={styles.verifiedBadge}>
               <Check size={px(11)} color="#15803D" strokeWidth={3} />
-              <Text style={[styles.verifiedText, { fontSize: px(11) }]}>Verified</Text>
+              <PartnerText style={[styles.verifiedText, { fontSize: px(11) }]}>Verified</PartnerText>
             </View>
           </View>
         </View>
 
         {/* Date of Birth (DD/MM/YYYY with Dual-Interaction: Direct Input + Interactive Calendar Modal) */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Date of birth <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+            Date of birth <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <Calendar size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, { fontSize: px(14) }]}
               placeholder="DD/MM/YYYY"
               placeholderTextColor="#9CA3AF"
@@ -355,9 +346,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
 
         {/* Operating City */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Operating city <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+            Operating city <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
           <Pressable
             onPress={() => {
               setCitySearchQuery('');
@@ -365,9 +356,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             }}
             style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <MapPin size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <Text style={[styles.textValue, { fontSize: px(14) }]}>
+            <PartnerText style={[styles.textValue, { fontSize: px(14) }]}>
               {driverPersonal.city || 'Bhubaneswar'}
-            </Text>
+            </PartnerText>
             <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
           </Pressable>
         </View>
@@ -375,12 +366,12 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
         {/* Current Address */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
           <View style={styles.inputLabelRow}>
-            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-              Current address <Text style={styles.requiredAsterisk}>*</Text>
-            </Text>
-            <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Current address <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
+            <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
               {driverPersonal.address.length}/120
-            </Text>
+            </PartnerText>
           </View>
           <View
             style={[
@@ -394,7 +385,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
               strokeWidth={2}
               style={[styles.leftInputIcon, { marginTop: px(2) }]}
             />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, styles.multilineInput, { fontSize: px(14) }]}
               placeholder="House/flat no., street, landmark, PIN code"
               placeholderTextColor="#9CA3AF"
@@ -408,20 +399,20 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
           </View>
           <View style={[styles.captionRow, { marginTop: px(4) }]}>
             <Info size={px(12)} color="#9CA3AF" />
-            <Text style={[styles.captionText, { fontSize: px(11) }]}>
+            <PartnerText style={[styles.captionText, { fontSize: px(11) }]}>
               Needed for verification
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
         {/* Email Address (Optional) */}
         <View style={styles.inputGroup}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-            Email address <Text style={styles.optionalText}>(Optional)</Text>
-          </Text>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+            Email address <PartnerText style={styles.optionalText}>(Optional)</PartnerText>
+          </PartnerText>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <Mail size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, { fontSize: px(14) }]}
               placeholder="For receipts and monthly summaries"
               placeholderTextColor="#9CA3AF"
@@ -449,16 +440,16 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             <ShieldAlert size={px(15)} color="#D97706" strokeWidth={2.2} />
           </View>
           <View style={styles.alertTextWrap}>
-            <Text style={[styles.alertTitle, { fontSize: px(12.5) }]} numberOfLines={1}>
+            <PartnerText style={[styles.alertTitle, { fontSize: px(12.5) }]} numberOfLines={1}>
               {driverPersonal.emergencyContactNumber
                 ? `Emergency: ${driverPersonal.emergencyContactName || 'Saved'} (${driverPersonal.emergencyContactNumber})`
                 : 'Add emergency contact before first job'}
-            </Text>
+            </PartnerText>
           </View>
           <View style={styles.alertActionBtn}>
-            <Text style={[styles.alertActionText, { fontSize: px(12) }]}>
+            <PartnerText style={[styles.alertActionText, { fontSize: px(12) }]}>
               {driverPersonal.emergencyContactNumber ? 'Edit' : 'Add'}
-            </Text>
+            </PartnerText>
             <ChevronRight size={px(14)} color="#D97706" />
           </View>
         </View>
@@ -469,7 +460,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
         <Pressable style={styles.modalOverlay} onPress={() => setCityModalVisible(false)}>
           <Pressable style={[styles.modalSheet, { maxHeight: '80%' }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { fontSize: px(16) }]}>Select Operating City</Text>
+              <PartnerText style={[styles.sheetTitle, { fontSize: px(16) }]}>Select Operating City</PartnerText>
               <Pressable hitSlop={12} onPress={() => setCityModalVisible(false)}>
                 <X size={px(20)} color="#4B5563" />
               </Pressable>
@@ -477,7 +468,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
 
             <View style={[styles.modalSearchContainer, { height: px(42), marginBottom: px(12) }]}>
               <Search size={px(18)} color="#9CA3AF" style={{ marginRight: px(8) }} />
-              <TextInput
+              <PartnerTextInput
                 style={[styles.modalSearchInput, { fontSize: px(14) }]}
                 placeholder="Search city in Odisha..."
                 placeholderTextColor="#9CA3AF"
@@ -508,14 +499,14 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                       isSelected && styles.cityRowSelected,
                       pressed && styles.pressed,
                     ]}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.cityText,
                         { fontSize: px(14) },
                         isSelected && styles.cityTextSelected,
                       ]}>
                       {c}
-                    </Text>
+                    </PartnerText>
                     {isSelected ? <Check size={px(18)} color="#D97706" strokeWidth={2.5} /> : null}
                   </Pressable>
                 );
@@ -533,7 +524,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             onPress={(e) => e.stopPropagation()}>
             {/* Box Header */}
             <View style={styles.calendarBoxHeader}>
-              <Text style={[styles.calendarBoxTitle, { fontSize: px(15) }]}>Select Date of Birth</Text>
+              <PartnerText style={[styles.calendarBoxTitle, { fontSize: px(15) }]}>Select Date of Birth</PartnerText>
               <Pressable hitSlop={12} onPress={() => setDobModalVisible(false)}>
                 <X size={px(20)} color="#4B5563" />
               </Pressable>
@@ -558,13 +549,13 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                       styles.yearChip,
                       isYearActive && styles.yearChipActive,
                     ]}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.yearChipText,
                         isYearActive && styles.yearChipTextActive,
                       ]}>
                       {y}
-                    </Text>
+                    </PartnerText>
                   </Pressable>
                 );
               })}
@@ -590,9 +581,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                 <ChevronLeft size={px(20)} color="#111827" strokeWidth={2.4} />
               </Pressable>
 
-              <Text style={[styles.monthNavTitle, { fontSize: px(14) }]}>
+              <PartnerText style={[styles.monthNavTitle, { fontSize: px(14) }]}>
                 {FULL_MONTH_NAMES[calendarMonth - 1]} {calendarYear}
-              </Text>
+              </PartnerText>
 
               <Pressable
                 onPress={() => {
@@ -616,9 +607,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             {/* Weekday Row */}
             <View style={styles.weekdayRow}>
               {WEEKDAY_HEADERS.map((w) => (
-                <Text key={w} style={styles.weekdayText}>
+                <PartnerText key={w} style={styles.weekdayText}>
                   {w}
-                </Text>
+                </PartnerText>
               ))}
             </View>
 
@@ -634,13 +625,13 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                     key={`day-${cellDay}`}
                     onPress={() => handleSelectDay(cellDay)}
                     style={[styles.dayCell, isSelected && styles.dayCellSelected]}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.dayCellText,
                         isSelected && styles.dayCellTextSelected,
                       ]}>
                       {cellDay}
-                    </Text>
+                    </PartnerText>
                   </Pressable>
                 );
               })}
@@ -649,8 +640,8 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             {/* Direct Input Row in Box: DD / MM / YYYY */}
             <View style={[styles.modalManualRow, { marginTop: px(10) }]}>
               <View style={styles.manualInputGroup}>
-                <Text style={styles.manualInputLabel}>Day</Text>
-                <TextInput
+                <PartnerText style={styles.manualInputLabel}>Day</PartnerText>
+                <PartnerTextInput
                   style={styles.manualInputField}
                   value={modalInputDay}
                   onChangeText={(val) => {
@@ -663,10 +654,10 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                   placeholder="DD"
                 />
               </View>
-              <Text style={styles.manualDivider}>/</Text>
+              <PartnerText style={styles.manualDivider}>/</PartnerText>
               <View style={styles.manualInputGroup}>
-                <Text style={styles.manualInputLabel}>Month</Text>
-                <TextInput
+                <PartnerText style={styles.manualInputLabel}>Month</PartnerText>
+                <PartnerTextInput
                   style={styles.manualInputField}
                   value={modalInputMonth}
                   onChangeText={(val) => {
@@ -680,10 +671,10 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
                   placeholder="MM"
                 />
               </View>
-              <Text style={styles.manualDivider}>/</Text>
+              <PartnerText style={styles.manualDivider}>/</PartnerText>
               <View style={[styles.manualInputGroup, { flex: 1.3 }]}>
-                <Text style={styles.manualInputLabel}>Year</Text>
-                <TextInput
+                <PartnerText style={styles.manualInputLabel}>Year</PartnerText>
+                <PartnerTextInput
                   style={styles.manualInputField}
                   value={modalInputYear}
                   onChangeText={(val) => {
@@ -703,9 +694,9 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             <Pressable
               onPress={handleConfirmCalendar}
               style={[styles.primaryModalBtn, { marginTop: px(12), height: px(44) }]}>
-              <Text style={[styles.primaryModalBtnText, { fontSize: px(14) }]}>
+              <PartnerText style={[styles.primaryModalBtnText, { fontSize: px(14) }]}>
                 Confirm Date ({modalInputDay.padStart(2, '0')}/{modalInputMonth.padStart(2, '0')}/{modalInputYear})
-              </Text>
+              </PartnerText>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -716,24 +707,24 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
         <Pressable style={styles.modalOverlay} onPress={() => setEmergencyModalVisible(false)}>
           <Pressable style={[styles.modalSheet, { paddingBottom: px(28) }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { fontSize: px(16) }]}>Emergency Contact</Text>
+              <PartnerText style={[styles.sheetTitle, { fontSize: px(16) }]}>Emergency Contact</PartnerText>
               <Pressable hitSlop={12} onPress={() => setEmergencyModalVisible(false)}>
                 <X size={px(20)} color="#4B5563" />
               </Pressable>
             </View>
-            <Text style={[styles.dobHint, { fontSize: px(12), marginBottom: px(14) }]}>
+            <PartnerText style={[styles.dobHint, { fontSize: px(12), marginBottom: px(14) }]}>
               This contact will only be called in case of road accidents or medical emergencies.
-            </Text>
+            </PartnerText>
             <View style={{ marginBottom: px(12) }}>
               <View style={styles.inputLabelRow}>
-                <Text style={[styles.inputLabel, { fontSize: px(12) }]}>Contact Name</Text>
+                <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Contact Name</PartnerText>
                 {(driverPersonal.emergencyContactName ?? '').length >= 20 ? (
-                  <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                  <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
                     {(driverPersonal.emergencyContactName ?? '').length}/35
-                  </Text>
+                  </PartnerText>
                 ) : null}
               </View>
-              <TextInput
+              <PartnerTextInput
                 style={[styles.simpleInput, { height: px(44) }]}
                 placeholder="e.g. Ramesh Kumar (Brother)"
                 maxLength={35}
@@ -747,14 +738,14 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             </View>
             <View style={{ marginBottom: px(16) }}>
               <View style={styles.inputLabelRow}>
-                <Text style={[styles.inputLabel, { fontSize: px(12) }]}>Mobile Number</Text>
+                <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Mobile Number</PartnerText>
                 {(driverPersonal.emergencyContactNumber ?? '').length > 0 ? (
-                  <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                  <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
                     {(driverPersonal.emergencyContactNumber ?? '').length}/10
-                  </Text>
+                  </PartnerText>
                 ) : null}
               </View>
-              <TextInput
+              <PartnerTextInput
                 style={[styles.simpleInput, { height: px(44) }]}
                 keyboardType="number-pad"
                 maxLength={10}
@@ -772,7 +763,7 @@ export default function DriverPersonalInfoScreen({ navigation, route }: Props) {
             <Pressable
               onPress={() => setEmergencyModalVisible(false)}
               style={[styles.primaryModalBtn, { height: px(44) }]}>
-              <Text style={[styles.primaryModalBtnText, { fontSize: px(14) }]}>Save Emergency Contact</Text>
+              <PartnerText style={[styles.primaryModalBtnText, { fontSize: px(14) }]}>Save Emergency Contact</PartnerText>
             </Pressable>
           </Pressable>
         </Pressable>

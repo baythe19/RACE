@@ -1,5 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Smartphone } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -30,15 +31,15 @@ export default function WrongAppRoleScreen() {
       <View style={styles.iconWrap}>
         <Smartphone size={40} color={colors.primary} strokeWidth={2} />
       </View>
-      <Text style={styles.title}>Use RACE Customer</Text>
-      <Text style={styles.body}>
+      <PartnerText style={styles.title}>Use RACE Customer</PartnerText>
+      <PartnerText style={styles.body}>
         This number is registered as a Customer. Book towing, driver hire, and roadside help in the
         RACE Customer app — not the Partner app.
-      </Text>
-      <Text style={styles.hint}>
-        Install <Text style={styles.bold}>RACE Customer</Text>, or sign out and continue partner
+      </PartnerText>
+      <PartnerText style={styles.hint}>
+        Install <PartnerText style={styles.bold}>RACE Customer</PartnerText>, or sign out and continue partner
         signup with a different number.
-      </Text>
+      </PartnerText>
       <Pressable
         onPress={() => void handleLogout()}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -46,7 +47,7 @@ export default function WrongAppRoleScreen() {
           styles.button,
           pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
         ]}>
-        <Text style={styles.buttonLabel}>Sign out</Text>
+        <PartnerText style={styles.buttonLabel}>Sign out</PartnerText>
       </Pressable>
     </View>
   );

@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Linking,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { MapPin, Navigation, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -129,13 +120,13 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
       <AppScreenLayout
         header={
           <View style={styles.headerPad}>
-            <Text style={styles.title}>Active job</Text>
+            <PartnerText style={styles.title}>Active job</PartnerText>
           </View>
         }>
         <View style={styles.empty}>
           <Navigation size={40} color={colors.primary} />
-          <Text style={styles.emptyTitle}>No active job</Text>
-          <Text style={styles.emptySubtitle}>Accept a booking from the Jobs tab.</Text>
+          <PartnerText style={styles.emptyTitle}>No active job</PartnerText>
+          <PartnerText style={styles.emptySubtitle}>Accept a booking from the Jobs tab.</PartnerText>
           <PrimaryButton label="Back to jobs" onPress={() => navigation.goBack()} />
         </View>
       </AppScreenLayout>
@@ -151,18 +142,18 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
     <AppScreenLayout
       header={
         <View style={styles.headerPad}>
-          <Text style={styles.title}>Active job</Text>
-          <Text style={styles.subtitle}>#{job.bookingNumber}</Text>
+          <PartnerText style={styles.title}>Active job</PartnerText>
+          <PartnerText style={styles.subtitle}>#{job.bookingNumber}</PartnerText>
         </View>
       }>
       <GlassCard style={styles.card}>
         <View style={styles.typeRow}>
-          <Text style={styles.typePill}>
+          <PartnerText style={styles.typePill}>
             {job.bookingType === 'towing' ? 'Towing' : 'Driver hire'}
-          </Text>
-          <Text style={styles.status}>
+          </PartnerText>
+          <PartnerText style={styles.status}>
             {STATUS_LABELS[job.status] ?? job.status.replace(/_/g, ' ')}
-          </Text>
+          </PartnerText>
         </View>
 
         <LiveTripMap
@@ -192,8 +183,8 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
         <View style={styles.locationRow}>
           <MapPin size={18} color={colors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.locationLabel}>Pickup</Text>
-            <Text style={styles.locationValue}>{pickup || 'Pickup location'}</Text>
+            <PartnerText style={styles.locationLabel}>Pickup</PartnerText>
+            <PartnerText style={styles.locationValue}>{pickup || 'Pickup location'}</PartnerText>
           </View>
         </View>
 
@@ -201,21 +192,21 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
           <View style={styles.locationRow}>
             <MapPin size={18} color={colors.secondary} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.locationLabel}>Drop</Text>
-              <Text style={styles.locationValue}>{dropoff}</Text>
+              <PartnerText style={styles.locationLabel}>Drop</PartnerText>
+              <PartnerText style={styles.locationValue}>{dropoff}</PartnerText>
             </View>
           </View>
         ) : null}
 
         {typeof job.estimatedFare === 'number' ? (
-          <Text style={styles.fare}>Est. ₹{Math.round(job.estimatedFare)}</Text>
+          <PartnerText style={styles.fare}>Est. ₹{Math.round(job.estimatedFare)}</PartnerText>
         ) : null}
       </GlassCard>
 
       {reportingEnabled ? (
         <View style={styles.liveBanner}>
           <View style={styles.liveDot} />
-          <Text style={styles.liveText}>Live location sharing with customer</Text>
+          <PartnerText style={styles.liveText}>Live location sharing with customer</PartnerText>
         </View>
       ) : null}
 
@@ -233,17 +224,17 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
         style={styles.callBtn}
         onPress={() => void Linking.openURL('tel:18001234567')}>
         <Phone size={18} color={colors.primary} />
-        <Text style={styles.callLabel}>Call support</Text>
+        <PartnerText style={styles.callLabel}>Call support</PartnerText>
       </Pressable>
 
       <Modal visible={otpModal} transparent animationType="fade" onRequestClose={() => setOtpModal(false)}>
         <Pressable style={styles.modalOverlay} onPress={() => setOtpModal(false)}>
           <Pressable style={styles.otpSheet} onPress={e => e.stopPropagation()}>
-            <Text style={styles.otpTitle}>Verify trip OTP</Text>
-            <Text style={styles.otpHint}>
+            <PartnerText style={styles.otpTitle}>Verify trip OTP</PartnerText>
+            <PartnerText style={styles.otpHint}>
               Ask the customer for the 4-digit code shown in their RACE app.
-            </Text>
-            <TextInput
+            </PartnerText>
+            <PartnerTextInput
               value={tripOtp}
               onChangeText={text => setTripOtp(text.replace(/\D/g, '').slice(0, 4))}
               keyboardType="number-pad"

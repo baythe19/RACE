@@ -1,14 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Crosshair, Map as MapIcon, MapPin, Search } from 'lucide-react-native';
@@ -119,19 +111,19 @@ export default function LocationSelectorSheet({
               accessibilityLabel="RACE"
             />
 
-            <Text style={styles.title}>Set your location</Text>
-            <Text style={styles.subtitle}>
+            <PartnerText style={styles.title}>Set your location</PartnerText>
+            <PartnerText style={styles.subtitle}>
               Choose where you need help so we can show nearby services
-            </Text>
+            </PartnerText>
 
             <Pressable style={styles.searchBar} onPress={() => setShowMapPicker(true)}>
               <Search size={18} color={colors.grey} strokeWidth={2} />
-              <Text style={styles.searchPlaceholder}>Search your location...</Text>
+              <PartnerText style={styles.searchPlaceholder}>Search your location...</PartnerText>
             </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <PartnerText style={styles.dividerText}>or</PartnerText>
               <View style={styles.dividerLine} />
             </View>
 
@@ -144,14 +136,14 @@ export default function LocationSelectorSheet({
               ) : (
                 <Crosshair size={20} color={colors.dark} strokeWidth={2.2} />
               )}
-              <Text style={styles.actionText}>
+              <PartnerText style={styles.actionText}>
                 {isLocating ? 'Getting your location...' : 'Use my current location'}
-              </Text>
+              </PartnerText>
             </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Select on map</Text>
+              <PartnerText style={styles.dividerText}>Select on map</PartnerText>
               <View style={styles.dividerLine} />
             </View>
 
@@ -159,10 +151,10 @@ export default function LocationSelectorSheet({
               style={[styles.actionRow, shadows.card]}
               onPress={() => setShowMapPicker(true)}>
               <MapIcon size={20} color={colors.dark} strokeWidth={2} />
-              <Text style={styles.actionText}>Open Map Picker</Text>
+              <PartnerText style={styles.actionText}>Open Map Picker</PartnerText>
             </Pressable>
 
-            <Text style={styles.popularLabel}>Popular cities</Text>
+            <PartnerText style={styles.popularLabel}>Popular cities</PartnerText>
             <View style={styles.chipsRow}>
               {SERVICEABLE_AREAS.map(city => (
                 <Pressable
@@ -174,14 +166,14 @@ export default function LocationSelectorSheet({
                     color={city.comingSoon ? colors.grey : colors.dark}
                     strokeWidth={2.2}
                   />
-                  <Text
+                  <PartnerText
                     style={[
                       styles.chipText,
                       city.comingSoon && { color: colors.grey },
                     ]}>
                     {city.displayName}
                     {city.comingSoon ? ' · Soon' : ''}
-                  </Text>
+                  </PartnerText>
                 </Pressable>
               ))}
             </View>

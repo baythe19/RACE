@@ -1,13 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React, { useEffect, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import {
   ChevronRight,
   Compass,
@@ -102,7 +95,7 @@ export default function UiTestNavigator() {
           accessibilityRole="button"
           accessibilityLabel="Open UI QA Navigator">
           <Zap size={14} color="#000000" strokeWidth={3} />
-          <Text style={styles.floatingText}>UI QA</Text>
+          <PartnerText style={styles.floatingText}>UI QA</PartnerText>
         </Pressable>
       </View>
 
@@ -122,7 +115,7 @@ export default function UiTestNavigator() {
             <View style={styles.sheetHeader}>
               <View style={styles.sheetTitleGroup}>
                 <Sparkles size={18} color={driverColors.amber} strokeWidth={2.4} />
-                <Text style={styles.sheetTitle}>UI QA Screen Navigator</Text>
+                <PartnerText style={styles.sheetTitle}>UI QA Screen Navigator</PartnerText>
               </View>
               <Pressable
                 hitSlop={12}
@@ -135,12 +128,12 @@ export default function UiTestNavigator() {
             {/* Permissive Mode Toggle Banner */}
             <View style={styles.toggleBanner}>
               <View style={styles.toggleCopy}>
-                <Text style={styles.toggleTitle}>Permissive Testing Mode</Text>
-                <Text style={styles.toggleSubtitle}>
+                <PartnerText style={styles.toggleTitle}>Permissive Testing Mode</PartnerText>
+                <PartnerText style={styles.toggleSubtitle}>
                   {permissiveMode
                     ? 'Bypasses required forms, pre-fills defaults on Next/Submit.'
                     : 'Strict validation enabled.'}
-                </Text>
+                </PartnerText>
               </View>
               <Switch
                 value={permissiveMode}
@@ -155,7 +148,7 @@ export default function UiTestNavigator() {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.sheetScrollContent}>
               {/* Role Fast Switchers */}
-              <Text style={styles.groupHeading}>1-Tap Role Switcher</Text>
+              <PartnerText style={styles.groupHeading}>1-Tap Role Switcher</PartnerText>
               <View style={styles.chipsRow}>
                 <Pressable
                   style={[styles.roleChip, isDriver && styles.roleChipActive]}
@@ -165,9 +158,9 @@ export default function UiTestNavigator() {
                     setModalVisible(false);
                   }}>
                   <Truck size={14} color={isDriver ? '#000000' : driverColors.grey} />
-                  <Text style={[styles.roleChipText, isDriver && styles.roleChipTextActive]}>
+                  <PartnerText style={[styles.roleChipText, isDriver && styles.roleChipTextActive]}>
                     Driver Mode
-                  </Text>
+                  </PartnerText>
                 </Pressable>
 
                 <Pressable
@@ -178,14 +171,14 @@ export default function UiTestNavigator() {
                     setModalVisible(false);
                   }}>
                   <Users size={14} color={isVendor ? '#000000' : driverColors.grey} />
-                  <Text style={[styles.roleChipText, isVendor && styles.roleChipTextActive]}>
+                  <PartnerText style={[styles.roleChipText, isVendor && styles.roleChipTextActive]}>
                     Vendor Mode
-                  </Text>
+                  </PartnerText>
                 </Pressable>
               </View>
 
               {/* Driver Screens */}
-              <Text style={styles.groupHeading}>Driver Flow (1-Tap Jump)</Text>
+              <PartnerText style={styles.groupHeading}>Driver Flow (1-Tap Jump)</PartnerText>
               <View style={styles.menuGroup}>
                 <JumpRow
                   label="1. Welcome Screen"
@@ -262,7 +255,7 @@ export default function UiTestNavigator() {
               </View>
 
               {/* Vendor Screens */}
-              <Text style={styles.groupHeading}>Vendor Flow (1-Tap Jump)</Text>
+              <PartnerText style={styles.groupHeading}>Vendor Flow (1-Tap Jump)</PartnerText>
               <View style={styles.menuGroup}>
                 <JumpRow
                   label="1. Vendor Registration: Business Info"
@@ -356,7 +349,7 @@ export default function UiTestNavigator() {
               </View>
 
               {/* Shared Account Subsystem */}
-              <Text style={styles.groupHeading}>Account & Profile Subsystem</Text>
+              <PartnerText style={styles.groupHeading}>Account & Profile Subsystem</PartnerText>
               <View style={styles.menuGroup}>
                 <JumpRow
                   label="Account Hub"
@@ -461,8 +454,8 @@ function JumpRow({
       style={({ pressed }) => [styles.jumpRow, pressed && styles.jumpRowPressed]}
       onPress={onPress}>
       <View style={styles.jumpRowCopy}>
-        <Text style={styles.jumpRowLabel}>{label}</Text>
-        <Text style={styles.jumpRowSub}>{sub}</Text>
+        <PartnerText style={styles.jumpRowLabel}>{label}</PartnerText>
+        <PartnerText style={styles.jumpRowSub}>{sub}</PartnerText>
       </View>
       <ChevronRight size={16} color="#9CA3AF" strokeWidth={2.4} />
     </Pressable>

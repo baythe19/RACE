@@ -1,11 +1,6 @@
+import { PartnerText } from '../PartnerText';
 import React from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { LogOut } from 'lucide-react-native';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 
@@ -34,10 +29,10 @@ export default function PartnerLogoutDialog({
             <LogOut size={26} color={driverColors.red} strokeWidth={2.2} />
           </View>
 
-          <Text style={styles.title}>Log out?</Text>
-          <Text style={styles.subtitle}>
+          <PartnerText style={styles.title}>Log out?</PartnerText>
+          <PartnerText style={styles.subtitle}>
             You will be signed out from this device. Are you sure you want to proceed?
-          </Text>
+          </PartnerText>
 
           <View style={styles.buttonGroup}>
             <Pressable
@@ -48,9 +43,9 @@ export default function PartnerLogoutDialog({
               ]}
               disabled={isLoading}
               onPress={onConfirm}>
-              <Text style={styles.primaryButtonText}>
+              <PartnerText style={styles.primaryButtonText}>
                 {isLoading ? 'Logging out...' : 'Log out'}
-              </Text>
+              </PartnerText>
             </Pressable>
 
             <Pressable
@@ -60,7 +55,7 @@ export default function PartnerLogoutDialog({
               ]}
               disabled={isLoading}
               onPress={onCancel}>
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
+              <PartnerText style={styles.secondaryButtonText}>Cancel</PartnerText>
             </Pressable>
           </View>
         </Pressable>

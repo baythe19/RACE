@@ -1,3 +1,4 @@
+import { PartnerText } from './PartnerText';
 /**
  * Incoming job request alert.
  *
@@ -22,7 +23,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native';
 import { Clock, MapPin, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -231,9 +232,9 @@ export default function DriverOfferAlert() {
               paddingHorizontal: px(9),
               paddingVertical: px(3),
             }}>
-            <Text style={[T.pill, { fontSize: px(10.5), lineHeight: px(13), color: C.blue }]}>
+            <PartnerText style={[T.pill, { fontSize: px(10.5), lineHeight: px(13), color: C.blue }]}>
               NEW
-            </Text>
+            </PartnerText>
           </View>
 
           {isExpired ? (
@@ -247,9 +248,9 @@ export default function DriverOfferAlert() {
                 paddingHorizontal: px(9),
                 paddingVertical: px(3),
               }}>
-              <Text style={[T.pill, { fontSize: px(10.5), lineHeight: px(13), color: C.red }]}>
+              <PartnerText style={[T.pill, { fontSize: px(10.5), lineHeight: px(13), color: C.red }]}>
                 EXPIRED
-              </Text>
+              </PartnerText>
             </View>
           ) : remainingMs !== null ? (
             <View
@@ -263,7 +264,7 @@ export default function DriverOfferAlert() {
                 paddingVertical: px(3),
               }}>
               <Clock size={px(11)} color={isUrgent ? C.amberText : C.grey} strokeWidth={2.6} />
-              <Text
+              <PartnerText
                 style={[
                   T.pill,
                   {
@@ -274,7 +275,7 @@ export default function DriverOfferAlert() {
                   },
                 ]}>
                 {formatCountdown(remainingMs)}
-              </Text>
+              </PartnerText>
             </View>
           ) : null}
 
@@ -290,44 +291,44 @@ export default function DriverOfferAlert() {
           </Pressable>
         </View>
 
-        <Text
+        <PartnerText
           numberOfLines={1}
           style={[
             T.jobTitle,
             { fontSize: px(16), lineHeight: px(21), color: C.ink, marginTop: px(8) },
           ]}>
           {offer.serviceLabel?.trim() || (offer.bookingType === 'towing' ? 'Towing' : 'Driver hire')}
-        </Text>
+        </PartnerText>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(4) }}>
           {offer.distanceKm != null ? (
             <>
               <MapPin size={px(13)} color={C.green} strokeWidth={2.6} />
-              <Text
+              <PartnerText
                 style={[
                   T.distance,
                   { fontSize: px(13.5), lineHeight: px(18), color: C.green, marginLeft: px(4) },
                 ]}>
                 {offer.distanceKm} km away
-              </Text>
+              </PartnerText>
             </>
           ) : null}
           {offer.distanceKm != null && offer.estimatedFare != null ? (
-            <Text style={[T.meta, { color: C.greySoft, marginHorizontal: px(6) }]}>·</Text>
+            <PartnerText style={[T.meta, { color: C.greySoft, marginHorizontal: px(6) }]}>·</PartnerText>
           ) : null}
           {offer.estimatedFare != null ? (
-            <Text style={[T.distance, { fontSize: px(13.5), lineHeight: px(18), color: C.ink }]}>
+            <PartnerText style={[T.distance, { fontSize: px(13.5), lineHeight: px(18), color: C.ink }]}>
               {formatInr(offer.estimatedFare)}
-            </Text>
+            </PartnerText>
           ) : null}
         </View>
 
         {showPickup ? (
-          <Text
+          <PartnerText
             numberOfLines={1}
             style={[T.meta, { fontSize: px(12.5), lineHeight: px(17), color: C.greySoft, marginTop: px(4) }]}>
             {pickup}
-          </Text>
+          </PartnerText>
         ) : null}
 
         {/* decision window --------------------------------------------- */}
@@ -353,7 +354,7 @@ export default function DriverOfferAlert() {
 
         {/* outcome message ---------------------------------------------- */}
         {activeOutcome ? (
-          <Text
+          <PartnerText
             style={[
               T.meta,
               {
@@ -369,7 +370,7 @@ export default function DriverOfferAlert() {
               : activeOutcome.kind === 'taken'
                 ? activeOutcome.message || 'Another partner accepted this request first.'
                 : activeOutcome.message}
-          </Text>
+          </PartnerText>
         ) : null}
 
         {/* actions ------------------------------------------------------ */}
@@ -392,13 +393,13 @@ export default function DriverOfferAlert() {
             {accepting ? (
               <ActivityIndicator color={C.ink} />
             ) : (
-              <Text style={[T.button, { fontSize: px(15.5), color: C.ink }]}>
+              <PartnerText style={[T.button, { fontSize: px(15.5), color: C.ink }]}>
                 {isExpired
                   ? 'Expired'
                   : activeOutcome?.kind === 'taken'
                     ? 'Not available'
                     : 'Accept trip'}
-              </Text>
+              </PartnerText>
             )}
           </Pressable>
 
@@ -420,7 +421,7 @@ export default function DriverOfferAlert() {
             {declining ? (
               <ActivityIndicator color={C.grey} />
             ) : (
-              <Text style={[T.button, { fontSize: px(15), color: C.grey }]}>Decline</Text>
+              <PartnerText style={[T.button, { fontSize: px(15), color: C.grey }]}>Decline</PartnerText>
             )}
           </Pressable>
         </View>

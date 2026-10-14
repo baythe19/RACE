@@ -1,11 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Truck,
@@ -141,12 +136,12 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
 
         <View style={styles.textCol}>
           <View style={styles.rowTop}>
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            <Text style={styles.itemTime}>{formattedTime}</Text>
+            <PartnerText style={styles.itemTitle}>{item.title}</PartnerText>
+            <PartnerText style={styles.itemTime}>{formattedTime}</PartnerText>
           </View>
-          <Text style={styles.itemMessage} numberOfLines={2}>
+          <PartnerText style={styles.itemMessage} numberOfLines={2}>
             {item.message}
-          </Text>
+          </PartnerText>
         </View>
 
         {!item.isRead ? <View style={styles.unreadDot} /> : null}
@@ -160,9 +155,18 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}
       headerRight={
         <Pressable
-          hitSlop={8}
+          hitSlop={10}
+          style={({ pressed }) => ({
+            paddingVertical: 4,
+            paddingHorizontal: 6,
+            borderRadius: 6,
+            backgroundColor: pressed ? '#FEF3C7' : 'transparent',
+            flexShrink: 0,
+          })}
           onPress={() => markAllReadMutation.mutate()}>
-          <Text style={styles.markReadText}>Mark all read</Text>
+          <PartnerText style={styles.markReadText} numberOfLines={1}>
+            Mark all read
+          </PartnerText>
         </Pressable>
       }>
       {/* Category Filter Chips */}
@@ -174,13 +178,13 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
               key={cat}
               style={[styles.filterChip, isSelected && styles.filterChipActive]}
               onPress={() => setActiveFilter(cat)}>
-              <Text
+              <PartnerText
                 style={[
                   styles.filterChipText,
                   isSelected && styles.filterChipTextActive,
                 ]}>
                 {cat}
-              </Text>
+              </PartnerText>
             </Pressable>
           );
         })}
@@ -193,16 +197,16 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
       ) : filteredNotifications.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Bell size={40} color={driverColors.greySoft} strokeWidth={1.5} />
-          <Text style={styles.emptyTitle}>No notifications yet</Text>
-          <Text style={styles.emptySubtitle}>
+          <PartnerText style={styles.emptyTitle}>No notifications yet</PartnerText>
+          <PartnerText style={styles.emptySubtitle}>
             You will see job updates, verification alerts, and payout notices here.
-          </Text>
+          </PartnerText>
         </View>
       ) : (
         <View style={styles.listContainer}>
           {todayItems.length > 0 ? (
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionHeader}>Today</Text>
+              <PartnerText style={styles.sectionHeader}>Today</PartnerText>
               <View style={styles.itemsWrapper}>
                 {todayItems.map(renderNotificationRow)}
               </View>
@@ -211,7 +215,7 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
 
           {yesterdayItems.length > 0 ? (
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionHeader}>Yesterday</Text>
+              <PartnerText style={styles.sectionHeader}>Yesterday</PartnerText>
               <View style={styles.itemsWrapper}>
                 {yesterdayItems.map(renderNotificationRow)}
               </View>
@@ -228,6 +232,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: driverColors.amberText,
+    flexShrink: 0,
   },
   filterRow: {
     flexDirection: 'row',

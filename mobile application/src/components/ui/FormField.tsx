@@ -1,5 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { StyleSheet, View, type TextInputProps } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -12,13 +13,13 @@ interface FormFieldProps extends TextInputProps {
 export default function FormField({ label, error, dark = false, style, ...props }: FormFieldProps) {
   return (
     <View style={styles.field}>
-      <Text style={[styles.label, dark && styles.labelDark]}>{label}</Text>
-      <TextInput
+      <PartnerText style={[styles.label, dark && styles.labelDark]}>{label}</PartnerText>
+      <PartnerTextInput
         style={[styles.input, dark && styles.inputDark, style]}
         placeholderTextColor={dark ? colors.subtext : colors.textMuted}
         {...props}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <PartnerText style={styles.error}>{error}</PartnerText> : null}
     </View>
   );
 }

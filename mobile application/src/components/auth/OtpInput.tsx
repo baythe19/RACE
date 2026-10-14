@@ -1,3 +1,4 @@
+import { PartnerTextInput } from '../partner/PartnerText';
 import React, { useRef } from 'react';
 import { Pressable, TextInput, View } from 'react-native';
 
@@ -67,7 +68,7 @@ export default function OtpInput({
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <TextInput
+              <PartnerTextInput
                 ref={ref => {
                   inputRefs.current[index] = ref;
                 }}

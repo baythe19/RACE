@@ -1,18 +1,6 @@
+import { PartnerText } from '../../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -60,8 +48,8 @@ const SUCCESS_GREEN = '#22C55E';
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value || '—'}</Text>
+      <PartnerText style={styles.detailLabel}>{label}</PartnerText>
+      <PartnerText style={styles.detailValue}>{value || '—'}</PartnerText>
     </View>
   );
 }
@@ -83,13 +71,13 @@ function SectionCard({
         <View style={styles.sectionIcon}>
           <Icon size={18} color={colors.primary} strokeWidth={2.2} />
         </View>
-        <Text style={styles.sectionTitle}>{title}</Text>
+        <PartnerText style={styles.sectionTitle}>{title}</PartnerText>
         <Pressable
           onPress={onEdit}
           style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
           hitSlop={8}>
           <Pencil size={14} color={colors.primaryDark} strokeWidth={2.4} />
-          <Text style={styles.editLabel}>Edit</Text>
+          <PartnerText style={styles.editLabel}>Edit</PartnerText>
         </Pressable>
       </View>
       <View style={styles.sectionBody}>{children}</View>
@@ -247,10 +235,10 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         </Pressable>
 
         <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
+          <PartnerText style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
             PARTNER
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={styles.backButton} />
@@ -271,16 +259,16 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
               paddingBottom: insets.bottom + px(spacing.xl),
             },
           ]}>
-          <Text style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
+          <PartnerText style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
             Almost done!
-          </Text>
-          <Text
+          </PartnerText>
+          <PartnerText
             style={[
               styles.heroSubtitle,
               { fontSize: px(14), lineHeight: px(21), marginTop: px(6) },
             ]}>
             Please review your details before submitting. Our team will verify and get you onboard.
-          </Text>
+          </PartnerText>
 
           <Image
             source={images.homeHeroTruck}
@@ -305,10 +293,10 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
               activeStep={4}
             />
 
-            <Text style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
+            <PartnerText style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
               Review your details
-            </Text>
-            <Text
+            </PartnerText>
+            <PartnerText
               style={[
                 styles.formSubtitle,
                 {
@@ -319,7 +307,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
                 },
               ]}>
               Confirm everything looks correct before you submit.
-            </Text>
+            </PartnerText>
 
             {submitting ? (
               <ActivityIndicator color={colors.primary} style={{ marginBottom: spacing.md }} />
@@ -353,7 +341,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
               Icon={FileText}
               onEdit={() => navigation.navigate('VendorDocuments', route.params)}>
               {uploadedDocs.length === 0 ? (
-                <Text style={styles.emptyDocs}>No documents uploaded yet.</Text>
+                <PartnerText style={styles.emptyDocs}>No documents uploaded yet.</PartnerText>
               ) : (
                 uploadedDocs.map(doc => {
                   const DocIcon = doc.Icon;
@@ -363,8 +351,8 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
                         <DocIcon size={14} color={SUCCESS_GREEN} strokeWidth={2.2} />
                       </View>
                       <View style={styles.docCopy}>
-                        <Text style={styles.docTitle}>{doc.label}</Text>
-                        <Text style={styles.docStatus}>Uploaded</Text>
+                        <PartnerText style={styles.docTitle}>{doc.label}</PartnerText>
+                        <PartnerText style={styles.docStatus}>Uploaded</PartnerText>
                       </View>
                       <Check size={14} color={SUCCESS_GREEN} strokeWidth={3} />
                     </View>
@@ -395,10 +383,10 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
               <View style={[styles.termsCheckbox, termsAccepted && styles.termsCheckboxChecked]}>
                 {termsAccepted ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
               </View>
-              <Text style={styles.termsCheckboxText}>
+              <PartnerText style={styles.termsCheckboxText}>
                 I confirm that all provided details and documents are authentic, and I agree to the
                 RACE Partner Terms and Verification Policy.
-              </Text>
+              </PartnerText>
             </Pressable>
 
             <Pressable
@@ -414,9 +402,9 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
                 (submitting || !termsAccepted) && styles.submitDisabled,
                 pressed && !submitting && termsAccepted && styles.pressed,
               ]}>
-              <Text style={[styles.submitLabel, { fontSize: px(16) }]}>
+              <PartnerText style={[styles.submitLabel, { fontSize: px(16) }]}>
                 {submitting ? 'Submitting…' : 'Submit for review'}
-              </Text>
+              </PartnerText>
               {!submitting ? (
                 <ArrowRight size={px(18)} color={colors.dark} strokeWidth={2.5} />
               ) : null}
@@ -424,10 +412,10 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
 
             <View style={[styles.agreeRow, { marginTop: px(spacing.lg) }]}>
               <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
-              <Text style={styles.agreeText}>
+              <PartnerText style={styles.agreeText}>
                 By submitting, you agree that all information is accurate to the best of your
                 knowledge.
-              </Text>
+              </PartnerText>
             </View>
           </View>
 
@@ -436,10 +424,10 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
               <ShieldCheck size={16} color={colors.primary} strokeWidth={2.2} />
             </View>
             <View style={styles.trustCopy}>
-              <Text style={styles.trustTitle}>Secure & Verified</Text>
-              <Text style={styles.trustText}>
+              <PartnerText style={styles.trustTitle}>Secure & Verified</PartnerText>
+              <PartnerText style={styles.trustText}>
                 We verify every document to keep RACE customers safe.
-              </Text>
+              </PartnerText>
             </View>
           </View>
         </ScrollView>

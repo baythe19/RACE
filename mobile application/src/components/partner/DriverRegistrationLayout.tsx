@@ -1,17 +1,7 @@
+import { PartnerText } from './PartnerText';
 import React, { useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableWithoutFeedback,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Keyboard, Platform, Pressable, ScrollView, StatusBar, StyleSheet, TouchableWithoutFeedback, View, useWindowDimensions } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { ArrowLeft, ArrowRight, Check, ChevronRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -52,19 +42,33 @@ export default function DriverRegistrationLayout({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
 
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    // Reset to top smoothly when changing registration steps
+    if (scrollViewRef.current?.scrollToPosition) {
+      scrollViewRef.current.scrollToPosition(0, 0, false);
+    } else if (scrollViewRef.current?.scrollTo) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: false });
+    }
   }, [step]);
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub = Keyboard.addListener(showEvent, () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardVisible(false));
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardVisible(true);
+      if (e?.endCoordinates?.height) {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardVisible(false);
+      setKeyboardHeight(0);
+    });
 
     return () => {
       showSub.remove();
@@ -120,9 +124,9 @@ export default function DriverRegistrationLayout({
 
       {/* Centered Driver Registration Title */}
       <View style={[styles.titleHeaderWrap, { paddingVertical: px(2) }]}>
-        <Text style={[styles.headerRegistrationTitle, { fontSize: px(15.5) }]}>
+        <PartnerText style={[styles.headerRegistrationTitle, { fontSize: px(15.5) }]}>
           {resolvedTitle}
-        </Text>
+        </PartnerText>
       </View>
 
       {/* Horizontal 4-Step Stepper */}
@@ -213,19 +217,19 @@ export default function DriverRegistrationLayout({
                   {isCompleted ? (
                     <Check size={px(13)} color="#FFFFFF" strokeWidth={3} />
                   ) : (
-                    <Text
+                    <PartnerText
                       style={[
                         styles.circleText,
                         { fontSize: px(11) },
                         isActive ? styles.circleTextActive : styles.circleTextIdle,
                       ]}>
                       {stepNum}
-                    </Text>
+                    </PartnerText>
                   )}
                 </View>
 
                 {/* Step Label (Centered directly beneath circle) */}
-                <Text
+                <PartnerText
                   numberOfLines={1}
                   style={[
                     styles.stepLabel,
@@ -235,42 +239,45 @@ export default function DriverRegistrationLayout({
                     !isActive && !isCompleted && styles.stepLabelIdle,
                   ]}>
                   {label}
-                </Text>
+                </PartnerText>
               </View>
             );
           })}
         </View>
       </View>
 
-      {/* Main Content Area */}
-      <KeyboardAvoidingView
-        style={styles.keyboardWrap}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? px(64) : 0}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          bounces={false}
-          scrollEnabled={scrollEnabled !== undefined ? scrollEnabled : step !== 4}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={[
-            styles.scrollContent,
-            step === 4 && styles.scrollContentStep4,
-            {
-              paddingHorizontal: px(12),
-              paddingTop: px(10),
-              paddingBottom:
-                insets.bottom +
-                px(showFooter ? (step === 4 ? 80 : 94) : 28) +
-                (keyboardVisible ? px(90) : 0),
-            },
-          ]}>
-          {/* Children Screen Body */}
-          <View style={step === 4 ? styles.step4BodyWrap : undefined}>{children}</View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+      {/* Main Content Area: KeyboardAwareScrollView automatically scrolls up when any input is focused */}
+      <KeyboardAwareScrollView
+        innerRef={(ref: any) => {
+          scrollViewRef.current = ref;
+        }}
+        style={styles.scrollView}
+        bounces={false}
+        enableOnAndroid={true}
+        enableAutomaticScroll={true}
+        extraScrollHeight={Platform.OS === 'ios' ? px(28) : px(85)}
+        extraHeight={Platform.OS === 'ios' ? px(48) : px(130)}
+        keyboardOpeningTime={Platform.OS === 'ios' ? 250 : 0}
+        scrollEnabled={scrollEnabled !== undefined ? scrollEnabled : true}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        enableResetScrollToCoords={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          step === 4 && styles.scrollContentStep4,
+          {
+            paddingHorizontal: px(12),
+            paddingTop: px(10),
+            paddingBottom:
+              insets.bottom +
+              px(showFooter ? (step === 4 ? 80 : 94) : 28) +
+              (keyboardVisible ? Math.max(keyboardHeight, px(220)) : 0),
+          },
+        ]}>
+        {/* Children Screen Body */}
+        <View style={step === 4 ? styles.step4BodyWrap : undefined}>{children}</View>
+      </KeyboardAwareScrollView>
 
       {/* Sticky Bottom Actions Bar (auto-hidden when typing on steps 1-3 so input is never covered) */}
       {showFooter && (!keyboardVisible || step === 4) ? (
@@ -296,7 +303,7 @@ export default function DriverRegistrationLayout({
                 ]}
                 accessibilityRole="button"
                 accessibilityLabel="Go back">
-                <Text style={[styles.backActionLabel, { fontSize: px(15) }]}>Back</Text>
+                <PartnerText style={[styles.backActionLabel, { fontSize: px(15) }]}>Back</PartnerText>
               </Pressable>
 
               {(() => {
@@ -316,7 +323,7 @@ export default function DriverRegistrationLayout({
                     ]}
                     accessibilityRole="button"
                     accessibilityLabel={cleanLabel}>
-                    <Text
+                    <PartnerText
                       numberOfLines={1}
                       ellipsizeMode="tail"
                       style={[
@@ -325,7 +332,7 @@ export default function DriverRegistrationLayout({
                         continueDisabled && styles.continueLabelDisabled,
                       ]}>
                       {continueLoading ? 'Please wait…' : cleanLabel}
-                    </Text>
+                    </PartnerText>
                     {!continueLoading ? (
                       <ArrowRight
                         size={px(17)}

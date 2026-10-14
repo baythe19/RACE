@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import GoogleIcon from '../auth/GoogleIcon';
 import { typography } from '../../theme';
@@ -15,7 +16,7 @@ export default function GooglePayIcon({ size = 32 }: Props) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: Math.round(size * 0.06) }}>
       <GoogleIcon size={gSize} />
-      <Text
+      <PartnerText
         style={{
           fontSize: paySize,
           fontWeight: typography.weights.medium,
@@ -23,7 +24,7 @@ export default function GooglePayIcon({ size = 32 }: Props) {
           letterSpacing: -0.3,
         }}>
         Pay
-      </Text>
+      </PartnerText>
     </View>
   );
 }

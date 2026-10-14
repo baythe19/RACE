@@ -192,6 +192,22 @@ export class VendorController {
     return sendSuccess(res, offers);
   });
 
+  listBookings = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const bookings = await vendorBookingsService.listBookings(user.id);
+    return sendSuccess(res, bookings);
+  });
+
+  assignDriverVehicle = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const driver = await vendorDriversService.assignVehicle(
+      user.id,
+      getParamId(req.params.id),
+      req.body,
+    );
+    return sendSuccess(res, driver);
+  });
+
   approveBooking = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await vendorBookingsService.approveBooking(

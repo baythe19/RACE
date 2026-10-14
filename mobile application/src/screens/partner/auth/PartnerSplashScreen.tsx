@@ -1,11 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useCallback, useEffect, useRef } from 'react';
-import {
-  Animated,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, StatusBar, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -84,7 +79,7 @@ export default function PartnerSplashScreen() {
         ]}>
         <View style={styles.centerBlock}>
           <PartnerBrandLogo />
-          <Text style={styles.appName}>RACE Service</Text>
+          <PartnerText style={styles.appName}>RACE Service</PartnerText>
         </View>
 
         <View style={styles.footer}>

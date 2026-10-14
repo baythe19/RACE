@@ -24,7 +24,35 @@ import { assertTripStartOtp } from './bookings/tripOtp';
 import { appendStatusHistory } from './bookings/booking';
 import { emitBookingStatusUpdate } from './socket';
 
+/** One booking row for the vendor portal list. */
+export type VendorBookingListItem = {
+  bookingType: 'towing' | 'driver';
+  id: string;
+  bookingNumber: string;
+  status: string;
+  pickup?: { label?: string; address?: string; latitude?: number; longitude?: number };
+  dropoff?: { label?: string; address?: string; latitude?: number; longitude?: number } | null;
+  estimatedFare?: number;
+  finalFare?: number;
+  createdAt: string;
+  scheduledAt?: string;
+  serviceLabel: string;
+  assignedFleetVehicleLabel?: string;
+  driver?: { id: string; name: string; phone: string; rating: number };
+};
+
 export class VendorBookingsService {
+  /** Max bookings returned for the vendor portal list. */
+  private static LIST_LIMIT = 100;
+
+  private async assertVendor(userId: string) {
+    const user = await UserModel.findById(userId).exec();
+    if (!user || user.role !== 'vendor') {
+      throw new ForbiddenError('Vendor access only');
+    }
+    return user;
+  }
+
   private async assertVendorApproved(vendorUserId: string) {
     const user = await UserModel.findById(vendorUserId).exec();
     if (!user || user.role !== 'vendor') {
@@ -74,6 +102,112 @@ export class VendorBookingsService {
       ...result,
       assignedFleetVehicleLabel: fleetVehicleLabel,
       message: 'Job approved — your drivers can now accept it',
+    };
+  }
+
+  /**
+   * Vendor portal bookings list: every booking routed to this vendor
+   * (vendorId) or claimed by one of this vendor's fleet drivers. Covers
+   * awaiting-driver, assigned, in-progress and completed states so the
+   * Jobs tabs reflect real fleet activity after assignment.
+   */
+  async listBookings(vendorUserId: string): Promise<VendorBookingListItem[]> {
+    const user = await this.assertVendor(vendorUserId);
+
+    const driverUsers = await UserModel.find({
+      role: 'driver',
+      'driverProfile.vendorUserId': user._id,
+    })
+      .select('_id')
+      .lean()
+      .exec();
+    const driverIds = driverUsers.map((driver) => driver._id.toString());
+    const driverIdSet = new Set(driverIds);
+
+    const query =
+      driverIds.length > 0
+        ? {
+            $or: [
+              { vendorId: user._id },
+              { driverId: { $in: driverIds } },
+            ],
+          }
+        : { vendorId: user._id };
+
+    const [towing, driverHire] = await Promise.all([
+      TowingBookingModel.find(query)
+        .sort({ createdAt: -1 })
+        .limit(VendorBookingsService.LIST_LIMIT)
+        .exec(),
+      DriverBookingModel.find(query)
+        .sort({ createdAt: -1 })
+        .limit(VendorBookingsService.LIST_LIMIT)
+        .exec(),
+    ]);
+
+    const items: VendorBookingListItem[] = [];
+    for (const booking of towing) {
+      items.push(await this.mapVendorBooking(booking.toObject(), 'towing', driverIdSet));
+    }
+    for (const booking of driverHire) {
+      items.push(await this.mapVendorBooking(booking.toObject(), 'driver', driverIdSet));
+    }
+
+    items.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return items.slice(0, VendorBookingsService.LIST_LIMIT);
+  }
+
+  private async mapVendorBooking(
+    booking: {
+      _id: { toString(): string };
+      bookingNumber: string;
+      status: string;
+      pickup?: { address?: string; label?: string; latitude?: number; longitude?: number };
+      dropoff?: { address?: string; label?: string; latitude?: number; longitude?: number } | null;
+      estimatedFare?: number;
+      finalFare?: number;
+      createdAt: Date;
+      scheduledAt?: Date | null;
+      towingMode?: 'instant' | 'scheduled' | 'emergency';
+      driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
+      driverId?: { toString(): string } | null;
+      assignedFleetVehicleLabel?: string | null;
+    },
+    bookingType: 'towing' | 'driver',
+    driverIdSet: Set<string>,
+  ): Promise<VendorBookingListItem> {
+    const bookingDriverId = booking.driverId?.toString();
+    const driver =
+      driverIdSet.has(bookingDriverId ?? '') ? await resolveAssignedDriver(bookingDriverId) : undefined;
+    return {
+      bookingType,
+      id: booking._id.toString(),
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      pickup: booking.pickup,
+      dropoff: booking.dropoff ?? null,
+      estimatedFare: booking.estimatedFare,
+      finalFare: booking.finalFare,
+      createdAt: booking.createdAt.toISOString(),
+      scheduledAt: booking.scheduledAt?.toISOString(),
+      serviceLabel:
+        bookingType === 'towing'
+          ? booking.towingMode === 'emergency'
+            ? 'Emergency Towing'
+            : booking.towingMode === 'scheduled'
+              ? 'Scheduled Towing'
+              : 'Towing'
+          : booking.driverServiceType === 'full_time'
+            ? 'Full-Time Driver'
+            : booking.driverServiceType === 'part_time'
+              ? 'Part-Time Driver'
+              : booking.driverServiceType === 'outstation'
+                ? 'Outstation Driver'
+                : booking.driverServiceType === 'night'
+                  ? 'Night Driver'
+                  : 'Driver hire',
+      assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
+      driver,
     };
   }
 

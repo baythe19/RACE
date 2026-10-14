@@ -1,12 +1,6 @@
+import { PartnerText, PartnerTextInput } from './PartnerText';
 import React, { useEffect, useRef, useState } from 'react';
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { RotateCcw, Sparkles } from 'lucide-react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
@@ -109,7 +103,7 @@ export default function PartnerOtpInput({
                       ? styles.boxFilled
                       : styles.boxIdle,
                 ]}>
-                <Text style={styles.digitText}>{digit}</Text>
+                <PartnerText style={styles.digitText}>{digit}</PartnerText>
                 {isCurrentActive && !isFilled ? <View style={styles.activeCaret} /> : null}
               </View>
             );
@@ -117,7 +111,7 @@ export default function PartnerOtpInput({
         </View>
 
         {/* Real Native TextInput placed over entire boxes area */}
-        <TextInput
+        <PartnerTextInput
           ref={inputRef}
           value={value}
           onChangeText={handleChange}
@@ -145,7 +139,7 @@ export default function PartnerOtpInput({
             accessibilityRole="button"
             accessibilityLabel="Clear all entered digits">
             <RotateCcw size={13} color={colors.grey} strokeWidth={2.4} />
-            <Text style={styles.actionText}>Clear all</Text>
+            <PartnerText style={styles.actionText}>Clear all</PartnerText>
           </Pressable>
         ) : (
           <View style={styles.actionPlaceholder} />
@@ -159,7 +153,7 @@ export default function PartnerOtpInput({
             accessibilityRole="button"
             accessibilityLabel={`Fill code ${suggestedOtp}`}>
             <Sparkles size={13} color={colors.primary} strokeWidth={2.4} />
-            <Text style={styles.pasteChipText}>Fill {suggestedOtp}</Text>
+            <PartnerText style={styles.pasteChipText}>Fill {suggestedOtp}</PartnerText>
           </Pressable>
         ) : null}
       </View>
@@ -285,4 +279,3 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.96 }],
   },
 });
-

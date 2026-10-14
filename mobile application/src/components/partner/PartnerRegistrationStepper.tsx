@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 
 import { colors, spacing, typography } from '../../theme';
@@ -36,16 +37,16 @@ export default function PartnerRegistrationStepper({
                   {isCompleted ? (
                     <Check size={14} color="#FFFFFF" strokeWidth={3} />
                   ) : (
-                    <Text
+                    <PartnerText
                       style={[
                         styles.circleText,
                         isActive ? styles.circleTextActive : styles.circleTextIdle,
                       ]}>
                       {stepNumber}
-                    </Text>
+                    </PartnerText>
                   )}
                 </View>
-                <Text
+                <PartnerText
                   style={[
                     styles.label,
                     isCompleted
@@ -56,7 +57,7 @@ export default function PartnerRegistrationStepper({
                   ]}
                   numberOfLines={2}>
                   {label}
-                </Text>
+                </PartnerText>
               </View>
               {index < steps.length - 1 ? (
                 <View

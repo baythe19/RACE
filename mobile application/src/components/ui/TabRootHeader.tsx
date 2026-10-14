@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Bell, UserRound } from 'lucide-react-native';
 
 import { useScreenPx } from '../../hooks/useScreenPx';
@@ -46,16 +47,16 @@ export default function TabRootHeader({
         <View style={{ flex: 1, minWidth: 0 }}>
           {leading ?? (
             <>
-              <Text
+              <PartnerText
                 style={{
                   fontSize: px(28),
                   fontWeight: typography.weights.extrabold,
                   color: colors.dark,
                 }}>
                 {title}
-              </Text>
+              </PartnerText>
               {subtitle ? (
-                <Text
+                <PartnerText
                   style={{
                     marginTop: px(4),
                     fontSize: px(13),
@@ -63,7 +64,7 @@ export default function TabRootHeader({
                     lineHeight: px(18),
                   }}>
                   {subtitle}
-                </Text>
+                </PartnerText>
               ) : null}
             </>
           )}
@@ -80,14 +81,14 @@ export default function TabRootHeader({
                 { width: px(40), height: px(40), borderRadius: px(20) },
               ]}>
               {resolvedAvatarLabel ? (
-                <Text
+                <PartnerText
                   style={{
                     fontSize: px(15),
                     fontWeight: typography.weights.bold,
                     color: colors.dark,
                   }}>
                   {resolvedAvatarLabel}
-                </Text>
+                </PartnerText>
               ) : (
                 <UserRound size={px(18)} color={colors.primary} strokeWidth={2} />
               )}

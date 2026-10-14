@@ -1,13 +1,6 @@
+import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -37,6 +30,7 @@ import { usePartnerOnboardingStore } from '../../store/partnerOnboardingStore';
 import { useDriverProfileQuery } from '../../services/driver/useDriverQueries';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import { UI_PREVIEW_MODE, switchMockRole } from '../../config/uiPreviewMode';
+import { usePartnerPayoutStore } from '../../store/partnerPayoutStore';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
 import { buildDriverVerification } from '../../utils/driverVerification';
@@ -68,6 +62,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
   const [locationSheetVisible, setLocationSheetVisible] = useState(false);
   const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
   const [selectedLang, setSelectedLang] = useState('en');
+  const avatarUri = usePartnerPayoutStore(state => state.avatarUri);
 
   const unreadNotifs = notifData?.unreadCount ?? 0;
   const driverVerification = buildDriverVerification(driverProfile);
@@ -119,7 +114,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
       {/* Header Pad */}
       <View style={[styles.headerPad, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.headerTitle}>Profile</Text>
+        <PartnerText style={styles.headerTitle}>Profile</PartnerText>
       </View>
 
       <ScrollView
@@ -131,87 +126,101 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarWrapper}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitials}>
-                {displayName
-                  .split(' ')
-                  .map(n => n[0])
-                  .join('')
-                  .slice(0, 2)
-                  .toUpperCase() || 'OS'}
-              </Text>
+          <View style={styles.profileTopRow}>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarCircle}>
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                ) : (
+                  <PartnerText style={styles.avatarInitials}>
+                    {displayName
+                      .split(' ')
+                      .map(n => n[0])
+                      .join('')
+                      .slice(0, 2)
+                      .toUpperCase() || 'OS'}
+                  </PartnerText>
+                )}
+              </View>
             </View>
-            <Pressable
-              style={styles.editAvatarBadge}
-              onPress={() => navigation.navigate('PartnerEditProfile')}>
-              <Edit2 size={12} color={driverColors.ink} strokeWidth={2.4} />
-            </Pressable>
+
+            <View style={styles.profileInfoCol}>
+              <View style={styles.nameRow}>
+                <PartnerText style={styles.profileName} numberOfLines={1}>
+                  {displayName}
+                </PartnerText>
+                <Pressable
+                  hitSlop={8}
+                  style={styles.editBtnPill}
+                  onPress={() => navigation.navigate('PartnerEditProfile')}>
+                  <Edit2 size={11} color="#92400E" strokeWidth={2.4} />
+                  <PartnerText style={styles.editBtnText}>Edit</PartnerText>
+                </Pressable>
+              </View>
+
+              <View style={styles.roleRow}>
+                <View style={styles.rolePill}>
+                  <PartnerText style={styles.roleText}>{roleLabel}</PartnerText>
+                </View>
+                <View style={accountApproved ? styles.verifiedPill : styles.reviewPill}>
+                  {accountApproved ? (
+                    <CheckCircle size={11} color={driverColors.green} strokeWidth={2.4} />
+                  ) : (
+                    <AlertCircle size={11} color={driverColors.amberText} strokeWidth={2.4} />
+                  )}
+                  <PartnerText style={accountApproved ? styles.verifiedText : styles.reviewText}>
+                    {accountStatusLabel}
+                  </PartnerText>
+                </View>
+              </View>
+
+              <PartnerText style={styles.partnerId}>{partnerCode}</PartnerText>
+            </View>
           </View>
 
-          <Text style={styles.profileName}>{displayName}</Text>
-
-          <View style={styles.roleRow}>
-            <View style={styles.rolePill}>
-              <Text style={styles.roleText}>{roleLabel}</Text>
-            </View>
-            <View style={accountApproved ? styles.verifiedPill : styles.reviewPill}>
-              {accountApproved ? (
-                <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
-              ) : (
-                <AlertCircle size={12} color={driverColors.amberText} strokeWidth={2.4} />
-              )}
-              <Text style={accountApproved ? styles.verifiedText : styles.reviewText}>
-                {accountStatusLabel}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={styles.partnerId}>{partnerCode}</Text>
-
-          {/* Only show values that come from the profile; do not invent driver KPIs. */}
+          {/* Metric Bar */}
           {!isVendor ? (
             <View style={styles.metricRow}>
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue}>{accountStatusLabel}</Text>
-                <Text style={styles.metricSubtitle}>Account status</Text>
+                <PartnerText style={styles.metricValue}>{accountStatusLabel}</PartnerText>
+                <PartnerText style={styles.metricSubtitle}>Account</PartnerText>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue} numberOfLines={1}>
-                  {driverProfile?.driverProfile?.driverType || '—'}
-                </Text>
-                <Text style={styles.metricSubtitle}>Driver type</Text>
+                <PartnerText style={styles.metricValue} numberOfLines={1}>
+                  {driverProfile?.driverProfile?.driverType || 'Tow Truck'}
+                </PartnerText>
+                <PartnerText style={styles.metricSubtitle}>Driver type</PartnerText>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue} numberOfLines={1}>
-                  {driverProfile?.driverProfile?.city || '—'}
-                </Text>
-                <Text style={styles.metricSubtitle}>Operating city</Text>
+                <PartnerText style={styles.metricValue} numberOfLines={1}>
+                  {driverProfile?.driverProfile?.city || 'Bhubaneswar'}
+                </PartnerText>
+                <PartnerText style={styles.metricSubtitle}>City</PartnerText>
               </View>
             </View>
           ) : (
             <View style={styles.metricRow}>
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue}>{vendor?.status ? 'Active' : 'Approved'}</Text>
-                <Text style={styles.metricSubtitle}>Fleet Status</Text>
+                <PartnerText style={styles.metricValue}>{vendor?.status ? 'Active' : 'Approved'}</PartnerText>
+                <PartnerText style={styles.metricSubtitle}>Fleet Status</PartnerText>
               </View>
               <View style={styles.metricDivider} />
               <View style={styles.metricCol}>
-                <Text style={styles.metricValue}>Towing</Text>
-                <Text style={styles.metricSubtitle}>Business Type</Text>
+                <PartnerText style={styles.metricValue}>Towing</PartnerText>
+                <PartnerText style={styles.metricSubtitle}>Business Type</PartnerText>
               </View>
             </View>
           )}
         </View>
 
         {/* Section 1: Account Operations & Fleet */}
-        <Text style={styles.sectionHeader}>{isVendor ? 'Vendor Operations' : 'Account & Vehicle'}</Text>
+        <PartnerText style={styles.sectionHeader}>{isVendor ? 'Vendor Operations' : 'Account & Vehicle'}</PartnerText>
         <View style={styles.menuCard}>
           {!isVendor ? (
             <>
@@ -222,8 +231,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <User size={18} color="#0284C7" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Personal Information</Text>
-                  <Text style={styles.menuSubtitle}>View and edit your details</Text>
+                  <PartnerText style={styles.menuTitle}>Personal Information</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>View and edit your details</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -237,12 +246,12 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Truck size={18} color="#EA580C" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Vehicle Information</Text>
-                  <Text style={styles.menuSubtitle}>
+                  <PartnerText style={styles.menuTitle}>Vehicle Information</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>
                     {driverProfile?.driverProfile?.vehicleRegistration ||
                       driverProfile?.driverProfile?.driverType ||
                       'Vehicle details not added'}
-                  </Text>
+                  </PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -256,12 +265,12 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <FileText size={18} color="#059669" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Documents</Text>
-                  <Text style={styles.menuSubtitle}>
+                  <PartnerText style={styles.menuTitle}>Documents</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>
                     {driverDocuments.length > 0
                       ? `${verifiedDriverDocuments}/${driverDocuments.length} verified`
                       : 'Verification status unavailable'}
-                  </Text>
+                  </PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -275,8 +284,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <CreditCard size={18} color="#7C3AED" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Bank & Payouts</Text>
-                  <Text style={styles.menuSubtitle}>Add or manage bank details</Text>
+                  <PartnerText style={styles.menuTitle}>Bank & Payouts</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Add or manage bank details</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -290,8 +299,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <DollarSign size={18} color="#D97706" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Earnings & History</Text>
-                  <Text style={styles.menuSubtitle}>Track earnings and payouts</Text>
+                  <PartnerText style={styles.menuTitle}>Earnings & History</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Track earnings and payouts</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -305,14 +314,14 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Bell size={18} color="#2563EB" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Notifications</Text>
-                  <Text style={styles.menuSubtitle}>
+                  <PartnerText style={styles.menuTitle}>Notifications</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>
                     {unreadNotifs > 0 ? `${unreadNotifs} unread updates` : 'Job requests and alerts'}
-                  </Text>
+                  </PartnerText>
                 </View>
                 {unreadNotifs > 0 ? (
                   <View style={styles.unreadCounter}>
-                    <Text style={styles.unreadCounterText}>{unreadNotifs}</Text>
+                    <PartnerText style={styles.unreadCounterText}>{unreadNotifs}</PartnerText>
                   </View>
                 ) : null}
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
@@ -328,8 +337,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Users size={18} color="#0284C7" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Vendor Drivers</Text>
-                  <Text style={styles.menuSubtitle}>Manage and assign drivers</Text>
+                  <PartnerText style={styles.menuTitle}>Vendor Drivers</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Manage and assign drivers</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -343,8 +352,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Truck size={18} color="#EA580C" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Vendor Vehicles</Text>
-                  <Text style={styles.menuSubtitle}>Manage tow trucks & fleet</Text>
+                  <PartnerText style={styles.menuTitle}>Vendor Vehicles</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Manage tow trucks & fleet</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -358,8 +367,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Building size={18} color="#059669" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Verification Status</Text>
-                  <Text style={styles.menuSubtitle}>Business compliance & docs</Text>
+                  <PartnerText style={styles.menuTitle}>Verification Status</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Business compliance & docs</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -373,8 +382,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <CreditCard size={18} color="#7C3AED" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Bank & Payouts</Text>
-                  <Text style={styles.menuSubtitle}>Manage business payouts</Text>
+                  <PartnerText style={styles.menuTitle}>Bank & Payouts</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Manage business payouts</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -388,8 +397,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <Bell size={18} color="#2563EB" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <Text style={styles.menuTitle}>Notifications</Text>
-                  <Text style={styles.menuSubtitle}>Leads and system notices</Text>
+                  <PartnerText style={styles.menuTitle}>Notifications</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Leads and system notices</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>
@@ -398,7 +407,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         </View>
 
         {/* Section 2: Preferences (Location, Language, Notifications - moved directly into Profile) */}
-        <Text style={styles.sectionHeader}>Preferences</Text>
+        <PartnerText style={styles.sectionHeader}>Preferences</PartnerText>
         <View style={styles.menuCard}>
           <Pressable
             style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
@@ -407,8 +416,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
               <MapPin size={18} color="#059669" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTextCol}>
-              <Text style={styles.menuTitle}>Location Settings</Text>
-              <Text style={styles.menuSubtitle}>Manage GPS & location permissions</Text>
+              <PartnerText style={styles.menuTitle}>Location Settings</PartnerText>
+              <PartnerText style={styles.menuSubtitle}>Manage GPS & location permissions</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -422,8 +431,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
               <Globe size={18} color="#2563EB" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTextCol}>
-              <Text style={styles.menuTitle}>Language</Text>
-              <Text style={styles.menuSubtitle}>{languageDisplayName}</Text>
+              <PartnerText style={styles.menuTitle}>Language</PartnerText>
+              <PartnerText style={styles.menuSubtitle}>{languageDisplayName}</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -437,15 +446,15 @@ export default function PartnerAccountScreen({ navigation }: Props) {
               <Bell size={18} color="#EA580C" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTextCol}>
-              <Text style={styles.menuTitle}>Notification Preferences</Text>
-              <Text style={styles.menuSubtitle}>Sound alerts, trip requests & reminders</Text>
+              <PartnerText style={styles.menuTitle}>Notification Preferences</PartnerText>
+              <PartnerText style={styles.menuSubtitle}>Sound alerts, trip requests & reminders</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
         </View>
 
         {/* Section 3: Support & About */}
-        <Text style={styles.sectionHeader}>Support & About</Text>
+        <PartnerText style={styles.sectionHeader}>Support & About</PartnerText>
         <View style={styles.menuCard}>
           <Pressable
             style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
@@ -454,8 +463,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
               <HelpCircle size={18} color="#DC2626" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTextCol}>
-              <Text style={styles.menuTitle}>Help & Support</Text>
-              <Text style={styles.menuSubtitle}>FAQs and contact support</Text>
+              <PartnerText style={styles.menuTitle}>Help & Support</PartnerText>
+              <PartnerText style={styles.menuSubtitle}>FAQs and contact support</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -467,8 +476,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
               <Info size={18} color="#64748B" strokeWidth={2.2} />
             </View>
             <View style={styles.menuTextCol}>
-              <Text style={styles.menuTitle}>App Version</Text>
-              <Text style={styles.menuSubtitle}>RACE Partner v1.0.0 (Production Build)</Text>
+              <PartnerText style={styles.menuTitle}>App Version</PartnerText>
+              <PartnerText style={styles.menuSubtitle}>RACE Partner v1.0.0 (Production Build)</PartnerText>
             </View>
           </View>
         </View>
@@ -481,9 +490,9 @@ export default function PartnerAccountScreen({ navigation }: Props) {
               getPressableFeedback(pressed),
             ]}
             onPress={() => void switchMockRole(dispatch, isDriver ? 'vendor' : 'driver')}>
-            <Text style={styles.switchRoleText}>
+            <PartnerText style={styles.switchRoleText}>
               {isDriver ? '⚡ Switch to Vendor Preview' : '⚡ Switch to Driver Preview'}
-            </Text>
+            </PartnerText>
           </Pressable>
         ) : null}
 
@@ -495,7 +504,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           ]}
           onPress={() => setLogoutVisible(true)}>
           <LogOut size={16} color={driverColors.red} strokeWidth={2.4} />
-          <Text style={styles.logoutText}>Log out</Text>
+          <PartnerText style={styles.logoutText}>Log out</PartnerText>
         </Pressable>
       </ScrollView>
 
@@ -554,109 +563,138 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     backgroundColor: driverColors.white,
-    borderRadius: driverRadius.card,
-    padding: 20,
+    borderRadius: 18,
+    padding: 14,
     borderWidth: 1,
-    borderColor: driverColors.hairline,
-    alignItems: 'center',
+    borderColor: '#F1F5F9',
     marginBottom: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    elevation: 0.5,
+  },
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   avatarWrapper: {
     position: 'relative',
-    marginBottom: 10,
+    marginRight: 12,
   },
   avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: driverColors.creamRow,
-    borderWidth: 2,
-    borderColor: driverColors.amberTile,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
   },
   avatarInitials: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
-    color: driverColors.ink,
+    color: '#92400E',
   },
-  editAvatarBadge: {
-    position: 'absolute',
-    right: 0,
-    bottom: 2,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: driverColors.white,
-    borderWidth: 1,
-    borderColor: '#D0D4DC',
+  profileInfoCol: {
+    flex: 1,
+  },
+  nameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   profileName: {
-    fontSize: 18,
+    fontSize: 16.5,
     fontWeight: '800',
     color: driverColors.ink,
+    flex: 1,
+  },
+  editBtnPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    marginLeft: 8,
+  },
+  editBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#92400E',
+    marginLeft: 3,
   },
   roleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
-    marginBottom: 4,
+    gap: 6,
+    marginTop: 3,
+    marginBottom: 3,
   },
   rolePill: {
     backgroundColor: driverColors.light,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 2.5,
     borderRadius: driverRadius.pill,
   },
   roleText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
     color: driverColors.grey,
   },
   verifiedPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3.5,
     backgroundColor: driverColors.greenPill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
     borderRadius: driverRadius.pill,
   },
   verifiedText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: driverColors.green,
   },
   reviewPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3.5,
     backgroundColor: driverColors.amberTile,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
     borderRadius: driverRadius.pill,
   },
   reviewText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '700',
     color: driverColors.amberText,
   },
   partnerId: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '600',
     color: driverColors.greySoft,
-    marginTop: 2,
-    marginBottom: 16,
   },
   metricRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: driverColors.light,
-    borderRadius: driverRadius.innerCard,
-    paddingVertical: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    paddingVertical: 8,
     paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     width: '100%',
   },
   metricCol: {
@@ -669,18 +707,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metricValue: {
-    fontSize: 15,
+    fontSize: 13.5,
     fontWeight: '800',
     color: driverColors.ink,
   },
   metricSubtitle: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: driverColors.grey,
-    marginTop: 2,
+    marginTop: 1,
   },
   metricDivider: {
     width: 1,
-    height: 24,
+    height: 20,
     backgroundColor: '#E2E4E8',
   },
   sectionHeader: {
@@ -695,16 +733,16 @@ const styles = StyleSheet.create({
   },
   menuCard: {
     backgroundColor: driverColors.white,
-    borderRadius: driverRadius.card,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
     marginBottom: 16,
     overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.02,
+    shadowRadius: 3,
+    elevation: 0.5,
   },
   menuRow: {
     flexDirection: 'row',

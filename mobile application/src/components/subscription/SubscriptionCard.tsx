@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import PrimaryButton from '../ui/PrimaryButton';
@@ -24,14 +25,14 @@ export default function SubscriptionCard({ plan, selected, onSelect }: Subscript
       ]}>
       {plan.popular ? (
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>MOST POPULAR</Text>
+          <PartnerText style={styles.badgeText}>MOST POPULAR</PartnerText>
         </View>
       ) : null}
-      <Text style={[styles.name, isPremium && styles.namePremium]}>{plan.name}</Text>
-      <Text style={[styles.price, isPremium && styles.pricePremium]}>
+      <PartnerText style={[styles.name, isPremium && styles.namePremium]}>{plan.name}</PartnerText>
+      <PartnerText style={[styles.price, isPremium && styles.pricePremium]}>
         ₹{plan.price}
-        <Text style={styles.period}>/{plan.period === 'yearly' ? 'year' : 'month'}</Text>
-      </Text>
+        <PartnerText style={styles.period}>/{plan.period === 'yearly' ? 'year' : 'month'}</PartnerText>
+      </PartnerText>
       <View style={styles.features}>
         {plan.features.map((feature) => (
           <View key={feature.label} style={styles.featureRow}>
@@ -40,14 +41,14 @@ export default function SubscriptionCard({ plan, selected, onSelect }: Subscript
               size={16}
               color={feature.included ? (isPremium ? colors.textLight : colors.primary) : colors.textMuted}
             />
-            <Text
+            <PartnerText
               style={[
                 styles.featureText,
                 !feature.included && styles.featureMuted,
                 isPremium && styles.featureTextPremium,
               ]}>
               {feature.label}
-            </Text>
+            </PartnerText>
           </View>
         ))}
       </View>

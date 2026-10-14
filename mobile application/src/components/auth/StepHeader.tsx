@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -36,12 +37,12 @@ export default function StepHeader({
         ) : (
           <View style={styles.backBtn} />
         )}
-        <Text style={[styles.stepText, { fontSize: px(14) }]}>
+        <PartnerText style={[styles.stepText, { fontSize: px(14) }]}>
           Step {step} of {totalSteps}
-        </Text>
+        </PartnerText>
         {showSkip && onSkip ? (
           <Pressable onPress={onSkip} hitSlop={12}>
-            <Text style={[styles.skip, { fontSize: px(14) }]}>Skip</Text>
+            <PartnerText style={[styles.skip, { fontSize: px(14) }]}>Skip</PartnerText>
           </Pressable>
         ) : (
           <View style={styles.skipPlaceholder} />

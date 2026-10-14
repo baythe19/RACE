@@ -1,11 +1,6 @@
+import { PartnerText } from '../PartnerText';
 import React from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 
@@ -36,8 +31,8 @@ export default function PartnerSuccessDialog({
             <Check size={30} color={driverColors.green} strokeWidth={2.8} />
           </View>
 
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{message}</Text>
+          <PartnerText style={styles.title}>{title}</PartnerText>
+          <PartnerText style={styles.subtitle}>{message}</PartnerText>
 
           <Pressable
             style={({ pressed }) => [
@@ -45,7 +40,7 @@ export default function PartnerSuccessDialog({
               getPressableFeedback(pressed),
             ]}
             onPress={onDismiss}>
-            <Text style={styles.primaryButtonText}>{buttonLabel}</Text>
+            <PartnerText style={styles.primaryButtonText}>{buttonLabel}</PartnerText>
           </Pressable>
         </Pressable>
       </Pressable>

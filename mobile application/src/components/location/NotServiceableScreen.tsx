@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MapPin } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -68,56 +59,56 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.illustration}>🚗</Text>
+          <PartnerText style={styles.illustration}>🚗</PartnerText>
 
-          <Text style={styles.title}>We're not in your area yet</Text>
-          <Text style={styles.subtitle}>
+          <PartnerText style={styles.title}>We're not in your area yet</PartnerText>
+          <PartnerText style={styles.subtitle}>
             RACE is currently available in limited cities. Change your location or leave your email
             to get notified.
-          </Text>
+          </PartnerText>
 
           <View style={[styles.card, shadows.card]}>
-            <Text style={styles.cardTitle}>RACE is currently available in:</Text>
+            <PartnerText style={styles.cardTitle}>RACE is currently available in:</PartnerText>
             {availableCities.map(city => (
-              <Text key={city.name} style={styles.cityLine}>
+              <PartnerText key={city.name} style={styles.cityLine}>
                 • {city.displayName}, {city.state}
-              </Text>
+              </PartnerText>
             ))}
             {comingSoonCities.map(city => (
-              <Text key={city.name} style={[styles.cityLine, styles.comingSoon]}>
+              <PartnerText key={city.name} style={[styles.cityLine, styles.comingSoon]}>
                 • {city.displayName} (Coming Soon)
-              </Text>
+              </PartnerText>
             ))}
           </View>
 
           {selectedLocation ? (
             <View style={styles.selectedBox}>
-              <Text style={styles.selectedLabel}>Selected location</Text>
+              <PartnerText style={styles.selectedLabel}>Selected location</PartnerText>
               <View style={styles.selectedRow}>
                 <MapPin size={16} color={colors.primary} strokeWidth={2.2} />
-                <Text style={styles.selectedAddress} numberOfLines={3}>
+                <PartnerText style={styles.selectedAddress} numberOfLines={3}>
                   {formatLocationDisplay({
                     address: selectedLocation.address,
                     displayLabel: selectedLocation.displayName,
                   })}
-                </Text>
+                </PartnerText>
               </View>
             </View>
           ) : null}
 
           <Pressable style={styles.changeBtn} onPress={onChangeLocation}>
-            <Text style={styles.changeBtnText}>Change Location</Text>
+            <PartnerText style={styles.changeBtnText}>Change Location</PartnerText>
           </Pressable>
 
           <View style={styles.notifySection}>
-            <Text style={styles.notifyTitle}>Notify me when RACE launches in my city</Text>
+            <PartnerText style={styles.notifyTitle}>Notify me when RACE launches in my city</PartnerText>
             {submitted ? (
               <View style={styles.thanksBox}>
-                <Text style={styles.thanksText}>We'll notify you!</Text>
+                <PartnerText style={styles.thanksText}>We'll notify you!</PartnerText>
               </View>
             ) : (
               <View style={styles.notifyRow}>
-                <TextInput
+                <PartnerTextInput
                   value={email}
                   onChangeText={setEmail}
                   placeholder="Enter email"
@@ -131,7 +122,7 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
                   style={[styles.notifyBtn, isSaving && { opacity: 0.7 }]}
                   onPress={() => void handleNotify()}
                   disabled={isSaving}>
-                  <Text style={styles.notifyBtnText}>{isSaving ? '...' : 'Submit'}</Text>
+                  <PartnerText style={styles.notifyBtnText}>{isSaving ? '...' : 'Submit'}</PartnerText>
                 </Pressable>
               </View>
             )}

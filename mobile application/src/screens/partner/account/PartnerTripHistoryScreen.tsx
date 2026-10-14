@@ -1,10 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Truck, ChevronRight } from 'lucide-react-native';
 
@@ -66,13 +62,13 @@ export default function PartnerTripHistoryScreen({ navigation }: Props) {
               key={tab}
               style={[styles.tabButton, isSelected && styles.tabButtonActive]}
               onPress={() => setActiveTab(tab)}>
-              <Text
+              <PartnerText
                 style={[
                   styles.tabText,
                   isSelected && styles.tabTextActive,
                 ]}>
                 {tab}
-              </Text>
+              </PartnerText>
             </Pressable>
           );
         })}
@@ -105,24 +101,24 @@ export default function PartnerTripHistoryScreen({ navigation }: Props) {
               </View>
 
               <View style={styles.metaCol}>
-                <Text style={styles.bookingNumber}>{trip.bookingNumber}</Text>
-                <Text style={styles.timeText}>{trip.time}</Text>
+                <PartnerText style={styles.bookingNumber}>{trip.bookingNumber}</PartnerText>
+                <PartnerText style={styles.timeText}>{trip.time}</PartnerText>
               </View>
 
               <View style={styles.fareCol}>
-                <Text style={styles.fareText}>{trip.fare}</Text>
+                <PartnerText style={styles.fareText}>{trip.fare}</PartnerText>
                 <View
                   style={[
                     styles.statusPill,
                     isCancelled ? styles.statusPillRed : styles.statusPillGreen,
                   ]}>
-                  <Text
+                  <PartnerText
                     style={[
                       styles.statusText,
                       isCancelled ? styles.statusTextRed : styles.statusTextGreen,
                     ]}>
                     {trip.status}
-                  </Text>
+                  </PartnerText>
                 </View>
               </View>
 

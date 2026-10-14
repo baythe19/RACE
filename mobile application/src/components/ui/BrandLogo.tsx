@@ -3,7 +3,6 @@ import {
   Image,
   type ImageStyle,
   StyleSheet,
-  Text,
   View,
   type StyleProp,
   type ViewStyle,

@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   Car,
   Check,
@@ -117,10 +108,10 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
             <Truck size={px(18)} color="#D97706" strokeWidth={2.4} />
           </View>
           <View style={styles.headerTextWrap}>
-            <Text style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Vehicle information</Text>
-            <Text style={[styles.cardHeaderSubtitle, { fontSize: px(12) }]}>
+            <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(15) }]}>Vehicle information</PartnerText>
+            <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(12) }]}>
               Tell us about your vehicle.
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
@@ -128,9 +119,9 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
 
         {/* Vehicle Type * (Single Row of 4 Compact Cards Side-by-Side) */}
         <View style={[styles.inputGroup, { marginBottom: px(16) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5), marginBottom: px(8) }]}>
-            Vehicle type <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12.5), marginBottom: px(8) }]}>
+            Vehicle type <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
 
           <View style={styles.vehicleRow}>
             {DRIVER_VEHICLE_TYPE_CARDS.map((item) => {
@@ -152,7 +143,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                       selected={isSelected}
                     />
                   </View>
-                  <Text
+                  <PartnerText
                     numberOfLines={1}
                     style={[
                       styles.vehicleCardLabel,
@@ -160,7 +151,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                       isSelected ? styles.vehicleCardLabelSelected : styles.vehicleCardLabelIdle,
                     ]}>
                     {item.label}
-                  </Text>
+                  </PartnerText>
                 </Pressable>
               );
             })}
@@ -170,18 +161,18 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
         {/* Vehicle Registration Number */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
           <View style={styles.inputLabelRow}>
-            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-              Vehicle registration number <Text style={styles.requiredAsterisk}>*</Text>
-            </Text>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Vehicle registration number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
             {driverVehicle.vehicleNumber.length >= 8 ? (
-              <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
                 {driverVehicle.vehicleNumber.length}/14
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <CreditCard size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, { fontSize: px(14), fontWeight: '600' }]}
               placeholder="e.g. OD 02 AB 1234"
               placeholderTextColor="#9CA3AF"
@@ -201,18 +192,18 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
         {/* Driving Licence Number */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
           <View style={styles.inputLabelRow}>
-            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-              Driving licence number <Text style={styles.requiredAsterisk}>*</Text>
-            </Text>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Driving licence number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
             {driverVehicle.licenseNumber.length >= 12 ? (
-              <Text style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
                 {driverVehicle.licenseNumber.length}/18
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <FileText size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, { fontSize: px(14), fontWeight: '600' }]}
               placeholder="Enter Driving License (DL) number"
               placeholderTextColor="#9CA3AF"
@@ -231,9 +222,9 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
 
         {/* Vehicle Registered To (Clean Radio Buttons - No Bulky Cards) */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-          <Text style={[styles.inputLabel, { fontSize: px(12.5), marginBottom: px(6) }]}>
-            Vehicle registered to <Text style={styles.requiredAsterisk}>*</Text>
-          </Text>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12.5), marginBottom: px(6) }]}>
+            Vehicle registered to <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
 
           <View style={styles.radioGroup}>
             {/* Option 1: Me */}
@@ -247,9 +238,9 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                 ]}>
                 {registeredTo === 'me' ? <View style={styles.radioDot} /> : null}
               </View>
-              <Text style={[styles.radioLabel, { fontSize: px(13) }]}>
+              <PartnerText style={[styles.radioLabel, { fontSize: px(13) }]}>
                 Me / I own this vehicle
-              </Text>
+              </PartnerText>
             </Pressable>
 
             {/* Option 2: Someone else */}
@@ -269,12 +260,12 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                 {registeredTo === 'someone_else' ? <View style={styles.radioDot} /> : null}
               </View>
               <View style={styles.radioTextWrap}>
-                <Text style={[styles.radioLabel, { fontSize: px(13) }]}>
+                <PartnerText style={[styles.radioLabel, { fontSize: px(13) }]}>
                   Someone else
-                </Text>
-                <Text style={[styles.radioSubLabel, { fontSize: px(11) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.radioSubLabel, { fontSize: px(11) }]}>
                   Owner authorisation may be needed
-                </Text>
+                </PartnerText>
               </View>
             </Pressable>
           </View>
@@ -283,24 +274,24 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
         {/* Vehicle Model (Custom Input or Dropdown) */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Text style={[styles.inputLabel, { fontSize: px(12.5) }]}>
-              Vehicle model <Text style={styles.optionalText}>(Optional)</Text>
-            </Text>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12.5) }]}>
+              Vehicle model <PartnerText style={styles.optionalText}>(Optional)</PartnerText>
+            </PartnerText>
             <Pressable
               hitSlop={8}
               onPress={() => {
                 setCustomModelInput(driverVehicle.vehicleModel || '');
                 setModelModalVisible(true);
               }}>
-              <Text style={{ color: '#D97706', fontWeight: '700', fontSize: px(11.5) }}>
+              <PartnerText style={{ color: '#D97706', fontWeight: '700', fontSize: px(11.5) }}>
                 Choose from list ▾
-              </Text>
+              </PartnerText>
             </Pressable>
           </View>
 
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(12) }]}>
             <Car size={px(17)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <TextInput
+            <PartnerTextInput
               style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
               placeholder="Type custom model or choose from list"
               placeholderTextColor="#9CA3AF"
@@ -329,9 +320,9 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
           <View style={[styles.noticeIconCircle, { width: px(22), height: px(22), borderRadius: px(11) }]}>
             <Info size={px(13)} color="#FFFFFF" strokeWidth={2.4} />
           </View>
-          <Text style={[styles.noticeText, { fontSize: px(11.5) }]}>
+          <PartnerText style={[styles.noticeText, { fontSize: px(11.5) }]}>
             RC and insurance details will be checked from uploaded documents.
-          </Text>
+          </PartnerText>
         </View>
       </View>
 
@@ -340,7 +331,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
         <Pressable style={styles.modalOverlay} onPress={() => setModelModalVisible(false)}>
           <Pressable style={[styles.modalSheet, { paddingBottom: px(28) }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { fontSize: px(16) }]}>Select Vehicle Model</Text>
+              <PartnerText style={[styles.sheetTitle, { fontSize: px(16) }]}>Select Vehicle Model</PartnerText>
               <Pressable hitSlop={12} onPress={() => setModelModalVisible(false)}>
                 <X size={px(20)} color="#4B5563" />
               </Pressable>
@@ -349,7 +340,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
             {/* Custom Input */}
             <View style={[styles.modalSearchContainer, { height: px(44), marginBottom: px(12) }]}>
               <Car size={px(18)} color="#9CA3AF" style={{ marginRight: px(8) }} />
-              <TextInput
+              <PartnerTextInput
                 style={[styles.modalSearchInput, { fontSize: px(14) }]}
                 placeholder="Or type custom model..."
                 placeholderTextColor="#9CA3AF"
@@ -366,7 +357,7 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                     setDriverVehicle({ vehicleModel: customModelInput });
                     setModelModalVisible(false);
                   }}>
-                  <Text style={styles.applyText}>Save</Text>
+                  <PartnerText style={styles.applyText}>Save</PartnerText>
                 </Pressable>
               ) : null}
             </View>
@@ -391,14 +382,14 @@ export default function DriverVehicleInfoScreen({ navigation, route }: Props) {
                       isSelected && styles.modelRowSelected,
                       pressed && styles.pressed,
                     ]}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.modelText,
                         { fontSize: px(13.5) },
                         isSelected && styles.modelTextSelected,
                       ]}>
                       {m}
-                    </Text>
+                    </PartnerText>
                     {isSelected ? <Check size={px(18)} color="#D97706" strokeWidth={2.5} /> : null}
                   </Pressable>
                 );

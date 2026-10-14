@@ -1,17 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -282,12 +271,12 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             ]}>
             {/* Title & Subtitle — Left Aligned, Clean & Meaningful */}
             <View style={[styles.titleSection, { marginTop: px(18) }]}>
-              <Text style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
+              <PartnerText style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
                 Sign in to RACE
-              </Text>
-              <Text style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
+              </PartnerText>
+              <PartnerText style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
                 We'll verify your partner account with a secure OTP.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Pre-Selected Role Card / Badge */}
@@ -323,9 +312,9 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                 )}
               </View>
 
-              <Text style={[styles.roleBadgeTitle, { fontSize: px(14.5) }]} numberOfLines={1}>
+              <PartnerText style={[styles.roleBadgeTitle, { fontSize: px(14.5) }]} numberOfLines={1}>
                 {roleDisplayTitle}
-              </Text>
+              </PartnerText>
 
               {/* Vertical divider */}
               <View style={[styles.roleDivider, { height: px(18), marginHorizontal: px(8) }]} />
@@ -335,15 +324,15 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                 onPress={handleChangeRole}
                 hitSlop={8}
                 style={({ pressed }) => [pressed && styles.pressed]}>
-                <Text style={[styles.changeRoleText, { fontSize: px(13.5) }]}>
+                <PartnerText style={[styles.changeRoleText, { fontSize: px(13.5) }]}>
                   {roleChangeLabel}
-                </Text>
+                </PartnerText>
               </Pressable>
             </View>
 
             {/* Mobile Number Label & Inputs */}
             <View style={[styles.inputSection, { marginTop: px(26) }]}>
-              <Text style={[styles.fieldLabel, { fontSize: px(14) }]}>Mobile number</Text>
+              <PartnerText style={[styles.fieldLabel, { fontSize: px(14) }]}>Mobile number</PartnerText>
 
               <View style={[styles.phoneRow, { marginTop: px(8), gap: px(10) }]}>
                 {/* Country Code Picker Box */}
@@ -356,8 +345,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                       paddingHorizontal: px(12),
                     },
                   ]}>
-                  <Text style={[styles.flagEmoji, { fontSize: px(16) }]}>🇮🇳</Text>
-                  <Text style={[styles.countryCode, { fontSize: px(15) }]}>+91</Text>
+                  <PartnerText style={[styles.flagEmoji, { fontSize: px(16) }]}>🇮🇳</PartnerText>
+                  <PartnerText style={[styles.countryCode, { fontSize: px(15) }]}>+91</PartnerText>
                   <ChevronDown size={px(16)} color="#6B7280" strokeWidth={2.4} />
                 </View>
 
@@ -372,7 +361,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                       borderWidth: focused ? 1.8 : 1.2,
                     },
                   ]}>
-                  <TextInput
+                  <PartnerTextInput
                     value={mobileNumber}
                     onChangeText={(text) => {
                       setMobileNumber(text.replace(/\D/g, '').slice(0, 10));
@@ -409,9 +398,9 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
               ]}
               accessibilityRole="button"
               accessibilityLabel="Send OTP">
-              <Text style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
+              <PartnerText style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
                 {isSubmitting ? 'Sending OTP...' : 'Send OTP'}
-              </Text>
+              </PartnerText>
               <ArrowRight
                 size={px(20)}
                 color="#111827"
@@ -427,17 +416,17 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                   style={styles.devBtn}
                   onPress={() => void handleQuickMockLogin(isDriver ? 'driver' : 'vendor')}>
                   <Zap size={14} color="#D97706" />
-                  <Text style={styles.devBtnText}>
+                  <PartnerText style={styles.devBtnText}>
                     ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Dashboard (Mock)
-                  </Text>
+                  </PartnerText>
                 </Pressable>
                 <Pressable
                   style={styles.devBtn}
                   onPress={() => goToRegistration(isDriver ? 'driver' : 'vendor')}>
                   <Sparkles size={14} color="#D97706" />
-                  <Text style={styles.devBtnText}>
+                  <PartnerText style={styles.devBtnText}>
                     ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Registration Flow
-                  </Text>
+                  </PartnerText>
                 </Pressable>
               </View>
             ) : null}
@@ -445,9 +434,9 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             {/* Security Assurance with Word Wrapping */}
             <View style={[styles.securityNotice, { marginTop: px(16) }]}>
               <ShieldCheck size={px(18)} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />
-              <Text style={[styles.securityText, { fontSize: px(12.5) }]}>
+              <PartnerText style={[styles.securityText, { fontSize: px(12.5) }]}>
                 Your number is used to verify your partner account.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Partner Benefits Trust Card (Fills bottom void professionally) */}
@@ -457,8 +446,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                   <Zap size={px(16)} color="#D97706" strokeWidth={2.4} />
                 </View>
                 <View style={styles.trustTextCol}>
-                  <Text style={[styles.trustTitle, { fontSize: px(13.5) }]}>Instant Roadside Requests</Text>
-                  <Text style={[styles.trustSubtitle, { fontSize: px(12) }]}>Receive customer breakdowns in real-time</Text>
+                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>Instant Roadside Requests</PartnerText>
+                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>Receive customer breakdowns in real-time</PartnerText>
                 </View>
               </View>
 
@@ -469,8 +458,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                   <Wallet size={px(16)} color="#059669" strokeWidth={2.4} />
                 </View>
                 <View style={styles.trustTextCol}>
-                  <Text style={[styles.trustTitle, { fontSize: px(13.5) }]}>Guaranteed Fast Settlements</Text>
-                  <Text style={[styles.trustSubtitle, { fontSize: px(12) }]}>Direct deposits straight to your account</Text>
+                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>Guaranteed Fast Settlements</PartnerText>
+                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>Direct deposits straight to your account</PartnerText>
                 </View>
               </View>
             </View>
@@ -480,28 +469,28 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
             {/* Terms and Privacy Footer */}
             <View style={[styles.footerBlock, { marginTop: px(10) }]}>
-              <Text style={[styles.footerText, { fontSize: px(12) }]}>
+              <PartnerText style={[styles.footerText, { fontSize: px(12) }]}>
                 By continuing, you agree to our
-              </Text>
-              <Text style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
+              </PartnerText>
+              <PartnerText style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
                 Terms & Privacy Policy
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Discreet Dev Demo Mode (for offline QA testing) */}
             {(__DEV__ || UI_PREVIEW_MODE) && (
               <View style={[styles.demoRow, { marginTop: px(14) }]}>
-                <Text style={[styles.demoLabel, { fontSize: px(10) }]}>Quick Preview:</Text>
+                <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Quick Preview:</PartnerText>
                 <Pressable
                   onPress={() => void loginAsMockDriver(dispatch)}
                   style={styles.demoLink}>
-                  <Text style={styles.demoLinkText}>Driver</Text>
+                  <PartnerText style={styles.demoLinkText}>Driver</PartnerText>
                 </Pressable>
-                <Text style={styles.demoDivider}>•</Text>
+                <PartnerText style={styles.demoDivider}>•</PartnerText>
                 <Pressable
                   onPress={() => void loginAsMockVendor(dispatch)}
                   style={styles.demoLink}>
-                  <Text style={styles.demoLinkText}>Vendor</Text>
+                  <PartnerText style={styles.demoLinkText}>Vendor</PartnerText>
                 </Pressable>
               </View>
             )}

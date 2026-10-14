@@ -1,11 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Info, Pencil, ShieldCheck } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -297,13 +292,13 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
       bottomBar={
         <>
           <ShieldCheck size={18} color={colors.primary} strokeWidth={2.2} />
-          <Text style={styles.securityText}>
+          <PartnerText style={styles.securityText}>
             Your data is secure and encrypted{'\n'}We never share your information
-          </Text>
+          </PartnerText>
         </>
       }>
       <View style={styles.phoneRow}>
-        <Text style={styles.phoneText}>{formatPartnerPhone(mobileNumber)}</Text>
+        <PartnerText style={styles.phoneText}>{formatPartnerPhone(mobileNumber)}</PartnerText>
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={8}
@@ -335,34 +330,34 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         }}
       />
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <PartnerText style={styles.errorText}>{error}</PartnerText> : null}
 
-      <Text style={styles.timerText}>
-        Resend OTP in <Text style={styles.timerValue}>{formatTimer(secondsLeft)}</Text>
-      </Text>
+      <PartnerText style={styles.timerText}>
+        Resend OTP in <PartnerText style={styles.timerValue}>{formatTimer(secondsLeft)}</PartnerText>
+      </PartnerText>
 
       <Pressable
         disabled={secondsLeft > 0 || loading}
         onPress={() => void handleResend()}
         style={styles.resendRow}>
-        <Text style={styles.resendPrompt}>
+        <PartnerText style={styles.resendPrompt}>
           Didn't receive the code?{' '}
-          <Text
+          <PartnerText
             style={[
               styles.resendAction,
               (secondsLeft > 0 || loading) && styles.resendActionDisabled,
             ]}>
             Resend OTP
-          </Text>
-        </Text>
+          </PartnerText>
+        </PartnerText>
       </Pressable>
 
       <View style={styles.infoCard}>
         <Info size={18} color={colors.primary} strokeWidth={2.2} />
-        <Text style={styles.infoText}>
-          <Text style={styles.infoTitle}>Didn't get the code?</Text> Please check your SMS inbox
+        <PartnerText style={styles.infoText}>
+          <PartnerText style={styles.infoTitle}>Didn't get the code?</PartnerText> Please check your SMS inbox
           or spam folder.
-        </Text>
+        </PartnerText>
       </View>
 
       <Pressable
@@ -376,12 +371,12 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         {isVerifying ? (
           <View style={styles.buttonContent}>
             <ActivityIndicator size="small" color={colors.dark} />
-            <Text style={styles.primaryButtonLabel}>Verifying OTP...</Text>
+            <PartnerText style={styles.primaryButtonLabel}>Verifying OTP...</PartnerText>
           </View>
         ) : (
-          <Text style={styles.primaryButtonLabel}>
+          <PartnerText style={styles.primaryButtonLabel}>
             {verified ? 'Verified' : 'Verify & Continue'}
-          </Text>
+          </PartnerText>
         )}
       </Pressable>
     </PartnerScreenLayout>

@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { colors, typography } from '../../theme';
 
@@ -37,10 +38,10 @@ export default function AuthMethodTabs({ value, onChange, px }: Props) {
         marginBottom: px(20),
       }}>
       <Pressable style={tabStyle(value === 'sms')} onPress={() => onChange('sms')}>
-        <Text style={labelStyle(value === 'sms')}>Phone</Text>
+        <PartnerText style={labelStyle(value === 'sms')}>Phone</PartnerText>
       </Pressable>
       <Pressable style={tabStyle(value === 'email')} onPress={() => onChange('email')}>
-        <Text style={labelStyle(value === 'email')}>Email</Text>
+        <PartnerText style={labelStyle(value === 'email')}>Email</PartnerText>
       </Pressable>
     </View>
   );

@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import PrimaryButton from './PrimaryButton';
@@ -25,8 +26,8 @@ export default function EmptyState({
       <View style={styles.iconWrap}>
         <Ionicons name={icon} size={40} color={colors.primary} />
       </View>
-      <Text style={styles.title}>{title}</Text>
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      <PartnerText style={styles.title}>{title}</PartnerText>
+      {subtitle ? <PartnerText style={styles.subtitle}>{subtitle}</PartnerText> : null}
       {actionLabel && onAction ? (
         <View style={styles.action}>
           <PrimaryButton label={actionLabel} onPress={onAction} />

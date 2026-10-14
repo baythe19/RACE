@@ -1,12 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  StyleSheet,
-  Switch,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   User,
@@ -64,7 +58,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
       onBack={() => navigation.goBack()}>
       {/* Account Section */}
       <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>Account</Text>
+        <PartnerText style={styles.sectionHeader}>Account</PartnerText>
         <View style={styles.cardGroup}>
           <Pressable
             style={({ pressed }) => [styles.rowItem, getPressableFeedback(pressed)]}
@@ -73,8 +67,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <User size={18} color="#0284C7" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Profile</Text>
-              <Text style={styles.rowDesc}>View and edit your profile</Text>
+              <PartnerText style={styles.rowTitle}>Profile</PartnerText>
+              <PartnerText style={styles.rowDesc}>View and edit your profile</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -88,8 +82,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <FileText size={18} color="#D97706" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Documents</Text>
-              <Text style={styles.rowDesc}>Upload or manage documents</Text>
+              <PartnerText style={styles.rowTitle}>Documents</PartnerText>
+              <PartnerText style={styles.rowDesc}>Upload or manage documents</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -103,8 +97,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <CreditCard size={18} color="#7C3AED" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Bank & Payouts</Text>
-              <Text style={styles.rowDesc}>Manage bank details and payouts</Text>
+              <PartnerText style={styles.rowTitle}>Bank & Payouts</PartnerText>
+              <PartnerText style={styles.rowDesc}>Manage bank details and payouts</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -118,8 +112,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <Lock size={18} color="#DC2626" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Change Password</Text>
-              <Text style={styles.rowDesc}>Update your account password</Text>
+              <PartnerText style={styles.rowTitle}>Change Password</PartnerText>
+              <PartnerText style={styles.rowDesc}>Update your account password</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -128,7 +122,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
 
       {/* App Settings Section */}
       <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>App Settings</Text>
+        <PartnerText style={styles.sectionHeader}>App Settings</PartnerText>
         <View style={styles.cardGroup}>
           <Pressable
             style={({ pressed }) => [styles.rowItem, getPressableFeedback(pressed)]}
@@ -137,10 +131,10 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <Globe size={18} color="#2563EB" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Language</Text>
-              <Text style={styles.rowDesc}>
+              <PartnerText style={styles.rowTitle}>Language</PartnerText>
+              <PartnerText style={styles.rowDesc}>
                 {selectedLang === 'en' ? 'English' : selectedLang === 'hi' ? 'हिंदी' : 'ଓଡ଼ିଆ'}
-              </Text>
+              </PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -154,8 +148,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <Bell size={18} color="#EA580C" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>App Notifications</Text>
-              <Text style={styles.rowDesc}>Manage notification preferences</Text>
+              <PartnerText style={styles.rowTitle}>App Notifications</PartnerText>
+              <PartnerText style={styles.rowDesc}>Manage notification preferences</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -169,8 +163,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <MapPin size={18} color="#059669" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Location Settings</Text>
-              <Text style={styles.rowDesc}>Manage location permissions</Text>
+              <PartnerText style={styles.rowTitle}>Location Settings</PartnerText>
+              <PartnerText style={styles.rowDesc}>Manage location permissions</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -182,8 +176,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <Moon size={18} color="#374151" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Theme</Text>
-              <Text style={styles.rowDesc}>Dark Mode (System Default)</Text>
+              <PartnerText style={styles.rowTitle}>Theme</PartnerText>
+              <PartnerText style={styles.rowDesc}>Dark Mode (System Default)</PartnerText>
             </View>
             <Switch
               value={darkMode}
@@ -197,7 +191,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
 
       {/* Support & Legal */}
       <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>Support</Text>
+        <PartnerText style={styles.sectionHeader}>Support</PartnerText>
         <View style={styles.cardGroup}>
           <Pressable
             style={({ pressed }) => [styles.rowItem, getPressableFeedback(pressed)]}
@@ -206,8 +200,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <HelpCircle size={18} color="#D97706" strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>Help & Support</Text>
-              <Text style={styles.rowDesc}>FAQs and contact support</Text>
+              <PartnerText style={styles.rowTitle}>Help & Support</PartnerText>
+              <PartnerText style={styles.rowDesc}>FAQs and contact support</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -216,15 +210,15 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
 
       {/* About & Version */}
       <View style={styles.sectionBlock}>
-        <Text style={styles.sectionHeader}>About</Text>
+        <PartnerText style={styles.sectionHeader}>About</PartnerText>
         <View style={styles.cardGroup}>
           <View style={styles.rowItem}>
             <View style={[styles.iconCircle, { backgroundColor: driverColors.light }]}>
               <Info size={18} color={driverColors.grey} strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={styles.rowTitle}>App Version</Text>
-              <Text style={styles.rowDesc}>RACE Partner v1.0.0 (Production Build)</Text>
+              <PartnerText style={styles.rowTitle}>App Version</PartnerText>
+              <PartnerText style={styles.rowDesc}>RACE Partner v1.0.0 (Production Build)</PartnerText>
             </View>
           </View>
         </View>
@@ -240,8 +234,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
               <LogOut size={18} color={driverColors.red} strokeWidth={2.2} />
             </View>
             <View style={styles.textCol}>
-              <Text style={[styles.rowTitle, { color: driverColors.red }]}>Log out</Text>
-              <Text style={styles.rowDesc}>Sign out from this device</Text>
+              <PartnerText style={[styles.rowTitle, { color: driverColors.red }]}>Log out</PartnerText>
+              <PartnerText style={styles.rowDesc}>Sign out from this device</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>

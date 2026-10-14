@@ -1,17 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -152,12 +141,12 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
             ]}>
             {/* Title & Subtitle — Left Aligned, Clean & Professional */}
             <View style={[styles.titleSection, { marginTop: px(16) }]}>
-              <Text style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
+              <PartnerText style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
                 Vendor Driver Login
-              </Text>
-              <Text style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
+              </PartnerText>
+              <PartnerText style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
                 Sign in with the ID and password given by your vendor.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Pre-Selected Role Card / Badge */}
@@ -190,9 +179,9 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
                 />
               </View>
 
-              <Text style={[styles.roleBadgeTitle, { fontSize: px(15) }]}>
+              <PartnerText style={[styles.roleBadgeTitle, { fontSize: px(15) }]}>
                 Vendor Driver account
-              </Text>
+              </PartnerText>
 
               <View style={[styles.roleDivider, { height: px(18) }]} />
 
@@ -200,16 +189,16 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
                 onPress={() => navigation.goBack()}
                 hitSlop={8}
                 style={({ pressed }) => [pressed && styles.pressed]}>
-                <Text style={[styles.changeRoleText, { fontSize: px(14) }]}>
+                <PartnerText style={[styles.changeRoleText, { fontSize: px(14) }]}>
                   Change type
-                </Text>
+                </PartnerText>
               </Pressable>
             </View>
 
             {/* Credentials Input Fields */}
             <View style={[styles.inputSection, { marginTop: px(24) }]}>
               {/* Login ID */}
-              <Text style={[styles.fieldLabel, { fontSize: px(14) }]}>Login ID</Text>
+              <PartnerText style={[styles.fieldLabel, { fontSize: px(14) }]}>Login ID</PartnerText>
               <View
                 style={[
                   styles.inputWrap,
@@ -222,7 +211,7 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
                   },
                 ]}>
                 <KeyRound size={px(18)} color="#9CA3AF" style={{ marginRight: px(10) }} />
-                <TextInput
+                <PartnerTextInput
                   value={loginId}
                   onChangeText={(text) => {
                     setLoginId(text);
@@ -239,7 +228,7 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
               </View>
 
               {/* Password */}
-              <Text style={[styles.fieldLabel, { fontSize: px(14), marginTop: px(16) }]}>Password</Text>
+              <PartnerText style={[styles.fieldLabel, { fontSize: px(14), marginTop: px(16) }]}>Password</PartnerText>
               <View
                 style={[
                   styles.inputWrap,
@@ -252,7 +241,7 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
                   },
                 ]}>
                 <Lock size={px(18)} color="#9CA3AF" style={{ marginRight: px(10) }} />
-                <TextInput
+                <PartnerTextInput
                   value={password}
                   onChangeText={(text) => {
                     setPassword(text);
@@ -297,9 +286,9 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
               ]}
               accessibilityRole="button"
               accessibilityLabel="Sign In">
-              <Text style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
+              <PartnerText style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
                 {isSubmitting ? 'Signing in...' : 'Sign In'}
-              </Text>
+              </PartnerText>
               <ArrowRight
                 size={px(20)}
                 color="#111827"
@@ -311,9 +300,9 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
             {/* Security Assurance */}
             <View style={[styles.securityNotice, { marginTop: px(16) }]}>
               <ShieldCheck size={px(18)} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />
-              <Text style={[styles.securityText, { fontSize: px(12.5) }]}>
+              <PartnerText style={[styles.securityText, { fontSize: px(12.5) }]}>
                 Credentials are managed by your registered RACE vendor.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Subtle Horizontal Divider */}
@@ -321,22 +310,22 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
 
             {/* Terms and Privacy Footer */}
             <View style={[styles.footerBlock, { marginTop: px(12) }]}>
-              <Text style={[styles.footerText, { fontSize: px(12) }]}>
+              <PartnerText style={[styles.footerText, { fontSize: px(12) }]}>
                 By continuing, you agree to our
-              </Text>
-              <Text style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
+              </PartnerText>
+              <PartnerText style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
                 Terms & Privacy Policy
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Discreet Dev Demo Mode (for offline QA testing) */}
             {(__DEV__ || UI_PREVIEW_MODE) && (
               <View style={[styles.demoRow, { marginTop: px(14) }]}>
-                <Text style={[styles.demoLabel, { fontSize: px(10) }]}>Demo Login:</Text>
+                <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Demo Login:</PartnerText>
                 <Pressable
                   onPress={() => void loginAsMockDriver(dispatch)}
                   style={styles.demoLink}>
-                  <Text style={styles.demoLinkText}>Mock Driver Dashboard</Text>
+                  <PartnerText style={styles.demoLinkText}>Mock Driver Dashboard</PartnerText>
                 </Pressable>
               </View>
             )}

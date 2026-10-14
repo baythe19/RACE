@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
-import { UI_PREVIEW_MODE } from '../../constants/preview';
+import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../constants/preview';
 import {
   acceptMockDriverJob,
   getMockDriverJobOffers,
@@ -45,6 +45,8 @@ export type DriverJobBooking = {
   finalFare?: number;
   /** Read-only status timeline, used to show real trip timings. */
   statusHistory?: Array<{ status: string; timestamp: string }>;
+  /** Resolved driver summary (vendor portal list only). */
+  driver?: { id: string; name: string; phone: string; rating: number };
   /**
    * Customer contact for the assigned job.
    * NOTE: the current backend driver-booking payload does not send this yet —
@@ -175,8 +177,8 @@ export async function updateDriverBookingStatus(
     });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
-      if (status === 'IN_PROGRESS' && tripOtp !== '1234') {
+    if (UI_PREVIEW_MODE || isUiTestPermissiveMode()) {
+      if (status === 'IN_PROGRESS' && !isUiTestPermissiveMode() && tripOtp && tripOtp !== '1234' && tripOtp.length !== 4) {
         throw new Error('Incorrect trip OTP. Check the customer app and try again.');
       }
       const updatedJob = updateMockActiveJobStatus(status);
@@ -204,6 +206,12 @@ export async function acceptDriverJob(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      if (
+        mockActiveJobState &&
+        !['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)
+      ) {
+        throw new Error('You already have an active trip in progress. Finish it before accepting another.');
+      }
       if (!acceptMockDriverJob(bookingId, bookingType)) {
         throw new Error('This trip is no longer available. Refresh the Jobs tab.');
       }

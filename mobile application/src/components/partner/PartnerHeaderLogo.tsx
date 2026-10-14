@@ -1,17 +1,15 @@
+import { PartnerText } from './PartnerText';
 import React from 'react';
-import {
-  Image,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { images } from '../../assets';
 
+/** Native aspect ratio for logoTransparent (480x230) */
+const LOGO_ASPECT = 480 / 230;
+
 interface PartnerHeaderLogoProps {
   width?: number;
+  height?: number;
   style?: StyleProp<ViewStyle>;
   showPartnerText?: boolean;
   cropZoom?: number;
@@ -19,47 +17,26 @@ interface PartnerHeaderLogoProps {
 }
 
 export default function PartnerHeaderLogo({
-  width = 92,
+  width = 72,
+  height,
   style,
-  showPartnerText = true,
-  cropZoom = showPartnerText ? 1.55 : 1.25,
-  maskColor = '#FFFFFF',
+  showPartnerText = false,
 }: PartnerHeaderLogoProps) {
-  // The supplied transparent brand asset still contains the legacy SERVICE
-  // wordmark. Crop it in the shared header and use the app's PARTNER label so
-  // every partner screen gets the same clean lock-up.
-  const imageWidth = Math.round(width * cropZoom);
-  const imageHeight = Math.round(imageWidth * (230 / 480));
-  const containerHeight = Math.round(width * (showPartnerText ? 0.68 : 0.58));
-  const legacyMarkTop = Math.round(imageHeight * 0.6);
-  const legacyMarkHeight = Math.max(8, Math.round(imageHeight * 0.18));
+  const containerHeight = height ?? Math.max(16, Math.round(width / LOGO_ASPECT));
 
   return (
     <View style={[styles.container, { width, height: containerHeight }, style]}>
       <Image
         source={images.logoTransparent}
-        style={{
-          position: 'absolute',
-          width: imageWidth,
-          height: imageHeight,
-          left: Math.round((width - imageWidth) / 2),
-          top: 0,
-        }}
+        style={styles.image}
         resizeMode="contain"
         accessibilityLabel="RACE Partner"
       />
-      <View
-        pointerEvents="none"
-        style={[
-          styles.legacyMarkMask,
-          {
-            top: legacyMarkTop,
-            height: legacyMarkHeight,
-            backgroundColor: maskColor,
-          },
-        ]}>
-        {showPartnerText ? <Text style={styles.partnerLabel}>PARTNER</Text> : null}
-      </View>
+      {showPartnerText ? (
+        <View style={styles.partnerLabelWrap}>
+          <PartnerText style={styles.partnerLabel}>PARTNER</PartnerText>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -68,20 +45,21 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
   },
-  legacyMarkMask: {
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  partnerLabelWrap: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    bottom: -6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   partnerLabel: {
     color: '#D97706',
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 2.1,
-    lineHeight: 10,
+    fontSize: 7.5,
+    fontWeight: '800',
+    letterSpacing: 1.8,
   },
 });

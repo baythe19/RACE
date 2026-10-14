@@ -1,11 +1,6 @@
+import { PartnerText } from '../PartnerText';
 import React, { useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Globe } from 'lucide-react-native';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 
@@ -49,7 +44,7 @@ export default function PartnerLanguageSheet({
             <View style={styles.iconCircle}>
               <Globe size={20} color={driverColors.amber} strokeWidth={2.2} />
             </View>
-            <Text style={styles.title}>Select Language</Text>
+            <PartnerText style={styles.title}>Select Language</PartnerText>
           </View>
 
           <View style={styles.optionsList}>
@@ -65,14 +60,14 @@ export default function PartnerLanguageSheet({
                   ]}
                   onPress={() => setCurrent(lang.id)}>
                   <View style={styles.labelCol}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.optionLabel,
                         isSelected && styles.optionLabelActive,
                       ]}>
                       {lang.native}
-                    </Text>
-                    <Text style={styles.optionSub}>{lang.label}</Text>
+                    </PartnerText>
+                    <PartnerText style={styles.optionSub}>{lang.label}</PartnerText>
                   </View>
 
                   <View
@@ -93,7 +88,7 @@ export default function PartnerLanguageSheet({
               getPressableFeedback(pressed),
             ]}
             onPress={handleDone}>
-            <Text style={styles.doneButtonText}>Done</Text>
+            <PartnerText style={styles.doneButtonText}>Done</PartnerText>
           </Pressable>
         </Pressable>
       </Pressable>

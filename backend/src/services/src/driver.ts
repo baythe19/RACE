@@ -310,6 +310,11 @@ export class DriverService {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
 
+    const driver = await UserModel.findById(driverId).select('activeBookingId isAvailable driverProfile').exec();
+    if (driver?.activeBookingId && driver.activeBookingId.toString() !== bookingId) {
+      throw new BadRequestError('You already have an active booking in progress');
+    }
+
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
     const booking = await Model.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');

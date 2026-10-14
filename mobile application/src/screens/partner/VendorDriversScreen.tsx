@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   BadgeCheck,
   Calendar,
@@ -48,7 +39,10 @@ import {
   useRemoveVendorDriverMutation,
   useVendorDriversQuery,
 } from '../../services/vendor/useVendorDriversQueries';
-import { useVendorFleetVehiclesQuery } from '../../services/vendor/useVendorBookingsQueries';
+import {
+  useLinkVendorDriverVehicleMutation,
+  useVendorFleetVehiclesQuery,
+} from '../../services/vendor/useVendorBookingsQueries';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
@@ -76,7 +70,7 @@ const VENDOR_DRIVER_DOCUMENTS: PartnerDocumentFieldConfig[] = [
   },
 ];
 
-type StatusFilter = 'all' | 'active' | 'on_job' | 'inactive';
+type StatusFilter = 'all' | 'active' | 'on_job' | 'pending' | 'inactive';
 type SortKey = 'newest' | 'name' | 'rating';
 
 function isValidIndianMobile(phone: string): boolean {
@@ -102,7 +96,7 @@ function formatPhone(phone: string) {
 }
 
 function driverUiStatus(driver: FleetDriver): {
-  key: 'active' | 'on_job' | 'inactive';
+  key: 'active' | 'on_job' | 'inactive' | 'pending';
   label: string;
   sub: string;
   badgeBg: string;
@@ -121,6 +115,18 @@ function driverUiStatus(driver: FleetDriver): {
   }
 
   const status = String(driver.status).toUpperCase();
+  // A vendor-created driver is created PENDING in production: they cannot claim
+  // jobs until an admin approves, so they must not read as "Active".
+  if (status === 'PENDING') {
+    return {
+      key: 'pending',
+      label: 'Pending',
+      sub: 'Awaiting approval',
+      badgeBg: colors.goldLight,
+      badgeText: colors.primaryDark,
+      dot: colors.primary,
+    };
+  }
   const blocked = ['INACTIVE', 'SUSPENDED', 'REJECTED'].includes(status);
   if (!driver.isAvailable || blocked) {
     return {
@@ -157,6 +163,7 @@ export default function VendorDriversScreen({}: Props) {
   const { data: vehicles = [] } = useVendorFleetVehiclesQuery(isVendor, false);
   const createMutation = useCreateVendorDriverMutation();
   const removeMutation = useRemoveVendorDriverMutation();
+  const linkDriverMutation = useLinkVendorDriverVehicleMutation();
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -166,10 +173,16 @@ export default function VendorDriversScreen({}: Props) {
   const [password, setPassword] = useState('');
   const [driverType, setDriverType] = useState<(typeof DRIVER_TYPES)[number]>('Tow Driver');
   const [showForm, setShowForm] = useState(false);
+  const [formStep, setFormStep] = useState<1 | 2>(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [driverDocuments, setDriverDocuments] = useState<
     Array<{ id: string; label: string; uri: string; name: string; mimeType?: string }>
   >([]);
+  const [docUploadFailures, setDocUploadFailures] = useState<string[]>([]);
+  const [newVehicleReg, setNewVehicleReg] = useState<string | null>(null);
+  const [linkTarget, setLinkTarget] = useState<FleetDriver | null>(null);
+
+  const linkableVehicles = vehicles.filter(v => v.status === 'ACTIVE');
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -196,13 +209,15 @@ export default function VendorDriversScreen({}: Props) {
     let active = 0;
     let onJob = 0;
     let inactive = 0;
+    let pending = 0;
     for (const driver of drivers) {
       const status = driverUiStatus(driver).key;
       if (status === 'on_job') onJob += 1;
+      else if (status === 'pending') pending += 1;
       else if (status === 'inactive') inactive += 1;
       else active += 1;
     }
-    return { total: drivers.length, active, onJob, inactive };
+    return { total: drivers.length, active, onJob, inactive, pending };
   }, [drivers]);
 
   const locationOptions = useMemo(() => {
@@ -271,7 +286,28 @@ export default function VendorDriversScreen({}: Props) {
       Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
       return;
     }
-    setShowForm(v => !v);
+    if (showForm) {
+      setShowForm(false);
+      setFormStep(1);
+      resetForm();
+    } else {
+      setShowForm(true);
+      setFormStep(1);
+    }
+  };
+
+  const resetForm = () => {
+    setName('');
+    setPhone('');
+    setLicenseNo('');
+    setCity('Bhubaneswar');
+    setLoginId('');
+    setPassword('');
+    setDriverType('Tow Driver');
+    setNewVehicleReg(null);
+    setDriverDocuments([]);
+    setDocUploadFailures([]);
+    setErrors({});
   };
 
   const submitCreate = async () => {
@@ -290,8 +326,10 @@ export default function VendorDriversScreen({}: Props) {
         city: city.trim() || 'Bhubaneswar',
         loginId: loginId.trim(),
         password,
+        vehicleRegistration: newVehicleReg ?? undefined,
       });
 
+      const failedDocs: string[] = [];
       for (const doc of driverDocuments) {
         try {
           await uploadVendorDriverDocument(created.id, doc.id, {
@@ -300,26 +338,42 @@ export default function VendorDriversScreen({}: Props) {
             mimeType: doc.mimeType ?? 'image/jpeg',
           });
         } catch {
-          // Driver created; doc upload can be retried later.
+          // Keep the driver; the failed upload can be re-attempted.
+          failedDocs.push(doc.label);
         }
       }
+      setDocUploadFailures(failedDocs);
 
       Alert.alert(
-        'Vendor driver added',
-        `${name.trim()} can sign in with Login ID “${loginId.trim()}”. Share the password securely.`,
+        failedDocs.length ? 'Driver added — some documents failed' : 'Vendor driver added',
+        failedDocs.length
+          ? `${name.trim()} was added, but ${failedDocs.join(', ')} could not be uploaded and can be retried later.`
+          : `${name.trim()} can sign in with Login ID “${loginId.trim()}”. Share the password securely. Documents stay pending until admin approves.`,
       );
-      setName('');
-      setPhone('');
-      setLicenseNo('');
-      setCity('Bhubaneswar');
-      setLoginId('');
-      setPassword('');
-      setDriverDocuments([]);
-      setErrors({});
+      resetForm();
       setShowForm(false);
+      setFormStep(1);
       setPage(1);
     } catch (error) {
       Alert.alert('Could not add', getApiErrorMessage(error, 'Add driver failed'));
+    }
+  };
+
+  const onLinkVehicle = async (reg: string | null) => {
+    if (!linkTarget) return;
+    try {
+      await linkDriverMutation.mutateAsync({
+        driverId: linkTarget.id,
+        vehicleRegistration: reg,
+      });
+      setLinkTarget(null);
+      await refetch();
+      Alert.alert(
+        reg ? 'Vehicle linked' : 'Vehicle unlinked',
+        reg ? `Linked to ${reg}.` : `${linkTarget.name} is no longer linked to a vehicle.`,
+      );
+    } catch (error) {
+      Alert.alert('Link failed', getApiErrorMessage(error, 'Please try again'));
     }
   };
 
@@ -340,7 +394,7 @@ export default function VendorDriversScreen({}: Props) {
   };
 
   const cycleStatusFilter = () => {
-    const order: StatusFilter[] = ['all', 'active', 'on_job', 'inactive'];
+    const order: StatusFilter[] = ['all', 'active', 'on_job', 'pending', 'inactive'];
     setStatusFilter(order[(order.indexOf(statusFilter) + 1) % order.length] ?? 'all');
     setPage(1);
   };
@@ -370,7 +424,9 @@ export default function VendorDriversScreen({}: Props) {
         ? 'Active'
         : statusFilter === 'on_job'
           ? 'On job'
-          : 'Inactive';
+          : statusFilter === 'pending'
+            ? 'Pending'
+            : 'Inactive';
 
   const sortLabel =
     sortBy === 'newest' ? 'Newest' : sortBy === 'name' ? 'Name' : 'Rating';
@@ -382,13 +438,13 @@ export default function VendorDriversScreen({}: Props) {
         scrollable={false}
         header={
           <View style={styles.headerPad}>
-            <Text style={styles.title}>Vendor drivers</Text>
+            <PartnerText style={styles.title}>Vendor drivers</PartnerText>
           </View>
         }>
         <View style={styles.pendingBanner}>
-          <Text style={styles.pendingText}>
+          <PartnerText style={styles.pendingText}>
             Vendor driver management is available after signing in as a vendor.
-          </Text>
+          </PartnerText>
         </View>
       </AppScreenLayout>
     );
@@ -405,16 +461,16 @@ export default function VendorDriversScreen({}: Props) {
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Vendor drivers</Text>
-              <Text style={styles.subtitle}>
+              <PartnerText style={styles.title}>Vendor drivers</PartnerText>
+              <PartnerText style={styles.subtitle}>
                 Manage your vendor drivers and keep your team ready for every call.
-              </Text>
+              </PartnerText>
             </View>
             <Pressable
               onPress={onToggleForm}
               style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}>
               <Plus size={16} color={colors.dark} strokeWidth={2.6} />
-              <Text style={styles.addLabel}>{showForm ? 'Close' : 'Add Driver'}</Text>
+              <PartnerText style={styles.addLabel}>{showForm ? 'Close' : 'Add Driver'}</PartnerText>
             </Pressable>
           </View>
         </View>
@@ -422,140 +478,214 @@ export default function VendorDriversScreen({}: Props) {
       <View style={styles.content}>
         {!vendorLoading && !isApproved ? (
           <View style={styles.pendingBanner}>
-            <Text style={styles.pendingText}>{PARTNER_WAITING_ADMIN_APPROVAL}</Text>
+            <PartnerText style={styles.pendingText}>{PARTNER_WAITING_ADMIN_APPROVAL}</PartnerText>
           </View>
         ) : null}
 
         {showForm && isApproved ? (
           <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Add driver</Text>
-            <FormField
-              variant="outlined"
-              label="Full name"
-              required
-              Icon={User}
-              value={name}
-              onChangeText={text => {
-                setName(text);
-                if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
-              }}
-              placeholder="e.g. Rakesh Behera"
-              error={errors.name}
-            />
-            <FormField
-              variant="outlined"
-              label="Mobile"
-              required
-              Icon={Phone}
-              value={phone}
-              onChangeText={text => {
-                setPhone(text.replace(/\D/g, '').slice(0, 10));
-                if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
-              }}
-              keyboardType="number-pad"
-              maxLength={10}
-              placeholder="e.g. 9876543210"
-              error={errors.phone}
-            />
-            <FormField
-              variant="outlined"
-              label="License no"
-              required
-              Icon={IdCard}
-              value={licenseNo}
-              onChangeText={text => {
-                setLicenseNo(text);
-                if (errors.licenseNo) setErrors(prev => ({ ...prev, licenseNo: '' }));
-              }}
-              placeholder="e.g. OD1420200012345"
-              autoCapitalize="characters"
-              error={errors.licenseNo}
-            />
-            <FormField
-              variant="outlined"
-              label="Location"
-              optional
-              value={city}
-              onChangeText={setCity}
-              placeholder="e.g. Bhubaneswar"
-            />
-            <FormField
-              variant="outlined"
-              label="Login ID"
-              required
-              Icon={KeyRound}
-              value={loginId}
-              onChangeText={text => {
-                setLoginId(text.replace(/\s/g, ''));
-                if (errors.loginId) setErrors(prev => ({ ...prev, loginId: '' }));
-              }}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="e.g. driver.odisha01"
-              error={errors.loginId}
-            />
-            <FormField
-              variant="outlined"
-              label="Password"
-              required
-              Icon={Lock}
-              value={password}
-              onChangeText={text => {
-                setPassword(text);
-                if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
-              }}
-              secureTextEntry
-              placeholder="Min. 6 characters"
-              error={errors.password}
-            />
-            <Text style={styles.helperText}>
-              Share this Login ID and password with the driver so they can sign in as a Vendor
-              driver.
-            </Text>
-
-            <Text style={styles.typeLabel}>Driver type</Text>
-            <View style={styles.typeRow}>
-              {DRIVER_TYPES.map(type => (
-                <Pressable
-                  key={type}
-                  onPress={() => setDriverType(type)}
-                  style={[styles.typeChip, driverType === type && styles.typeChipActive]}>
-                  <Text
-                    style={[styles.typeChipText, driverType === type && styles.typeChipTextActive]}>
-                    {type}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={styles.stepHeaderRow}>
+              <PartnerText style={styles.formTitle}>
+                {formStep === 1 ? 'Driver details & credentials' : 'Documents & vehicle'}
+              </PartnerText>
+              <PartnerText style={styles.stepPill}>Step {formStep} of 2</PartnerText>
             </View>
 
-            <Text style={styles.sectionTitle}>Documents</Text>
-            <Text style={styles.helperText}>
-              Upload documents. Status stays pending until admin approves.
-            </Text>
-            <PartnerDocumentUploadList
-              documents={VENDOR_DRIVER_DOCUMENTS}
-              uploadedIds={driverDocuments.map(d => d.id)}
-              onUpload={(id, uri, fileName, mimeType) => {
-                const label = VENDOR_DRIVER_DOCUMENTS.find(doc => doc.id === id)?.label ?? id;
-                setDriverDocuments(prev => [
-                  ...prev.filter(d => d.id !== id),
-                  { id, label, uri, name: fileName, mimeType },
-                ]);
-              }}
-            />
+            {formStep === 1 ? (
+              <>
+                <FormField
+                  variant="outlined"
+                  label="Full name"
+                  required
+                  Icon={User}
+                  value={name}
+                  onChangeText={text => {
+                    setName(text);
+                    if (errors.name) setErrors(prev => ({ ...prev, name: '' }));
+                  }}
+                  placeholder="e.g. Rakesh Behera"
+                  error={errors.name}
+                />
+                <FormField
+                  variant="outlined"
+                  label="Mobile"
+                  required
+                  Icon={Phone}
+                  value={phone}
+                  onChangeText={text => {
+                    setPhone(text.replace(/\D/g, '').slice(0, 10));
+                    if (errors.phone) setErrors(prev => ({ ...prev, phone: '' }));
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                  placeholder="e.g. 9876543210"
+                  error={errors.phone}
+                />
+                <FormField
+                  variant="outlined"
+                  label="License no"
+                  required
+                  Icon={IdCard}
+                  value={licenseNo}
+                  onChangeText={text => {
+                    setLicenseNo(text);
+                    if (errors.licenseNo) setErrors(prev => ({ ...prev, licenseNo: '' }));
+                  }}
+                  placeholder="e.g. OD1420200012345"
+                  autoCapitalize="characters"
+                  error={errors.licenseNo}
+                />
+                <FormField
+                  variant="outlined"
+                  label="Location"
+                  optional
+                  value={city}
+                  onChangeText={setCity}
+                  placeholder="e.g. Bhubaneswar"
+                />
+                <FormField
+                  variant="outlined"
+                  label="Login ID"
+                  required
+                  Icon={KeyRound}
+                  value={loginId}
+                  onChangeText={text => {
+                    setLoginId(text.replace(/\s/g, ''));
+                    if (errors.loginId) setErrors(prev => ({ ...prev, loginId: '' }));
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="e.g. driver.odisha01"
+                  error={errors.loginId}
+                />
+                <FormField
+                  variant="outlined"
+                  label="Password"
+                  required
+                  Icon={Lock}
+                  value={password}
+                  onChangeText={text => {
+                    setPassword(text);
+                    if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
+                  }}
+                  secureTextEntry
+                  placeholder="Min. 6 characters"
+                  error={errors.password}
+                />
+                <PartnerText style={styles.helperText}>
+                  Share this Login ID and password with the driver so they can sign in as a Vendor
+                  driver.
+                </PartnerText>
 
-            <Pressable
-              onPress={() => void submitCreate()}
-              disabled={createMutation.isPending}
-              style={({ pressed }) => [
-                styles.saveBtn,
-                pressed && styles.pressed,
-                createMutation.isPending && styles.disabled,
-              ]}>
-              <Text style={styles.saveLabel}>
-                {createMutation.isPending ? 'Saving…' : 'Save vendor driver'}
-              </Text>
-            </Pressable>
+                <PartnerText style={styles.typeLabel}>Driver type</PartnerText>
+                <View style={styles.typeRow}>
+                  {DRIVER_TYPES.map(type => (
+                    <Pressable
+                      key={type}
+                      onPress={() => setDriverType(type)}
+                      style={[styles.typeChip, driverType === type && styles.typeChipActive]}>
+                      <PartnerText
+                        style={[
+                          styles.typeChipText,
+                          driverType === type && styles.typeChipTextActive,
+                        ]}>
+                        {type}
+                      </PartnerText>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Pressable
+                  onPress={() => {
+                    const next: Record<string, string> = {};
+                    if (name.trim().length < 2) next.name = 'Enter driver full name';
+                    if (!isValidIndianMobile(phoneDigits)) {
+                      next.phone = 'Enter a valid 10-digit mobile';
+                    }
+                    if (licenseNo.trim().length < 4) next.licenseNo = 'Enter a valid license number';
+                    if (!/^[a-zA-Z0-9._-]{4,40}$/.test(loginId.trim())) {
+                      next.loginId = 'Login ID: 4–40 chars (letters, numbers, . _ -)';
+                    }
+                    if (password.length < 6) next.password = 'Password must be at least 6 characters';
+                    setErrors(next);
+                    if (Object.keys(next).length === 0) setFormStep(2);
+                  }}
+                  style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed]}>
+                  <PartnerText style={styles.saveLabel}>Continue to documents</PartnerText>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <PartnerText style={styles.sectionTitle}>Fleet vehicle (optional)</PartnerText>
+                <View style={styles.typeRow}>
+                  {linkableVehicles.map(vehicle => (
+                    <Pressable
+                      key={vehicle.id}
+                      onPress={() => setNewVehicleReg(vehicle.registrationNo)}
+                      style={[
+                        styles.typeChip,
+                        newVehicleReg === vehicle.registrationNo && styles.typeChipActive,
+                      ]}>
+                      <PartnerText
+                        style={[
+                          styles.typeChipText,
+                          newVehicleReg === vehicle.registrationNo && styles.typeChipTextActive,
+                        ]}>
+                        {formatPlate(vehicle.registrationNo)}
+                      </PartnerText>
+                    </Pressable>
+                  ))}
+                  <Pressable
+                    onPress={() => setNewVehicleReg(null)}
+                    style={[styles.typeChip, !newVehicleReg && styles.typeChipActive]}>
+                    <PartnerText style={[styles.typeChipText, !newVehicleReg && styles.typeChipTextActive]}>
+                      No vehicle
+                    </PartnerText>
+                  </Pressable>
+                </View>
+                {linkableVehicles.length === 0 ? (
+                  <PartnerText style={styles.helperText}>
+                    You have no active fleet vehicles — you can link one later from this driver's
+                    menu.
+                  </PartnerText>
+                ) : null}
+
+                <PartnerText style={styles.sectionTitle}>Documents</PartnerText>
+                <PartnerText style={styles.helperText}>
+                  Upload documents. Status stays pending until admin approves.
+                </PartnerText>
+                <PartnerDocumentUploadList
+                  documents={VENDOR_DRIVER_DOCUMENTS}
+                  uploadedIds={driverDocuments.map(d => d.id)}
+                  onUpload={(id, uri, fileName, mimeType) => {
+                    const label = VENDOR_DRIVER_DOCUMENTS.find(doc => doc.id === id)?.label ?? id;
+                    const entry = { id, label, uri, name: fileName, mimeType };
+                    setDriverDocuments(prev => [...prev.filter(d => d.id !== id), entry]);
+                    setDocUploadFailures(prev => prev.filter(f => f !== label));
+                  }}
+                />
+
+                <Pressable
+                  onPress={() => setFormStep(1)}
+                  hitSlop={6}
+                  style={styles.backStepLink}>
+                  <PartnerText style={styles.backStepText}>← Back to details</PartnerText>
+                </Pressable>
+
+                <Pressable
+                  onPress={() => void submitCreate()}
+                  disabled={createMutation.isPending}
+                  style={({ pressed }) => [
+                    styles.saveBtn,
+                    pressed && styles.pressed,
+                    createMutation.isPending && styles.disabled,
+                  ]}>
+                  <PartnerText style={styles.saveLabel}>
+                    {createMutation.isPending ? 'Saving…' : 'Save vendor driver'}
+                  </PartnerText>
+                </Pressable>
+              </>
+            )}
           </View>
         ) : null}
 
@@ -567,39 +697,47 @@ export default function VendorDriversScreen({}: Props) {
             <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
               <Users size={16} color={INFO_BLUE} strokeWidth={2.2} />
             </View>
-            <Text style={styles.statValue}>{String(stats.total)}</Text>
-            <Text style={styles.statLabel}>Total drivers</Text>
-            <Text style={styles.statHint}>Across all locations</Text>
+            <PartnerText style={styles.statValue}>{String(stats.total)}</PartnerText>
+            <PartnerText style={styles.statLabel}>Total drivers</PartnerText>
+            <PartnerText style={styles.statHint}>Across all locations</PartnerText>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#DCFCE7' }]}>
               <CheckCircle2 size={16} color={SUCCESS_GREEN} strokeWidth={2.2} />
             </View>
-            <Text style={styles.statValue}>{String(stats.active)}</Text>
-            <Text style={styles.statLabel}>Active</Text>
-            <Text style={styles.statHint}>On duty and available</Text>
+            <PartnerText style={styles.statValue}>{String(stats.active)}</PartnerText>
+            <PartnerText style={styles.statLabel}>Active</PartnerText>
+            <PartnerText style={styles.statHint}>On duty and available</PartnerText>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: colors.goldLight }]}>
               <UserCog size={16} color={colors.primaryDark} strokeWidth={2.2} />
             </View>
-            <Text style={styles.statValue}>{String(stats.onJob)}</Text>
-            <Text style={styles.statLabel}>On job</Text>
-            <Text style={styles.statHint}>Currently assigned</Text>
+            <PartnerText style={styles.statValue}>{String(stats.onJob)}</PartnerText>
+            <PartnerText style={styles.statLabel}>On job</PartnerText>
+            <PartnerText style={styles.statHint}>Currently assigned</PartnerText>
+          </View>
+          <View style={styles.statCard}>
+            <View style={[styles.statIcon, { backgroundColor: colors.goldLight }]}>
+              <Users size={16} color={colors.primaryDark} strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.statValue}>{String(stats.pending)}</PartnerText>
+            <PartnerText style={styles.statLabel}>Pending</PartnerText>
+            <PartnerText style={styles.statHint}>Awaiting admin approval</PartnerText>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIcon, { backgroundColor: '#FEE2E2' }]}>
               <XCircle size={16} color={colors.error} strokeWidth={2.2} />
             </View>
-            <Text style={styles.statValue}>{String(stats.inactive)}</Text>
-            <Text style={styles.statLabel}>Inactive</Text>
-            <Text style={styles.statHint}>Not in service</Text>
+            <PartnerText style={styles.statValue}>{String(stats.inactive)}</PartnerText>
+            <PartnerText style={styles.statLabel}>Inactive</PartnerText>
+            <PartnerText style={styles.statHint}>Not in service</PartnerText>
           </View>
         </ScrollView>
 
         <View style={styles.searchBox}>
           <Search size={16} color={colors.grey} strokeWidth={2.2} />
-          <TextInput
+          <PartnerTextInput
             value={search}
             onChangeText={text => {
               setSearch(text);
@@ -613,23 +751,23 @@ export default function VendorDriversScreen({}: Props) {
 
         <View style={styles.filterRow}>
           <Pressable onPress={cycleStatusFilter} style={styles.filterPill}>
-            <Text style={styles.filterText}>{statusFilterLabel}</Text>
+            <PartnerText style={styles.filterText}>{statusFilterLabel}</PartnerText>
             <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
           </Pressable>
           <Pressable onPress={cycleLocationFilter} style={styles.filterPill}>
-            <Text style={styles.filterText}>
+            <PartnerText style={styles.filterText}>
               {locationFilter === 'all' ? 'All locations' : locationFilter}
-            </Text>
+            </PartnerText>
             <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
           </Pressable>
           <Pressable onPress={cycleTypeFilter} style={styles.filterPill}>
-            <Text style={styles.filterText}>
+            <PartnerText style={styles.filterText}>
               {typeFilter === 'all' ? 'All vehicle types' : typeFilter}
-            </Text>
+            </PartnerText>
             <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
           </Pressable>
           <Pressable onPress={cycleSort} style={styles.filterPill}>
-            <Text style={styles.filterText}>Sort: {sortLabel}</Text>
+            <PartnerText style={styles.filterText}>Sort: {sortLabel}</PartnerText>
             <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
           </Pressable>
         </View>
@@ -641,10 +779,10 @@ export default function VendorDriversScreen({}: Props) {
             <View style={styles.iconWrap}>
               <Users size={36} color={colors.primary} strokeWidth={2} />
             </View>
-            <Text style={styles.emptyTitle}>No vendor drivers yet</Text>
-            <Text style={styles.emptySubtitle}>
+            <PartnerText style={styles.emptyTitle}>No vendor drivers yet</PartnerText>
+            <PartnerText style={styles.emptySubtitle}>
               Add drivers to your vendor team so you can assign them to vehicles and jobs.
-            </Text>
+            </PartnerText>
           </View>
         ) : (
           pageItems.map(driver => {
@@ -656,27 +794,27 @@ export default function VendorDriversScreen({}: Props) {
                 <View style={styles.driverTop}>
                   <View style={styles.avatarWrap}>
                     <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
+                      <PartnerText style={styles.avatarText}>
                         {driver.name.charAt(0).toUpperCase()}
-                      </Text>
+                      </PartnerText>
                     </View>
                     <View style={[styles.statusDot, { backgroundColor: ui.dot }]} />
                   </View>
 
                   <View style={styles.driverMain}>
                     <View style={styles.nameRow}>
-                      <Text style={styles.driverName} numberOfLines={1}>
+                      <PartnerText style={styles.driverName} numberOfLines={1}>
                         {driver.name}
-                      </Text>
+                      </PartnerText>
                       {isVerified(driver) ? (
                         <BadgeCheck size={16} color={INFO_BLUE} strokeWidth={2.2} />
                       ) : null}
                     </View>
                     <View style={styles.metaRow}>
                       <Phone size={12} color={colors.grey} strokeWidth={2.2} />
-                      <Text style={styles.metaText}>{formatPhone(driver.phone)}</Text>
+                      <PartnerText style={styles.metaText}>{formatPhone(driver.phone)}</PartnerText>
                     </View>
-                    <Text style={styles.dlText}>DL: {driver.licenseNo || '—'}</Text>
+                    <PartnerText style={styles.dlText}>DL: {driver.licenseNo || '—'}</PartnerText>
                   </View>
 
                   <Pressable
@@ -690,23 +828,23 @@ export default function VendorDriversScreen({}: Props) {
                 <View style={styles.metricsRow}>
                   <View style={styles.metric}>
                     <Star size={13} color={colors.primary} strokeWidth={2.2} fill={colors.primary} />
-                    <Text style={styles.metricText}>
+                    <PartnerText style={styles.metricText}>
                       {(driver.rating || 0).toFixed(1)} Rating
-                    </Text>
+                    </PartnerText>
                   </View>
                   <View style={styles.metric}>
-                    <Text style={styles.metricText}>{driver.driverType}</Text>
+                    <PartnerText style={styles.metricText}>{driver.driverType}</PartnerText>
                   </View>
                   {driver.loginId ? (
                     <View style={styles.metric}>
                       <KeyRound size={12} color={colors.grey} strokeWidth={2.2} />
-                      <Text style={styles.metricText}>{driver.loginId}</Text>
+                      <PartnerText style={styles.metricText}>{driver.loginId}</PartnerText>
                     </View>
                   ) : null}
                   {driver.city ? (
                     <View style={styles.metric}>
                       <Calendar size={12} color={colors.grey} strokeWidth={2.2} />
-                      <Text style={styles.metricText}>{driver.city}</Text>
+                      <PartnerText style={styles.metricText}>{driver.city}</PartnerText>
                     </View>
                   ) : null}
                 </View>
@@ -717,22 +855,22 @@ export default function VendorDriversScreen({}: Props) {
                     <View style={{ flex: 1 }}>
                       {plate ? (
                         <>
-                          <Text style={styles.vehiclePlate}>{plate}</Text>
-                          <Text style={styles.vehicleModel}>
+                          <PartnerText style={styles.vehiclePlate}>{plate}</PartnerText>
+                          <PartnerText style={styles.vehicleModel}>
                             {vehicle
                               ? `${vehicle.model} · ${vehicle.type}`
                               : driver.driverType}
-                          </Text>
+                          </PartnerText>
                         </>
                       ) : (
-                        <Text style={styles.vehicleEmpty}>— Not assigned</Text>
+                        <PartnerText style={styles.vehicleEmpty}>— Not assigned</PartnerText>
                       )}
                     </View>
                   </View>
 
                   <View style={[styles.statusBadge, { backgroundColor: ui.badgeBg }]}>
-                    <Text style={[styles.statusLabel, { color: ui.badgeText }]}>{ui.label}</Text>
-                    <Text style={styles.statusSub}>{ui.sub}</Text>
+                    <PartnerText style={[styles.statusLabel, { color: ui.badgeText }]}>{ui.label}</PartnerText>
+                    <PartnerText style={styles.statusSub}>{ui.sub}</PartnerText>
                   </View>
                 </View>
               </View>
@@ -742,15 +880,15 @@ export default function VendorDriversScreen({}: Props) {
 
         {filtered.length > 0 ? (
           <View style={styles.pagination}>
-            <Text style={styles.pageMeta}>
+            <PartnerText style={styles.pageMeta}>
               Showing {showingFrom} to {showingTo} of {filtered.length} drivers
-            </Text>
+            </PartnerText>
             <View style={styles.pageControls}>
               <Pressable
                 disabled={currentPage <= 1}
                 onPress={() => setPage(p => Math.max(1, p - 1))}
                 style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}>
-                <Text style={styles.pageBtnText}>‹</Text>
+                <PartnerText style={styles.pageBtnText}>‹</PartnerText>
               </Pressable>
               {Array.from({ length: totalPages }, (_, i) => i + 1)
                 .slice(0, 4)
@@ -759,20 +897,20 @@ export default function VendorDriversScreen({}: Props) {
                     key={num}
                     onPress={() => setPage(num)}
                     style={[styles.pageBtn, num === currentPage && styles.pageBtnActive]}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.pageBtnText,
                         num === currentPage && styles.pageBtnTextActive,
                       ]}>
                       {String(num)}
-                    </Text>
+                    </PartnerText>
                   </Pressable>
                 ))}
               <Pressable
                 disabled={currentPage >= totalPages}
                 onPress={() => setPage(p => Math.min(totalPages, p + 1))}
                 style={[styles.pageBtn, currentPage >= totalPages && styles.pageBtnDisabled]}>
-                <Text style={styles.pageBtnText}>›</Text>
+                <PartnerText style={styles.pageBtnText}>›</PartnerText>
               </Pressable>
             </View>
           </View>
@@ -786,7 +924,7 @@ export default function VendorDriversScreen({}: Props) {
         onRequestClose={() => setMenuDriver(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setMenuDriver(null)}>
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{menuDriver?.name ?? 'Driver'}</Text>
+            <PartnerText style={styles.sheetTitle}>{menuDriver?.name ?? 'Driver'}</PartnerText>
             <Pressable
               style={styles.sheetItem}
               onPress={() => {
@@ -799,16 +937,79 @@ export default function VendorDriversScreen({}: Props) {
                   );
                 }
               }}>
-              <Text style={styles.sheetItemText}>View details</Text>
+              <PartnerText style={styles.sheetItemText}>View details</PartnerText>
+            </Pressable>
+            <Pressable
+              style={styles.sheetItem}
+              onPress={() => {
+                setLinkTarget(menuDriver);
+                setMenuDriver(null);
+              }}
+              disabled={!menuDriver}>
+              <PartnerText style={[styles.sheetItemText, { color: colors.primaryDark }]}>
+                Assign vehicle
+              </PartnerText>
             </Pressable>
             <Pressable
               style={styles.sheetItem}
               onPress={() => menuDriver && onRemove(menuDriver)}>
-              <Text style={[styles.sheetItemText, { color: colors.error }]}>
+              <PartnerText style={[styles.sheetItemText, { color: colors.error }]}>
                 Unlink driver
-              </Text>
+              </PartnerText>
             </Pressable>
           </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={Boolean(linkTarget)}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setLinkTarget(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setLinkTarget(null)}>
+          <Pressable style={styles.linkSheet} onPress={e => e.stopPropagation()}>
+            <PartnerText style={styles.sheetTitle}>
+              Link vehicle{linkTarget ? ` · ${linkTarget.name}` : ''}
+            </PartnerText>
+            <PartnerText style={styles.assignHint}>
+              Choose one of your active fleet vehicles for this driver.
+            </PartnerText>
+            <ScrollView style={{ maxHeight: 320 }}>
+              {linkableVehicles.map(vehicle => (
+                <Pressable
+                  key={vehicle.id}
+                  style={styles.driverPick}
+                  onPress={() => void onLinkVehicle(vehicle.registrationNo)}
+                  disabled={linkDriverMutation.isPending}>
+                  <Truck size={16} color={colors.primaryDark} strokeWidth={2.2} />
+                  <View style={{ flex: 1 }}>
+                    <PartnerText style={styles.vehiclePlate}>{formatPlate(vehicle.registrationNo)}</PartnerText>
+                    <PartnerText style={styles.vehicleModel}>
+                      {vehicle.model} · {vehicle.type}
+                    </PartnerText>
+                  </View>
+                  <PartnerText style={styles.assignLink}>Link</PartnerText>
+                </Pressable>
+              ))}
+              {linkableVehicles.length === 0 ? (
+                <View style={{ paddingVertical: spacing.md }}>
+                  <PartnerText style={styles.helperText}>
+                    No active fleet vehicles. Add and activate a vehicle first.
+                  </PartnerText>
+                </View>
+              ) : null}
+            </ScrollView>
+            {linkTarget?.vehicleRegistration ? (
+              <Pressable
+                onPress={() => void onLinkVehicle(null)}
+                disabled={linkDriverMutation.isPending}
+                style={styles.addDriverLink}>
+                <PartnerText style={[styles.assignLink, { color: colors.error }]}>
+                  Unlink from {formatPlate(linkTarget.vehicleRegistration)}
+                </PartnerText>
+              </Pressable>
+            ) : null}
+          </Pressable>
         </Pressable>
       </Modal>
     </AppScreenLayout>
@@ -1230,6 +1431,58 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.lg,
     marginBottom: spacing.sm,
+  },
+  linkSheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  stepHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  stepPill: {
+    color: colors.primaryDark,
+    backgroundColor: colors.goldLight,
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  backStepLink: { alignSelf: 'flex-start', paddingVertical: spacing.xs },
+  backStepText: {
+    color: colors.grey,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+  },
+  assignHint: {
+    color: colors.grey,
+    fontSize: typography.sizes.sm,
+    marginBottom: spacing.md,
+  },
+  driverPick: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  assignLink: {
+    color: colors.primaryDark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+    marginTop: 2,
+  },
+  addDriverLink: {
+    alignItems: 'center',
+    paddingTop: spacing.lg,
   },
   sheetItem: {
     paddingVertical: spacing.md,

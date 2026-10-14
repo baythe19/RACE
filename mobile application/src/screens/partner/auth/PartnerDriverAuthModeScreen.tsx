@@ -1,14 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  Image,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -95,15 +87,15 @@ export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
         ]}>
         {/* Title & Subtitle (Left-aligned, clean and concise) */}
         <View style={[styles.headingBlock, { marginTop: px(16) }]}>
-          <Text style={[styles.mainTitle, { fontSize: px(28), lineHeight: px(34) }]}>
+          <PartnerText style={[styles.mainTitle, { fontSize: px(28), lineHeight: px(34) }]}>
             Choose your
-          </Text>
-          <Text style={[styles.mainTitle, { fontSize: px(28), lineHeight: px(34) }]}>
+          </PartnerText>
+          <PartnerText style={[styles.mainTitle, { fontSize: px(28), lineHeight: px(34) }]}>
             driver type
-          </Text>
-          <Text style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(8) }]}>
+          </PartnerText>
+          <PartnerText style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(8) }]}>
             Select how you work with RACE.
-          </Text>
+          </PartnerText>
         </View>
 
         {/* Options List with Prominent Optimized Avatars (Instantly Loaded) */}
@@ -139,10 +131,10 @@ export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.cardTextBox}>
-              <Text style={[styles.cardTitle, { fontSize: px(17) }]}>Self Driver</Text>
-              <Text style={[styles.cardDescription, { fontSize: px(13), marginTop: px(4) }]}>
+              <PartnerText style={[styles.cardTitle, { fontSize: px(17) }]}>Self Driver</PartnerText>
+              <PartnerText style={[styles.cardDescription, { fontSize: px(13), marginTop: px(4) }]}>
                 I own my vehicle and work independently using my mobile number.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Custom Radio Button */}
@@ -194,10 +186,10 @@ export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.cardTextBox}>
-              <Text style={[styles.cardTitle, { fontSize: px(17) }]}>Vendor Driver</Text>
-              <Text style={[styles.cardDescription, { fontSize: px(13), marginTop: px(4) }]}>
+              <PartnerText style={[styles.cardTitle, { fontSize: px(17) }]}>Vendor Driver</PartnerText>
+              <PartnerText style={[styles.cardDescription, { fontSize: px(13), marginTop: px(4) }]}>
                 I'm a driver working with a registered RACE vendor. I have a Login ID and Password from my vendor.
-              </Text>
+              </PartnerText>
             </View>
 
             {/* Custom Radio Button */}
@@ -229,7 +221,7 @@ export default function PartnerDriverAuthModeScreen({ navigation }: Props) {
           ]}
           accessibilityRole="button"
           accessibilityLabel="Continue">
-          <Text style={[styles.continueButtonText, { fontSize: px(16.5) }]}>Continue</Text>
+          <PartnerText style={[styles.continueButtonText, { fontSize: px(16.5) }]}>Continue</PartnerText>
           <ArrowRight size={px(20)} color="#111827" strokeWidth={2.6} style={{ marginLeft: px(8) }} />
         </Pressable>
       </ScrollView>

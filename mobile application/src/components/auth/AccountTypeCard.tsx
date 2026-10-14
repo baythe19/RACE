@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
 import GlassCard from '../ui/GlassCard';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -23,10 +24,10 @@ export default function AccountTypeCard({
     <TouchableOpacity onPress={onPress} disabled={disabled} activeOpacity={0.88}>
       <GlassCard style={[styles.card, disabled && styles.disabled]}>
         <View style={styles.row}>
-          <Text style={styles.emoji}>{emoji}</Text>
+          <PartnerText style={styles.emoji}>{emoji}</PartnerText>
           <View style={styles.textWrap}>
-            <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <PartnerText style={styles.title}>{title}</PartnerText>
+            <PartnerText style={styles.subtitle}>{subtitle}</PartnerText>
           </View>
         </View>
       </GlassCard>

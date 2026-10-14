@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { DriverJobBooking } from '../driver/driverApi';
 import { UI_PREVIEW_MODE } from '../../constants/preview';
-import { MOCK_JOB_OFFERS } from '../../data/mockPartnerData';
+import { MOCK_JOB_OFFERS, MOCK_VENDOR_BOOKINGS } from '../../data/mockPartnerData';
 
 export type VendorApproveResult = {
   id: string;
@@ -13,6 +13,37 @@ export type VendorApproveResult = {
   assignedFleetVehicleLabel?: string;
   message?: string;
 };
+
+/** One booking row for the vendor portal list (mirrors GET /vendor/bookings). */
+export type VendorBookingItem = {
+  bookingType: 'towing' | 'driver';
+  id: string;
+  bookingNumber: string;
+  status: string;
+  pickup?: { label?: string; address?: string; latitude?: number; longitude?: number };
+  dropoff?: { label?: string; address?: string; latitude?: number; longitude?: number } | null;
+  estimatedFare?: number;
+  finalFare?: number;
+  createdAt: string;
+  scheduledAt?: string;
+  serviceLabel: string;
+  assignedFleetVehicleLabel?: string;
+  driver?: { id: string; name: string; phone: string; rating: number };
+};
+
+export async function listVendorBookings(): Promise<VendorBookingItem[]> {
+  try {
+    const { data } = await api.get<ApiSuccessResponse<VendorBookingItem[]>>(
+      API_ENDPOINTS.vendorBookings,
+    );
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      return MOCK_VENDOR_BOOKINGS;
+    }
+    throw error;
+  }
+}
 
 /** @deprecated Use VendorApproveResult — assign API kept for older clients. */
 export type VendorAssignResult = VendorApproveResult & {

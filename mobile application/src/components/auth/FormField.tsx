@@ -1,12 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { type ReactNode } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from 'react-native';
+import { Pressable, StyleSheet, View, type TextInputProps } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
@@ -70,7 +64,7 @@ export default function FormField({
           <Icon size={iconSize} color={iconColor} />
         </View>
       ) : null}
-      <TextInput
+      <PartnerTextInput
         style={[
           styles.input,
           compact && {
@@ -96,7 +90,7 @@ export default function FormField({
     return (
       <View style={[styles.container, compact && { marginBottom: Math.round(16 * scale) }]}>
         <View style={styles.outlinedWrap}>
-          <Text
+          <PartnerText
             style={[
               styles.outlinedLabel,
               {
@@ -106,8 +100,8 @@ export default function FormField({
               },
             ]}>
             {label}
-            {required ? <Text style={styles.required}> *</Text> : null}
-          </Text>
+            {required ? <PartnerText style={styles.required}> *</PartnerText> : null}
+          </PartnerText>
           {onPress ? (
             <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
               {content}
@@ -117,11 +111,11 @@ export default function FormField({
           )}
         </View>
         {helperText ? (
-          <Text style={[styles.helper, helperColor ? { color: helperColor } : null]}>
+          <PartnerText style={[styles.helper, helperColor ? { color: helperColor } : null]}>
             {helperText}
-          </Text>
+          </PartnerText>
         ) : null}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <PartnerText style={styles.error}>{error}</PartnerText> : null}
       </View>
     );
   }
@@ -129,11 +123,11 @@ export default function FormField({
   return (
     <View style={styles.container}>
       <View style={styles.labelRow}>
-        <Text style={styles.label}>
+        <PartnerText style={styles.label}>
           {label}
-          {required ? <Text style={styles.required}> *</Text> : null}
-        </Text>
-        {optional ? <Text style={styles.optional}>(Optional)</Text> : null}
+          {required ? <PartnerText style={styles.required}> *</PartnerText> : null}
+        </PartnerText>
+        {optional ? <PartnerText style={styles.optional}>(Optional)</PartnerText> : null}
       </View>
       {onPress ? (
         <Pressable onPress={onPress} style={({ pressed }) => pressed && styles.pressed}>
@@ -143,11 +137,11 @@ export default function FormField({
         content
       )}
       {helperText ? (
-        <Text style={[styles.helper, helperColor ? { color: helperColor } : null]}>
+        <PartnerText style={[styles.helper, helperColor ? { color: helperColor } : null]}>
           {helperText}
-        </Text>
+        </PartnerText>
       ) : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <PartnerText style={styles.error}>{error}</PartnerText> : null}
     </View>
   );
 }

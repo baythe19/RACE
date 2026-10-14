@@ -1,12 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { useEffect, useRef } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Animated, Pressable, StyleSheet, View } from 'react-native';
 import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -105,14 +99,14 @@ export default function AuthToast({
       </View>
 
       <View style={styles.messageWrap}>
-        <Text
+        <PartnerText
           style={[
             styles.messageText,
             isError ? styles.errorText : isSuccess ? styles.successText : styles.infoText,
           ]}
           numberOfLines={2}>
           {message}
-        </Text>
+        </PartnerText>
       </View>
 
       {actionLabel && onAction ? (
@@ -121,7 +115,7 @@ export default function AuthToast({
           hitSlop={8}
           style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
           accessibilityRole="button">
-          <Text style={styles.actionLabel}>{actionLabel}</Text>
+          <PartnerText style={styles.actionLabel}>{actionLabel}</PartnerText>
         </Pressable>
       ) : null}
 
@@ -176,7 +170,7 @@ export function AuthLoadingOverlay({
   return (
     <View style={styles.overlay}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.overlayText}>{label}</Text>
+      <PartnerText style={styles.overlayText}>{label}</PartnerText>
     </View>
   );
 }

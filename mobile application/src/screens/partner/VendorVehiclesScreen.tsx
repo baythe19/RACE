@@ -1,15 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Calendar,
   CheckCircle2,
@@ -31,8 +22,8 @@ import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { FleetDriver } from '../../services/vendor/vendorDriversApi';
 import type { FleetVehicle, FleetVehicleStatus } from '../../services/vendor/vendorVehiclesApi';
 import {
-  useAssignDriverToVehicleMutation,
   useCreateVendorVehicleMutation,
+  useLinkVendorDriverVehicleMutation,
   useRemoveVendorVehicleMutation,
   useUpdateVendorVehicleMutation,
   useVendorFleetDriversQuery,
@@ -81,21 +72,12 @@ function typeBadge(type: string) {
   return { bg: colors.goldLight, text: colors.primaryDark, label: type };
 }
 
-function tonnageFor(type: string) {
-  const lower = type.toLowerCase();
-  if (lower.includes('truck') || lower.includes('recovery')) return '3.5 Ton';
-  if (lower.includes('flat')) return '2.5 Ton';
-  if (lower.includes('wheel') || lower.includes('car')) return '1.5 Ton';
-  if (lower.includes('jump')) return '—';
-  return '2.0 Ton';
-}
-
 function statusMeta(status: string, driverBusy?: boolean) {
   if (status === 'UNDER_MAINTENANCE') {
     return {
       key: 'service' as const,
-      label: 'In service',
-      sub: 'Maintenance',
+      label: 'Under maintenance',
+      sub: 'Not assignable',
       color: colors.primaryDark,
     };
   }
@@ -115,15 +97,6 @@ function statusMeta(status: string, driverBusy?: boolean) {
   };
 }
 
-function driverTypeLabel(driverType?: string): CreateDriverType {
-  if (driverType === 'Full-Time' || driverType === 'Part-Time' || driverType === 'Tow Driver') {
-    return driverType;
-  }
-  return 'Tow Driver';
-}
-
-type CreateDriverType = 'Tow Driver' | 'Full-Time' | 'Part-Time';
-
 export default function VendorVehiclesScreen() {
   const navigation = useNavigation();
   const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
@@ -140,13 +113,18 @@ export default function VendorVehiclesScreen() {
   const createMutation = useCreateVendorVehicleMutation();
   const updateMutation = useUpdateVendorVehicleMutation();
   const removeMutation = useRemoveVendorVehicleMutation();
-  const assignMutation = useAssignDriverToVehicleMutation();
+  const linkDriverMutation = useLinkVendorDriverVehicleMutation();
 
   const [showForm, setShowForm] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<FleetVehicle | null>(null);
   const [registrationNo, setRegistrationNo] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
   const [type, setType] = useState<(typeof VEHICLE_TYPES)[number]>('Car Tow');
+  const [rcNumber, setRcNumber] = useState('');
+  const [insuranceProvider, setInsuranceProvider] = useState('');
+  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
+  const [insuranceExpiry, setInsuranceExpiry] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [search, setSearch] = useState('');
@@ -226,17 +204,75 @@ export default function VendorVehiclesScreen() {
     const next: Record<string, string> = {};
     if (registrationNo.trim().length < 4) next.registrationNo = 'Enter registration number';
     if (model.trim().length < 1) next.model = 'Enter vehicle model';
-    if (year && (Number(year) < 1990 || Number(year) > 2100)) next.year = 'Enter a valid year';
+    if (year && (Number(year) < 1980 || Number(year) > 2100)) next.year = 'Enter a valid year';
+    if (insuranceExpiry && !/^\d{4}-\d{2}-\d{2}$/.test(insuranceExpiry)) {
+      next.insuranceExpiry = 'Use YYYY-MM-DD date';
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  const onToggleForm = () => {
+  const resetForm = () => {
+    setRegistrationNo('');
+    setModel('');
+    setYear('');
+    setType('Car Tow');
+    setRcNumber('');
+    setInsuranceProvider('');
+    setInsurancePolicyNumber('');
+    setInsuranceExpiry('');
+    setErrors({});
+  };
+
+  const openForm = () => {
     if (!isApproved) {
       Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
       return;
     }
-    setShowForm(v => !v);
+    setEditingVehicle(null);
+    resetForm();
+    setShowForm(true);
+  };
+
+  const onToggleForm = () => {
+    if (!showForm) {
+      openForm();
+    } else if (showForm && editingVehicle) {
+      setShowForm(false);
+      setEditingVehicle(null);
+      resetForm();
+    } else {
+      setShowForm(false);
+      resetForm();
+    }
+  };
+
+  const startEdit = (vehicle: FleetVehicle) => {
+    if (!isApproved) {
+      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
+      return;
+    }
+    setMenuVehicle(null);
+    setShowForm(true);
+    setEditingVehicle(vehicle);
+    setRegistrationNo(vehicle.registrationNo);
+    setModel(vehicle.model);
+    setYear(vehicle.year ? String(vehicle.year) : '');
+    const matched = VEHICLE_TYPES.find(t => t.toLowerCase() === vehicle.type.toLowerCase());
+    setType(matched ?? (vehicle.type as (typeof VEHICLE_TYPES)[number]));
+    setRcNumber('');
+    setInsuranceProvider('');
+    setInsurancePolicyNumber('');
+    setInsuranceExpiry(vehicle.insuranceExpiry ? vehicle.insuranceExpiry.slice(0, 10) : '');
+    setErrors({});
+  };
+
+  const insuranceMeta = () => {
+    const parts: string[] = [];
+    if (rcNumber.trim()) parts.push(`RC: ${rcNumber.trim().toUpperCase()}`);
+    if (insuranceProvider.trim()) parts.push(`Insurer: ${insuranceProvider.trim()}`);
+    if (insurancePolicyNumber.trim()) parts.push(`Policy: ${insurancePolicyNumber.trim()}`);
+    return parts.join(' · ') || undefined;
   };
 
   const submitCreate = async () => {
@@ -252,16 +288,41 @@ export default function VendorVehiclesScreen() {
         model: model.trim(),
         year: year ? Number(year) : undefined,
         status: 'ACTIVE',
+        rcNumber: rcNumber.trim().toUpperCase() || undefined,
+        insuranceProvider: insuranceProvider.trim() || undefined,
+        insurancePolicyNumber: insurancePolicyNumber.trim() || undefined,
+        insuranceExpiry: insuranceExpiry || undefined,
       });
-      setRegistrationNo('');
-      setModel('');
-      setYear('');
-      setType('Car Tow');
+      resetForm();
       setShowForm(false);
+      setEditingVehicle(null);
       setPage(1);
       Alert.alert('Vehicle added', 'Vendor vehicle is ready to assign on jobs.');
     } catch (error) {
       Alert.alert('Could not add vehicle', getApiErrorMessage(error, 'Please try again'));
+    }
+  };
+
+  const submitEdit = async () => {
+    if (!editingVehicle) return;
+    if (!validate()) return;
+    try {
+      await updateMutation.mutateAsync({
+        vehicleId: editingVehicle.id,
+        payload: {
+          type,
+          model: model.trim(),
+          year: year ? Number(year) : undefined,
+          insuranceExpiry: insuranceExpiry || undefined,
+          maintenanceNote: insuranceMeta(),
+        },
+      });
+      resetForm();
+      setShowForm(false);
+      setEditingVehicle(null);
+      Alert.alert('Vehicle updated', 'Vehicle details were saved.');
+    } catch (error) {
+      Alert.alert('Could not save', getApiErrorMessage(error, 'Please try again'));
     }
   };
 
@@ -294,22 +355,21 @@ export default function VendorVehiclesScreen() {
     ]);
   };
 
-  const onAssignDriver = async (driver: FleetDriver) => {
+  const onLinkDriver = async (driver: FleetDriver) => {
     if (!assignVehicle) return;
     try {
-      await assignMutation.mutateAsync({
-        name: driver.name,
-        phone: driver.phone,
-        licenseNo: driver.licenseNo || 'PENDING',
-        driverType: driverTypeLabel(driver.driverType),
-        city: driver.city,
+      await linkDriverMutation.mutateAsync({
+        driverId: driver.id,
         vehicleRegistration: assignVehicle.registrationNo,
-      } as any);
+      });
       setAssignVehicle(null);
       await refetchDrivers();
-      Alert.alert('Driver assigned', `${driver.name} is linked to ${formatPlate(assignVehicle.registrationNo)}.`);
+      Alert.alert(
+        'Driver linked',
+        `${driver.name} is now linked to ${formatPlate(assignVehicle.registrationNo)}.`,
+      );
     } catch (error) {
-      Alert.alert('Assign failed', getApiErrorMessage(error, 'Please try again'));
+      Alert.alert('Link failed', getApiErrorMessage(error, 'Please try again'));
     }
   };
 
@@ -357,7 +417,7 @@ export default function VendorVehiclesScreen() {
       : statusFilter === 'ACTIVE'
         ? 'Active'
         : statusFilter === 'UNDER_MAINTENANCE'
-          ? 'In service'
+          ? 'Under maintenance'
           : 'Inactive';
 
   const sortLabel =
@@ -366,6 +426,7 @@ export default function VendorVehiclesScreen() {
   return (
     <AppScreenLayout
       backgroundColor={PAGE_BG}
+      keyboardAvoiding
       refreshing={isRefetching}
       onRefresh={() => {
         void refetch();
@@ -375,18 +436,18 @@ export default function VendorVehiclesScreen() {
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Vendor vehicles</Text>
-              <Text style={styles.subtitle}>
+              <PartnerText style={styles.title}>Vendor vehicles</PartnerText>
+              <PartnerText style={styles.subtitle}>
                 Manage your vendor vehicles and keep them road-ready.
-              </Text>
+              </PartnerText>
             </View>
             <Pressable
               onPress={onToggleForm}
               style={({ pressed }) => [styles.registerBtn, pressed && styles.pressed]}>
               <Plus size={16} color={colors.dark} strokeWidth={2.6} />
-              <Text style={styles.registerLabel}>
-                {showForm ? 'Close' : 'Register'}
-              </Text>
+              <PartnerText style={styles.registerLabel}>
+                {showForm ? 'Close' : 'Add vehicle'}
+              </PartnerText>
             </Pressable>
           </View>
         </View>
@@ -397,32 +458,35 @@ export default function VendorVehiclesScreen() {
         <View style={styles.content}>
           {!isApproved ? (
             <View style={styles.pendingBanner}>
-              <Text style={styles.pendingText}>{PARTNER_WAITING_ADMIN_APPROVAL}</Text>
+              <PartnerText style={styles.pendingText}>{PARTNER_WAITING_ADMIN_APPROVAL}</PartnerText>
             </View>
           ) : null}
 
           {showForm ? (
             <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Register vehicle</Text>
+              <PartnerText style={styles.formTitle}>
+                {editingVehicle ? 'Edit vehicle' : 'Add vehicle'}
+              </PartnerText>
               <FormField
                 label="Registration number"
                 required
                 value={registrationNo}
                 onChangeText={setRegistrationNo}
+                editable={!editingVehicle}
                 autoCapitalize="characters"
                 error={errors.registrationNo}
                 placeholder="e.g. OD02AT1234"
               />
-              <Text style={styles.typeLabel}>Vehicle type</Text>
+              <PartnerText style={styles.typeLabel}>Vehicle type</PartnerText>
               <View style={styles.typeRow}>
                 {VEHICLE_TYPES.map(item => (
                   <Pressable
                     key={item}
                     onPress={() => setType(item)}
                     style={[styles.typeChip, type === item && styles.typeChipActive]}>
-                    <Text style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>
+                    <PartnerText style={[styles.typeChipText, type === item && styles.typeChipTextActive]}>
                       {item}
-                    </Text>
+                    </PartnerText>
                   </Pressable>
                 ))}
               </View>
@@ -443,17 +507,54 @@ export default function VendorVehiclesScreen() {
                 error={errors.year}
                 placeholder="2022"
               />
+              <FormField
+                label="RC number"
+                optional
+                value={rcNumber}
+                onChangeText={setRcNumber}
+                autoCapitalize="characters"
+                placeholder="e.g. OD0212345678"
+              />
+              <PartnerText style={styles.sectionHint}>
+                Insurance & RC details are stored as vehicle notes shown on jobs.
+              </PartnerText>
+              <FormField
+                label="Insurance provider"
+                optional
+                value={insuranceProvider}
+                onChangeText={setInsuranceProvider}
+                placeholder="e.g. ICICI Lombard"
+              />
+              <FormField
+                label="Insurance policy no"
+                optional
+                value={insurancePolicyNumber}
+                onChangeText={setInsurancePolicyNumber}
+                placeholder="Policy number"
+              />
+              <FormField
+                label="Insurance expiry"
+                optional
+                value={insuranceExpiry}
+                onChangeText={text => setInsuranceExpiry(text.replace(/[^0-9-]/g, '').slice(0, 10))}
+                error={errors.insuranceExpiry}
+                placeholder="YYYY-MM-DD"
+              />
               <Pressable
-                onPress={() => void submitCreate()}
-                disabled={createMutation.isPending}
+                onPress={() => (editingVehicle ? void submitEdit() : void submitCreate())}
+                disabled={createMutation.isPending || updateMutation.isPending}
                 style={({ pressed }) => [
                   styles.saveBtn,
                   pressed && styles.pressed,
-                  createMutation.isPending && styles.disabled,
+                  (createMutation.isPending || updateMutation.isPending) && styles.disabled,
                 ]}>
-                <Text style={styles.saveLabel}>
-                  {createMutation.isPending ? 'Saving…' : 'Save vehicle'}
-                </Text>
+                <PartnerText style={styles.saveLabel}>
+                  {createMutation.isPending || updateMutation.isPending
+                    ? 'Saving…'
+                    : editingVehicle
+                      ? 'Save changes'
+                      : 'Save vehicle'}
+                </PartnerText>
               </Pressable>
             </View>
           ) : null}
@@ -466,39 +567,39 @@ export default function VendorVehiclesScreen() {
               <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
                 <Truck size={16} color={INFO_BLUE} strokeWidth={2.2} />
               </View>
-              <Text style={styles.statValue}>{String(stats.total)}</Text>
-              <Text style={styles.statLabel}>Total vehicles</Text>
+              <PartnerText style={styles.statValue}>{String(stats.total)}</PartnerText>
+              <PartnerText style={styles.statLabel}>Total vehicles</PartnerText>
             </View>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: '#DCFCE7' }]}>
                 <CheckCircle2 size={16} color={SUCCESS_GREEN} strokeWidth={2.2} />
               </View>
-              <Text style={styles.statValue}>{String(stats.active)}</Text>
-              <Text style={styles.statLabel}>Active</Text>
-              <Text style={styles.statHint}>On duty and available.</Text>
+              <PartnerText style={styles.statValue}>{String(stats.active)}</PartnerText>
+              <PartnerText style={styles.statLabel}>Active</PartnerText>
+              <PartnerText style={styles.statHint}>On duty and available.</PartnerText>
             </View>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: colors.goldLight }]}>
                 <Wrench size={16} color={colors.primaryDark} strokeWidth={2.2} />
               </View>
-              <Text style={styles.statValue}>{String(stats.service)}</Text>
-              <Text style={styles.statLabel}>In service</Text>
-              <Text style={styles.statHint}>Maintenance ongoing.</Text>
+              <PartnerText style={styles.statValue}>{String(stats.service)}</PartnerText>
+              <PartnerText style={styles.statLabel}>In service</PartnerText>
+              <PartnerText style={styles.statHint}>Maintenance ongoing.</PartnerText>
             </View>
             <View style={styles.statCard}>
               <View style={[styles.statIcon, { backgroundColor: '#FEE2E2' }]}>
                 <XCircle size={16} color={colors.error} strokeWidth={2.2} />
               </View>
-              <Text style={styles.statValue}>{String(stats.inactive)}</Text>
-              <Text style={styles.statLabel}>Inactive</Text>
-              <Text style={styles.statHint}>Not in operation.</Text>
+              <PartnerText style={styles.statValue}>{String(stats.inactive)}</PartnerText>
+              <PartnerText style={styles.statLabel}>Inactive</PartnerText>
+              <PartnerText style={styles.statHint}>Not in operation.</PartnerText>
             </View>
           </ScrollView>
 
           <View style={styles.searchRow}>
             <View style={styles.searchBox}>
               <Search size={16} color={colors.grey} strokeWidth={2.2} />
-              <TextInput
+              <PartnerTextInput
                 value={search}
                 onChangeText={text => {
                   setSearch(text);
@@ -513,17 +614,17 @@ export default function VendorVehiclesScreen() {
 
           <View style={styles.filterRow}>
             <Pressable onPress={cycleStatusFilter} style={styles.filterPill}>
-              <Text style={styles.filterText}>{statusFilterLabel}</Text>
+              <PartnerText style={styles.filterText}>{statusFilterLabel}</PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
             <Pressable onPress={cycleTypeFilter} style={styles.filterPill}>
-              <Text style={styles.filterText}>
+              <PartnerText style={styles.filterText}>
                 {typeFilter === 'all' ? 'All vehicle types' : typeFilter}
-              </Text>
+              </PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
             <Pressable onPress={cycleSort} style={styles.filterPill}>
-              <Text style={styles.filterText}>Sort: {sortLabel}</Text>
+              <PartnerText style={styles.filterText}>Sort: {sortLabel}</PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
           </View>
@@ -533,10 +634,10 @@ export default function VendorVehiclesScreen() {
               <View style={styles.iconWrap}>
                 <Truck size={36} color={colors.primary} strokeWidth={2} />
               </View>
-              <Text style={styles.emptyTitle}>No vendor vehicles yet</Text>
-              <Text style={styles.emptySubtitle}>
+              <PartnerText style={styles.emptyTitle}>No vendor vehicles yet</PartnerText>
+              <PartnerText style={styles.emptySubtitle}>
                 Register a tow vehicle so you can assign it with a driver when a job comes in.
-              </Text>
+              </PartnerText>
             </View>
           ) : (
             pageItems.map(vehicle => {
@@ -551,23 +652,29 @@ export default function VendorVehiclesScreen() {
                     </View>
                     <View style={styles.vehicleMain}>
                       <View style={styles.plateRow}>
-                        <Text style={styles.plate}>{formatPlate(vehicle.registrationNo)}</Text>
+                        <PartnerText style={styles.plate}>{formatPlate(vehicle.registrationNo)}</PartnerText>
                         <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
-                          <Text style={[styles.typeBadgeText, { color: badge.text }]}>
+                          <PartnerText style={[styles.typeBadgeText, { color: badge.text }]}>
                             {badge.label}
-                          </Text>
+                          </PartnerText>
                         </View>
                       </View>
-                      <Text style={styles.modelLine}>
+                      <PartnerText style={styles.modelLine}>
                         {vehicle.model} • {vehicle.type}
-                      </Text>
+                      </PartnerText>
                       <View style={styles.specRow}>
-                        <Text style={styles.specText}>{tonnageFor(vehicle.type)}</Text>
+                        <PartnerText style={styles.specText}>{vehicle.type}</PartnerText>
+                        {vehicle.maintenanceNote ? (
+                          <>
+                            <PartnerText style={styles.specDot}>•</PartnerText>
+                            <PartnerText style={styles.specText} numberOfLines={1}>{vehicle.maintenanceNote}</PartnerText>
+                          </>
+                        ) : null}
                         {vehicle.year ? (
                           <>
-                            <Text style={styles.specDot}>•</Text>
+                            <PartnerText style={styles.specDot}>•</PartnerText>
                             <Calendar size={12} color={colors.grey} strokeWidth={2.2} />
-                            <Text style={styles.specText}>{String(vehicle.year)}</Text>
+                            <PartnerText style={styles.specText}>{String(vehicle.year)}</PartnerText>
                           </>
                         ) : null}
                       </View>
@@ -588,9 +695,9 @@ export default function VendorVehiclesScreen() {
                           !driver && styles.driverAvatarEmpty,
                         ]}>
                         {driver ? (
-                          <Text style={styles.driverInitial}>
+                          <PartnerText style={styles.driverInitial}>
                             {driver.name.charAt(0).toUpperCase()}
-                          </Text>
+                          </PartnerText>
                         ) : (
                           <User size={14} color={colors.grey} strokeWidth={2.2} />
                         )}
@@ -598,14 +705,14 @@ export default function VendorVehiclesScreen() {
                       <View style={{ flex: 1 }}>
                         {driver ? (
                           <>
-                            <Text style={styles.driverName}>{driver.name}</Text>
-                            <Text style={styles.driverPhone}>{driver.phone}</Text>
+                            <PartnerText style={styles.driverName}>{driver.name}</PartnerText>
+                            <PartnerText style={styles.driverPhone}>{driver.phone}</PartnerText>
                           </>
                         ) : (
                           <>
-                            <Text style={styles.driverNameMuted}>Not assigned</Text>
+                            <PartnerText style={styles.driverNameMuted}>Not assigned</PartnerText>
                             <Pressable onPress={() => openAssign(vehicle)} hitSlop={6}>
-                              <Text style={styles.assignLink}>Assign driver</Text>
+                              <PartnerText style={styles.assignLink}>Assign driver</PartnerText>
                             </Pressable>
                           </>
                         )}
@@ -613,10 +720,10 @@ export default function VendorVehiclesScreen() {
                     </View>
 
                     <View style={styles.statusBlock}>
-                      <Text style={[styles.statusLabel, { color: status.color }]}>
+                      <PartnerText style={[styles.statusLabel, { color: status.color }]}>
                         {status.label}
-                      </Text>
-                      <Text style={styles.statusSub}>{status.sub}</Text>
+                      </PartnerText>
+                      <PartnerText style={styles.statusSub}>{status.sub}</PartnerText>
                     </View>
                   </View>
                 </View>
@@ -626,15 +733,15 @@ export default function VendorVehiclesScreen() {
 
           {filtered.length > 0 ? (
             <View style={styles.pagination}>
-              <Text style={styles.pageMeta}>
+              <PartnerText style={styles.pageMeta}>
                 Showing {showingFrom} to {showingTo} of {filtered.length} vehicles
-              </Text>
+              </PartnerText>
               <View style={styles.pageControls}>
                 <Pressable
                   disabled={currentPage <= 1}
                   onPress={() => setPage(p => Math.max(1, p - 1))}
                   style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}>
-                  <Text style={styles.pageBtnText}>‹</Text>
+                  <PartnerText style={styles.pageBtnText}>‹</PartnerText>
                 </Pressable>
                 {Array.from({ length: totalPages }, (_, i) => i + 1)
                   .slice(0, 4)
@@ -643,13 +750,13 @@ export default function VendorVehiclesScreen() {
                       key={num}
                       onPress={() => setPage(num)}
                       style={[styles.pageBtn, num === currentPage && styles.pageBtnActive]}>
-                      <Text
+                      <PartnerText
                         style={[
                           styles.pageBtnText,
                           num === currentPage && styles.pageBtnTextActive,
                         ]}>
                         {String(num)}
-                      </Text>
+                      </PartnerText>
                     </Pressable>
                   ))}
                 <Pressable
@@ -659,7 +766,7 @@ export default function VendorVehiclesScreen() {
                     styles.pageBtn,
                     currentPage >= totalPages && styles.pageBtnDisabled,
                   ]}>
-                  <Text style={styles.pageBtnText}>›</Text>
+                  <PartnerText style={styles.pageBtnText}>›</PartnerText>
                 </Pressable>
               </View>
             </View>
@@ -674,25 +781,34 @@ export default function VendorVehiclesScreen() {
         onRequestClose={() => setMenuVehicle(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setMenuVehicle(null)}>
           <View style={styles.sheet}>
-            <Text style={styles.sheetTitle}>
+            <PartnerText style={styles.sheetTitle}>
               {menuVehicle ? formatPlate(menuVehicle.registrationNo) : 'Vehicle'}
-            </Text>
+            </PartnerText>
+            {menuVehicle ? (
+              <Pressable
+                style={styles.sheetItem}
+                onPress={() => startEdit(menuVehicle)}>
+                <PartnerText style={[styles.sheetItemText, { color: colors.primaryDark }]}>
+                  Edit details
+                </PartnerText>
+              </Pressable>
+            ) : null}
             <Pressable
               style={styles.sheetItem}
               onPress={() => menuVehicle && void setVehicleStatus(menuVehicle, 'ACTIVE')}>
-              <Text style={styles.sheetItemText}>Mark Active</Text>
+              <PartnerText style={styles.sheetItemText}>Mark Active</PartnerText>
             </Pressable>
             <Pressable
               style={styles.sheetItem}
               onPress={() =>
                 menuVehicle && void setVehicleStatus(menuVehicle, 'UNDER_MAINTENANCE')
               }>
-              <Text style={styles.sheetItemText}>Mark In service</Text>
+              <PartnerText style={styles.sheetItemText}>Mark Under maintenance</PartnerText>
             </Pressable>
             <Pressable
               style={styles.sheetItem}
               onPress={() => menuVehicle && void setVehicleStatus(menuVehicle, 'INACTIVE')}>
-              <Text style={styles.sheetItemText}>Mark Inactive</Text>
+              <PartnerText style={styles.sheetItemText}>Mark Inactive</PartnerText>
             </Pressable>
             {!driverByReg.get(normalizeReg(menuVehicle?.registrationNo)) ? (
               <Pressable
@@ -702,15 +818,15 @@ export default function VendorVehiclesScreen() {
                   setMenuVehicle(null);
                   if (vehicle) openAssign(vehicle);
                 }}>
-                <Text style={[styles.sheetItemText, { color: colors.primaryDark }]}>
+                <PartnerText style={[styles.sheetItemText, { color: colors.primaryDark }]}>
                   Assign driver
-                </Text>
+                </PartnerText>
               </Pressable>
             ) : null}
             <Pressable
               style={styles.sheetItem}
               onPress={() => menuVehicle && onRemove(menuVehicle)}>
-              <Text style={[styles.sheetItemText, { color: colors.error }]}>Remove vehicle</Text>
+              <PartnerText style={[styles.sheetItemText, { color: colors.error }]}>Remove vehicle</PartnerText>
             </Pressable>
           </View>
         </Pressable>
@@ -723,28 +839,28 @@ export default function VendorVehiclesScreen() {
         onRequestClose={() => setAssignVehicle(null)}>
         <Pressable style={styles.modalOverlay} onPress={() => setAssignVehicle(null)}>
           <Pressable style={styles.assignSheet} onPress={e => e.stopPropagation()}>
-            <Text style={styles.sheetTitle}>
+            <PartnerText style={styles.sheetTitle}>
               Assign driver
               {assignVehicle ? ` · ${formatPlate(assignVehicle.registrationNo)}` : ''}
-            </Text>
-            <Text style={styles.assignHint}>
+            </PartnerText>
+            <PartnerText style={styles.assignHint}>
               Choose a vendor driver to link with this vehicle.
-            </Text>
+            </PartnerText>
             <ScrollView style={{ maxHeight: 320 }}>
               {(unassignedDrivers.length > 0 ? unassignedDrivers : drivers).map(driver => (
                 <Pressable
                   key={driver.id}
                   style={styles.driverPick}
-                  onPress={() => void onAssignDriver(driver)}
-                  disabled={assignMutation.isPending}>
+                  onPress={() => void onLinkDriver(driver)}
+                  disabled={linkDriverMutation.isPending}>
                   <View style={styles.driverAvatar}>
-                    <Text style={styles.driverInitial}>{driver.name.charAt(0).toUpperCase()}</Text>
+                    <PartnerText style={styles.driverInitial}>{driver.name.charAt(0).toUpperCase()}</PartnerText>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.driverName}>{driver.name}</Text>
-                    <Text style={styles.driverPhone}>{driver.phone}</Text>
+                    <PartnerText style={styles.driverName}>{driver.name}</PartnerText>
+                    <PartnerText style={styles.driverPhone}>{driver.phone}</PartnerText>
                   </View>
-                  <Text style={styles.assignLink}>Assign</Text>
+                  <PartnerText style={styles.assignLink}>Assign</PartnerText>
                 </Pressable>
               ))}
             </ScrollView>
@@ -754,7 +870,7 @@ export default function VendorVehiclesScreen() {
                 goDrivers();
               }}
               style={styles.addDriverLink}>
-              <Text style={styles.assignLink}>Manage drivers</Text>
+              <PartnerText style={styles.assignLink}>Manage drivers</PartnerText>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -858,6 +974,11 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
   },
   typeChipTextActive: { color: colors.primaryDark },
+  sectionHint: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    lineHeight: 15,
+  },
   saveBtn: {
     backgroundColor: colors.primary,
     borderRadius: radius.button,

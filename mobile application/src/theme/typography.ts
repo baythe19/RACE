@@ -4,9 +4,16 @@ type FontSizeKey = keyof typeof typography.sizes;
 
 export const typography = {
   fontFamily: {
-    regular: 'System',
-    medium: 'System',
-    bold: 'System',
+    regular: 'Inter_400Regular',
+    medium: 'Inter_500Medium',
+    bold: 'Inter_700Bold',
+    inter: {
+      regular: 'Inter_400Regular',
+      medium: 'Inter_500Medium',
+      semibold: 'Inter_600SemiBold',
+      bold: 'Inter_700Bold',
+      extrabold: 'Inter_800ExtraBold',
+    },
   },
   sizes: {
     xs: 11,

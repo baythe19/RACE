@@ -1,6 +1,7 @@
 import type { DriverJobBooking } from '../services/driver/driverApi';
 import type { FleetVehicle } from '../services/vendor/vendorVehiclesApi';
 import type { VendorDriver } from '../services/vendor/vendorDriversApi';
+import type { VendorBookingItem } from '../services/vendor/vendorBookingsApi';
 import type { VendorDashboardStats } from '../services/vendor/vendorApi';
 import type { VendorProfileResponse } from '../types/vendor';
 import type { AuthUser } from '../types/auth';
@@ -359,6 +360,14 @@ export function acceptMockDriverJob(
   bookingId: string,
   bookingType: DriverJobBooking['bookingType'],
 ): DriverJobBooking | null {
+  // A driver cannot accept another job while an active trip is in progress
+  if (
+    mockActiveJobState &&
+    !['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)
+  ) {
+    return null;
+  }
+
   const offer = mockJobOffersState.find(
     job => job.id === bookingId && job.bookingType === bookingType,
   );
@@ -407,6 +416,73 @@ export const MOCK_VENDOR_VEHICLES: FleetVehicle[] = [
     status: 'ACTIVE',
     insuranceExpiry: '2026-11-20',
     createdAt: d1,
+  },
+];
+
+/** Preview-only fleet bookings list (awaiting driver / assigned / completed states). */
+export const MOCK_VENDOR_BOOKINGS: VendorBookingItem[] = [
+  {
+    bookingType: 'towing',
+    id: 'RACE-VND-BKG-001',
+    bookingNumber: 'TOW-10048',
+    status: 'DRIVER_EN_ROUTE',
+    serviceLabel: 'Instant Towing',
+    pickup: {
+      address: 'Janpath Road, Saheed Nagar, Bhubaneswar',
+    },
+    dropoff: {
+      address: 'Sector B, Mancheswar, Bhubaneswar',
+    },
+    estimatedFare: 1650,
+    createdAt: new Date(now.getTime() - 1000 * 60 * 40).toISOString(),
+    assignedFleetVehicleLabel: 'OD 02 TOW 1001 · Flatbed Tow Truck · Tata 407 Recovery',
+    driver: {
+      id: 'mock-driver-001',
+      name: 'Om Singh',
+      phone: '+918888880001',
+      rating: 4.9,
+    },
+  },
+  {
+    bookingType: 'towing',
+    id: 'RACE-VND-BKG-002',
+    bookingNumber: 'TOW-10040',
+    status: 'COMPLETED',
+    serviceLabel: 'Instant Towing',
+    pickup: {
+      address: 'Vani Vihar Square, Bhubaneswar',
+    },
+    dropoff: {
+      address: 'Rasulgarh Industrial Estate, Bhubaneswar',
+    },
+    estimatedFare: 1250,
+    finalFare: 1250,
+    createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 26).toISOString(),
+    assignedFleetVehicleLabel: 'OD 02 TOW 1002 · Wheel-Lift Tow Truck · Mahindra Bolero Maxi Truck',
+    driver: {
+      id: 'mock-driver-002',
+      name: 'Ramesh Kumar',
+      phone: '+918888880002',
+      rating: 4.8,
+    },
+  },
+  {
+    bookingType: 'driver',
+    id: 'RACE-VND-BKG-003',
+    bookingNumber: 'DRV-1024',
+    status: 'DRIVER_EN_ROUTE',
+    serviceLabel: 'Full-Time Driver',
+    pickup: {
+      address: 'Khandagiri Square, Bhubaneswar',
+    },
+    estimatedFare: 2400,
+    createdAt: new Date(now.getTime() - 1000 * 60 * 90).toISOString(),
+    driver: {
+      id: 'mock-driver-002',
+      name: 'Ramesh Kumar',
+      phone: '+918888880002',
+      rating: 4.8,
+    },
   },
 ];
 

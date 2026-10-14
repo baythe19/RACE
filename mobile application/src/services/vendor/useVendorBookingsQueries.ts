@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { approveVendorBooking, assignVendorBooking, listVendorBookingOffers } from './vendorBookingsApi';
+import {
+  approveVendorBooking,
+  assignVendorBooking,
+  listVendorBookings,
+  listVendorBookingOffers,
+  type VendorBookingItem,
+} from './vendorBookingsApi';
+export type { VendorBookingItem };
 import {
   createVendorVehicle,
   listVendorVehicles,
@@ -9,15 +16,31 @@ import {
   type CreateFleetVehicleInput,
   type UpdateFleetVehicleInput,
 } from './vendorVehiclesApi';
-import { createVendorDriver, listVendorDrivers, type CreateVendorDriverInput } from './vendorDriversApi';
+import {
+  createVendorDriver,
+  linkVendorDriverVehicle,
+  listVendorDrivers,
+  type CreateVendorDriverInput,
+} from './vendorDriversApi';
 import { driverQueryKeys } from '../driver/useDriverQueries';
 import { vendorDriverKeys } from './useVendorDriversQueries';
 
 export const vendorBookingQueryKeys = {
   offers: ['vendor', 'booking-offers'] as const,
+  bookings: ['vendor', 'bookings'] as const,
   drivers: ['vendor', 'drivers'] as const,
   vehicles: ['vendor', 'vehicles'] as const,
 };
+
+/** Fleet bookings after assignment: awaiting driver, assigned, in progress, completed. */
+export function useVendorBookingsQuery(enabled = true) {
+  return useQuery<VendorBookingItem[]>({
+    queryKey: vendorBookingQueryKeys.bookings,
+    queryFn: listVendorBookings,
+    enabled,
+    refetchInterval: 15_000,
+  });
+}
 
 export function useVendorBookingOffersQuery(enabled = true) {
   return useQuery({
@@ -102,7 +125,26 @@ export function useApproveVendorBookingMutation() {
     mutationFn: approveVendorBooking,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.offers });
+      void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.bookings });
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.offers });
+    },
+  });
+}
+
+/** Link (or unlink, with empty registration) a fleet driver to a vehicle. */
+export function useLinkVendorDriverVehicleMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      driverId,
+      vehicleRegistration,
+    }: {
+      driverId: string;
+      vehicleRegistration?: string | null;
+    }) => linkVendorDriverVehicle(driverId, vehicleRegistration),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: vendorDriverKeys.list });
+      void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.drivers });
     },
   });
 }

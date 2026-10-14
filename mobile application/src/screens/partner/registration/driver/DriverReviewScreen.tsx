@@ -1,15 +1,6 @@
+import { PartnerText } from '../../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   AlertCircle,
   ArrowRight,
@@ -227,10 +218,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                 <CheckCircle2 size={px(14)} color="#15803D" strokeWidth={2.4} />
               </View>
               <View style={styles.statusTextWrap}>
-                <Text style={[styles.statusSuccessTitle, { fontSize: px(12) }]}>Re-submission mode</Text>
-                <Text style={[styles.statusSuccessSubtitle, { fontSize: px(10.5) }]}>
+                <PartnerText style={[styles.statusSuccessTitle, { fontSize: px(12) }]}>Re-submission mode</PartnerText>
+                <PartnerText style={[styles.statusSuccessSubtitle, { fontSize: px(10.5) }]}>
                   Review your updated details below and tap Re-submit.
-                </Text>
+                </PartnerText>
               </View>
             </View>
           </View>
@@ -249,10 +240,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                 <CheckCircle2 size={px(14)} color="#15803D" strokeWidth={2.4} />
               </View>
               <View style={styles.statusTextWrap}>
-                <Text style={[styles.statusSuccessTitle, { fontSize: px(12) }]}>Ready to submit</Text>
-                <Text style={[styles.statusSuccessSubtitle, { fontSize: px(10.5) }]}>
+                <PartnerText style={[styles.statusSuccessTitle, { fontSize: px(12) }]}>Ready to submit</PartnerText>
+                <PartnerText style={[styles.statusSuccessSubtitle, { fontSize: px(10.5) }]}>
                   All required information and documents are complete.
-                </Text>
+                </PartnerText>
               </View>
             </View>
           </View>
@@ -271,12 +262,12 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                 <AlertCircle size={px(14)} color="#D97706" strokeWidth={2.4} />
               </View>
               <View style={styles.statusTextWrap}>
-                <Text style={[styles.statusWarningTitle, { fontSize: px(12) }]}>
+                <PartnerText style={[styles.statusWarningTitle, { fontSize: px(12) }]}>
                   {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} review items complete
-                </Text>
-                <Text style={[styles.statusWarningSubtitle, { fontSize: px(10.5) }]}>
+                </PartnerText>
+                <PartnerText style={[styles.statusWarningSubtitle, { fontSize: px(10.5) }]}>
                   {missingCoreDocs.length} pending document{missingCoreDocs.length > 1 ? 's' : ''}.
-                </Text>
+                </PartnerText>
               </View>
               <Pressable
                 hitSlop={8}
@@ -287,7 +278,7 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   })
                 }
                 style={[styles.statusRightActionBtn, { paddingVertical: px(3), paddingHorizontal: px(7) }]}>
-                <Text style={[styles.statusRightActionText, { fontSize: px(10.5) }]}>+ Add →</Text>
+                <PartnerText style={[styles.statusRightActionText, { fontSize: px(10.5) }]}>+ Add →</PartnerText>
               </Pressable>
             </View>
           </View>
@@ -314,14 +305,14 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   <User size={px(15)} color="#D97706" />
                 </View>
                 <View style={styles.summaryTitleRow}>
-                  <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Personal details</Text>
+                  <PartnerText style={[styles.summaryTitle, { fontSize: px(13) }]}>Personal details</PartnerText>
                   <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
-                    <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
+                    <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                   </View>
                 </View>
               </View>
               <View style={styles.editBtn}>
-                <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
                 <ChevronRight size={px(13)} color="#2563EB" />
               </View>
             </View>
@@ -330,23 +321,23 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  <Text style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</Text>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  <PartnerText style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</PartnerText>
                   {'  •  '}+91 {driverPersonal.mobileNumber || '9876543210'}
-                </Text>
+                </PartnerText>
               </View>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  DOB: <Text style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</Text>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  DOB: <PartnerText style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</PartnerText>
                   {'  •  '}{driverPersonal.city || 'Bhubaneswar'}
-                </Text>
+                </PartnerText>
               </View>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
-                  Address: <Text style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</Text>
-                </Text>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
+                  Address: <PartnerText style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</PartnerText>
+                </PartnerText>
               </View>
             </View>
           </Pressable>
@@ -372,14 +363,14 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   <Truck size={px(15)} color="#D97706" />
                 </View>
                 <View style={styles.summaryTitleRow}>
-                  <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Vehicle details</Text>
+                  <PartnerText style={[styles.summaryTitle, { fontSize: px(13) }]}>Vehicle details</PartnerText>
                   <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
-                    <Text style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</Text>
+                    <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                   </View>
                 </View>
               </View>
               <View style={styles.editBtn}>
-                <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
                 <ChevronRight size={px(13)} color="#2563EB" />
               </View>
             </View>
@@ -388,24 +379,24 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  Type: <Text style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</Text>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  Type: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</PartnerText>
                   {'  •  '}{driverVehicle.vehicleModel || 'Tata 407 Recovery Spec'}
-                </Text>
+                </PartnerText>
               </View>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  Plate: <Text style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</Text>
-                  {'  •  '}RC: <Text style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</Text>
-                </Text>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  Plate: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</PartnerText>
+                  {'  •  '}RC: <PartnerText style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</PartnerText>
+                </PartnerText>
               </View>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  DL: <Text style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</Text>
-                  {'  •  '}Ownership: <Text style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</Text>
-                </Text>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                  DL: <PartnerText style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</PartnerText>
+                  {'  •  '}Ownership: <PartnerText style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</PartnerText>
+                </PartnerText>
               </View>
             </View>
           </Pressable>
@@ -433,33 +424,33 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   {isAllCoreComplete ? (
                     <Check size={px(11)} color="#15803D" strokeWidth={3} />
                   ) : (
-                    <Text style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</Text>
+                    <PartnerText style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706' }}>!</PartnerText>
                   )}
                 </View>
                 <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
                   <FileText size={px(15)} color="#D97706" />
                 </View>
                 <View style={styles.summaryTitleRow}>
-                  <Text style={[styles.summaryTitle, { fontSize: px(13) }]}>Documents</Text>
+                  <PartnerText style={[styles.summaryTitle, { fontSize: px(13) }]}>Documents</PartnerText>
                   <View
                     style={[
                       styles.checkedPill,
                       { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) },
                       !isAllCoreComplete && { backgroundColor: '#FEF3C7' },
                     ]}>
-                    <Text
+                    <PartnerText
                       style={[
                         styles.checkedPillText,
                         { fontSize: px(9.5) },
                         !isAllCoreComplete && { color: '#B45309' },
                       ]}>
                       {coreUploadedCount}/{CORE_REVIEW_DOCUMENTS.length} Checked
-                    </Text>
+                    </PartnerText>
                   </View>
                 </View>
               </View>
               <View style={styles.editBtn}>
-                <Text style={[styles.editText, { fontSize: px(12) }]}>Edit</Text>
+                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
                 <ChevronRight size={px(13)} color="#2563EB" />
               </View>
             </View>
@@ -476,16 +467,16 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                         { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
                       ]}>
                       <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
-                      <Text style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</Text>
+                      <PartnerText style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</PartnerText>
                     </View>
                   ),
                 )}
               </View>
               <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <Text style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
                   {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
-                </Text>
+                </PartnerText>
               </View>
             </View>
           </Pressable>
@@ -506,12 +497,12 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
           ]}>
           <View style={styles.editPreviousLeft}>
             <Pencil size={px(13)} color="#B45309" strokeWidth={2.4} style={{ marginRight: px(7) }} />
-            <Text style={[styles.editPreviousLabel, { fontSize: px(12) }]}>
+            <PartnerText style={[styles.editPreviousLabel, { fontSize: px(12) }]}>
               Edit your previous details
-            </Text>
+            </PartnerText>
           </View>
           <View style={styles.editPreviousRight}>
-            <Text style={[styles.editPreviousActionText, { fontSize: px(11) }]}>Change info</Text>
+            <PartnerText style={[styles.editPreviousActionText, { fontSize: px(11) }]}>Change info</PartnerText>
             <ChevronRight size={px(12)} color="#B45309" strokeWidth={2.4} />
           </View>
         </Pressable>
@@ -530,9 +521,9 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
               ]}>
               <Info size={px(12)} color="#2563EB" strokeWidth={2.2} />
             </View>
-            <Text style={[styles.noticeBannerText, { fontSize: px(10.5), flex: 1 }]}>
+            <PartnerText style={[styles.noticeBannerText, { fontSize: px(10.5), flex: 1 }]}>
               Verification typically takes 2 to 4 hours after submission.
-            </Text>
+            </PartnerText>
           </View>
         </View>
 
@@ -548,10 +539,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             ]}>
             {confirmAgreed ? <Check size={px(11)} color="#FFFFFF" strokeWidth={3} /> : null}
           </View>
-          <Text style={[styles.checkboxLabel, { fontSize: px(11) }]}>
+          <PartnerText style={[styles.checkboxLabel, { fontSize: px(11) }]}>
             I confirm all details are genuine and agree to RACE{' '}
-            <Text style={styles.linkText}>Terms</Text> & <Text style={styles.linkText}>Privacy</Text>.
-          </Text>
+            <PartnerText style={styles.linkText}>Terms</PartnerText> & <PartnerText style={styles.linkText}>Privacy</PartnerText>.
+          </PartnerText>
         </Pressable>
 
         {/* Save and finish later link */}
@@ -562,7 +553,7 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             { marginBottom: px(4) },
             pressed && styles.pressed,
           ]}>
-          <Text style={[styles.saveLaterText, { fontSize: px(11.5) }]}>Save and finish later</Text>
+          <PartnerText style={[styles.saveLaterText, { fontSize: px(11.5) }]}>Save and finish later</PartnerText>
         </Pressable>
       </View>
 
@@ -574,10 +565,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <View>
-                <Text style={[styles.sheetTitle, { fontSize: px(15) }]}>Edit previous details</Text>
-                <Text style={[styles.sheetSubtitle, { fontSize: px(11.5), color: '#6B7280' }]}>
+                <PartnerText style={[styles.sheetTitle, { fontSize: px(15) }]}>Edit previous details</PartnerText>
+                <PartnerText style={[styles.sheetSubtitle, { fontSize: px(11.5), color: '#6B7280' }]}>
                   Select a section to modify before submission
-                </Text>
+                </PartnerText>
               </View>
               <Pressable hitSlop={12} onPress={() => setEditSectionModalVisible(false)}>
                 <X size={px(18)} color="#4B5563" />
@@ -599,10 +590,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   <User size={px(18)} color="#D97706" />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <Text style={[styles.pickerTitle, { fontSize: px(13.5) }]}>1. Personal details</Text>
-                  <Text style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
+                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>1. Personal details</PartnerText>
+                  <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
                     Full name, Mobile number, Date of birth, City, Address
-                  </Text>
+                  </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />
               </Pressable>
@@ -621,10 +612,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   <Truck size={px(18)} color="#D97706" />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <Text style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Vehicle details</Text>
-                  <Text style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
+                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Vehicle details</PartnerText>
+                  <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
                     Vehicle type, Plate number, Driving licence, Vehicle model
-                  </Text>
+                  </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />
               </Pressable>
@@ -643,10 +634,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                   <FileText size={px(18)} color="#D97706" />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <Text style={[styles.pickerTitle, { fontSize: px(13.5) }]}>3. Uploaded documents</Text>
-                  <Text style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
+                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>3. Uploaded documents</PartnerText>
+                  <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
                     RC, Driving licence, Insurance, Fitness, Vehicle photos
-                  </Text>
+                  </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />
               </Pressable>
@@ -655,7 +646,7 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             <Pressable
               onPress={() => setEditSectionModalVisible(false)}
               style={[styles.pickerCancelBtn, { marginTop: px(12), paddingVertical: px(10), borderRadius: px(10) }]}>
-              <Text style={[styles.pickerCancelText, { fontSize: px(13) }]}>Cancel</Text>
+              <PartnerText style={[styles.pickerCancelText, { fontSize: px(13) }]}>Cancel</PartnerText>
             </Pressable>
           </Pressable>
         </Pressable>

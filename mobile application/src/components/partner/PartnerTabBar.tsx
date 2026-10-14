@@ -1,3 +1,4 @@
+import { PartnerText } from './PartnerText';
 /**
  * RACE Partner — bottom tab bar.
  *
@@ -9,7 +10,7 @@
  */
 
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import {
   ClipboardList,
   House,
@@ -148,7 +149,7 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
                     justifyContent: 'center',
                     paddingHorizontal: px(3),
                   }}>
-                  <Text
+                  <PartnerText
                     style={{
                       fontSize: px(11),
                       lineHeight: px(13),
@@ -156,12 +157,12 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
                       color: C.white,
                     }}>
                     {pendingRequests > 9 ? '9+' : pendingRequests}
-                  </Text>
+                  </PartnerText>
                 </View>
               ) : null}
             </View>
 
-            <Text
+            <PartnerText
               style={[
                 T.tab,
                 {
@@ -172,7 +173,7 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
                 },
               ]}>
               {label}
-            </Text>
+            </PartnerText>
 
             <View
               style={{

@@ -1,17 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -146,10 +135,10 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
         </Pressable>
 
         <View style={styles.brandBlock}>
-          <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-          <Text style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
+          <PartnerText style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</PartnerText>
+          <PartnerText style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
             PARTNER
-          </Text>
+          </PartnerText>
         </View>
 
         <View style={styles.backButton} />
@@ -170,9 +159,9 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
               paddingBottom: insets.bottom + px(spacing.xl),
             },
           ]}>
-          <Text style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
+          <PartnerText style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
             Let's get your business registered
-          </Text>
+          </PartnerText>
 
           <Image
             source={images.homeHeroTruck}
@@ -197,24 +186,24 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
               activeStep={1}
             />
 
-            <Text style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
+            <PartnerText style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
               Tell us about your business
-            </Text>
-            <Text style={[styles.formSubtitle, { fontSize: px(13), lineHeight: px(19), marginTop: px(4) }]}>
+            </PartnerText>
+            <PartnerText style={[styles.formSubtitle, { fontSize: px(13), lineHeight: px(19), marginTop: px(4) }]}>
               Business details for your towing / roadside company.
-            </Text>
+            </PartnerText>
 
             <View style={{ marginTop: px(spacing.xl) }}>
-              <Text style={styles.fieldLabel}>
-                Business name <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={styles.fieldLabel}>
+                Business name <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   errors.businessName ? styles.inputError : null,
                   fieldValid.businessName ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorBusiness.businessName}
                   onChangeText={(businessName) => {
                     setVendorBusiness({ businessName });
@@ -226,18 +215,18 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                 />
                 <ValidCheck visible={fieldValid.businessName && !errors.businessName} />
               </View>
-              {errors.businessName ? <Text style={styles.error}>{errors.businessName}</Text> : null}
+              {errors.businessName ? <PartnerText style={styles.error}>{errors.businessName}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Owner name <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Owner name <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   errors.ownerName ? styles.inputError : null,
                   fieldValid.ownerName ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorBusiness.ownerName}
                   onChangeText={(ownerName) => {
                     setVendorBusiness({ ownerName });
@@ -249,15 +238,15 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                 />
                 <ValidCheck visible={fieldValid.ownerName && !errors.ownerName} />
               </View>
-              {errors.ownerName ? <Text style={styles.error}>{errors.ownerName}</Text> : null}
+              {errors.ownerName ? <PartnerText style={styles.error}>{errors.ownerName}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Mobile number <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Mobile number <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <View style={styles.phoneRow}>
                 <View style={styles.countryBox}>
-                  <Text style={styles.flag}>🇮🇳</Text>
-                  <Text style={styles.countryCode}>+91</Text>
+                  <PartnerText style={styles.flag}>🇮🇳</PartnerText>
+                  <PartnerText style={styles.countryCode}>+91</PartnerText>
                   <ChevronDown size={14} color={colors.grey} strokeWidth={2.5} />
                 </View>
                 <View
@@ -266,7 +255,7 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                     errors.mobileNumber ? styles.inputError : null,
                     mobileFocused || fieldValid.mobileNumber ? styles.inputValid : null,
                   ]}>
-                  <TextInput
+                  <PartnerTextInput
                     value={formatMobileDisplay(vendorBusiness.mobileNumber)}
                     onChangeText={(text) => {
                       setVendorBusiness({
@@ -285,18 +274,18 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                   <ValidCheck visible={fieldValid.mobileNumber && !errors.mobileNumber} />
                 </View>
               </View>
-              {errors.mobileNumber ? <Text style={styles.error}>{errors.mobileNumber}</Text> : null}
+              {errors.mobileNumber ? <PartnerText style={styles.error}>{errors.mobileNumber}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Email <Text style={styles.optional}>(optional)</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Email <PartnerText style={styles.optional}>(optional)</PartnerText>
+              </PartnerText>
               <View
                 style={[
                   styles.inputWrap,
                   errors.email ? styles.inputError : null,
                   vendorBusiness.email.trim() && fieldValid.email ? styles.inputValid : null,
                 ]}>
-                <TextInput
+                <PartnerTextInput
                   value={vendorBusiness.email}
                   onChangeText={(email) => {
                     setVendorBusiness({ email: email.trimStart() });
@@ -314,11 +303,11 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                   visible={Boolean(vendorBusiness.email.trim()) && fieldValid.email && !errors.email}
                 />
               </View>
-              {errors.email ? <Text style={styles.error}>{errors.email}</Text> : null}
+              {errors.email ? <PartnerText style={styles.error}>{errors.email}</PartnerText> : null}
 
-              <Text style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Business type <Text style={styles.required}>*</Text>
-              </Text>
+              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
+                Business type <PartnerText style={styles.required}>*</PartnerText>
+              </PartnerText>
               <Pressable
                 onPress={() =>
                   showSelectOptions(
@@ -336,21 +325,21 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                   errors.businessType ? styles.inputError : null,
                   fieldValid.businessType ? styles.inputValid : null,
                 ]}>
-                <Text
+                <PartnerText
                   style={[
                     styles.input,
                     !vendorBusiness.businessType && styles.placeholder,
                   ]}
                   numberOfLines={1}>
                   {vendorBusiness.businessType || 'Select business type'}
-                </Text>
+                </PartnerText>
                 {fieldValid.businessType && !errors.businessType ? (
                   <ValidCheck visible />
                 ) : (
                   <ChevronDown size={18} color={colors.grey} strokeWidth={2.4} />
                 )}
               </Pressable>
-              {errors.businessType ? <Text style={styles.error}>{errors.businessType}</Text> : null}
+              {errors.businessType ? <PartnerText style={styles.error}>{errors.businessType}</PartnerText> : null}
             </View>
 
             <Pressable
@@ -360,26 +349,26 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
                 { marginTop: px(spacing.xl), minHeight: px(54), borderRadius: px(14) },
                 pressed && styles.pressed,
               ]}>
-              <Text style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</Text>
+              <PartnerText style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</PartnerText>
               <ArrowRight size={px(18)} color={colors.dark} strokeWidth={2.5} />
             </Pressable>
 
             <View style={[styles.secureRow, { marginTop: px(spacing.lg) }]}>
               <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
-              <Text style={styles.secureText}>Your information is secure and encrypted</Text>
+              <PartnerText style={styles.secureText}>Your information is secure and encrypted</PartnerText>
             </View>
           </View>
 
           <View style={[styles.whyCard, { marginTop: px(spacing.lg), borderRadius: px(16) }]}>
-            <Text style={styles.whyTitle}>Why register with RACE?</Text>
+            <PartnerText style={styles.whyTitle}>Why register with RACE?</PartnerText>
             {WHY_ITEMS.map(({ title, subtitle, Icon }) => (
               <View key={title} style={styles.whyItem}>
                 <View style={styles.whyIcon}>
                   <Icon size={16} color={colors.primary} strokeWidth={2.2} />
                 </View>
                 <View style={styles.whyCopy}>
-                  <Text style={styles.whyItemTitle}>{title}</Text>
-                  <Text style={styles.whyItemSubtitle}>{subtitle}</Text>
+                  <PartnerText style={styles.whyItemTitle}>{title}</PartnerText>
+                  <PartnerText style={styles.whyItemSubtitle}>{subtitle}</PartnerText>
                 </View>
               </View>
             ))}

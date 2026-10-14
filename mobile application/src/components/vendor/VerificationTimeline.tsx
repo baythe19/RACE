@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { colors, spacing, typography } from '../../theme';
@@ -55,16 +56,16 @@ export default function VerificationTimeline({
               ) : null}
             </View>
             <View style={styles.content}>
-              <Text
+              <PartnerText
                 style={[
                   styles.label,
                   isLight && styles.labelLight,
                   active && (isLight ? styles.labelActiveLight : styles.labelActive),
                 ]}>
                 {stage.label}
-              </Text>
+              </PartnerText>
               {historyItem?.note ? (
-                <Text style={[styles.note, isLight && styles.noteLight]}>{historyItem.note}</Text>
+                <PartnerText style={[styles.note, isLight && styles.noteLight]}>{historyItem.note}</PartnerText>
               ) : null}
             </View>
           </View>
@@ -73,7 +74,7 @@ export default function VerificationTimeline({
       {isRejected ? (
         <View style={styles.rejectedBanner}>
           <Ionicons name="close-circle" size={18} color={colors.accentRed} />
-          <Text style={styles.rejectedText}>Application rejected</Text>
+          <PartnerText style={styles.rejectedText}>Application rejected</PartnerText>
         </View>
       ) : null}
     </View>
