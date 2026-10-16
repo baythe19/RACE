@@ -2,7 +2,7 @@
 
 **Audit snapshot:** 16 अक्टूबर 2026
 **Repository:** [`teamwebstarts-cmyk/RACE`](https://github.com/teamwebstarts-cmyk/RACE)
-**जाँची गई branch/commit:** `3.5.0-new-driver-screeens` / `33a524e` (14 अक्टूबर 2026)
+**जाँची गई source snapshot:** branch `3.5.0-new-driver-screeens`, base source `33a524e`; report commit `2494283` (docs only). Follow-up deep review: `2494283`.
 **दायरा:** Partner app, संबंधित backend/API, booking/dispatch, OTP, uploads, deployment config और MVP संचालन प्रवाह।
 **निर्णय:** **अभी वास्तविक ग्राहकों के लिए MVP launch पर NO-GO; सीमित internal demo/staging के लिए GO, यदि mock-mode को स्पष्ट रूप से demo तक सीमित रखें।**
 
@@ -151,6 +151,54 @@ MVP का win केवल app store पर चलना नहीं है।
 
 **लाभ:** account takeover/accidental mock data का जोखिम घटेगा। **लागत:** secret rotation, admin MFA setup और deployment configuration को सख्ती से चलाना।
 
+## अतिरिक्त P0 — deeper audit में मिले launch blockers
+
+### P0.7 — Client payment endpoint बिना gateway proof के payment success मान लेता है
+
+**सबूत:** `bookingPaymentValidator.ts:11-14` client से transaction ID और payment status लेता है। `bookingPayment.ts:34-43` payment session `stub_...` बनाता है; `verifyAdvance()`/`verifyFinal()` (`:130-189, 235-279`) सीधे `transaction.status = dto.status` save करके client के `success` पर booking के paid flags बदलते हैं। इस path में provider signature, server-to-server payment fetch या webhook proof नहीं है।
+
+**जोखिम:** authenticated customer अपना transaction बनाकर `success` भेज सकता है; advance booking `CONFIRMED` होकर dispatch होती है और final payment `FULLY_PAID` दिख सकती है—बिना capture proof के।
+
+**समाधान:** production में client status को authoritative न मानें। Backend gateway order बनाए; केवल signed webhook (raw body verification) या server-side gateway API verification से capture मानें। Transaction को conditional, idempotent `initiated → captured/failed` transition करें; amount/currency/order/customer match कर booking ledger update करें। Gateway उपलब्ध होने तक payment routes बंद रखकर manual reconciliation state दिखाएँ; stub केवल demo environment में।
+
+**स्वीकृति जाँच:** client `success` से paid state न बने; invalid/missing signature, गलत amount/currency/order और duplicate/out-of-order webhook reject/idempotent हों; capture proof के बाद ही paid flags बदलें।
+
+### P0.8 — OTP replay fallback verified MessageCentral record पर arbitrary code स्वीकार कर सकता है
+
+**सबूत:** `authRepository.ts:42-59` का `findRecentlyVerifiedOtpLog()` MessageCentral digit DB में न होने पर `mcVerificationId exists` को match करता है—submitted OTP से नहीं। `otp.ts:105-118` pending OTP न मिलने पर यह lookup successful हो तो verification लौटाता है; `auth.ts:167-195` token pair जारी करता है। Local OTP mode में भी recent verified OTP reuse idempotent माना जाता है।
+
+**जोखिम:** सही user के पहले OTP verify करने के बाद, उस phone के लिए arbitrary code भेजकर expiry window में नया session मिल सकता है। OTP one-time guarantee टूटती है।
+
+**समाधान:** recently-verified record से login authorize न करें। नई challenge पर provider हर बार verify करे। UX retry के लिए server-issued idempotency key original challenge/client से bind हो; arbitrary OTP से नहीं। Challenge को atomic single-consume रखें और parallel verification में एक ही session जारी हो।
+
+**स्वीकृति जाँच:** valid OTP के बाद random/replayed code और दूसरे client का replay कोई token न दें; concurrent verify में एक ही session; provider error पर fail closed।
+
+### P0.9 — Customer-authenticated status API booking को खुद confirm/start/complete कर सकती है
+
+**सबूत:** authenticated customer को `driverBookingRoutes.ts:16,29-33` और `towingBookingRoutes.ts:16,29-33` में `PATCH /api/v1/bookings/{driver|towing}/:id/status` मिलता है। Validator हर unified status स्वीकार करता है; services (`bookings/driverBooking.ts:169-209`, `towingBooking.ts:162-203`) केवल owner/admin check और generic transition graph लागू करती हैं—actor-specific permission, payment proof, driver assignment या OTP check नहीं। Generic route driver-specific OTP gate bypass करता है।
+
+**जोखिम:** owner बिना payment booking `CONFIRMED`, बिना driver `IN_PROGRESS/COMPLETED`, या dedicated cancellation/refund metadata के बिना `CANCELLED` कर सकता है। False history और premature driver release हो सकते हैं।
+
+**समाधान:** generic status mutation routes हटाएँ। Customer केवल policy-based cancel request; assigned driver ही progress/completion; trip start पर OTP consume; payment service/webhook ही booking confirm करे; vendor/admin अलग audited action करे। सभी transitions expected state + authorized actor + idempotency पर conditional atomic write हों।
+
+**स्वीकृति जाँच:** customer की हर operational status mutation 403/422; payment proof के बिना confirmation नहीं; driver का valid OTP cycle pass; refund/cancellation metadata सही path से; races में एक transition जीते।
+
+### P0.10 — Driver को वास्तविक job में hardcoded unrelated customer name/phone दिखता और dial हो सकता है
+
+**सबूत:** `mobile application/src/services/driver/driverApi.ts:48-51` कहता है backend customer contact नहीं भेजता; फिर भी `screens/partner/driver/DriverActiveJobScreen.tsx:1007-1014,1254-1262` active job पर `Rohit Sharma` और hardcoded phone render/call fallback देता है।
+
+**समाधान:** synthetic contact/call fallback हटाएँ। केवल assigned driver को backend-authorized masked/relay contact दिखाएँ; absent contact पर “उपलब्ध नहीं” + ops escalation दें।
+
+**स्वीकृति जाँच:** contact-less real payload में कोई नाम/फोन/call button नहीं; cross-booking contact access blocked; masked access policy verified।
+
+### P0.11 — Earnings, bank details और payout server evidence के बिना verified/completed दिखते हैं
+
+**सबूत:** `PartnerEarningsScreen.tsx:24-45,90-131,235,257-265` hardcoded amounts/trips/automated payout/completed payouts दिखाता है। `PartnerPayoutStore.ts:30-47` local bank/UPI data को `isVerified:true` रखता है; `PartnerBankDetailsScreen.tsx:57-105,332-333` 500ms local timeout के बाद API/provider proof के बिना verified बताती है।
+
+**समाधान:** screens को server-backed होने तक disable करें या manual-settlement/unavailable state दें। Earnings ledger से; bank verification server/provider/ops से; payout completed केवल ledger/provider confirmation पर। Demo data/verified flags production bundle से हटाएँ।
+
+**स्वीकृति जाँच:** fresh account पर fabricated records नहीं; local input verified नहीं बनता; केवल masked server-confirmed bank info; payout completion का ledger/provider event मौजूद हो।
+
 ## P1 — Pilot quality और recovery gates
 
 ### P1.1 — दो अलग bookings एक ही driver को concurrent dispatch में मिल सकती हैं
@@ -233,17 +281,7 @@ MVP का win केवल app store पर चलना नहीं है।
 
 **लाभ:** एक flow सही करने पर दूसरा कमजोर नहीं रहता। **लागत:** shared domain layer और कुछ refactor/migration।
 
-### P1.9 — Payment और settlement को MVP boundary में साफ़ रखें
-
-**सबूत:** `docs/ops/CLOUD_PRODUCTION_RUNBOOK.md` और `docs/RACE_REMAINING_WORK_AND_GAPS.md` payment/settlement अधूरा/stubbed बताते हैं। Audit ने payment gateway या live merchant account verify नहीं किया।
-
-**ठोस समाधान:** पहले तय करें कि pilot में payment app के बाहर (manual/cash/UPI) होगा या integrated। Manual हो तो app status `PAYMENT_PENDING_MANUAL`/`SETTLEMENT_PENDING` जैसे साफ़ states दिखाए, receipt/reference और reconciliation owner हो; “PAID” केवल verified evidence पर। Integrated हो तो provider webhook signature verification, idempotency, refund/cancel/reconciliation, failure handling, ledger entries और sandbox-to-production verification पूरा करें। Card/UPI data स्वयं store न करें; provider-hosted flow उपयोग करें।
-
-**स्वीकृति जाँच:** duplicate webhook से duplicate charge/ledger entry नहीं; failed/unknown payment booking को falsely paid न करे; refund/partial/cancel path documented और tested; daily reconciliation में totals match।
-
-**लाभ:** वित्तीय भरोसा और disputes के लिए evidence। **लागत:** integrated payments कई अतिरिक्त सप्ताह और compliance/ops work ले सकते हैं। Manual pilot तेज है, लेकिन collection/reconciliation staff चाहिए।
-
-### P1.10 — Failure/support operations product flow में first-class नहीं हैं
+### P1.9 — Failure/support operations product flow में first-class नहीं हैं
 
 **समस्या/evidence:** Source में booking/driver status primitives हैं, लेकिन इस audit में end-to-end ops console, stuck-job queue, contact/escalation SLA, document review queue और reconciliation runbook को पूर्णतः प्रमाणित नहीं किया गया। यह absence-of-evidence है; कुछ UI या external process मौजूद हो सकता है।
 
@@ -394,12 +432,67 @@ Line numbers are based on the audit snapshot; line numbers may move in later com
 | Socket auth/rooms/events | `backend/src/services/src/socket.ts` | handshake, client room join और booking broadcast paths |
 | Driver assignment race | `backend/src/services/src/bookings/driverAssignment.ts` | availability read, booking CAS, driver write, OTP event |
 | Vendor booking/OTP/vehicle | `backend/src/services/src/vendorBookings.ts` | vehicle check/assignment और OTP status update |
-| Vehicle lifecycle | `backend/src/services/src/vendorVehiclesService.ts` (repo filename capitalization may differ) | active booking guard review target |
+| Vehicle lifecycle | `backend/src/services/src/vendorVehicles.ts` (repo filename capitalization may differ) | active booking guard review target |
 | Driver approval defaults | `backend/src/services/src/vendorDrivers.ts` | non-production approval/verification/availability/location values |
 | Upload fallback/static serving | `backend/src/storage/src/index.ts`; `backend/src/app.ts`; `backend/src/middleware/upload.ts` | GCS/local fallback, static route, MIME handling |
 | Index synchronization | `backend/src/database/src/indexes.ts`; `backend/src/models/src/vendorDocument.ts` | syncIndexes startup list और declared unique index |
 | Health / env / payment docs | `backend/src/app.ts`; backend env schema; `docs/ops/CLOUD_PRODUCTION_RUNBOOK.md`; `docs/RACE_REMAINING_WORK_AND_GAPS.md` | health scope, defaults और payment scope evidence |
 
+## Follow-up deep audit: अन्य अतिरिक्त P1/P2 gaps
+
+ये source-level findings हैं; environment, app variant या policy पर निर्भर बातों को नीचे conditional रखा गया है। P0 section में दर्ज payment/OTP/customer-state/fake-contact/fake-payout findings को यहाँ दोबारा अलग gap नहीं गिना गया।
+
+### P1 — Admin assignment unapproved driver लगा सकती है और trip OTP बनाए बिना start dead-end हो सकता है
+
+`admin/adminServiceBookings.ts:15-29` role/availability जाँचकर `assignDriverToBooking()` call करता है। `bookings/driverAssignment.ts:579-645` eligibility देखता है पर approval status gate और OTP generation नहीं करता; OTP केवल `claimOpenBookingOffer()` में बनता है (`:483-489`)। Driver start endpoint बाद में OTP माँगता है (`driver.ts:251-253`)। **Fix:** सभी dispatch paths shared transaction/service से चलाएँ: approved/fresh driver, booking/resource reservation और OTP generation एक साथ; legacy path retire करें। **Test:** admin/auto-assigned booking accept→arrive→OTP→start पूरा हो; unapproved driver fail हो।
+
+### P1 — Reject/cancel races booking को resurrect या दूसरे active job को release कर सकती हैं
+
+`unassignDriverFromBooking()` (`driverAssignment.ts:656-686`) ID-only update करती है; cancellation paths stale doc save करते हैं (`bookings/driverBooking.ts:285-328`, towing equivalent), repository status updates expected-state filter नहीं लेते, और `releaseDriver()` (`driverAssignment.ts:648-653`) active booking unconditional clear करता है। **Fix:** status+assigned driver CAS; release में activeBookingId/type match; refunds/outbox idempotent। **Test:** reject-vs-cancel/accept, cancel-vs-start, duplicate cleanup—कोई resurrection/duplicate refund न हो और नया driver reservation न टूटे।
+
+### P1 — Concurrent create में booking number collision और network retry से duplicate jobs
+
+`generatePrefixedBookingNumber()` (`bookings/booking.ts:384-391`) count+1 उपयोग करता है; driver/towing create calls उसी count पर निर्भर हैं। Unique booking number के कारण simultaneous creates में एक duplicate-key failure संभव। Create routes में persisted idempotency key नहीं, इसलिए timeout retry दूसरी booking बना सकती है। **Fix:** atomic sequence या collision-resistant reference + bounded retry; customer/service-scoped idempotency key। **Test:** synchronized creates unique IDs दें; same-key retry वही booking लौटाए।
+
+### P1 — Self-driver KYC documents backend-readable storage में upload नहीं होते
+
+`DriverReviewScreen.tsx:82-86` और `DriverRegistrationFlowScreen.tsx:709-713` local device URI को `documents[].url` बनाते हैं; `driverSelf.ts:26-35,50-56` string store करता है। Self-driver upload endpoint नहीं मिला; vendor-managed driver upload अलग है। **Fix:** authenticated private upload, content validation, document review/access workflow जोड़ें; या pilot से self-onboarding CTA हटाकर vendor-only supply रखें। **Test:** reviewer server-stored private document खोल सके; upload failure/retry से approval या duplicate file न बने।
+
+### P1 — Account suspend के बाद existing access token expiry तक booking कर सकता है
+
+`middleware/src/auth.ts:6-25` केवल JWT verify करता है। Admin suspension उपलब्ध है, पर `controller/src/driverBooking.ts:9-13` token subject को create service देता है और `bookings/driverBooking.ts:95-132` account status recheck नहीं करती। **Fix:** centralized active-account/token-version/revocation check। **Test:** suspend के बाद उसी access token से protected write तुरंत 401/403; refresh भी denied।
+
+### P1 — Admin login के लिए dedicated throttling नहीं और password-reset response झूठा है
+
+`adminAuthRoutes.ts:15` login पर केवल validation; global limiter 200 requests/15 min/IP है। `adminAuth.ts:93-107` forgot-password में “reset link sent” कहता है पर केवल log करता है; reset हमेशा error देता है। **Fix:** admin-specific IP/account backoff + audit; functional one-time recovery या truthful documented ops rotation। **Test:** brute-force throttle; recovery/rotation वास्तविक रूप से pass, false success message नहीं।
+
+### P1 — Active-job map/ETA simulated; trip history fake data से वास्तविक job छिपा सकती है
+
+`DriverActiveJobScreen.tsx:774-780,923-928` 5.4km/12min fallback देता है; `DeliveryNavMap.tsx:66-100,169-187` hardcoded route पर timer से marker चलाता है। Screen real `LiveTripMap` render नहीं करती। Backend offer distance driver→pickup है, UI उसे trip distance कहती है। `PartnerTripHistoryScreen.tsx:16-21,27-45` empty/loading/error में sample rows दिखाती, unknown statuses को Completed करती और estimated fare को earned amount जैसा दिखाती है। **Fix:** actual coordinates/routing या honest external Maps CTA; unknown ETA unknown; explicit loading/error/empty; only server-completed/final ledger values. **Test:** known route/GPS match; no fake estimate when missing; empty/error has no demo trips; active status never Completed label।
+
+### P1 — Background location सुनिश्चित नहीं; network errors developer-specific/misleading हैं
+
+`useDriverLocationReporting.ts:38-80,85-105` foreground permission + JS interval पर निर्भर; background task/foreground service प्रमाणित नहीं। `mobile application/src/services/api.ts:120-129` किसी भी 429 को OTP limit बताता और network error पर dev host/Wi-Fi steps दिखा सकता है। **Fix:** consent/battery controls के साथ background location या foreground-only promise + stale GPS dispatch gate; endpoint-aware retry/support copy। **Test:** screen-off/external navigation device test; job/upload 429 OTP error न दिखाए; production message में internal host/commands न हों।
+
+### P1 — Partner store release project, CI और generated manifest का प्रमाण नहीं
+
+`mobile application/app.config.js` में Partner slug/owner है पर explicit EAS projectId नहीं; `docs/ops/CLOUD_PRODUCTION_RUNBOOK.md:6-7,21-26,62-72` पुराना है, Customer EAS पर केंद्रित और Partner Play scope से बाहर। Snapshot में checked-in `.github` workflows नहीं। Remote EAS/account/env, signing credentials, branch rules और external CI इस audit में verify नहीं। **Fix:** Partner EAS project/env/app ID, signed AAB, SHA/artifact manifest, staged rollout/rollback owner और required CI checks स्थापित करें। **Test:** intentional failing security/typecheck test release रोकता हो; generated manifest/API host/mock flags/permissions inspect हों। Repo evidence से live EAS absence सिद्ध नहीं—cloud owner से verify करें।
+
+### P1 — Public fare endpoint billed Maps request और silent ₹499 fallback कर सकता है
+
+`fareRoutes.ts:7-10` public unauthenticated है; `googleMaps.ts:23-45` towing quote पर billed Distance Matrix call करता है। Maps null/error पर `towingBooking.ts:99-102` fixed fallback fare बनाता है; `booking.ts:213-233` इसे ₹499 मानता है। Location schemas lat/lng range limit नहीं करतीं। **Fix:** endpoint-specific throttling/cache/provider timeout/quota alerts/region validation; outage में provisional quote/manual confirm, गलत route पर flat final-like price नहीं। **Test:** provider outage/slow/error, invalid coordinates और abuse पर truthful price तथा cost bound।
+
+### P1/P2 — Pricing timezone/duration contract अस्पष्ट
+
+`bookings/booking.ts:154-157` surcharge server-local `Date.getHours()` से तय है; यदि pilot tariff IST है और server UTC है तो रात के boundary पर quote बदल सकता है। `driverBookingValidator.ts:20-46` packageHours और arbitrary estimatedDurationHours inconsistent स्वीकार कर सकता है; `driverBooking.ts:104-120` fare package से पर duration अलग store कर सकता है। **Fix:** canonical duration/package, max horizon और explicit `Asia/Kolkata` timezone policy; boundary tests (21:59/22:00/05:59/06:00 IST) और mismatch rejects। Business tariff verify करना बाकी है।
+
+### P2 — QR endpoint public owner/emergency contact PII लौटाता है; feature contract तय करें
+
+`qrRoutes.ts:7-10` public; `vehicle.ts`/vehicle service valid vehicle ID पर owner/emergency phone/name देता है। Physical emergency QR का यह intended use हो सकता है; पर consent/data minimization/revocation तय नहीं। Minimum emergency relay/masked contact, owner consent, revoke/rotate और scan audit तय करें; sold/lost vehicle पर पुराना QR disable test करें।
+
+### P2 — अतिरिक्त defense-in-depth
+
+OTP send response existing-user/profile/role बताता (`services/src/auth.ts:145-164`); admin/user JWT secrets साझा हैं; OTP rate limiter in-process/IP आधारित है। Generic pre-verification response, separate admin/user keys/audience, distributed account+IP throttling और rotation अपनाएँ। ये OTP replay वाले P0 का विकल्प नहीं।
 ## तकनीकी निर्णयों के लिए प्राथमिक स्रोत
 
 यहाँ links solution design को support करते हैं; ये RACE deployment settings का प्रमाण नहीं हैं। जहाँ policy choice है (उदाहरण OTP TTL 5 मिनट, pilot thresholds), उसे suggested design कहा गया है।
@@ -414,6 +507,8 @@ Line numbers are based on the audit snapshot; line numbers may move in later com
 - MongoDB multi-document transactions deployment topology और operational cost के साथ plan करें: [MongoDB transactions](https://www.mongodb.com/docs/manual/core/transactions/)
 - Health probe में liveness और readiness अलग semantics रखते हैं; यहाँ वही operational distinction लागू करने की सलाह है, Kubernetes अपनाने की नहीं: [Kubernetes liveness, readiness and startup probes](https://kubernetes.io/docs/concepts/workloads/pods/probes/)
 - REST/API access control, validation और CORS को authentication/authorization का विकल्प न मानें: [OWASP REST Security Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html)
+- Payment signature को server पर verify करें और webhook authenticity जाँचें: [Razorpay payment signature verification](https://razorpay.com/docs/payments/server-integration/nodejs/payment-gateway/build-integration/), [Razorpay webhook validation](https://razorpay.com/docs/webhooks/validate-test/)
+- सीमित/कभी-कभार media access के लिए Android Photo Picker और Google Play की media permission policy जाँचें: [Google Play Photo and Video Permissions policy](https://support.google.com/googleplay/android-developer/answer/14016515?hl=en), [Android Photo Picker](https://developer.android.com/training/data-storage/shared/photopicker)
 
 ### अनिश्चितताएँ और जिनकी अलग verification बाकी है
 
@@ -427,7 +522,7 @@ Line numbers are based on the audit snapshot; line numbers may move in later com
 
 ## Go/No-Go निष्कर्ष
 
-**अभी customer-facing MVP: NO-GO.** सबसे पहले P0.1–P0.6 release isolation, OTP, socket authorization, document privacy, driver approval और admin/config defaults बंद करें। उसके बाद P1.1–P1.4 reservation/state correctness के concurrency tests pass होने चाहिए। बाकी P1 work के लिए named owner, tested manual fallback और explicit pilot scope चाहिए।
+**अभी customer-facing MVP: NO-GO.** सबसे पहले P0.1–P0.11 release isolation, OTP, socket authorization, document privacy, driver approval और admin/config defaults बंद करें। उसके बाद P1.1–P1.4 reservation/state correctness के concurrency tests pass होने चाहिए। बाकी P1 work के लिए named owner, tested manual fallback और explicit pilot scope चाहिए।
 
 **सीमित internal demo: GO**, बशर्ते वह demo data/authorized testers तक सीमित हो और live customer/KYC/payment न संभाले। Demo को Codespace preview flag से पहचानें; उसे production readiness evidence न मानें।
 
