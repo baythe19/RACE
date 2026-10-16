@@ -1,5 +1,5 @@
 import { PartnerText } from './PartnerText';
-import React, { type ReactNode } from 'react';
+import React, { type ReactNode, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,6 +42,7 @@ export default function PartnerScreenLayout({
   toast,
 }: PartnerScreenLayoutProps) {
   const insets = useSafeAreaInsets();
+  const [overlayHeight, setOverlayHeight] = useState(0);
 
   const body = (
     <>
@@ -98,7 +99,10 @@ export default function PartnerScreenLayout({
           {
             paddingHorizontal: layout.screenPadding,
             paddingTop: contentTopSpacing,
-            paddingBottom: footer || bottomBar ? spacing.lg : insets.bottom + spacing.xl,
+            paddingBottom:
+              footer || bottomBar
+                ? overlayHeight + spacing.lg
+                : insets.bottom + spacing.xl,
           },
           scrollContentStyle,
         ]}>
@@ -107,6 +111,7 @@ export default function PartnerScreenLayout({
 
       {footer ? (
         <View
+          onLayout={event => setOverlayHeight(event.nativeEvent.layout.height)}
           style={[
             styles.footer,
             {
@@ -120,6 +125,7 @@ export default function PartnerScreenLayout({
 
       {bottomBar ? (
         <View
+          onLayout={event => setOverlayHeight(event.nativeEvent.layout.height)}
           style={[
             styles.bottomBar,
             {

@@ -315,7 +315,20 @@ export default function VendorDriversScreen({}: Props) {
       Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
       return;
     }
-    if (!validate()) return;
+    if (!validate() || Object.values(errors).some(Boolean)) {
+      setFormStep(1);
+      return;
+    }
+    const missingRequired = VENDOR_DRIVER_DOCUMENTS.filter(
+      doc => doc.required && !driverDocuments.some(d => d.id === doc.id),
+    );
+    if (missingRequired.length > 0) {
+      Alert.alert(
+        'Documents missing',
+        `Upload required document(s): ${missingRequired.map(doc => doc.label).join(', ')}`,
+      );
+      return;
+    }
 
     try {
       const created = await createMutation.mutateAsync({
@@ -595,20 +608,24 @@ export default function VendorDriversScreen({}: Props) {
                   ))}
                 </View>
 
+                {(() => {
+                  const stepErrors = Object.values(errors).filter(Boolean);
+                  return stepErrors.length > 0 ? (
+                    <View style={styles.errorBanner}>
+                      <PartnerText style={styles.errorBannerText}>
+                        {stepErrors.length > 1
+                          ? `${stepErrors[0]} (+${stepErrors.length - 1} more field(s) need attention)`
+                          : stepErrors[0]}
+                      </PartnerText>
+                    </View>
+                  ) : null;
+                })()}
+
                 <Pressable
                   onPress={() => {
-                    const next: Record<string, string> = {};
-                    if (name.trim().length < 2) next.name = 'Enter driver full name';
-                    if (!isValidIndianMobile(phoneDigits)) {
-                      next.phone = 'Enter a valid 10-digit mobile';
-                    }
-                    if (licenseNo.trim().length < 4) next.licenseNo = 'Enter a valid license number';
-                    if (!/^[a-zA-Z0-9._-]{4,40}$/.test(loginId.trim())) {
-                      next.loginId = 'Login ID: 4–40 chars (letters, numbers, . _ -)';
-                    }
-                    if (password.length < 6) next.password = 'Password must be at least 6 characters';
-                    setErrors(next);
-                    if (Object.keys(next).length === 0) setFormStep(2);
+                    if (!validate()) return;
+                    setErrors({});
+                    setFormStep(2);
                   }}
                   style={({ pressed }) => [styles.saveBtn, pressed && styles.pressed]}>
                   <PartnerText style={styles.saveLabel}>Continue to documents</PartnerText>
@@ -671,6 +688,20 @@ export default function VendorDriversScreen({}: Props) {
                   style={styles.backStepLink}>
                   <PartnerText style={styles.backStepText}>← Back to details</PartnerText>
                 </Pressable>
+
+                {(() => {
+                  const missingRequired = VENDOR_DRIVER_DOCUMENTS.filter(
+                    doc => doc.required && !driverDocuments.some(d => d.id === doc.id),
+                  ).map(doc => doc.label);
+                  if (missingRequired.length === 0) return null;
+                  return (
+                    <View style={styles.errorBanner}>
+                      <PartnerText style={styles.errorBannerText}>
+                        {`Upload required document${missingRequired.length > 1 ? 's' : ''}: ${missingRequired.join(', ')}`}
+                      </PartnerText>
+                    </View>
+                  );
+                })()}
 
                 <Pressable
                   onPress={() => void submitCreate()}
@@ -1135,6 +1166,22 @@ const styles = StyleSheet.create({
     minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  errorBanner: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  errorBannerText: {
+    color: '#B91C1C',
+    fontSize: typography.sizes.xs,
+    lineHeight: typography.lineHeights.relaxed,
+    fontWeight: typography.weights.semibold,
   },
   saveLabel: {
     color: colors.dark,

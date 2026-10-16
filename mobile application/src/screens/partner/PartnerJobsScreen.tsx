@@ -793,12 +793,18 @@ const styles = StyleSheet.create({
   tabsRow: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    gap: spacing.sm,
+    gap: 6,
+    flexGrow: 0,
+    flexShrink: 0,
+    alignItems: 'flex-start',
   },
   tab: {
+    height: 28,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: colors.lightGrey,
     borderWidth: 1,
     borderColor: colors.border,
@@ -810,7 +816,7 @@ const styles = StyleSheet.create({
   tabText: {
     color: colors.grey,
     fontWeight: typography.weights.semibold,
-    fontSize: typography.sizes.sm,
+    fontSize: 12,
   },
   tabTextActive: { color: colors.dark },
   list: {

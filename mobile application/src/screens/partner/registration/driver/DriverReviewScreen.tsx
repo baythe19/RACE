@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
   FileText,
   Info,
@@ -56,6 +57,19 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
   const [confirmAgreed, setConfirmAgreed] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [editSectionModalVisible, setEditSectionModalVisible] = useState(false);
+  // Collapsible review sections: all collapsed by default. Accordion — one open at a time.
+  const [expandedSections, setExpandedSections] = useState<{
+    personal: boolean;
+    vehicle: boolean;
+    documents: boolean;
+  }>({ personal: false, vehicle: false, documents: false });
+
+  const toggleSection = (key: 'personal' | 'vehicle' | 'documents') =>
+    setExpandedSections((prev) => {
+      const next = { personal: false, vehicle: false, documents: false };
+      next[key] = !prev[key];
+      return next;
+    });
 
   const handleBack = () =>
     partnerRegistrationGoBack(navigation, 'DriverReview', route.params);
@@ -287,17 +301,12 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
         {/* Unified Compact Review Card (3 sections matching Board 1 Screen 4) */}
         <View style={[styles.summaryCard, { padding: px(10), marginBottom: px(8), borderRadius: px(12) }]}>
           {/* Section 1: Personal Details */}
-          <Pressable
-            hitSlop={8}
-            onPress={() =>
-              navigation.navigate('DriverPersonalInfo', {
-                ...route.params,
-                fromReview: true,
-              })
-            }
-            style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+          <View style={styles.summarySectionCol}>
             <View style={styles.summarySectionHeader}>
-              <View style={styles.summarySectionLeft}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => toggleSection('personal')}
+                style={({ pressed }) => [styles.summarySectionLeft, pressed && { opacity: 0.8 }]}>
                 <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
                   <Check size={px(11)} color="#15803D" strokeWidth={3} />
                 </View>
@@ -310,52 +319,70 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                     <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                   </View>
                 </View>
-              </View>
-              <View style={styles.editBtn}>
-                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
-                <ChevronRight size={px(13)} color="#2563EB" />
+              </Pressable>
+              <View style={styles.summarySectionRight}>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    navigation.navigate('DriverPersonalInfo', {
+                      ...route.params,
+                      fromReview: true,
+                    })
+                  }
+                  style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.8 }]}>
+                  <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
+                  <ChevronRight size={px(13)} color="#2563EB" />
+                </Pressable>
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => toggleSection('personal')}
+                  style={({ pressed }) => [styles.sectionDropdownBtn, pressed && { opacity: 0.8 }]}>
+                  <ChevronDown
+                    size={px(16)}
+                    color="#6B7280"
+                    strokeWidth={2.4}
+                    style={{ transform: [{ rotate: expandedSections.personal ? '180deg' : '0deg' }] }}
+                  />
+                </Pressable>
               </View>
             </View>
 
-            {/* Key Information Points (Personal Details) */}
-            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  <PartnerText style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</PartnerText>
-                  {'  •  '}+91 {driverPersonal.mobileNumber || '9876543210'}
-                </PartnerText>
+            {/* Key Information Points (Personal Details) — expands below the header */}
+            {expandedSections.personal && (
+              <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+                <View style={styles.reviewPointRow}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                    <PartnerText style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</PartnerText>
+                    {'  •  '}+91 {driverPersonal.mobileNumber || '9876543210'}
+                  </PartnerText>
+                </View>
+                <View style={styles.reviewPointRow}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                    DOB: <PartnerText style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</PartnerText>
+                    {'  •  '}{driverPersonal.city || 'Bhubaneswar'}
+                  </PartnerText>
+                </View>
+                <View style={styles.reviewPointRow}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
+                    Address: <PartnerText style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</PartnerText>
+                  </PartnerText>
+                </View>
               </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  DOB: <PartnerText style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</PartnerText>
-                  {'  •  '}{driverPersonal.city || 'Bhubaneswar'}
-                </PartnerText>
-              </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
-                  Address: <PartnerText style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</PartnerText>
-                </PartnerText>
-              </View>
-            </View>
-          </Pressable>
+            )}
+          </View>
 
           <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
 
           {/* Section 2: Vehicle Details */}
-          <Pressable
-            hitSlop={8}
-            onPress={() =>
-              navigation.navigate('DriverVehicleInfo', {
-                ...route.params,
-                fromReview: true,
-              })
-            }
-            style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+          <View style={styles.summarySectionCol}>
             <View style={styles.summarySectionHeader}>
-              <View style={styles.summarySectionLeft}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => toggleSection('vehicle')}
+                style={({ pressed }) => [styles.summarySectionLeft, pressed && { opacity: 0.8 }]}>
                 <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
                   <Check size={px(11)} color="#15803D" strokeWidth={3} />
                 </View>
@@ -368,53 +395,71 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                     <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                   </View>
                 </View>
-              </View>
-              <View style={styles.editBtn}>
-                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
-                <ChevronRight size={px(13)} color="#2563EB" />
+              </Pressable>
+              <View style={styles.summarySectionRight}>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    navigation.navigate('DriverVehicleInfo', {
+                      ...route.params,
+                      fromReview: true,
+                    })
+                  }
+                  style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.8 }]}>
+                  <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
+                  <ChevronRight size={px(13)} color="#2563EB" />
+                </Pressable>
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => toggleSection('vehicle')}
+                  style={({ pressed }) => [styles.sectionDropdownBtn, pressed && { opacity: 0.8 }]}>
+                  <ChevronDown
+                    size={px(16)}
+                    color="#6B7280"
+                    strokeWidth={2.4}
+                    style={{ transform: [{ rotate: expandedSections.vehicle ? '180deg' : '0deg' }] }}
+                  />
+                </Pressable>
               </View>
             </View>
 
-            {/* Key Vehicle Information Points */}
-            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  Type: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</PartnerText>
-                  {'  •  '}{driverVehicle.vehicleModel || 'Tata 407 Recovery Spec'}
-                </PartnerText>
+            {/* Key Vehicle Information Points — expands below the header */}
+            {expandedSections.vehicle && (
+              <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+                <View style={styles.reviewPointRow}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                    Type: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</PartnerText>
+                    {'  •  '}{driverVehicle.vehicleModel || 'Tata 407 Recovery Spec'}
+                  </PartnerText>
+                </View>
+                <View style={styles.reviewPointRow}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                    Plate: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</PartnerText>
+                    {'  •  '}RC: <PartnerText style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</PartnerText>
+                  </PartnerText>
+                </View>
+                <View style={styles.reviewPointRow}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                    DL: <PartnerText style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</PartnerText>
+                    {'  •  '}Ownership: <PartnerText style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</PartnerText>
+                  </PartnerText>
+                </View>
               </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  Plate: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</PartnerText>
-                  {'  •  '}RC: <PartnerText style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</PartnerText>
-                </PartnerText>
-              </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  DL: <PartnerText style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</PartnerText>
-                  {'  •  '}Ownership: <PartnerText style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</PartnerText>
-                </PartnerText>
-              </View>
-            </View>
-          </Pressable>
+            )}
+          </View>
 
           <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
 
           {/* Section 3: Documents */}
-          <Pressable
-            hitSlop={8}
-            onPress={() =>
-              navigation.navigate('DriverDocuments', {
-                ...route.params,
-                fromReview: true,
-              })
-            }
-            style={({ pressed }) => [styles.summarySectionCol, pressed && { opacity: 0.8 }]}>
+          <View style={styles.summarySectionCol}>
             <View style={styles.summarySectionHeader}>
-              <View style={styles.summarySectionLeft}>
+              <Pressable
+                hitSlop={8}
+                onPress={() => toggleSection('documents')}
+                style={({ pressed }) => [styles.summarySectionLeft, pressed && { opacity: 0.8 }]}>
                 <View
                   style={[
                     styles.headerCheckBadge,
@@ -448,64 +493,62 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
                     </PartnerText>
                   </View>
                 </View>
-              </View>
-              <View style={styles.editBtn}>
-                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
-                <ChevronRight size={px(13)} color="#2563EB" />
+              </Pressable>
+              <View style={styles.summarySectionRight}>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() =>
+                    navigation.navigate('DriverDocuments', {
+                      ...route.params,
+                      fromReview: true,
+                    })
+                  }
+                  style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.8 }]}>
+                  <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
+                  <ChevronRight size={px(13)} color="#2563EB" />
+                </Pressable>
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => toggleSection('documents')}
+                  style={({ pressed }) => [styles.sectionDropdownBtn, pressed && { opacity: 0.8 }]}>
+                  <ChevronDown
+                    size={px(16)}
+                    color="#6B7280"
+                    strokeWidth={2.4}
+                    style={{ transform: [{ rotate: expandedSections.documents ? '180deg' : '0deg' }] }}
+                  />
+                </Pressable>
               </View>
             </View>
 
-            {/* Key Document Status & Badges */}
-            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
-              <View style={styles.reviewDocTagsRow}>
-                {['RC Book', 'Driving licence', 'Vehicle insurance', 'Fitness cert', 'Vehicle photos'].map(
-                  (docTag) => (
-                    <View
-                      key={docTag}
-                      style={[
-                        styles.docReviewTag,
-                        { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
-                      ]}>
-                      <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
-                      <PartnerText style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</PartnerText>
-                    </View>
-                  ),
-                )}
+            {/* Key Document Status & Badges — expands below the header */}
+            {expandedSections.documents && (
+              <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
+                <View style={styles.reviewDocTagsRow}>
+                  {['RC Book', 'Driving licence', 'Vehicle insurance', 'Fitness cert', 'Vehicle photos'].map(
+                    (docTag) => (
+                      <View
+                        key={docTag}
+                        style={[
+                          styles.docReviewTag,
+                          { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
+                        ]}>
+                        <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
+                        <PartnerText style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</PartnerText>
+                      </View>
+                    ),
+                  )}
+                </View>
+                <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
+                  <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
+                  <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
+                    {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
+                  </PartnerText>
+                </View>
               </View>
-              <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
-                </PartnerText>
-              </View>
-            </View>
-          </Pressable>
+            )}
+          </View>
         </View>
-
-        {/* Prominent "Edit your previous details" Button */}
-        <Pressable
-          onPress={() => setEditSectionModalVisible(true)}
-          style={({ pressed }) => [
-            styles.editPreviousBtn,
-            {
-              paddingVertical: px(8),
-              paddingHorizontal: px(12),
-              borderRadius: px(10),
-              marginBottom: px(8),
-            },
-            pressed && styles.pressed,
-          ]}>
-          <View style={styles.editPreviousLeft}>
-            <Pencil size={px(13)} color="#B45309" strokeWidth={2.4} style={{ marginRight: px(7) }} />
-            <PartnerText style={[styles.editPreviousLabel, { fontSize: px(12) }]}>
-              Edit your previous details
-            </PartnerText>
-          </View>
-          <View style={styles.editPreviousRight}>
-            <PartnerText style={[styles.editPreviousActionText, { fontSize: px(11) }]}>Change info</PartnerText>
-            <ChevronRight size={px(12)} color="#B45309" strokeWidth={2.4} />
-          </View>
-        </Pressable>
 
         {/* Blue Informational Banner */}
         <View
@@ -543,17 +586,6 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
             I confirm all details are genuine and agree to RACE{' '}
             <PartnerText style={styles.linkText}>Terms</PartnerText> & <PartnerText style={styles.linkText}>Privacy</PartnerText>.
           </PartnerText>
-        </Pressable>
-
-        {/* Save and finish later link */}
-        <Pressable
-          onPress={handleBack}
-          style={({ pressed }) => [
-            styles.saveLaterLink,
-            { marginBottom: px(4) },
-            pressed && styles.pressed,
-          ]}>
-          <PartnerText style={[styles.saveLaterText, { fontSize: px(11.5) }]}>Save and finish later</PartnerText>
         </Pressable>
       </View>
 
@@ -963,6 +995,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginRight: 8,
+  },
+  summarySectionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sectionDropdownBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
   },
   sectionIconWrap: {
     backgroundColor: '#FEF3C7',

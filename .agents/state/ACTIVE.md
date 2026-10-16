@@ -5,6 +5,13 @@
 
 ---
 
+## Deep-recheck pass — Vendor UI (2026-10-14, branch 3.5.0-new-driver-screeens)
+
+- Re-verified all vendor deliverables/connections, then fixed 4 gaps: (1) production vendor-created drivers (`PENDING`) wrongly shown as Active in `VendorDriversScreen` — distinct Pending badge/stat/filter added; (2) vendor 403 "must be approved" message now recognized as the pending-approval state in `PartnerJobsScreen`; (3) `VendorAssignJobScreen` refetches offers+vehicles after approve failure (stale lead); (4) dead `useWindowDimensions` removed from `PartnerHomeScreen`.
+- Endpoint contracts re-verified against the `/api/v1/vendor` mount and zod validators; both new endpoints behind `authMiddleware` + `requireRole('vendor')`.
+- Final tree verified: `npx tsc --noEmit` in `mobile application/` = **exit 0** (includes the concurrent Active-Job refinements below); backend `npm run lint` = **exit 0** (backend untouched in the recheck).
+- Live-API smoke of `GET /vendor/bookings` + `POST /vendor/drivers/:id/assign-vehicle` and device screenshots still pending.
+
 ## Latest session — Driver Active Job Screen & Navigation Sheet Refinements (2026-10-14, branch feat/auth-screens-alignment)
 
 - **Removed "Tap to minimize" / "Tap for full trip details" Text & Arrows:** The bottom sheet header now displays only the sleek, centered dash handle (`-`). Tapping the dash handle toggles between compact and expanded views with zero unnecessary text.
@@ -18,6 +25,7 @@
   - **SVG Touch Interception Fix:** Added `pointerEvents="none"` to `<Svg>` in `DeliveryNavMap.tsx` so Android's native SVG view does not absorb touches, guaranteeing 100% reliable touch forwarding to the PanResponder.
   - **Small Screen & Large Font Protection:** Added `maxHeight: screenHeight - insets.top - px(54)` and wrapped the expanded detail card in a smooth `ScrollView`. This prevents buttons from clipping on compact Android devices or when system font scale is enlarged.
   - **High-DPI Touch Targets:** Added expanded `hitSlop` (`{ top: 16, bottom: 20, left: 50, right: 50 }`) on the dash drag handle and `hitSlop={8}` on all map controls (Zoom, Recenter, Compass) for effortless tapping on Android phones.
+- **Fluid Map Panning & Dragging:** Upgraded `PanResponder` in `DeliveryNavMap.tsx` using persistent `panRef` without re-creating handlers mid-drag, expanded pan limits to `±360/320`, added tap detection (`dist < 8px && elapsed < 350ms`), and set `onPanResponderTerminationRequest: () => false`.
 - **Verified:** `npx tsc --noEmit` in `mobile application/` exits 0 (zero errors), and `npm run lint` in `backend/` exits 0.
 
 ## Previous session — Vendor UI implementation (2026-10-14, branch 3.5.0-new-driver-screeens)

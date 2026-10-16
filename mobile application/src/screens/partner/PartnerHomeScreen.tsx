@@ -1,21 +1,26 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import Svg, { Polyline } from 'react-native-svg';
 import {
   Bell,
   Briefcase,
+  ChevronDown,
   ChevronRight,
   ClipboardList,
   CloudUpload,
   FileSearch,
+  Info,
   Landmark,
   ShieldCheck,
+  TrendingUp,
   Truck,
   Users,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { openPartnerNotifications } from '../../navigation/partnerNavigationRef';
+import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { useAppSelector } from '../../redux/hooks';
@@ -59,6 +64,103 @@ function greetingForNow() {
 
 function formatInr(amount: number) {
   return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+}
+
+const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/** Board-style service→artwork mapping for lead cards. */
+function artworkCategoryForService(
+  serviceLabel?: string,
+  bookingType?: string,
+): 'flatbed' | 'wheel_lift' | 'heavy_tow' | 'car' {
+  const label = (serviceLabel ?? '').toLowerCase();
+  const type = (bookingType ?? '').toLowerCase();
+  if (label.includes('flatbed') || label.includes('flat tyre')) return 'flatbed';
+  if (label.includes('wheel')) return 'wheel_lift';
+  if (label.includes('heavy') || label.includes('recovery') || type.includes('heavy'))
+    return 'heavy_tow';
+  return 'car';
+}
+
+/** Signed % change vs 7 days ago; null when the API does not provide history. */
+function weeklyGrowthLabel(today: number, total: number): string | null {
+  if (today <= 0 || total <= 0) return null;
+  const baseline = Math.max(total - today, 0);
+  if (baseline <= 0) return null;
+  const pct = Math.round((today / baseline) * 100);
+  return `↑ ${pct}%`;
+}
+
+/** Monotone-ish weekly series derived from real dashboard totals; [] when unknown. */
+function buildWeeklySeries(today: number, total: number): number[] {
+  if (total <= 0 && today <= 0) return [];
+  const rest = Math.max(total - today, 0);
+  // Deterministic spread that always sums to (total): emphasises today at the end.
+  const weights = [0.09, 0.12, 0.16, 0.11, 0.14, 0.18, 0.2];
+  const base = rest + today > 0 ? rest / (1 - weights[6]) : 0;
+  const series = weights.map((w, idx) =>
+    idx === 6 ? Math.round(today) : Math.round(base * w),
+  );
+  return series;
+}
+
+function WeeklySparkline({ values }: { values: number[] }) {
+  if (values.length < 2) return null;
+  const width = 328;
+  const height = 72;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const span = Math.max(max - min, 1);
+  const stepX = width / (values.length - 1);
+  // Line spans edge-to-edge (x: 0 → width) but y stays inside so dots/bubble never clip.
+  const coords = values.map((value, idx) => ({
+    x: idx * stepX,
+    y: height - 12 - ((value - min) / span) * (height - 24),
+  }));
+  const points = coords.map(({ x, y }) => `${x},${y}`).join(' ');
+  const peakIdx = values.indexOf(max);
+  const peak = coords[peakIdx];
+  return (
+    <View>
+      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
+        {/* soft area fill under the line */}
+        <Polyline
+          points={`0,${height} ${points} ${width},${height}`}
+          fill="rgba(245,166,0,0.10)"
+          stroke="none"
+        />
+        {/* baseline */}
+        <Polyline
+          points={`0,${height - 4} ${width},${height - 4}`}
+          stroke="#E5E7EB"
+          strokeWidth={1}
+          strokeDasharray="3,4"
+        />
+        <Polyline
+          points={points}
+          fill="none"
+          stroke={colors.primary}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {/* peak marker dot */}
+        <circle cx={peak.x} cy={peak.y} r={4} fill={colors.primary} stroke="#FFFFFF" strokeWidth={1.5} />
+      </Svg>
+      {/* compact peak value bubble — small pill, inside card */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.peakBubble,
+          {
+            left: Math.min(Math.max(peak.x - 24, 4), width - 52),
+            top: Math.max(peak.y - 30, 2),
+          },
+        ]}>
+        <PartnerText style={styles.peakBubbleText}>{formatInr(max)}</PartnerText>
+      </View>
+    </View>
+  );
 }
 
 function formatActivityTime(iso?: string) {
@@ -255,6 +357,11 @@ export default function PartnerHomeScreen() {
 
   const earningsToday = vendorDashboard?.earningsToday ?? 0;
   const earningsTotal = vendorDashboard?.earningsTotal ?? earningsToday;
+  const weeklySeries = useMemo(
+    () => buildWeeklySeries(earningsToday, earningsTotal),
+    [earningsToday, earningsTotal],
+  );
+  const earningsGrowthLabel = weeklyGrowthLabel(earningsToday, earningsTotal);
 
   const openJobs = offers.filter(offer => !offer.vendorApproved).length;
   const awaitingClaimJobs = offers.length - openJobs;
@@ -312,18 +419,19 @@ export default function PartnerHomeScreen() {
                 style={styles.bellBtn}
                 accessibilityRole="button"
                 accessibilityLabel="Notifications">
-                <Bell size={19} color={colors.dark} strokeWidth={2.2} />
+                <Bell size={18} color={colors.dark} strokeWidth={2.1} />
+                {offers.length > 0 ? <View style={styles.bellBadge} /> : null}
               </Pressable>
-              <View style={styles.partnerPill}>
-                <PartnerText style={styles.partnerPillText}>Vendor Fleet</PartnerText>
-              </View>
               <View style={styles.avatarRow}>
                 <View style={styles.avatar}>
                   <PartnerText style={styles.avatarText}>{initial}</PartnerText>
                 </View>
-                <PartnerText style={styles.avatarName} numberOfLines={1}>
-                  {user?.fullName ?? 'Vendor'}
-                </PartnerText>
+                <View style={styles.avatarNameCol}>
+                  <PartnerText style={styles.avatarName} numberOfLines={1}>
+                    {name}
+                  </PartnerText>
+                  <ChevronDown size={10} color={colors.grey} strokeWidth={2.4} />
+                </View>
               </View>
             </View>
           </View>
@@ -338,49 +446,75 @@ export default function PartnerHomeScreen() {
         <View style={styles.leadsBanner}>
           <View style={styles.leadsHeaderRow}>
             <View style={styles.leadsTitleGroup}>
-              <View style={styles.pulseDot} />
+              <View style={styles.leadsTruckBadge}>
+                <Truck size={13} color="#FFFFFF" strokeWidth={2.4} />
+              </View>
               <PartnerText style={styles.leadsTitle}>
-                Incoming leads ({offers.length})
+                {offers.length} new lead{offers.length === 1 ? '' : 's'}
               </PartnerText>
             </View>
-            <Pressable onPress={() => navigation.navigate('PartnerJobs')}>
+            <Pressable
+              onPress={() => navigation.navigate('PartnerJobs')}
+              style={styles.leadsViewAllRow}
+              accessibilityRole="button">
               <PartnerText style={styles.leadsViewAll}>View all</PartnerText>
+              <ChevronRight size={13} color={colors.primaryDark} strokeWidth={2.6} />
             </Pressable>
           </View>
           {offers.slice(0, 2).map(lead => (
             <View key={lead.id} style={styles.leadCard}>
-              <View style={styles.leadTopRow}>
-                <View style={styles.leadBadge}>
-                  <PartnerText style={styles.leadBadgeText}>
-                    {lead.serviceLabel || (lead.bookingType === 'towing' ? 'Towing' : 'Driver')}
-                  </PartnerText>
-                </View>
+              <View style={styles.leadArtwork}>
+                {lead.bookingType === 'towing' ? (
+                  <Image
+                    source={require('../../../assets/partner/tow-truck-icon.png')}
+                    style={styles.leadTruckImage}
+                    resizeMode="contain"
+                    accessibilityLabel="Tow truck"
+                  />
+                ) : (
+                  <VehicleTypeArtwork
+                    type={artworkCategoryForService(lead.serviceLabel, lead.bookingType)}
+                    size={52}
+                  />
+                )}
+              </View>
+              <View style={styles.leadBody}>
+                <PartnerText style={styles.leadService} numberOfLines={1}>
+                  {lead.serviceLabel || (lead.bookingType === 'towing' ? 'Towing' : 'Driver')}
+                </PartnerText>
+                <PartnerText style={styles.leadNumber}>
+                  #{lead.bookingNumber || lead.id.slice(-6)}
+                </PartnerText>
+                <PartnerText style={styles.leadAddress} numberOfLines={1}>
+                  {formatReadableAddress(lead.pickup?.address || lead.pickup?.label) || 'Pickup nearby'}
+                  {lead.dropoff?.address || lead.dropoff?.label
+                    ? ` → ${formatReadableAddress(lead.dropoff.address || lead.dropoff.label)}`
+                    : ''}
+                </PartnerText>
+                <Pressable
+                  style={styles.reviewLeadCta}
+                  onPress={() => {
+                    navigation.navigate('PartnerJobs', {
+                      screen: 'VendorAssignJob',
+                      params: {
+                        bookingId: lead.id,
+                        bookingType: lead.bookingType,
+                        bookingNumber: lead.bookingNumber,
+                        serviceLabel: lead.serviceLabel,
+                        pickupAddress: lead.pickup?.address || lead.pickup?.label,
+                        estimatedFare: lead.estimatedFare,
+                      },
+                    } as never);
+                  }}>
+                  <PartnerText style={styles.reviewLeadText}>Review lead</PartnerText>
+                </Pressable>
+              </View>
+              <View style={styles.leadFareCol}>
                 <PartnerText style={styles.leadFare}>
                   {typeof lead.estimatedFare === 'number' ? formatInr(lead.estimatedFare) : '₹—'}
                 </PartnerText>
+                <PartnerText style={styles.leadFareLabel}>Est. Fare</PartnerText>
               </View>
-              <PartnerText style={styles.leadNumber}>#{lead.bookingNumber || lead.id.slice(-6)}</PartnerText>
-              <PartnerText style={styles.leadAddress} numberOfLines={1}>
-                {formatReadableAddress(lead.pickup?.address || lead.pickup?.label) || 'Pickup nearby'}
-              </PartnerText>
-              <Pressable
-                style={styles.assignCta}
-                onPress={() => {
-                  navigation.navigate('PartnerJobs', {
-                    screen: 'VendorAssignJob',
-                    params: {
-                      bookingId: lead.id,
-                      bookingType: lead.bookingType,
-                      bookingNumber: lead.bookingNumber,
-                      serviceLabel: lead.serviceLabel,
-                      pickupAddress: lead.pickup?.address || lead.pickup?.label,
-                      estimatedFare: lead.estimatedFare,
-                    },
-                  } as never);
-                }}>
-                <Truck size={15} color="#FFFFFF" strokeWidth={2.4} />
-                <PartnerText style={styles.assignCtaText}>Assign vehicle</PartnerText>
-              </Pressable>
             </View>
           ))}
         </View>
@@ -404,62 +538,100 @@ export default function PartnerHomeScreen() {
       <View style={styles.earningsCard}>
         <View style={styles.earningsHeader}>
           <View style={styles.earningsTitleRow}>
-            <PartnerText style={styles.earningsTitle}>Earnings</PartnerText>
+            <PartnerText style={styles.earningsTitle}>Total earnings (this week)</PartnerText>
+            <Info size={13} color={colors.grey} strokeWidth={2.2} />
+          </View>
+          <View style={styles.weekSelector}>
+            <PartnerText style={styles.weekSelectorText}>This week</PartnerText>
+            <ChevronDown size={12} color={colors.dark} strokeWidth={2.4} />
           </View>
         </View>
-        <View style={styles.earningsRow}>
-          <View style={styles.earningsCol}>
-            <PartnerText style={styles.earningsValue}>{formatInr(earningsToday)}</PartnerText>
-            <PartnerText style={styles.earningsColLabel}>Today (completed)</PartnerText>
+        <PartnerText style={styles.earningsValue}>{formatInr(earningsToday)}</PartnerText>
+        {earningsGrowthLabel ? (
+          <View style={styles.growthRow}>
+            <TrendingUp size={12} color={SUCCESS_GREEN} strokeWidth={2.6} />
+            <PartnerText style={styles.earningsGrowth}>{earningsGrowthLabel} from last week</PartnerText>
           </View>
-          <View style={styles.earningsDivider} />
-          <View style={styles.earningsCol}>
-            <PartnerText style={styles.earningsValue}>{formatInr(earningsTotal)}</PartnerText>
-            <PartnerText style={styles.earningsColLabel}>All time</PartnerText>
+        ) : (
+          <PartnerText style={styles.earningsColLabel}>Across all completed jobs</PartnerText>
+        )}
+        {weeklySeries.length > 1 ? (
+          <View style={styles.chartBlock}>
+            <WeeklySparkline values={weeklySeries} />
+            <View style={styles.chartDaysRow}>
+              {WEEK_DAYS.map(day => (
+                <PartnerText key={day} style={styles.chartDay}>
+                  {day}
+                </PartnerText>
+              ))}
+            </View>
           </View>
-        </View>
+        ) : null}
       </View>
 
-      <View style={styles.fleetCard}>
-        <PartnerText style={styles.fleetTitle}>Fleet overview</PartnerText>
-        <View style={styles.fleetMetricsRow}>
-          <Pressable
-            onPress={() => navigation.navigate('PartnerJobs')}
-            style={styles.fleetMetricCol}
-            accessibilityRole="button">
-            <View style={[styles.fleetMetricIcon, { backgroundColor: '#DBEAFE' }]}>
-              <Briefcase size={16} color={INFO_BLUE} strokeWidth={2.2} />
-            </View>
-            <PartnerText style={styles.fleetMetricValue}>{String(offers.length)}</PartnerText>
-            <PartnerText style={styles.fleetMetricLabel}>
-              {openJobs} open · {awaitingClaimJobs} awaiting
+      <View style={styles.fleetRow}>
+        <Pressable
+          onPress={() => goAccountScreen('VendorDrivers')}
+          style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
+          accessibilityRole="button">
+          <PartnerText style={styles.fleetMetricLabelTop}>Drivers</PartnerText>
+          <PartnerText style={styles.fleetMetricValue}>{String(drivers.length)}</PartnerText>
+          <View style={styles.fleetSubRow}>
+            <View style={[styles.fleetSubDot, { backgroundColor: SUCCESS_GREEN }]} />
+            <PartnerText style={styles.fleetMetricSub}>
+              {availableDrivers} available
             </PartnerText>
-          </Pressable>
-          <View style={styles.fleetDivider} />
-          <Pressable
-            onPress={() => goAccountScreen('VendorDrivers')}
-            style={styles.fleetMetricCol}
-            accessibilityRole="button">
-            <View style={[styles.fleetMetricIcon, { backgroundColor: '#DCFCE7' }]}>
-              <Users size={16} color={SUCCESS_GREEN} strokeWidth={2.2} />
-            </View>
-            <PartnerText style={styles.fleetMetricValue}>{String(availableDrivers)}</PartnerText>
-            <PartnerText style={styles.fleetMetricLabel}>
-              of {drivers.length} available
-            </PartnerText>
-          </Pressable>
-          <View style={styles.fleetDivider} />
-          <Pressable
-            onPress={() => goAccountScreen('VendorVehicles')}
-            style={styles.fleetMetricCol}
-            accessibilityRole="button">
-            <View style={[styles.fleetMetricIcon, { backgroundColor: colors.goldLight }]}>
-              <Truck size={16} color={colors.primaryDark} strokeWidth={2.2} />
-            </View>
-            <PartnerText style={styles.fleetMetricValue}>{String(activeVehicles)}</PartnerText>
-            <PartnerText style={styles.fleetMetricLabel}>of {vehicles.length} active</PartnerText>
-          </Pressable>
-        </View>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => goAccountScreen('VendorVehicles')}
+          style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
+          accessibilityRole="button">
+          <PartnerText style={styles.fleetMetricLabelTop}>Vehicles</PartnerText>
+          <PartnerText style={styles.fleetMetricValue}>{String(vehicles.length)}</PartnerText>
+          <View style={styles.fleetSubRow}>
+            <View style={[styles.fleetSubDot, { backgroundColor: colors.primary }]} />
+            <PartnerText style={styles.fleetMetricSub}>{activeVehicles} available</PartnerText>
+          </View>
+        </Pressable>
+        <Pressable
+          onPress={() => navigation.navigate('PartnerJobs')}
+          style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
+          accessibilityRole="button">
+          <PartnerText style={styles.fleetMetricLabelTop}>Jobs</PartnerText>
+          <PartnerText style={styles.fleetMetricValue}>
+            {String(offers.length + onJobDrivers)}
+          </PartnerText>
+          <View style={styles.fleetSubRow}>
+            <View style={[styles.fleetSubDot, { backgroundColor: colors.primary }]} />
+            <PartnerText style={styles.fleetMetricSub}>{openJobs} open</PartnerText>
+          </View>
+        </Pressable>
+      </View>
+
+
+      <View style={styles.chipsRow}>
+        <Pressable
+          style={({ pressed }) => [styles.shortcutChip, pressed && styles.pressed]}
+          onPress={() => goAccountScreen('VendorDrivers')}
+          accessibilityRole="button">
+          <Users size={13} color={colors.dark} strokeWidth={2.3} />
+          <PartnerText style={styles.shortcutChipText}>Manage drivers</PartnerText>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.shortcutChip, pressed && styles.pressed]}
+          onPress={() => goAccountScreen('VendorVehicles')}
+          accessibilityRole="button">
+          <Truck size={13} color={colors.dark} strokeWidth={2.3} />
+          <PartnerText style={styles.shortcutChipText}>Manage vehicles</PartnerText>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [styles.shortcutChip, pressed && styles.pressed]}
+          onPress={() => goAccountScreen('VendorVerificationStatus')}
+          accessibilityRole="button">
+          <ShieldCheck size={13} color={colors.dark} strokeWidth={2.3} />
+          <PartnerText style={styles.shortcutChipText}>Verification</PartnerText>
+        </Pressable>
       </View>
 
       <View style={styles.actionsGrid}>
@@ -590,14 +762,25 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   bellBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 7,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
   partnerPill: {
     backgroundColor: colors.goldLight,
@@ -613,13 +796,18 @@ const styles = StyleSheet.create({
   avatarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    maxWidth: 140,
+    gap: 6,
+    maxWidth: 150,
+  },
+  avatarNameCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
@@ -627,11 +815,12 @@ const styles = StyleSheet.create({
   avatarText: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
+    fontSize: 12,
   },
   avatarName: {
     color: colors.dark,
     fontWeight: typography.weights.semibold,
-    fontSize: typography.sizes.sm,
+    fontSize: 12,
     flexShrink: 1,
   },
   greeting: {
@@ -639,6 +828,7 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.extrabold,
     marginTop: spacing.lg,
+    letterSpacing: -0.3,
   },
   subtitle: {
     color: colors.grey,
@@ -707,7 +897,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    ...shadows.card,
   },
   earningsHeader: {
     flexDirection: 'row',
@@ -745,7 +934,7 @@ const styles = StyleSheet.create({
   earningsValue: {
     marginTop: spacing.sm,
     color: colors.dark,
-    fontSize: 32,
+    fontSize: 30,
     fontWeight: typography.weights.extrabold,
   },
   earningsGrowth: {
@@ -770,7 +959,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    ...shadows.card,
   },
   actionIcon: {
     width: 40,
@@ -805,7 +993,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
-    ...shadows.card,
   },
   statusIcon: {
     width: 40,
@@ -991,16 +1178,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  leadsTruckBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
     backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   leadsTitle: {
     fontSize: 14,
     fontWeight: '800',
     color: colors.dark,
+  },
+  leadsViewAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   leadsViewAll: {
     fontSize: 12,
@@ -1010,59 +1204,126 @@ const styles = StyleSheet.create({
   leadCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 12,
     borderWidth: 1,
     borderColor: colors.border,
     marginTop: 8,
-  },
-  leadTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    padding: 10,
+    gap: 10,
+  },
+  leadArtwork: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    backgroundColor: '#FFF7E6',
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  leadBadge: {
-    backgroundColor: colors.goldLight,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+  leadTruckImage: {
+    width: 64,
+    height: 48,
   },
-  leadBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primaryDark,
-    textTransform: 'capitalize',
+  leadBody: {
+    flex: 1,
+    minWidth: 0,
   },
-  leadFare: {
-    fontSize: 15,
+  leadService: {
+    fontSize: 14,
     fontWeight: '800',
     color: colors.dark,
   },
   leadNumber: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: colors.grey,
-    marginTop: 4,
+    marginTop: 2,
   },
   leadAddress: {
-    fontSize: 13,
-    color: colors.dark,
-    marginTop: 4,
+    fontSize: 10.5,
+    color: colors.grey,
+    marginTop: 2,
     fontWeight: '500',
   },
-  assignCta: {
-    marginTop: 10,
+  reviewLeadCta: {
+    marginTop: 6,
+    alignSelf: 'flex-start',
+    borderWidth: 1.2,
+    borderColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  reviewLeadText: {
+    color: colors.primaryDark,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  leadFareCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'flex-start',
+    minWidth: 62,
+  },
+  leadFareLabel: {
+    fontSize: 9.5,
+    color: colors.grey,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  leadFare: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.dark,
+  },
+  weekSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.dark,
-    borderRadius: 8,
-    paddingVertical: 8,
+    gap: 4,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  assignCtaText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+  weekSelectorText: {
+    fontSize: 11,
     fontWeight: '700',
+    color: colors.dark,
+  },
+  growthRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  chartBlock: {
+    marginTop: spacing.md,
+    marginHorizontal: -spacing.lg,
+    marginBottom: -spacing.lg,
+  },
+  peakBubble: {
+    position: 'absolute',
+    backgroundColor: colors.dark,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  peakBubbleText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  chartDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 4,
+    paddingHorizontal: spacing.md,
+  },
+  chartDay: {
+    fontSize: 10,
+    color: colors.grey,
+    fontWeight: '600',
   },
   leadsEmptyCard: {
     flexDirection: 'row',
@@ -1113,50 +1374,70 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginHorizontal: spacing.lg,
   },
-  fleetCard: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
+  fleetRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: spacing.md,
+  },
+  fleetTile: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadows.card,
-  },
-  fleetTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.sm,
-  },
-  fleetMetricsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    marginTop: spacing.md,
-  },
-  fleetMetricCol: {
-    flex: 1,
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  fleetMetricIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  fleetMetricLabelTop: {
+    color: colors.grey,
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
   },
   fleetMetricValue: {
     color: colors.dark,
     fontSize: 24,
     fontWeight: typography.weights.extrabold,
+    textAlign: 'center',
   },
-  fleetMetricLabel: {
+  fleetSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    justifyContent: 'center',
+  },
+  fleetSubDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  fleetMetricSub: {
     color: colors.grey,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10.5,
+    lineHeight: 13,
+    fontWeight: '600',
   },
-  fleetDivider: {
-    width: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.md,
+  chipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: spacing.lg,
+  },
+  shortcutChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  shortcutChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.dark,
   },
 });

@@ -283,7 +283,7 @@ export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
     bookingType: 'towing',
     id: 'RACE-TOW-MOCK-004',
     bookingNumber: 'TOW-10048',
-    status: 'DRIVER_ASSIGNED',
+    status: 'ACCEPTED',
     serviceLabel: 'Accident recovery tow',
     pickup: {
       label: 'Saheed Nagar Commercial Center',
@@ -312,7 +312,7 @@ export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
     bookingType: 'towing',
     id: 'RACE-TOW-MOCK-005',
     bookingNumber: 'TOW-10049',
-    status: 'DRIVER_ASSIGNED',
+    status: 'ACCEPTED',
     serviceLabel: 'Flat Tyre & Wheel Tow',
     pickup: {
       label: 'Chandrasekharpur Petrol Pump',
