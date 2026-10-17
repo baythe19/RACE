@@ -15,6 +15,7 @@ interface FormFieldProps extends TextInputProps {
   error?: string;
   Icon?: LucideIcon;
   iconColor?: string;
+  leftElement?: ReactNode;
   rightElement?: ReactNode;
   helperText?: string;
   helperColor?: string;
@@ -32,6 +33,7 @@ export default function FormField({
   error,
   Icon,
   iconColor = colors.grey,
+  leftElement,
   rightElement,
   helperText,
   helperColor,
@@ -52,13 +54,14 @@ export default function FormField({
     <View
       style={[
         isOutlined ? styles.outlinedField : styles.field,
-        compact && isOutlined && {
+        compact && {
           minHeight: fieldHeight,
           paddingHorizontal: fieldPadH,
           borderRadius: fieldRadius,
         },
         error ? styles.fieldError : null,
       ]}>
+      {leftElement}
       {Icon ? (
         <View style={[styles.fieldIcon, compact && { marginRight: Math.round(8 * scale) }]}>
           <Icon size={iconSize} color={iconColor} />
@@ -121,9 +124,9 @@ export default function FormField({
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.labelRow}>
-        <PartnerText style={styles.label}>
+    <View style={[styles.container, compact && { marginBottom: Math.round(12 * scale) }]}>
+      <View style={[styles.labelRow, compact && { marginBottom: 5 }]}>
+        <PartnerText style={[styles.label, compact && { fontSize: labelSize }]}>
           {label}
           {required ? <PartnerText style={styles.required}> *</PartnerText> : null}
         </PartnerText>

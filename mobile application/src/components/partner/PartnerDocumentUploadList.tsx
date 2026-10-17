@@ -17,6 +17,7 @@ export interface PartnerDocumentFieldConfig {
   hint?: string;
   required: boolean;
   Icon: LucideIcon;
+  alternatives?: Array<{ id: string; label: string }>;
 }
 
 interface PartnerDocumentUploadListProps {
@@ -26,6 +27,7 @@ interface PartnerDocumentUploadListProps {
   /** `card` matches the RACE Partner documents design */
   variant?: 'default' | 'card';
   hideTitle?: boolean;
+  compact?: boolean;
 }
 
 export default function PartnerDocumentUploadList({
@@ -34,17 +36,18 @@ export default function PartnerDocumentUploadList({
   onUpload,
   variant = 'default',
   hideTitle = false,
+  compact = false,
 }: PartnerDocumentUploadListProps) {
   if (variant === 'card') {
     return (
       <View style={styles.cardList}>
         {documents.map(doc => {
-          const uploaded = uploadedIds.includes(doc.id);
+          const uploaded = uploadedIds.includes(doc.id) || Boolean(doc.alternatives?.some(option => uploadedIds.includes(option.id)));
           const Icon = doc.Icon;
 
           return (
-            <View key={doc.id} style={styles.cardRow}>
-              <View style={[styles.cardIconWrap, uploaded && styles.cardIconWrapDone]}>
+            <View key={doc.id} style={[styles.cardRow, compact && styles.compactCardRow]}>
+              <View style={[styles.cardIconWrap, compact && styles.compactIconWrap, uploaded && styles.cardIconWrapDone]}>
                 <Icon
                   size={18}
                   color={uploaded ? SUCCESS_GREEN : colors.primary}
@@ -53,11 +56,14 @@ export default function PartnerDocumentUploadList({
               </View>
 
               <View style={styles.cardCopy}>
-                <PartnerText style={styles.cardTitle}>
+                <PartnerText style={[styles.cardTitle, compact && styles.compactCardTitle]}>
                   {doc.label}
                   {doc.required ? <PartnerText style={styles.required}> *</PartnerText> : null}
                 </PartnerText>
                 {doc.hint ? <PartnerText style={styles.cardHint}>{doc.hint}</PartnerText> : null}
+                {compact ? <PartnerText style={styles.compactDocStatus}>
+                  {uploaded ? 'Ready to upload' : doc.required ? 'Not uploaded' : 'Optional'}
+                </PartnerText> : null}
               </View>
 
               {uploaded ? (
@@ -70,7 +76,7 @@ export default function PartnerDocumentUploadList({
               ) : (
                 <Pressable
                   onPress={() => void pickDocument(doc, uploaded, onUpload)}
-                  style={({ pressed }) => [styles.uploadPill, pressed && styles.pressed]}>
+                  style={({ pressed }) => [styles.uploadPill, compact && styles.compactUploadPill, pressed && styles.pressed]}>
                   <CloudUpload size={14} color={colors.dark} strokeWidth={2.4} />
                   <PartnerText style={styles.uploadPillLabel}>Upload</PartnerText>
                 </Pressable>
@@ -93,7 +99,7 @@ export default function PartnerDocumentUploadList({
     <View>
       {hideTitle ? null : <PartnerText style={styles.listTitle}>Required Documents</PartnerText>}
       {documents.map(doc => {
-        const uploaded = uploadedIds.includes(doc.id);
+        const uploaded = uploadedIds.includes(doc.id) || Boolean(doc.alternatives?.some(option => uploadedIds.includes(option.id)));
         const Icon = doc.Icon;
 
         return (
@@ -153,6 +159,16 @@ async function pickDocument(
   uploaded: boolean,
   onUpload: PartnerDocumentUploadListProps['onUpload'],
 ) {
+  if (doc.alternatives?.length) {
+    Alert.alert(doc.label, 'Choose the document type to upload.', [
+      ...doc.alternatives.map(option => ({
+        text: option.label,
+        onPress: () => void launchPicker({ ...doc, ...option, alternatives: undefined }, onUpload),
+      })),
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+    return;
+  }
   if (uploaded) {
     Alert.alert(doc.label, 'Document already uploaded. Pick again to replace?', [
       { text: 'Cancel', style: 'cancel' },
@@ -350,6 +366,11 @@ const styles = StyleSheet.create({
   cardList: {
     gap: spacing.sm,
   },
+  compactCardRow: { gap: 8, padding: 8, minHeight: 62, borderRadius: 10 },
+  compactIconWrap: { width: 32, height: 32, borderRadius: 8 },
+  compactCardTitle: { fontSize: 11, lineHeight: 14 },
+  compactDocStatus: { fontSize: 9, color: colors.grey, marginTop: 3 },
+  compactUploadPill: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',

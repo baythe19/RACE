@@ -140,6 +140,16 @@ export class VendorController {
     return sendSuccess(res, result);
   });
 
+  resetDriverPassword = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await vendorDriversService.resetDriverPassword(
+      user.id,
+      getParamId(req.params.id),
+      req.body,
+    );
+    return sendSuccess(res, result);
+  });
+
   uploadDriverDocument = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const file = req.file;

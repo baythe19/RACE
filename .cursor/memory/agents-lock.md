@@ -6,8 +6,8 @@ If the surface you need is already claimed, **stop** and tell the user. Do not s
 
 True isolation (optional, user must ask): git worktrees — one branch/worktree per agent. Still update this file.
 
-| cursor-agent | partner | Partner tab bar pixel-perfect rebuild (PartnerTabBar) | 2026-10-17 |
-
+| Claimed | Surface | Task | Session note |
+|---------|---------|------|----------------|
 
 
 

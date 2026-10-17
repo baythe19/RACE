@@ -40,8 +40,11 @@ const GREY = '#A6A8B4';
 
 type TabRouteName = keyof PartnerTabParamList;
 
-/** Screens that own the whole viewport — bar hidden while focused. */
-const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob']);
+/**
+ * Screens that own the whole viewport: while one of them is focused the bar is
+ * hidden so the map and the single primary action keep the full height.
+ */
+const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob', 'VendorAssignJob']);
 
 const TAB_CONFIG: Record<TabRouteName, { label: string; Icon: LucideIcon }> = {
   PartnerHome: { label: 'Home', Icon: House },
@@ -61,7 +64,12 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
 
   const activeRoute = state.routes[state.index];
   const nestedRouteName = activeRoute ? getFocusedRouteNameFromRoute(activeRoute) : undefined;
-  if (nestedRouteName && FULLSCREEN_ROUTES.has(nestedRouteName)) {
+  const nestedState = activeRoute?.state;
+  const nestedLeaf = nestedState?.routes[nestedState.index ?? 0];
+  const vendorDriverWizardIsFullScreen =
+    nestedRouteName === 'VendorDrivers' &&
+    Boolean((nestedLeaf?.params as { fullScreen?: boolean } | undefined)?.fullScreen);
+  if ((nestedRouteName && FULLSCREEN_ROUTES.has(nestedRouteName)) || vendorDriverWizardIsFullScreen) {
     return null;
   }
 

@@ -1,11 +1,15 @@
 import React from 'react';
-import { Pressable } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackHeaderLeftProps } from '@react-navigation/native-stack';
 
 import { colors } from '../../theme';
 
+/**
+ * Shared stack back arrow — plain chevron-style arrow, no outline button box,
+ * matching the reference boards (bare arrow on the page background).
+ */
 export default function StackBackButton({ canGoBack }: NativeStackHeaderLeftProps) {
   const navigation = useNavigation();
   const allowBack = canGoBack || navigation.canGoBack();
@@ -22,10 +26,22 @@ export default function StackBackButton({ canGoBack }: NativeStackHeaderLeftProp
         }
       }}
       hitSlop={12}
-      style={{ marginLeft: 4, padding: 6, minWidth: 40, minHeight: 40, justifyContent: 'center' }}
+      style={styles.hit}
       accessibilityRole="button"
       accessibilityLabel="Go back">
-      <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
+      <ArrowLeft size={21} color={colors.dark} strokeWidth={2.4} />
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  hit: {
+    marginLeft: 2,
+    paddingLeft: 8,
+    paddingRight: 14,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    // No background, border, or rounded box — bare arrow like the boards.
+  },
+});

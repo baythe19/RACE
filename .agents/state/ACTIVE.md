@@ -311,3 +311,13 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 - Recreate `customerweb/`, `partnerweb/`, `web application/`, `race-service/`
 - Delete unused-looking screens without an import graph
 - Commit `.env` or secrets
+
+
+## Vendor UI — Peach screenshot review (2026-10-17)
+
+- Used the existing Peach v0.1.1594 CLI, runtime v0.1.1473 and Metro 8082 in this Codespace; no Expo restart. Used isolated simulator b6 and did not take the user's leased b1 simulator.
+- Applied driver list/details/documents layout, compact form and document components, single-header/full-screen route behavior, assignment card/layout and vendor API/navigation type updates before the concurrent Cursor partner claim appeared. Preserved pre-existing Home/Vehicles edits. No commit or push.
+- Captured and visually reviewed /tmp/race-drivers-final.png, /tmp/race-driver-details-final.png and /tmp/race-driver-documents-final.png. Details -> documents navigation and missing-required-documents Save guard were exercised with dummy draft input; no driver was created or booking assigned. Preview screenshots do not verify real backend uploads/approval.
+- Applied mobile npm run lint (tsc --noEmit) passed; git diff --check passed.
+- Final four-file Jobs/Assign/progress/compact-document refinements remain unapplied in /tmp/race-vendor-pending-final-fixes.patch. New offers are currently omitted from the Jobs card list, so the Assign path still needs that fix and a screenshot pass. Patch passed read-only git apply --check and TypeScript in a temporary copy.
+- Stopped partner source writes when Cursor claimed partner; user explicitly confirmed Cursor is still working. Re-read Cursor's finished changes and the lock before reconciling/applying the pending patch.

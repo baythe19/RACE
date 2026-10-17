@@ -10,7 +10,11 @@ import { storageService } from '../../storage/src/index';
 import { UserModel, type IUser } from '../../models/src/user';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
 import { driverRepository } from './driverRepository';
-import type { AssignVendorDriverVehicleDto, CreateVendorDriverDto } from './vendorDriversValidator';
+import type {
+  AssignVendorDriverVehicleDto,
+  CreateVendorDriverDto,
+  ResetVendorDriverPasswordDto,
+} from './vendorDriversValidator';
 
 function mapVendorDriver(user: IUser) {
   const profile = user.driverProfile;
@@ -181,6 +185,32 @@ export class VendorDriversService {
     driver.driverProfile.passwordHash = undefined;
     await driver.save();
     return { removed: true, driverId };
+  }
+
+  /**
+   * Vendor sets a new password for a fleet driver's Login ID sign-in
+   * (driver forgot their password). The hash is never returned.
+   */
+  async resetDriverPassword(
+    vendorUserId: string,
+    driverId: string,
+    dto: ResetVendorDriverPasswordDto,
+  ) {
+    await this.assertVendor(vendorUserId);
+    const driver = await UserModel.findOne({ _id: driverId, role: 'driver' })
+      .select('+driverProfile.passwordHash')
+      .exec();
+    if (!driver?.driverProfile) throw new NotFoundError('Driver not found');
+    if (driver.driverProfile.vendorUserId?.toString() !== vendorUserId) {
+      throw new ForbiddenError('Driver is not on your vendor team');
+    }
+    if (!driver.driverProfile.loginId) {
+      throw new BadRequestError('This driver has no Login ID. Edit the driver to add one.');
+    }
+
+    driver.driverProfile.passwordHash = await hashDriverPassword(dto.password);
+    await driver.save();
+    return { reset: true, driverId };
   }
 
   /**

@@ -87,7 +87,7 @@ function PartnerJobsStackNavigator() {
       <JobsStack.Screen
         name="VendorAssignJob"
         component={VendorAssignJobScreen}
-        options={{ headerTitle: 'Assign job' }}
+        options={{ headerShown: false }}
       />
     </JobsStack.Navigator>
   );
@@ -149,7 +149,7 @@ function PartnerAccountStackNavigator() {
       <AccountStack.Screen
         name="VendorDrivers"
         component={VendorDriversScreen}
-        options={{ headerTitle: 'Vendor drivers' }}
+        options={{ headerShown: false }}
       />
       <AccountStack.Screen
         name="VendorVehicles"

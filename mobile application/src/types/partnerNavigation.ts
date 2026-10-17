@@ -61,6 +61,7 @@ export type PartnerJobsStackParamList = {
     bookingNumber: string;
     serviceLabel: string;
     pickupAddress?: string;
+    dropoffAddress?: string;
     estimatedFare?: number;
   };
 };
@@ -77,6 +78,6 @@ export type PartnerAccountStackParamList = {
   PartnerBankDetails: undefined;
   PartnerTripHistory: undefined;
   VendorVerificationStatus: undefined;
-  VendorDrivers: undefined;
+  VendorDrivers: { fullScreen?: boolean } | undefined;
   VendorVehicles: undefined;
 };

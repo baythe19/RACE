@@ -23,6 +23,10 @@ import type {
   PartnerRole,
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
+import {
+  isVendorDriverLoginError,
+  VENDOR_DRIVER_LOGIN_HINT,
+} from '../../../utils/vendorDriverLoginError';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 import { isUiTestPermissiveMode } from '../../../constants/preview';
 import { colors, radius, spacing, typography } from '../../../theme';
@@ -57,6 +61,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
   const [verified, setVerified] = useState(false);
   const [backendOtpToast, setBackendOtpToast] = useState('');
+  const [vendorDriverCta, setVendorDriverCta] = useState(false);
   const verifyLockRef = useRef(false);
   const backendOtpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -164,7 +169,14 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         goToRegistration(role);
         return;
       } catch (err) {
-        if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode() || finalCode === '123456' || finalCode === '000000') {
+        if (isVendorDriverLoginError(err)) {
+          setError(VENDOR_DRIVER_LOGIN_HINT);
+          setVendorDriverCta(true);
+          setOtp('');
+          verifyLockRef.current = false;
+          return;
+        }
+        if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode()) {
           const fallbackRole = resolvePartnerRole();
           setVerified(true);
 
@@ -243,6 +255,11 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         otpMessage: result.message,
       });
     } catch (err) {
+      if (isVendorDriverLoginError(err)) {
+        setError(VENDOR_DRIVER_LOGIN_HINT);
+        setVendorDriverCta(true);
+        return;
+      }
       if (isRoleMismatchError(err)) {
         setError(
           getRoleMismatchMessage(
@@ -264,7 +281,15 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
       subtitle="Enter the 6-digit code sent to your mobile"
       onBack={() => navigation.goBack()}
       toast={
-        backendOtpToast ? (
+        vendorDriverCta ? (
+          <AuthToast
+            message={VENDOR_DRIVER_LOGIN_HINT}
+            type="error"
+            actionLabel="Login with ID"
+            onAction={() => navigation.navigate('PartnerVendorDriverLogin')}
+            onDismiss={() => setVendorDriverCta(false)}
+          />
+        ) : backendOtpToast ? (
           <AuthToast
             message={backendOtpToast}
             type="info"
@@ -273,11 +298,10 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
               const code =
                 extractOtpFromMessage(backendOtpToast) ??
                 devOtp ??
-                extractOtpFromMessage(otpMessage) ??
-                '123456';
-              setOtp(code);
+                extractOtpFromMessage(otpMessage);
+              setOtp(code ?? '');
               setBackendOtpToast('');
-              void handleVerify(code);
+              if (code) void handleVerify(code);
             }}
             onDismiss={() => setBackendOtpToast('')}
           />
@@ -322,7 +346,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         }}
         disabled={loading || verified}
         onComplete={(code) => void handleVerify(code)}
-        suggestedOtp={devOtp ?? extractOtpFromMessage(otpMessage) ?? (UI_PREVIEW_MODE ? '123456' : undefined)}
+        suggestedOtp={devOtp ?? extractOtpFromMessage(otpMessage) ?? undefined}
         onClear={() => {
           setOtp('');
           setError('');

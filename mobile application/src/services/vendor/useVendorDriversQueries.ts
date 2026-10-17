@@ -5,6 +5,7 @@ import {
   createVendorDriver,
   listVendorDrivers,
   removeVendorDriver,
+  resetVendorDriverPassword,
   type CreateVendorDriverInput,
 } from './vendorDriversApi';
 
@@ -44,6 +45,17 @@ export function useRemoveVendorDriverMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (driverId: string) => removeVendorDriver(driverId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: vendorDriverKeys.list });
+    },
+  });
+}
+
+export function useResetVendorDriverPasswordMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ driverId, password }: { driverId: string; password: string }) =>
+      resetVendorDriverPassword(driverId, password),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: vendorDriverKeys.list });
     },

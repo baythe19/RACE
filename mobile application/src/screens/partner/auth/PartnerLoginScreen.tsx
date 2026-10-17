@@ -32,6 +32,10 @@ import type {
   PartnerRole,
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
+import {
+  isVendorDriverLoginError,
+  VENDOR_DRIVER_LOGIN_HINT,
+} from '../../../utils/vendorDriverLoginError';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 import { isUiTestPermissiveMode } from '../../../constants/preview';
 import { Sparkles } from 'lucide-react-native';
@@ -63,6 +67,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState('');
+  const [vendorDriverCta, setVendorDriverCta] = useState(false);
   const [focused, setFocused] = useState(false);
 
   const sendOtpMutation = useSendOtpMutation();
@@ -205,6 +210,11 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             'This number belongs to another app role. Use the RACE Customer app or a different number.',
           ),
         );
+        return;
+      }
+      if (isVendorDriverLoginError(err)) {
+        setError(VENDOR_DRIVER_LOGIN_HINT);
+        setVendorDriverCta(true);
         return;
       }
       if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode()) {
@@ -382,6 +392,32 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
             {/* Error Message Toast */}
             <AuthToast message={error} type="error" position="inline" onDismiss={() => setError('')} />
+
+            {/* Vendor-driver 409: jump to Login ID / password screen */}
+            {vendorDriverCta ? (
+              <Pressable
+                onPress={() => navigation.navigate('PartnerVendorDriverLogin')}
+                style={({ pressed }) => [
+                  {
+                    minHeight: px(46),
+                    borderRadius: px(12),
+                    borderWidth: 1.5,
+                    borderColor: '#F59E0B',
+                    backgroundColor: '#FFFDF5',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: px(12),
+                    paddingHorizontal: px(16),
+                  },
+                  pressed && { opacity: 0.85 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="Login with ID and password">
+                <PartnerText style={{ fontSize: px(14.5), fontWeight: '700', color: '#B45309' }}>
+                  Login with ID &amp; password →
+                </PartnerText>
+              </Pressable>
+            ) : null}
 
             {/* Primary CTA: Send OTP */}
             <Pressable

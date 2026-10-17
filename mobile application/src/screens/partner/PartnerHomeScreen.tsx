@@ -36,7 +36,7 @@ import { useVendorDashboardQuery, useVendorStatusQuery } from '../../services/ve
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
 import type { VerificationStage, VendorProfileResponse } from '../../types/vendor';
 import { formatReadableAddress } from '../../utils/readableAddress';
-import { colors, layout, radius, shadows, spacing, typography } from '../../theme';
+import { colors, layout, radius, spacing, typography } from '../../theme';
 
 const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
@@ -503,23 +503,42 @@ export default function PartnerHomeScreen() {
                 </PartnerText>
                 <View style={styles.leadAddressCol}>
                   {[
-                    lead.pickup?.address || lead.pickup?.label
-                      ? formatReadableAddress(lead.pickup.address || lead.pickup.label)
-                      : 'Pickup nearby',
+                    {
+                      key: 'pickup',
+                      text: lead.pickup?.address
+                        ? formatReadableAddress(
+                            lead.pickup.label
+                              ? `${lead.pickup.label}, ${lead.pickup.address}`
+                              : lead.pickup.address,
+                          )
+                        : lead.pickup?.label
+                          ? formatReadableAddress(lead.pickup.label)
+                          : 'Pickup nearby',
+                    },
                     lead.dropoff?.address || lead.dropoff?.label
-                      ? `→  ${formatReadableAddress(lead.dropoff.address || lead.dropoff.label)}`
+                      ? {
+                          key: 'drop',
+                          text: lead.dropoff?.address
+                            ? formatReadableAddress(
+                                lead.dropoff.label
+                                  ? `${lead.dropoff.label}, ${lead.dropoff.address}`
+                                  : lead.dropoff.address,
+                              )
+                            : formatReadableAddress(lead.dropoff!.label!),
+                        }
                       : null,
                   ]
                     .filter(Boolean)
                     .map((addr, idx) => (
-                      <View key={idx} style={styles.leadAddrLine}>
-                        {idx === 0 ? (
-                          <MapPin size={12} color={colors.primary} strokeWidth={2.4} />
-                        ) : (
-                          <View style={styles.leadAddrDot} />
-                        )}
+                      <View key={addr!.key} style={styles.leadAddrLine}>
+                        <MapPin
+                          size={12}
+                          color={idx === 0 ? colors.primary : colors.grey}
+                          strokeWidth={2.4}
+                          fill={idx === 0 ? colors.primary : 'transparent'}
+                        />
                         <PartnerText style={styles.leadAddrText} numberOfLines={1}>
-                          {addr}
+                          {addr!.text}
                         </PartnerText>
                       </View>
                     ))}
@@ -914,7 +933,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    ...shadows.card,
   },
   onlineCardActive: {
     borderColor: colors.primary,
@@ -1141,7 +1159,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.lg,
     marginBottom: spacing.lg,
-    ...shadows.card,
   },
   activityHeader: {
     flexDirection: 'row',
@@ -1316,12 +1333,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-  },
-  leadAddrDot: {
-    width: 12,
-    height: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   leadAddrText: {
     fontSize: 11.5,

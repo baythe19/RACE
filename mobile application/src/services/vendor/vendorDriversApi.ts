@@ -70,8 +70,8 @@ export async function createVendorDriver(payload: CreateVendorDriverInput): Prom
         licenseNo: payload.licenseNo,
         city: payload.city || 'Bhubaneswar',
         vehicleRegistration: payload.vehicleRegistration,
-        status: 'APPROVED',
-        isAvailable: true,
+        status: 'PENDING',
+        isAvailable: false,
         isBusy: false,
         rating: 5.0,
         vendorId: 'mock-vendor-001',
@@ -133,6 +133,26 @@ export async function removeVendorDriver(driverId: string): Promise<void> {
     if (UI_PREVIEW_MODE) {
       const idx = MOCK_VENDOR_DRIVERS.findIndex(d => d.id === driverId);
       if (idx !== -1) MOCK_VENDOR_DRIVERS.splice(idx, 1);
+      return;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Vendor sets a new Login-ID password for a fleet driver.
+ * Mirrors POST /vendor/drivers/:id/reset-password. The hash never leaves the backend.
+ */
+export async function resetVendorDriverPassword(
+  driverId: string,
+  password: string,
+): Promise<void> {
+  try {
+    await api.post(API_ENDPOINTS.vendorDriverResetPassword(driverId), { password });
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      const driver = MOCK_VENDOR_DRIVERS.find(d => d.id === driverId);
+      if (driver) driver.hasPasswordLogin = true;
       return;
     }
     throw error;

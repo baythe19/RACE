@@ -9,6 +9,7 @@ import {
   assignVendorDriverVehicleSchema,
   claimVendorDriverSchema,
   createVendorDriverSchema,
+  resetVendorDriverPasswordSchema,
   uploadVendorDriverDocumentSchema,
 } from '../../services/src/vendorDriversValidator';
 import {
@@ -68,6 +69,12 @@ router.post(
   requireRole('vendor'),
   validate(assignVendorDriverVehicleSchema),
   vendorController.assignDriverVehicle,
+);
+router.post(
+  '/drivers/:id/reset-password',
+  requireRole('vendor'),
+  validate(resetVendorDriverPasswordSchema),
+  vendorController.resetDriverPassword,
 );
 router.delete('/drivers/:id', requireRole('vendor'), vendorController.removeDriver);
 

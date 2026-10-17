@@ -49,7 +49,7 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
 
   const loginMutation = useDriverCredentialLoginMutation();
 
-  const canSubmit = loginId.trim().length >= 3 && password.length >= 4 && !loading;
+  const canSubmit = loginId.trim().length >= 3 && password.length >= 6 && !loading;
 
   const goToPartnerMain = () => {
     const rootNavigation =
@@ -69,8 +69,8 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
       setError('Enter the Login ID provided by your vendor');
       return;
     }
-    if (password.length < 4) {
-      setError('Password must be at least 4 characters');
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
       return;
     }
 

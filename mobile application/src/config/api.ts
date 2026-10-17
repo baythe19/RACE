@@ -73,6 +73,7 @@ export const API_ENDPOINTS = {
   vendorDriver: (id: string) => `/api/v1/vendor/drivers/${id}`,
   vendorDriverAssignVehicle: (id: string) => `/api/v1/vendor/drivers/${id}/assign-vehicle`,
   vendorDriverUploadDocument: (id: string) => `/api/v1/vendor/drivers/${id}/upload-document`,
+  vendorDriverResetPassword: (id: string) => `/api/v1/vendor/drivers/${id}/reset-password`,
   vendorVehicles: '/api/v1/vendor/vehicles',
   vendorVehicle: (id: string) => `/api/v1/vendor/vehicles/${id}`,
   vendorBookings: '/api/v1/vendor/bookings',

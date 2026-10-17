@@ -23,12 +23,18 @@ export const claimVendorDriverSchema = z.object({
   phone: z.string().min(10).max(15),
 });
 
+/** Vendor resets a fleet driver's login password (driver forgot it). */
+export const resetVendorDriverPasswordSchema = z.object({
+  password: z.string().min(6, 'Password must be at least 6 characters').max(72),
+});
+
 export const uploadVendorDriverDocumentSchema = z.object({
   documentType: z.string().min(2).max(50),
 });
 
 export type CreateVendorDriverDto = z.infer<typeof createVendorDriverSchema>;
 export type ClaimVendorDriverDto = z.infer<typeof claimVendorDriverSchema>;
+export type ResetVendorDriverPasswordDto = z.infer<typeof resetVendorDriverPasswordSchema>;
 export type UploadVendorDriverDocumentDto = z.infer<typeof uploadVendorDriverDocumentSchema>;
 
 export const assignVendorDriverVehicleSchema = z.object({

@@ -473,35 +473,12 @@ export default function PartnerJobsScreen() {
                   bookingNumber: job.bookingNumber,
                   serviceLabel,
                   pickupAddress: job.pickup?.address || job.pickup?.label,
+                  dropoffAddress: job.dropoff?.address || job.dropoff?.label || undefined,
                   estimatedFare: job.estimatedFare,
                 })
               }
               style={styles.assignBtn}>
               <PartnerText style={styles.assignLabel}>Assign vehicle</PartnerText>
-            </Pressable>
-          </View>
-        ) : null}
-
-        {isVendor && isOffer && !job.vendorApproved ? (
-          <View style={styles.vendorActions}>
-            <Pressable
-              onPress={() =>
-                navigation.navigate('VendorAssignJob', {
-                  bookingId: job.id,
-                  bookingType: job.bookingType,
-                  bookingNumber: job.bookingNumber,
-                  serviceLabel,
-                  pickupAddress: job.pickup?.address || job.pickup?.label,
-                  estimatedFare: job.estimatedFare,
-                })
-              }
-              style={styles.assignBtn}>
-              <PartnerText style={styles.assignLabel}>Approve & assign vehicle</PartnerText>
-            </Pressable>
-            <Pressable
-              onPress={() => navigation.navigate('VendorVehicles')}
-              style={styles.addVehicleOutline}>
-              <PartnerText style={styles.addVehicleOutlineLabel}>Add vehicle</PartnerText>
             </Pressable>
           </View>
         ) : null}
