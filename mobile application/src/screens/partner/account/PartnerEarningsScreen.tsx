@@ -246,6 +246,7 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
 
 /** Payouts tab body — real payout account + history. */
 function PayoutsTabBody() {
+  const navigation = useNavigation<NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerEarnings'>['navigation']>();
   const payoutAccount = usePayoutAccountQuery(true);
   const earnings = useVendorEarningsQuery(true);
   const account = payoutAccount.data;
