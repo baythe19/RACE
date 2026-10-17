@@ -120,7 +120,14 @@ async function authorizeDriverRoom(
 export function initializeSocket(httpServer: import('http').Server): void {
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(','),
+      // BUG-15: same production rule as the REST app — no wildcard reflect in
+      // production; native apps (custom origins) are unaffected by CORS anyway.
+      origin:
+        env.NODE_ENV === 'production' && env.CORS_ORIGIN === '*'
+          ? false
+          : env.CORS_ORIGIN === '*'
+            ? true
+            : env.CORS_ORIGIN.split(','),
       methods: ['GET', 'POST'],
     },
   });

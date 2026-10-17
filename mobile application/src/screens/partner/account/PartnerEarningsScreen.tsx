@@ -1,6 +1,7 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   TrendingUp,
@@ -374,6 +375,37 @@ function PayoutsTabBody() {
 }
 
 const styles = StyleSheet.create({
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: driverColors.light,
+    borderRadius: driverRadius.pill,
+    padding: 4,
+    marginBottom: 16,
+  },
+  segmentTab: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: driverRadius.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentTabActive: {
+    backgroundColor: driverColors.white,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: driverColors.grey,
+  },
+  segmentTextActive: {
+    fontWeight: '800',
+    color: driverColors.ink,
+  },
   loaderWrap: {
     paddingVertical: 60,
     alignItems: 'center',

@@ -23,6 +23,7 @@ import vendorRoutes from './vendorRoutes';
 import driverRoutes from './driverRoutes';
 import adminRoutes from './admin/index';
 import fareRoutes from './fareRoutes';
+import documentRoutes from './documentRoutes';
 
 const router = Router();
 const api = env.API_PREFIX;
@@ -48,6 +49,8 @@ router.use(`${api}/subscriptions`, subscriptionRoutes);
 router.use(`${api}/sos`, sosRoutes);
 router.use(`${api}/vendor`, vendorRoutes);
 router.use(`${api}/driver`, driverRoutes);
+// BUG-02/P0.4 — KYC/document access is identity-gated (replaces /uploads static).
+router.use(`${api}/documents`, documentRoutes);
 
 /** Admin panel API */
 router.use(`${api}/admin`, adminRoutes);

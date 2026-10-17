@@ -2,7 +2,6 @@ import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
-import path from 'path';
 
 import { env } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/src/error';
@@ -19,7 +18,15 @@ export function createApp() {
   app.use(helmet());
   app.use(
     cors({
-      origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(','),
+      // BUG-15: in production an open CORS reflect-with-credentials is not
+      // acceptable — force an explicit allowlist. Dev keeps the permissive
+      // default so local Expo/web previews keep working.
+      origin:
+        env.NODE_ENV === 'production' && env.CORS_ORIGIN === '*'
+          ? false // no CORS headers; same-origin/native apps unaffected
+          : env.CORS_ORIGIN === '*'
+            ? true
+            : env.CORS_ORIGIN.split(','),
       credentials: true,
     }),
   );
@@ -29,7 +36,8 @@ export function createApp() {
   app.use(loggerMiddleware);
   app.use(globalRateLimiter);
 
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  // BUG-02/P0.4: the unauthenticated /uploads static route is GONE.
+  // Documents are now served only through the gated /api/v1/documents proxy.
 
   app.use('/health', healthRoutes);
   app.use(apiRoutes);

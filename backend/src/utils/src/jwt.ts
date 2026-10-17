@@ -8,6 +8,8 @@ export interface AccessTokenPayload {
   sub: string;
   role: string;
   mobileNumber: string;
+  /** BUG-14: distinguishes user tokens from admin tokens (same JWT secret). */
+  tokenType: 'user';
 }
 
 export interface RefreshTokenPayload {
@@ -25,7 +27,7 @@ const REFRESH_PREFIX = 'refresh:';
 
 export function signAccessToken(payload: AccessTokenPayload): string {
   const options: SignOptions = { expiresIn: env.JWT_ACCESS_EXPIRES_IN as SignOptions['expiresIn'] };
-  return jwt.sign(payload, env.JWT_ACCESS_SECRET, options);
+  return jwt.sign({ ...payload, tokenType: 'user' }, env.JWT_ACCESS_SECRET, options);
 }
 
 export function signRefreshToken(userId: string): { token: string; jti: string } {
@@ -53,7 +55,13 @@ export async function isRefreshTokenValid(userId: string, jti: string): Promise<
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload {
-  return jwt.verify(token, env.JWT_ACCESS_SECRET) as AccessTokenPayload;
+  const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as AccessTokenPayload;
+  // BUG-14: an admin-issued token (tokenType 'admin', same secret) must never
+  // authenticate as a platform user — reject the confusion explicitly.
+  if ((payload as { tokenType?: string }).tokenType === 'admin') {
+    throw new jwt.JsonWebTokenError('admin token used on user endpoint');
+  }
+  return payload;
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
