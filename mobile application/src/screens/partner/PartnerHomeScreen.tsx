@@ -8,10 +8,12 @@ import {
   ChevronDown,
   ChevronRight,
   ClipboardList,
+  Check,
   CloudUpload,
   FileSearch,
   Info,
   Landmark,
+  MapPin,
   ShieldCheck,
   TrendingUp,
   Truck,
@@ -23,6 +25,7 @@ import { openPartnerNotifications } from '../../navigation/partnerNavigationRef'
 import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
 import { useAppSelector } from '../../redux/hooks';
 import {
   useVendorBookingOffersQuery,
@@ -106,16 +109,18 @@ function buildWeeklySeries(today: number, total: number): number[] {
 
 function WeeklySparkline({ values }: { values: number[] }) {
   if (values.length < 2) return null;
-  const width = 328;
-  const height = 72;
+  const width = 332;
+  const height = 88;
+  const PAD_TOP = 26; // room for the peak bubble
+  const PAD_BOTTOM = 10;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const span = Math.max(max - min, 1);
   const stepX = width / (values.length - 1);
-  // Line spans edge-to-edge (x: 0 → width) but y stays inside so dots/bubble never clip.
+  // Edges connected: first point at x=0, last at x=width (Mon & Sun touch card edges).
   const coords = values.map((value, idx) => ({
     x: idx * stepX,
-    y: height - 12 - ((value - min) / span) * (height - 24),
+    y: PAD_TOP + (1 - (value - min) / span) * (height - PAD_TOP - PAD_BOTTOM),
   }));
   const points = coords.map(({ x, y }) => `${x},${y}`).join(' ');
   const peakIdx = values.indexOf(max);
@@ -126,16 +131,10 @@ function WeeklySparkline({ values }: { values: number[] }) {
         {/* soft area fill under the line */}
         <Polyline
           points={`0,${height} ${points} ${width},${height}`}
-          fill="rgba(245,166,0,0.10)"
+          fill="rgba(245,166,0,0.12)"
           stroke="none"
         />
-        {/* baseline */}
-        <Polyline
-          points={`0,${height - 4} ${width},${height - 4}`}
-          stroke="#E5E7EB"
-          strokeWidth={1}
-          strokeDasharray="3,4"
-        />
+        {/* amber line spanning the full card width */}
         <Polyline
           points={points}
           fill="none"
@@ -144,8 +143,18 @@ function WeeklySparkline({ values }: { values: number[] }) {
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-        {/* peak marker dot */}
-        <circle cx={peak.x} cy={peak.y} r={4} fill={colors.primary} stroke="#FFFFFF" strokeWidth={1.5} />
+        {/* dot on EVERY point (reference board style) */}
+        {coords.map((c, idx) => (
+          <circle
+            key={idx}
+            cx={c.x}
+            cy={c.y}
+            r={idx === peakIdx ? 4.5 : 3}
+            fill="#FFFFFF"
+            stroke={colors.primary}
+            strokeWidth={2}
+          />
+        ))}
       </Svg>
       {/* compact peak value bubble — small pill, inside card */}
       <View
@@ -154,7 +163,7 @@ function WeeklySparkline({ values }: { values: number[] }) {
           styles.peakBubble,
           {
             left: Math.min(Math.max(peak.x - 24, 4), width - 52),
-            top: Math.max(peak.y - 30, 2),
+            top: Math.max(peak.y - 28, 0),
           },
         ]}>
         <PartnerText style={styles.peakBubbleText}>{formatInr(max)}</PartnerText>
@@ -357,11 +366,21 @@ export default function PartnerHomeScreen() {
 
   const earningsToday = vendorDashboard?.earningsToday ?? 0;
   const earningsTotal = vendorDashboard?.earningsTotal ?? earningsToday;
+  const [earningsRange, setEarningsRange] = useState<'this_week' | 'last_week'>('this_week');
+  const [weekMenuOpen, setWeekMenuOpen] = useState(false);
   const weeklySeries = useMemo(
     () => buildWeeklySeries(earningsToday, earningsTotal),
     [earningsToday, earningsTotal],
   );
   const earningsGrowthLabel = weeklyGrowthLabel(earningsToday, earningsTotal);
+  // Last-week view: show the previous week's slice (total minus current week) with no growth row.
+  const lastWeekEarnings = Math.max(earningsTotal - earningsToday, 0);
+  const lastWeekSeries = useMemo(
+    () => buildWeeklySeries(Math.round(lastWeekEarnings * 0.42), lastWeekEarnings),
+    [lastWeekEarnings],
+  );
+  const displayEarnings = earningsRange === 'this_week' ? earningsToday : lastWeekEarnings;
+  const displaySeries = earningsRange === 'this_week' ? weeklySeries : lastWeekSeries;
 
   const openJobs = offers.filter(offer => !offer.vendorApproved).length;
   const awaitingClaimJobs = offers.length - openJobs;
@@ -408,10 +427,7 @@ export default function PartnerHomeScreen() {
       header={
         <View style={styles.headerPad}>
           <View style={styles.headerTop}>
-            <View>
-              <PartnerText style={styles.brandRace}>RACE</PartnerText>
-              <PartnerText style={styles.brandPartner}>PARTNER</PartnerText>
-            </View>
+            <PartnerHeaderLogo width={84} />
             <View style={styles.headerRight}>
               <Pressable
                 onPress={openPartnerNotifications}
@@ -485,12 +501,29 @@ export default function PartnerHomeScreen() {
                 <PartnerText style={styles.leadNumber}>
                   #{lead.bookingNumber || lead.id.slice(-6)}
                 </PartnerText>
-                <PartnerText style={styles.leadAddress} numberOfLines={1}>
-                  {formatReadableAddress(lead.pickup?.address || lead.pickup?.label) || 'Pickup nearby'}
-                  {lead.dropoff?.address || lead.dropoff?.label
-                    ? ` → ${formatReadableAddress(lead.dropoff.address || lead.dropoff.label)}`
-                    : ''}
-                </PartnerText>
+                <View style={styles.leadAddressCol}>
+                  {[
+                    lead.pickup?.address || lead.pickup?.label
+                      ? formatReadableAddress(lead.pickup.address || lead.pickup.label)
+                      : 'Pickup nearby',
+                    lead.dropoff?.address || lead.dropoff?.label
+                      ? `→  ${formatReadableAddress(lead.dropoff.address || lead.dropoff.label)}`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .map((addr, idx) => (
+                      <View key={idx} style={styles.leadAddrLine}>
+                        {idx === 0 ? (
+                          <MapPin size={12} color={colors.primary} strokeWidth={2.4} />
+                        ) : (
+                          <View style={styles.leadAddrDot} />
+                        )}
+                        <PartnerText style={styles.leadAddrText} numberOfLines={1}>
+                          {addr}
+                        </PartnerText>
+                      </View>
+                    ))}
+                </View>
                 <Pressable
                   style={styles.reviewLeadCta}
                   onPress={() => {
@@ -536,28 +569,75 @@ export default function PartnerHomeScreen() {
       )}
 
       <View style={styles.earningsCard}>
-        <View style={styles.earningsHeader}>
-          <View style={styles.earningsTitleRow}>
-            <PartnerText style={styles.earningsTitle}>Total earnings (this week)</PartnerText>
-            <Info size={13} color={colors.grey} strokeWidth={2.2} />
+          <View style={styles.earningsHeader}>
+            <View style={styles.earningsTitleRow}>
+              <PartnerText style={styles.earningsTitle}>
+                {earningsRange === 'this_week' ? 'Total earnings (this week)' : 'Total earnings (last week)'}
+              </PartnerText>
+              <Info size={13} color={colors.grey} strokeWidth={2.2} />
+            </View>
+            <View style={styles.weekMenuWrap}>
+              <Pressable
+                onPress={() => setWeekMenuOpen(open => !open)}
+                style={styles.weekSelector}
+                accessibilityRole="button"
+                accessibilityLabel="Select earnings period">
+                <PartnerText style={styles.weekSelectorText}>
+                  {earningsRange === 'this_week' ? 'This week' : 'Last week'}
+                </PartnerText>
+                <ChevronDown size={12} color={colors.dark} strokeWidth={2.4} />
+              </Pressable>
+              {weekMenuOpen ? (
+                <>
+                  {/* backdrop to catch outside taps */}
+                  <Pressable
+                    accessibilityLabel="Close earnings period menu"
+                    onPress={() => setWeekMenuOpen(false)}
+                    style={styles.weekMenuBackdrop}
+                  />
+                  <View style={styles.weekMenu}>
+                    {(['this_week', 'last_week'] as const).map(option => (
+                      <Pressable
+                        key={option}
+                        onPress={() => {
+                          setEarningsRange(option);
+                          setWeekMenuOpen(false);
+                        }}
+                        style={[
+                          styles.weekMenuItem,
+                          earningsRange === option && styles.weekMenuItemActive,
+                        ]}>
+                        <PartnerText
+                          style={[
+                            styles.weekMenuText,
+                            earningsRange === option && styles.weekMenuTextActive,
+                          ]}>
+                          {option === 'this_week' ? 'This week' : 'Last week'}
+                        </PartnerText>
+                        {earningsRange === option ? (
+                          <Check size={12} color={colors.primaryDark} strokeWidth={2.6} />
+                        ) : null}
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </View>
           </View>
-          <View style={styles.weekSelector}>
-            <PartnerText style={styles.weekSelectorText}>This week</PartnerText>
-            <ChevronDown size={12} color={colors.dark} strokeWidth={2.4} />
-          </View>
-        </View>
-        <PartnerText style={styles.earningsValue}>{formatInr(earningsToday)}</PartnerText>
-        {earningsGrowthLabel ? (
+        <PartnerText style={styles.earningsValue}>{formatInr(displayEarnings)}</PartnerText>
+        {earningsRange === 'this_week' && earningsGrowthLabel ? (
           <View style={styles.growthRow}>
             <TrendingUp size={12} color={SUCCESS_GREEN} strokeWidth={2.6} />
             <PartnerText style={styles.earningsGrowth}>{earningsGrowthLabel} from last week</PartnerText>
           </View>
         ) : (
-          <PartnerText style={styles.earningsColLabel}>Across all completed jobs</PartnerText>
+          <PartnerText style={styles.earningsColLabel}>
+            {earningsRange === 'this_week' ? 'Across all completed jobs' : 'Previous week total'}
+          </PartnerText>
         )}
-        {weeklySeries.length > 1 ? (
+        {displaySeries.length > 1 ? (
           <View style={styles.chartBlock}>
-            <WeeklySparkline values={weeklySeries} />
+            <WeeklySparkline values={displaySeries} />
             <View style={styles.chartDaysRow}>
               {WEEK_DAYS.map(day => (
                 <PartnerText key={day} style={styles.chartDay}>
@@ -742,18 +822,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.md,
-  },
-  brandRace: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    fontSize: typography.sizes.md,
-    letterSpacing: 0.4,
-  },
-  brandPartner: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-    fontSize: 10,
-    letterSpacing: 1.5,
   },
   headerRight: {
     flexDirection: 'row',
@@ -1239,24 +1307,41 @@ const styles = StyleSheet.create({
     color: colors.grey,
     marginTop: 2,
   },
-  leadAddress: {
-    fontSize: 10.5,
+  leadAddressCol: {
+    flexDirection: 'column',
+    gap: 3,
+    marginTop: 4,
+  },
+  leadAddrLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  leadAddrDot: {
+    width: 12,
+    height: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leadAddrText: {
+    fontSize: 11.5,
     color: colors.grey,
-    marginTop: 2,
-    fontWeight: '500',
+    fontWeight: '600',
+    flexShrink: 1,
   },
   reviewLeadCta: {
-    marginTop: 6,
-    alignSelf: 'flex-start',
+    marginTop: 8,
+    alignSelf: 'stretch',
     borderWidth: 1.2,
     borderColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    alignItems: 'center',
   },
   reviewLeadText: {
     color: colors.primaryDark,
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
   },
   leadFareCol: {
@@ -1290,6 +1375,56 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: colors.dark,
+  },
+  weekMenuWrap: {
+    position: 'relative',
+    zIndex: 30,
+  },
+  weekMenuBackdrop: {
+    position: 'absolute',
+    top: -500,
+    left: -500,
+    right: -500,
+    bottom: -500,
+    zIndex: 29,
+  },
+  weekMenu: {
+    position: 'absolute',
+    top: 34,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 4,
+    minWidth: 132,
+    zIndex: 30,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+  },
+  weekMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 36,
+  },
+  weekMenuItemActive: {
+    backgroundColor: colors.goldLight,
+  },
+  weekMenuText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.dark,
+  },
+  weekMenuTextActive: {
+    fontWeight: '800',
+    color: colors.primaryDark,
   },
   growthRow: {
     flexDirection: 'row',

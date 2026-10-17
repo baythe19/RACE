@@ -1,12 +1,16 @@
 import { PartnerText } from './PartnerText';
 /**
- * RACE Partner — bottom tab bar.
+ * RACE Partner — bottom tab bar (pixel-matched to user's reference crop).
  *
- * Rebuilt to match the approved partner boards:
- *  - 3 destinations only: Home / Jobs / Account (Dashboard → Home)
- *  - active tab = amber filled icon + amber label + amber underline
- *  - a red count badge on Jobs while the driver has unaccepted requests
- *  - bar sits on the page as a white surface with rounded top corners
+ * Reference (image copy.png): flat white bar, NO top hairline border, NO rounded
+ * corners. Each tab = outline icon above label; active tab gets **solid amber
+ * fill icon** (House solid / ClipboardList solid / User solid) + amber bold
+ * label; inactive = grey outline icon + grey label. No underline pill.
+ *
+ * Behavior kept from before:
+ *  - Jobs red count badge while the driver has unaccepted offers
+ *  - bar hidden on fullscreen routes (active job map)
+ *  - tabPress emit + navigate (React Navigation contract)
  */
 
 import React from 'react';
@@ -29,24 +33,20 @@ import { useAppSelector } from '../../redux/hooks';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
 import { buildDriverVerification } from '../../utils/driverVerification';
-import { driverColors as C, driverMetrics as M, driverType as T } from '../../theme/driverUi';
+
+const AMBER = '#FEA701';
+const AMBER_TEXT = '#F58A00';
+const GREY = '#A6A8B4';
 
 type TabRouteName = keyof PartnerTabParamList;
 
-/**
- * Screens that own the whole viewport: while one of them is focused the bar is
- * hidden so the map and the single primary action keep the full height.
- */
+/** Screens that own the whole viewport — bar hidden while focused. */
 const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob']);
 
-/** `activeFill` mirrors the board's solid-vs-outline active treatment. */
-const TAB_CONFIG: Record<
-  TabRouteName,
-  { label: string; Icon: LucideIcon; activeFill: boolean }
-> = {
-  PartnerHome: { label: 'Home', Icon: House, activeFill: true },
-  PartnerJobs: { label: 'Jobs', Icon: ClipboardList, activeFill: true },
-  PartnerAccount: { label: 'Account', Icon: User, activeFill: true },
+const TAB_CONFIG: Record<TabRouteName, { label: string; Icon: LucideIcon }> = {
+  PartnerHome: { label: 'Home', Icon: House },
+  PartnerJobs: { label: 'Jobs', Icon: ClipboardList },
+  PartnerAccount: { label: 'Account', Icon: User },
 };
 
 export default function PartnerTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
@@ -65,37 +65,25 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
     return null;
   }
 
-  const iconSize = px(24);
+  const iconSize = px(23);
   const badgeSize = px(19);
 
   return (
     <View
-      style={[
-        {
-          flexDirection: 'row',
-          backgroundColor: C.white,
-          borderTopLeftRadius: px(20),
-          borderTopRightRadius: px(20),
-          borderTopWidth: 1,
-          borderTopColor: C.hairline,
-          paddingTop: px(10),
-          paddingBottom: Math.max(insets.bottom, px(6)),
-          paddingHorizontal: px(8),
-          shadowColor: '#0B0B0B',
-          shadowOffset: { width: 0, height: -1 },
-          shadowOpacity: 0.04,
-          shadowRadius: 6,
-          elevation: 2,
-        },
-      ]}>
+      style={{
+        flexDirection: 'row',
+        backgroundColor: '#FFFFFF',
+        paddingTop: px(12),
+        paddingBottom: Math.max(insets.bottom, px(10)),
+        paddingHorizontal: px(6),
+      }}>
       {state.routes.map((route, index) => {
         const routeName = route.name as TabRouteName;
         const tabConfig = TAB_CONFIG[routeName];
         if (!tabConfig) return null;
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
-        const { label, Icon, activeFill } = tabConfig;
-        const tint = isFocused ? C.amberText : C.greySoft;
+        const { label, Icon } = tabConfig;
         const showBadge = routeName === 'PartnerJobs' && pendingRequests > 0;
 
         const onPress = () => {
@@ -109,10 +97,16 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
           }
         };
 
+        const onLongPress = () => navigation.emit({
+          type: 'tabLongPress',
+          target: route.key,
+        });
+
         return (
           <Pressable
             key={route.key}
             onPress={onPress}
+            onLongPress={onLongPress}
             accessibilityRole="button"
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={
@@ -124,14 +118,14 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
               flex: 1,
               alignItems: 'center',
               justifyContent: 'flex-start',
-              minHeight: px(M.tabBarHeight - 16),
+              gap: px(5),
             }}>
             <View>
               <Icon
                 size={iconSize}
-                color={isFocused ? C.amber : C.greySoft}
-                strokeWidth={isFocused && activeFill ? 0 : 2.1}
-                fill={isFocused && activeFill ? C.amber : 'transparent'}
+                color={isFocused ? AMBER : GREY}
+                strokeWidth={isFocused ? 0 : 1.9}
+                fill={isFocused ? AMBER : 'transparent'}
               />
               {showBadge ? (
                 <View
@@ -142,9 +136,9 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
                     minWidth: badgeSize,
                     height: badgeSize,
                     borderRadius: badgeSize / 2,
-                    backgroundColor: C.red,
+                    backgroundColor: '#EF4444',
                     borderWidth: px(2),
-                    borderColor: C.white,
+                    borderColor: '#FFFFFF',
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingHorizontal: px(3),
@@ -154,7 +148,7 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
                       fontSize: px(11),
                       lineHeight: px(13),
                       fontWeight: '700',
-                      color: C.white,
+                      color: '#FFFFFF',
                     }}>
                     {pendingRequests > 9 ? '9+' : pendingRequests}
                   </PartnerText>
@@ -163,27 +157,14 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
             </View>
 
             <PartnerText
-              style={[
-                T.tab,
-                {
-                  fontSize: px(12),
-                  lineHeight: px(15),
-                  color: tint,
-                  marginTop: px(4),
-                },
-              ]}>
+              style={{
+                fontSize: px(11.5),
+                lineHeight: px(14),
+                fontWeight: isFocused ? '700' : '500',
+                color: isFocused ? AMBER_TEXT : GREY,
+              }}>
               {label}
             </PartnerText>
-
-            <View
-              style={{
-                width: isFocused ? px(M.activeTabUnderlineWidth) : 0,
-                height: px(3),
-                borderRadius: px(2),
-                backgroundColor: C.amber,
-                marginTop: px(4),
-              }}
-            />
           </Pressable>
         );
       })}

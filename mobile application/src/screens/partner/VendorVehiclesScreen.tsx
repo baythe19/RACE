@@ -30,7 +30,7 @@ import {
   useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
-import { colors, radius, shadows, spacing, typography } from '../../theme';
+import { colors, radius, spacing, typography } from '../../theme';
 
 const PAGE_BG = '#F7F7F5';
 const SUCCESS_GREEN = '#22C55E';
@@ -436,7 +436,7 @@ export default function VendorVehiclesScreen() {
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <PartnerText style={styles.title}>Vendor vehicles</PartnerText>
+              <PartnerText style={styles.title}>Vehicles</PartnerText>
               <PartnerText style={styles.subtitle}>
                 Manage your vendor vehicles and keep them road-ready.
               </PartnerText>
@@ -468,6 +468,7 @@ export default function VendorVehiclesScreen() {
                 {editingVehicle ? 'Edit vehicle' : 'Add vehicle'}
               </PartnerText>
               <FormField
+                testID="vehicleRegInput"
                 label="Registration number"
                 required
                 value={registrationNo}
@@ -491,6 +492,7 @@ export default function VendorVehiclesScreen() {
                 ))}
               </View>
               <FormField
+                testID="vehicleModelInput"
                 label="Model"
                 required
                 value={model}
@@ -499,6 +501,7 @@ export default function VendorVehiclesScreen() {
                 placeholder="e.g. Tata 407"
               />
               <FormField
+                testID="vehicleYearInput"
                 label="Year"
                 optional
                 value={year}
@@ -508,6 +511,7 @@ export default function VendorVehiclesScreen() {
                 placeholder="2022"
               />
               <FormField
+                testID="vehicleRcInput"
                 label="RC number"
                 optional
                 value={rcNumber}
@@ -933,13 +937,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   formCard: {
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card,
   },
   formTitle: {
     color: colors.dark,
@@ -997,12 +1000,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: 140,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    ...shadows.card,
   },
   statIcon: {
     width: 32,
@@ -1094,13 +1096,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   vehicleCard: {
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.md,
-    ...shadows.card,
   },
   vehicleTop: {
     flexDirection: 'row',

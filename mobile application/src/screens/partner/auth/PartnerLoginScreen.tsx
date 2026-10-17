@@ -155,7 +155,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
       // --- OTP auth bypass (when SKIP_OTP_AUTH is active) ---
       if (SKIP_OTP_AUTH) {
-        const otp = result.devOtp ?? extractOtpFromMessage(result.message);
+        const otp = result.devOtp ?? extractOtpFromMessage(result.message) ?? (UI_PREVIEW_MODE ? '123456' : null);
         if (!otp) {
           setError('Dev OTP unavailable. Turn off SKIP_OTP_AUTH or use a non-production API.');
           return;
@@ -362,6 +362,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                     },
                   ]}>
                   <PartnerTextInput
+                    testID="partnerLoginMobile"
                     value={mobileNumber}
                     onChangeText={(text) => {
                       setMobileNumber(text.replace(/\D/g, '').slice(0, 10));

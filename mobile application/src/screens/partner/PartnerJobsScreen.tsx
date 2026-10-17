@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Bell,
   Briefcase,
@@ -8,6 +8,7 @@ import {
   Car,
   MapPin,
   Navigation,
+  Phone,
   Plus,
   Truck,
 } from 'lucide-react-native';
@@ -36,11 +37,13 @@ import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
 import { colors, radius, spacing, typography } from '../../theme';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 
+const SUCCESS_GREEN = '#22C55E';
+
 const ACTIVE_STATUSES = new Set(['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS']);
 
 type JobTab = 'all' | 'new' | 'nearby' | 'assigned' | 'in_progress' | 'completed';
 
-const PAGE_BG = '#F7F7F5';
+const PAGE_BG = '#FFFFFF';
 
 const DRIVER_TABS: Array<{ key: JobTab; label: string }> = [
   { key: 'all', label: 'All' },
@@ -357,80 +360,46 @@ export default function PartnerJobsScreen() {
       <GlassCard
         key={`${isOffer ? 'o' : 'm'}-${job.bookingType}-${job.id}`}
         style={[styles.jobCard, isOffer && isDriver && styles.driverOfferCard]}>
-        <View style={styles.jobTop}>
-          <View style={[styles.serviceIcon, { backgroundColor: statusStyle.bg }]}>
-            <Icon size={22} color={statusStyle.text} strokeWidth={2.2} />
+        {/* status badge + booking ref */}
+        <View style={styles.cardHeadRow}>
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+            <PartnerText style={[styles.statusBadgeText, { color: statusStyle.text }]}>{label}</PartnerText>
           </View>
-          <View style={styles.jobTopCopy}>
-            <View style={styles.badgeRow}>
-              <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
-                <PartnerText style={[styles.statusBadgeText, { color: statusStyle.text }]}>{label}</PartnerText>
-              </View>
-              <PartnerText style={styles.jobNumber}>#{job.bookingNumber}</PartnerText>
-            </View>
-            {typeof job.distanceKm === 'number' && job.distanceKm < 900 ? (
-              <View style={styles.distanceRow}>
-                <MapPin size={13} color="#16A34A" strokeWidth={2.4} />
-                <PartnerText style={styles.distanceText}>{job.distanceKm.toFixed(1)} km away</PartnerText>
-              </View>
-            ) : null}
+          <View style={styles.refPill}>
+            <PartnerText style={styles.jobNumber}>#{job.bookingNumber}</PartnerText>
           </View>
         </View>
 
-        {isOffer && job.vendorApproved ? (
-          <View style={styles.vendorApprovedChip}>
-            <PartnerText style={styles.vendorApprovedChipText}>Vendor approved · vehicle assigned</PartnerText>
-          </View>
-        ) : null}
-
-        <View style={styles.routeBlock}>
-          <View style={styles.routeRail}>
-            <View style={styles.routeDot} />
-            {job.dropoff ? (
-              <>
-                <View style={styles.routeLine} />
-                <View style={[styles.routeDot, styles.routeDotEnd]} />
-              </>
-            ) : null}
-          </View>
-          <View style={styles.routeCopy}>
-            <PartnerText style={styles.routeText} numberOfLines={2}>
-              {formatReadableAddress(job.pickup?.address || job.pickup?.label) || 'Pickup'}
-            </PartnerText>
-            {job.dropoff ? (
-              <PartnerText style={[styles.routeText, { marginTop: spacing.sm }]} numberOfLines={2}>
-                {formatReadableAddress(job.dropoff.address || job.dropoff.label) || 'Drop-off'}
+        {/* service title + fare column */}
+        <View style={styles.cardMainRow}>
+          <View style={styles.cardCopyCol}>
+            <PartnerText style={styles.cardTitle}>{serviceLabel}</PartnerText>
+            <View style={styles.pinRow}>
+              <MapPin size={12} color="#2563EB" strokeWidth={2.4} />
+              <PartnerText style={styles.pinText} numberOfLines={1}>
+                {formatReadableAddress(job.pickup?.address || job.pickup?.label) || 'Pickup'}
               </PartnerText>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.timeRow}>
-          <Calendar size={13} color={colors.grey} strokeWidth={2.2} />
-          <PartnerText style={styles.timeText}>{formatJobTime(job.createdAt)}</PartnerText>
-        </View>
-
-        {!isOffer && job.driver ? (
-          <View style={styles.driverChipRow}>
-            <View style={styles.driverChipAvatar}>
-              <PartnerText style={styles.driverChipInitial}>{job.driver.name.charAt(0).toUpperCase()}</PartnerText>
             </View>
-            <View style={styles.driverChipCopy}>
-              <PartnerText style={styles.driverChipName} numberOfLines={1}>
-                {job.driver.name}
-              </PartnerText>
-              <PartnerText style={styles.driverChipMeta}>Fleet driver on this job</PartnerText>
-            </View>
-            <PartnerText style={styles.driverChipPhone}>{job.driver.phone}</PartnerText>
-          </View>
-        ) : null}
-
-        <View style={styles.bottomRow}>
-          <View style={{ flex: 1 }}>
-            <PartnerText style={styles.serviceLabel}>{serviceLabel}</PartnerText>
-            {job.assignedFleetVehicleLabel ? (
-              <PartnerText style={styles.vehicleHint}>Vehicle: {job.assignedFleetVehicleLabel}</PartnerText>
+            {job.dropoff ? (
+              <View style={styles.pinRow}>
+                <MapPin size={12} color="#F59E0B" strokeWidth={2.4} />
+                <PartnerText style={styles.pinText} numberOfLines={1}>
+                  {formatReadableAddress(job.dropoff.address || job.dropoff.label)}
+                </PartnerText>
+              </View>
             ) : null}
+            <View style={styles.metaRow}>
+              {typeof job.distanceKm === 'number' && job.distanceKm < 900 ? (
+                <>
+                  <Navigation size={11} color={colors.grey} strokeWidth={2.4} />
+                  <PartnerText style={styles.metaText}>{job.distanceKm.toFixed(1)} km</PartnerText>
+                </>
+              ) : null}
+              <Calendar size={11} color={colors.grey} strokeWidth={2.2} />
+              <PartnerText style={styles.metaText}>{formatJobTime(job.createdAt)}</PartnerText>
+            </View>
+          </View>
+          <View style={styles.fareCol}>
             {typeof (isVendor && job.status === 'COMPLETED' ? job.finalFare : job.estimatedFare) ===
             'number' ? (
               <>
@@ -442,14 +411,76 @@ export default function PartnerJobsScreen() {
                 <PartnerText style={styles.fareHint}>
                   {isVendor
                     ? job.status === 'COMPLETED'
-                      ? 'Confirmed order value'
-                      : 'Customer estimate'
-                    : 'Estimated earnings'}
+                      ? 'Confirmed value'
+                      : 'Est. Fare'
+                    : 'Est. earnings'}
                 </PartnerText>
               </>
             ) : null}
           </View>
         </View>
+
+        {/* driver row with call icon */}
+        {!isOffer && job.driver ? (
+          <View style={styles.driverChipRow}>
+            <View style={styles.driverChipAvatar}>
+              <PartnerText style={styles.driverChipInitial}>{job.driver.name.charAt(0).toUpperCase()}</PartnerText>
+            </View>
+            <View style={styles.driverChipCopy}>
+              <PartnerText style={styles.driverChipName} numberOfLines={1}>
+                {job.driver.name}
+              </PartnerText>
+              <PartnerText style={styles.driverChipMeta}>Fleet driver on this job</PartnerText>
+            </View>
+            {job.driver.phone ? (
+              <Pressable
+                onPress={() => {
+                  const phone = job.driver?.phone;
+                  if (phone) void Linking.openURL(`tel:${phone}`);
+                }}
+                hitSlop={8}
+                style={styles.callBtn}
+                accessibilityRole="button"
+                accessibilityLabel={`Call ${job.driver.name}`}>
+                <Phone size={14} color="#FFFFFF" strokeWidth={2.4} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* vehicle hint (assigned cards) */}
+        {job.assignedFleetVehicleLabel ? (
+          <PartnerText style={styles.vehicleHint} numberOfLines={1}>
+            Vehicle: {job.assignedFleetVehicleLabel}
+          </PartnerText>
+        ) : null}
+
+        {isOffer && job.vendorApproved ? (
+          <View style={styles.awaitingDriverBanner}>
+            <PartnerText style={styles.awaitingDriverText}>
+              Awaiting driver — your fleet drivers can accept this job
+            </PartnerText>
+          </View>
+        ) : null}
+
+        {isVendor && isOffer && !job.vendorApproved ? (
+          <View style={styles.vendorActions}>
+            <Pressable
+              onPress={() =>
+                navigation.navigate('VendorAssignJob', {
+                  bookingId: job.id,
+                  bookingType: job.bookingType,
+                  bookingNumber: job.bookingNumber,
+                  serviceLabel,
+                  pickupAddress: job.pickup?.address || job.pickup?.label,
+                  estimatedFare: job.estimatedFare,
+                })
+              }
+              style={styles.assignBtn}>
+              <PartnerText style={styles.assignLabel}>Assign vehicle</PartnerText>
+            </Pressable>
+          </View>
+        ) : null}
 
         {isVendor && isOffer && !job.vendorApproved ? (
           <View style={styles.vendorActions}>
@@ -531,8 +562,11 @@ export default function PartnerJobsScreen() {
         <View style={styles.headerPad}>
           <View style={styles.headerTop}>
             <View style={styles.headerCopy}>
-              <PartnerText style={styles.title}>Jobs</PartnerText>
-              <PartnerText style={styles.subtitle}>
+              <View>
+                <PartnerText style={styles.brandRace}>RACE</PartnerText>
+                <PartnerText style={styles.brandPartner}>PARTNER</PartnerText>
+              </View>
+              <PartnerText style={styles.subtitle} numberOfLines={1}>
                 {isVendor
                   ? 'Manage and assign roadside assistance requests.'
                   : 'Trips approved by your vendor appear here — accept to start.'}
@@ -737,11 +771,23 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.extrabold,
   },
+  brandRace: {
+    color: colors.dark,
+    fontSize: 17,
+    fontWeight: typography.weights.extrabold,
+    letterSpacing: 0.5,
+  },
+  brandPartner: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: typography.weights.extrabold,
+    letterSpacing: 2.5,
+  },
   subtitle: {
-    marginTop: spacing.xs,
+    marginTop: 6,
     color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 20,
+    fontSize: typography.sizes.xs,
+    lineHeight: 15,
   },
   addVehicleBtn: {
     flexDirection: 'row',
@@ -834,29 +880,22 @@ const styles = StyleSheet.create({
   sectionHeadingSpaced: {
     marginTop: spacing.lg,
   },
-  jobCard: { gap: spacing.md },
+  jobCard: {
+    gap: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+  },
   driverOfferCard: {
     borderColor: colors.primary,
     borderWidth: 1.5,
-    backgroundColor: colors.background,
   },
-  jobTop: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  serviceIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  jobTopCopy: { flex: 1, gap: 4 },
-  badgeRow: {
+  cardHeadRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   statusBadge: {
     borderRadius: radius.sm,
@@ -868,84 +907,81 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     letterSpacing: 0.4,
   },
+  refPill: {
+    backgroundColor: colors.lightGrey,
+    borderRadius: radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
   jobNumber: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
+    fontSize: 11,
   },
-  distanceRow: {
+  cardMainRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
+  cardCopyCol: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  cardTitle: {
+    color: colors.dark,
+    fontSize: 14,
+    fontWeight: typography.weights.extrabold,
+  },
+  pinRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  distanceText: {
-    color: '#16A34A',
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  routeBlock: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  routeRail: {
-    width: 10,
-    alignItems: 'center',
-    paddingTop: 4,
-  },
-  routeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#2563EB',
-  },
-  routeDotEnd: {
-    backgroundColor: colors.primary,
-  },
-  routeLine: {
-    width: 2,
+  pinText: {
     flex: 1,
-    minHeight: 18,
-    backgroundColor: colors.border,
-    marginVertical: 2,
+    color: colors.grey,
+    fontSize: 11.5,
+    fontWeight: '500',
   },
-  routeCopy: { flex: 1 },
-  routeText: {
-    color: colors.dark,
-    fontSize: typography.sizes.sm,
-    lineHeight: 20,
-  },
-  timeRow: {
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
+    marginTop: 2,
   },
-  timeText: {
+  metaText: {
     color: colors.grey,
-    fontSize: typography.sizes.sm,
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginRight: 6,
   },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  fareCol: {
     alignItems: 'flex-end',
-  },
-  serviceLabel: {
-    color: '#2563EB',
-    fontWeight: typography.weights.semibold,
-    fontSize: typography.sizes.sm,
+    justifyContent: 'flex-start',
+    minWidth: 70,
   },
   fare: {
-    marginTop: 2,
     color: colors.dark,
     fontWeight: typography.weights.extrabold,
-    fontSize: typography.sizes.xxl,
+    fontSize: 17,
   },
   fareHint: {
     color: colors.grey,
-    fontSize: typography.sizes.xs,
+    fontSize: 10,
+    marginTop: 2,
   },
   vehicleHint: {
     marginTop: 2,
     color: colors.grey,
     fontSize: typography.sizes.xs,
+  },
+  callBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: SUCCESS_GREEN,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   vendorActions: { gap: spacing.sm },
   assignBtn: {

@@ -46,7 +46,7 @@ import {
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
-import { colors, radius, shadows, spacing, typography } from '../../theme';
+import { colors, radius, spacing, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'VendorDrivers'>;
 
@@ -474,7 +474,7 @@ export default function VendorDriversScreen({}: Props) {
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1 }}>
-              <PartnerText style={styles.title}>Vendor drivers</PartnerText>
+              <PartnerText style={styles.title}>Drivers</PartnerText>
               <PartnerText style={styles.subtitle}>
                 Manage your vendor drivers and keep your team ready for every call.
               </PartnerText>
@@ -1101,13 +1101,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   formCard: {
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.lg,
     gap: spacing.sm,
-    ...shadows.card,
   },
   formTitle: {
     color: colors.dark,
@@ -1194,12 +1193,11 @@ const styles = StyleSheet.create({
   },
   statCard: {
     width: 140,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
-    ...shadows.card,
   },
   statIcon: {
     width: 32,
@@ -1290,13 +1288,12 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   driverCard: {
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.md,
-    ...shadows.card,
   },
   driverTop: {
     flexDirection: 'row',
