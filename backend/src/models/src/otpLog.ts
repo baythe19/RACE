@@ -13,6 +13,7 @@ export interface IOtpLog extends Document {
   mobileAttempts: number;
   emailAttempts: number;
   mcVerificationId?: string;   // MessageCentral verificationId for server-side OTP validation
+  mcVerificationIdHash?: string; // sha256(verificationId + submitted-otp) — replay-proof idempotency key
   provider?: 'messagecentral' | 'hanu' | 'local'; // which SMS route created this log
   otpHash?: string;            // sha256(otp + pepper) for provider==='hanu' (digits never stored)
   createdAt: Date;
@@ -34,6 +35,7 @@ const OtpLogSchema = new Schema<IOtpLog>(
     mcVerificationId: { type: String },
     provider: { type: String, enum: ['messagecentral', 'hanu', 'local'] },
     otpHash: { type: String },
+    mcVerificationIdHash: { type: String },
     createdAt: { type: Date, default: Date.now, index: true },
   },
   { timestamps: false },

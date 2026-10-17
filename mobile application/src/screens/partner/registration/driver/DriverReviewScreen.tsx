@@ -93,39 +93,77 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
           }
         : undefined;
 
-      const documentsPayload = driverDocuments.map((doc) => ({
-        type: doc.id,
-        url: doc.uri,
-        status: 'PENDING' as const,
-      }));
+      // BUG-05 / PA-2 fix: upload each document to real storage BEFORE
+      // registration, then reference the server fileUrl — never local device
+      // URIs. Failures surface per-document so the driver can retry.
+      const documentsPayload: { type: string; url: string; status: 'PENDING' }[] = [];
+      for (const doc of driverDocuments) {
+        if (!doc.uri) continue;
+        try {
+          const formData = new FormData();
+          formData.append('documentType', doc.id);
+          formData.append('file', {
+            uri: doc.uri,
+            name: doc.name ?? `${doc.id}.jpg`,
+            type: doc.mimeType ?? 'image/jpeg',
+          } as unknown as Blob);
+          const { data } = await api.post<ApiSuccessResponse<{ fileUrl: string }>>(
+            API_ENDPOINTS.driverUploadDocument ?? '/api/v1/driver/upload-document',
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' } },
+          );
+          documentsPayload.push({ type: doc.id, url: data.data.fileUrl, status: 'PENDING' });
+        } catch (uploadError) {
+          Alert.alert(
+            'Document upload failed',
+            `${doc.label ?? doc.id} could not be uploaded. Please check your connection and try again.`,
+          );
+          setSubmitting(false);
+          return;
+        }
+      }
 
       const driverType = mapVehicleToDriverType(driverVehicle.vehicleType || 'Flatbed Tow Truck');
 
       const payload = {
-        fullName: driverPersonal.fullName.trim() || authUser?.fullName || 'Rajesh Kumar',
-        email: driverPersonal.email || 'rajesh.driver@gmail.com',
-        address: driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road',
-        city: driverPersonal.city || 'Bhubaneswar',
-        dateOfBirth: driverPersonal.dateOfBirth || '1992-05-15',
+        // BUG-16 / PA-3: no fabricated defaults — required fields must come
+        // from the driver's own step-1/step-2 input (validated below).
+        fullName: driverPersonal.fullName.trim(),
+        email: driverPersonal.email || undefined,
+        address: driverPersonal.address || undefined,
+        city: driverPersonal.city || undefined,
+        dateOfBirth: driverPersonal.dateOfBirth || undefined,
         emergencyContact,
-        licenseNo:
-          driverVehicle.licenseNumber ||
-          driverVehicle.rcNumber ||
-          'OD-0220190012345',
+        licenseNo: driverVehicle.licenseNumber || driverVehicle.rcNumber || undefined,
         driverType,
-        vehicleRegistration: driverVehicle.vehicleNumber || 'OD 02 AB 1234',
+        vehicleRegistration: driverVehicle.vehicleNumber || undefined,
         vehicleType: driverVehicle.vehicleType || 'Flatbed Tow Truck',
         documents: documentsPayload,
         experienceYears: driverPersonal.yearsOfExperience
           ? Number(driverPersonal.yearsOfExperience)
-          : 5,
+          : undefined,
         languages: driverPersonal.languages
           ? driverPersonal.languages
               .split(',')
               .map((s) => s.trim())
               .filter(Boolean)
-          : ['Odia', 'Hindi', 'English'],
+          : undefined,
       };
+
+      // Honest submission gate (BUG-16): block with the exact missing fields
+      // instead of silently fabricating profile data in production records.
+      const missing: string[] = [];
+      if (!payload.fullName) missing.push('Full name');
+      if (!payload.licenseNo) missing.push('Driving licence number');
+      if (!payload.vehicleRegistration) missing.push('Vehicle registration number');
+      if (missing.length) {
+        Alert.alert(
+          'Missing details',
+          `Please go back and complete: ${missing.join(', ')}.`,
+        );
+        setSubmitting(false);
+        return;
+      }
 
       let registeredName = payload.fullName;
 
@@ -167,10 +205,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
               }
             : {
                 id: `driver-${Date.now()}`,
-                mobileNumber: driverPersonal.mobileNumber || '9876543210',
+                mobileNumber: driverPersonal.mobileNumber,
                 role: 'driver',
                 fullName: registeredName,
-                email: driverPersonal.email || 'rajesh.driver@gmail.com',
+                email: driverPersonal.email || undefined,
                 isVerified: true,
                 isProfileCompleted: true,
               },

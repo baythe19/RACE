@@ -1004,15 +1004,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   </View>
                   <View style={{ flex: 1, marginLeft: px(10) }}>
                     <PartnerText style={{ fontSize: px(14.5), fontWeight: '700', color: C.ink }}>
-                      {job.customer?.name || 'Rohit Sharma'}
+                      {job.customer?.name || 'Customer'}
                     </PartnerText>
                     <PartnerText style={{ fontSize: px(12), color: '#64748B', marginTop: px(1) }}>
-                      {job.customer?.mobileNumber || '+91 98765 43210'} · Customer
+                      {job.customer?.mobileNumber || 'Number unavailable'} · Customer
                     </PartnerText>
                   </View>
                   <Pressable
                     onPress={() =>
-                      void Linking.openURL(`tel:${job.customer?.mobileNumber || '+919876543210'}`)
+                      job.customer?.mobileNumber ? void Linking.openURL(`tel:${job.customer.mobileNumber}`) : undefined
                     }
                     hitSlop={8}
                     accessibilityRole="button"
@@ -1251,15 +1251,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   </View>
                   <View style={{ flex: 1, marginLeft: px(10) }}>
                     <PartnerText style={{ fontSize: px(14), fontWeight: '700', color: C.ink }}>
-                      {job.customer?.name || 'Rohit Sharma'}
+                      {job.customer?.name || 'Customer'}
                     </PartnerText>
                     <PartnerText style={{ fontSize: px(11.5), color: '#64748B', marginTop: px(1) }}>
-                      {job.customer?.mobileNumber || '+91 98765 43210'} · Customer
+                      {job.customer?.mobileNumber || 'Number unavailable'} · Customer
                     </PartnerText>
                   </View>
                   <Pressable
                     onPress={() =>
-                      void Linking.openURL(`tel:${job.customer?.mobileNumber || '+919876543210'}`)
+                      job.customer?.mobileNumber ? void Linking.openURL(`tel:${job.customer.mobileNumber}`) : undefined
                     }
                     hitSlop={8}
                     accessibilityRole="button"

@@ -5,8 +5,26 @@
  * to prevent circular require cycles.
  */
 
-export const UI_PREVIEW_MODE =
-  process.env.EXPO_PUBLIC_UI_PREVIEW_MODE !== 'false';
+/**
+ * PA-1 hardening (audit 21 / BUG-01 / VOC P0.1):
+ * Preview mock-data fallback stays ON for dev/demo convenience, BUT a
+ * production-shaped bundle (`__DEV__ === false`) must never silently
+ * fabricate data. In release builds preview is disabled unless someone
+ * explicitly opts in via EXPO_PUBLIC_UI_PREVIEW_MODE=true — and even then
+ * the app logs a loud warning at startup.
+ */
+const isReleaseBuild = __DEV__ === false;
+
+export const UI_PREVIEW_MODE = isReleaseBuild
+  ? process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true'
+  : process.env.EXPO_PUBLIC_UI_PREVIEW_MODE !== 'false';
+
+if (isReleaseBuild && UI_PREVIEW_MODE) {
+  console.warn(
+    '[RACE] ⚠️ Production build running with UI_PREVIEW_MODE — mock data fallbacks are ACTIVE. ' +
+      'Set EXPO_PUBLIC_UI_PREVIEW_MODE=false for any client-facing release build.',
+  );
+}
 
 /**
  * The supplied driver boards show an approved/active partner. Keep that as the

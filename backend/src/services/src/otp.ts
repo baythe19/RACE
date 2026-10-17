@@ -186,6 +186,13 @@ export class OtpService {
         }
 
         log.mobileVerified = true;
+        // VOC P0.8: store a submission-bound idempotency hash so a later
+        // "recently verified" replay only ever matches the SAME code —
+        // the repository now matches mcVerificationIdHash === submitted otp,
+        // so an arbitrary code can no longer mint a fresh session.
+        if (!log.mcVerificationIdHash) {
+          log.mcVerificationIdHash = `${log.mcVerificationId}:${otp}`;
+        }
         await log.save();
         return;
       } catch (error) {
@@ -208,6 +215,13 @@ export class OtpService {
       }
 
       log.mobileVerified = true;
+      // Replay-proof idempotency (VOC P0.8): after a success the submitted
+      // code itself becomes the only value that can match a re-verify —
+      // the repository matches mobileOtp === otp. Never store anything the
+      // user did not submit.
+      if (!log.mobileOtp) {
+        log.mobileOtp = otp;
+      }
       await log.save();
       return;
     }

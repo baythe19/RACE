@@ -3,8 +3,10 @@ import { Router } from 'express';
 import { authMiddleware } from '../../middleware/src/auth';
 import { requireRole } from '../../middleware/src/role';
 import { validate } from '../../middleware/src/validation';
+import { driverDocumentUpload } from '../../middleware/src/upload';
 import { driverController } from './driver';
 import { registerDriverSelfSchema } from '../../services/src/driverSelf';
+import { z } from 'zod';
 import {
   driverBookingsQuerySchema,
   driverBookingActionSchema,
@@ -12,6 +14,10 @@ import {
   updateDriverBookingStatusSchema,
   updateDriverLocationSchema,
 } from '../../services/src/driverValidator';
+
+const uploadDriverSelfDocumentSchema = z.object({
+  documentType: z.string().min(2).max(60),
+});
 
 const router = Router();
 
@@ -22,6 +28,15 @@ router.post(
   '/register',
   validate(registerDriverSelfSchema),
   driverController.registerSelf,
+);
+
+// Self-driver KYC upload (BUG-05/PA-2): real file storage for own documents —
+// authenticated, before role gate, mirroring /register's access model.
+router.post(
+  '/upload-document',
+  driverDocumentUpload.single('file'),
+  validate(uploadDriverSelfDocumentSchema),
+  driverController.uploadSelfDocument,
 );
 
 router.use(requireRole('driver'));

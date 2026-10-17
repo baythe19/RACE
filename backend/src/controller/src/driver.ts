@@ -2,6 +2,7 @@ import type { Request, Response } from 'express';
 
 import { asyncHandler } from '../../utils/src/asyncHandler';
 import { sendSuccess } from '../../utils/src/apiResponse';
+import { AppError } from '../../utils/src/errors';
 import { emitDriverLocation } from '../../services/src/socket';
 import { getAuthUser, getParamId } from '../../utils/src/request';
 import { UserModel } from '../../models/src/user';
@@ -86,6 +87,19 @@ export class DriverController {
   registerSelf = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await driverSelfService.register(user.id, req.body);
+    return sendSuccess(res, result, 201);
+  });
+
+  uploadSelfDocument = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const file = req.file;
+    if (!file) throw new AppError('No file uploaded', 400);
+
+    const result = await driverSelfService.uploadSelfDocument(user.id, req.body.documentType, {
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+      originalname: file.originalname,
+    });
     return sendSuccess(res, result, 201);
   });
 }

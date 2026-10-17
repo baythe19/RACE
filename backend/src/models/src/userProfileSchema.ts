@@ -163,6 +163,15 @@ export const VendorProfileSchema = new Schema<IVendorProfile>(
       accountNumber: String,
       ifsc: String,
       bankName: String,
+      /** Payout channel: bank transfer or UPI VPA. */
+      payoutMethod: { type: String, enum: ['bank', 'upi'] },
+      upiId: { type: String, trim: true, lowercase: true },
+      /** True only after a real verification (penny-drop / admin review). */
+      isVerified: { type: Boolean, default: false },
+      verifiedAt: Date,
+      /** Where this record came from — vendor app, admin panel, or seeding. */
+      source: { type: String, enum: ['vendor_app', 'admin', 'seed'] },
+      updatedAt: Date,
     },
     partnerDriverDetails: {
       dateOfBirth: String,

@@ -23,9 +23,9 @@ import PartnerDocumentUploadList, {
   type PartnerDocumentSelection,
   type PartnerDocumentUploadState,
 } from '../../../../components/partner/PartnerDocumentUploadList';
+import VendorVehicleImage from '../../../../components/partner/VendorVehicleImage';
 import { PartnerText } from '../../../../components/partner/PartnerText';
 import AppScreenLayout from '../../../../components/ui/AppScreenLayout';
-import VehicleTypeArtwork from '../../../../components/partner/VehicleTypeArtwork';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../../../constants/partnerCopy';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import {
@@ -51,6 +51,14 @@ const VEHICLE_TYPES = [
   'Heavy Tow Truck',
   'Other',
 ] as const;
+
+const THIS_YEAR = new Date().getFullYear();
+const VEHICLE_MODEL_SUGGESTIONS: Record<(typeof VEHICLE_TYPES)[number], string[]> = {
+  'Flatbed Tow Truck': ['Tata 407 Recovery', 'Mahindra Bolero Pickup', 'Ashok Leyland Dost'],
+  'Wheel-lift Tow Truck': ['Mahindra Bolero Maxi Truck', 'Tata 407 Recovery', 'Force Traveller'],
+  'Heavy Tow Truck': ['Eicher Pro 2049', 'Tata 609', 'Ashok Leyland Partner'],
+  Other: ['Tata Ace', 'Mahindra Bolero', 'Other'],
+};
 
 const VEHICLE_DOCUMENTS: PartnerDocumentFieldConfig[] = [
   { id: 'vehicle_rc', label: 'Registration Certificate (RC)', required: true, Icon: IdCard },
@@ -134,6 +142,7 @@ export default function VendorVehicleRegistrationScreen() {
   const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
   const [originalAssignedDriverId, setOriginalAssignedDriverId] = useState<string | null>(null);
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
   const [rcNumber, setRcNumber] = useState('');
   const [insuranceProvider, setInsuranceProvider] = useState('');
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
@@ -178,6 +187,10 @@ export default function VendorVehicleRegistrationScreen() {
   }, [drivers, editingVehicle, initializedVehicleId, vehicleId]);
 
   const assignedDriverName = drivers.find(driver => driver.id === assignedDriverId)?.name ?? '';
+  const yearOptions = useMemo(
+    () => Array.from({ length: THIS_YEAR - 1979 }, (_, index) => String(THIS_YEAR - index)),
+    [],
+  );
   const availableDrivers = drivers.filter(
     driver =>
       !normalizeReg(driver.vehicleRegistration) ||
@@ -208,7 +221,7 @@ export default function VendorVehicleRegistrationScreen() {
       next.registrationNo = 'This vehicle is already in your fleet';
     }
     if (!model.trim()) next.model = 'Enter vehicle make and model';
-    if (year && (!/^\d{4}$/.test(year) || Number(year) < 1980 || Number(year) > 2100)) {
+    if (year && (!/^\d{4}$/.test(year) || Number(year) < 1980 || Number(year) > THIS_YEAR)) {
       next.year = 'Enter a valid manufacturing year';
     }
     setErrors(current => ({
@@ -475,6 +488,9 @@ export default function VendorVehicleRegistrationScreen() {
             <PartnerText style={styles.progressStepText}>2</PartnerText>
           </View>
         </View>
+        <PartnerText style={styles.progressCaption}>
+          {step === 'vehicle' ? 'Vehicle details · 1 of 2' : 'Vehicle documents · 2 of 2'}
+        </PartnerText>
 
         {step === 'vehicle' ? (
           <View style={styles.formCard}>
@@ -496,7 +512,7 @@ export default function VendorVehicleRegistrationScreen() {
                     ? 'wheel_lift'
                     : item.toLowerCase().includes('truck') || item.toLowerCase().includes('heavy')
                       ? 'heavy_tow'
-                      : 'car';
+                      : 'other';
                 return (
                   <Pressable
                     key={item}
@@ -504,7 +520,7 @@ export default function VendorVehicleRegistrationScreen() {
                     accessibilityState={{ checked: active }}
                     onPress={() => setType(item)}
                     style={({ pressed }) => [styles.typeCard, active && styles.typeCardActive, pressed && styles.pressed]}>
-                    <VehicleTypeArtwork type={artwork} size={38} selected={active} />
+                    <VendorVehicleImage type={artwork} size={42} />
                     <PartnerText numberOfLines={2} style={[styles.typeCardText, active && styles.typeCardTextActive]}>{item}</PartnerText>
                   </Pressable>
                 );
@@ -538,17 +554,31 @@ export default function VendorVehicleRegistrationScreen() {
               variant="outlined"
               returnKeyType="next"
             />
+            <View style={styles.suggestionBlock}>
+              <PartnerText style={styles.suggestionLabel}>Common for this vehicle type</PartnerText>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.suggestionRow}>
+                {VEHICLE_MODEL_SUGGESTIONS[type].map(suggestion => (
+                  <Pressable
+                    key={suggestion}
+                    onPress={() => setModel(suggestion)}
+                    style={({ pressed }) => [styles.suggestionChip, model === suggestion && styles.suggestionChipActive, pressed && styles.pressed]}>
+                    <PartnerText style={[styles.suggestionText, model === suggestion && styles.suggestionTextActive]}>{suggestion}</PartnerText>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
             <FormField
               testID="vehicleYearInput"
               label="Manufacturing year"
               optional
               value={year}
-              onChangeText={text => setYear(text.replace(/\D/g, '').slice(0, 4))}
-              keyboardType="number-pad"
+              editable={false}
+              onPress={() => setYearPickerOpen(true)}
               error={errors.year}
-              placeholder="e.g. 2022"
+              placeholder="Choose a year"
               Icon={Calendar}
               variant="outlined"
+              rightElement={<ChevronDown size={16} color={colors.grey} strokeWidth={2.2} />}
             />
             <FormField
               label="Assigned driver"
@@ -570,6 +600,21 @@ export default function VendorVehicleRegistrationScreen() {
                 <PartnerText style={styles.sectionTitle}>Registration & documents</PartnerText>
                 <PartnerText style={styles.sectionSubtitle}>Add the vehicle details and upload clear documents for review.</PartnerText>
               </View>
+            </View>
+            <View style={styles.documentGroup}>
+              <PartnerText style={styles.documentGroupTitle}>Required for vehicle registration</PartnerText>
+              <PartnerText style={styles.documentGroupHint}>Upload the RC and current insurance. JPG, PNG or PDF up to 5 MB.</PartnerText>
+              <PartnerDocumentUploadList
+                variant="card"
+                compact
+                hideTitle
+                documents={REQUIRED_VEHICLE_DOCUMENTS}
+                uploadedIds={vehicleDocuments.map(document => document.id)}
+                selectedFiles={vehicleDocuments}
+                uploadStates={documentUploadStates}
+                disabled={saving}
+                onUpload={selectVehicleDocument}
+              />
             </View>
             <FormField
               label="RC number"
@@ -616,21 +661,6 @@ export default function VendorVehicleRegistrationScreen() {
               Icon={Calendar}
               variant="outlined"
             />
-            <View style={styles.documentGroup}>
-              <PartnerText style={styles.documentGroupTitle}>Required for vehicle registration</PartnerText>
-              <PartnerText style={styles.documentGroupHint}>Upload the RC and current insurance. JPG, PNG or PDF up to 5 MB.</PartnerText>
-              <PartnerDocumentUploadList
-                variant="card"
-                compact
-                hideTitle
-                documents={REQUIRED_VEHICLE_DOCUMENTS}
-                uploadedIds={vehicleDocuments.map(document => document.id)}
-                selectedFiles={vehicleDocuments}
-                uploadStates={documentUploadStates}
-                disabled={saving}
-                onUpload={selectVehicleDocument}
-              />
-            </View>
             <View style={styles.optionalDocumentGroup}>
               <PartnerText style={styles.documentGroupTitle}>Additional vehicle documents</PartnerText>
               <PartnerText style={styles.documentGroupHint}>Add fitness, PUC, permit, or a vehicle photo when applicable.</PartnerText>
@@ -654,6 +684,46 @@ export default function VendorVehicleRegistrationScreen() {
         )}
         {submitError ? <PartnerText accessibilityRole="alert" style={styles.errorBanner}>{submitError}</PartnerText> : null}
       </View>
+
+      <Modal
+        visible={yearPickerOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setYearPickerOpen(false)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setYearPickerOpen(false)}>
+          <Pressable style={styles.driverSheet} onPress={event => event.stopPropagation()}>
+            <View style={styles.sheetHeader}>
+              <View>
+                <PartnerText style={styles.sheetTitle}>Manufacturing year</PartnerText>
+                <PartnerText style={styles.documentGroupHint}>Choose the year printed on the vehicle papers.</PartnerText>
+              </View>
+              <Pressable hitSlop={8} onPress={() => setYearPickerOpen(false)} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close year picker">
+                <X size={18} color={colors.grey} strokeWidth={2.3} />
+              </Pressable>
+            </View>
+            <ScrollView style={styles.yearList} contentContainerStyle={styles.yearGrid} showsVerticalScrollIndicator={false}>
+              {yearOptions.map(option => {
+                const selected = option === year;
+                return (
+                  <Pressable
+                    key={option}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    onPress={() => { setYear(option); setYearPickerOpen(false); setErrors(current => ({ ...current, year: '' })); }}
+                    style={({ pressed }) => [styles.yearOption, selected && styles.yearOptionActive, pressed && styles.pressed]}>
+                    <PartnerText style={[styles.yearOptionText, selected && styles.yearOptionTextActive]}>{option}</PartnerText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {year ? (
+              <Pressable style={styles.clearYearButton} onPress={() => { setYear(''); setYearPickerOpen(false); }}>
+                <PartnerText style={styles.clearDriverLabel}>Clear year</PartnerText>
+              </Pressable>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={driverPickerOpen}
@@ -729,6 +799,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     position: 'relative',
   },
+  progressCaption: { alignSelf: 'center', marginTop: -spacing.sm, marginBottom: spacing.sm, color: colors.grey, fontSize: typography.sizes.sm, fontWeight: typography.weights.semibold },
   progressRail: { position: 'absolute', left: 12, right: 12, height: 2, backgroundColor: '#E5E7EB' },
   progressFill: {
     position: 'absolute',
@@ -786,6 +857,13 @@ const styles = StyleSheet.create({
   typeCardActive: { borderColor: colors.primary, backgroundColor: '#FFFBEB' },
   typeCardText: { color: colors.grey, fontSize: 10, lineHeight: 12, textAlign: 'center', fontWeight: typography.weights.semibold },
   typeCardTextActive: { color: colors.primaryDark, fontWeight: typography.weights.bold },
+  suggestionBlock: { marginTop: -spacing.sm, marginBottom: spacing.xs },
+  suggestionLabel: { color: colors.grey, fontSize: typography.sizes.xs, fontWeight: typography.weights.semibold, marginBottom: spacing.xs },
+  suggestionRow: { flexDirection: 'row', gap: spacing.xs, paddingRight: spacing.xs },
+  suggestionChip: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  suggestionChipActive: { borderColor: colors.primary, backgroundColor: colors.goldLight },
+  suggestionText: { color: colors.grey, fontSize: typography.sizes.xs, fontWeight: typography.weights.semibold },
+  suggestionTextActive: { color: colors.primaryDark },
   infoBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, backgroundColor: '#EFF6FF', borderRadius: 10, padding: spacing.sm + 2 },
   infoText: { flex: 1, color: '#1E40AF', fontSize: typography.sizes.xs, lineHeight: 17 },
   errorBanner: { color: colors.error, backgroundColor: '#FEF2F2', borderRadius: 10, padding: spacing.md, lineHeight: 19 },
@@ -806,6 +884,13 @@ const styles = StyleSheet.create({
   sheetTitle: { color: colors.dark, fontSize: typography.sizes.lg, fontWeight: typography.weights.bold },
   closeButton: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.lightGrey },
   driverList: { flexGrow: 0, maxHeight: 360 },
+  yearList: { flexGrow: 0, maxHeight: 390 },
+  yearGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', rowGap: spacing.sm, paddingBottom: spacing.sm },
+  yearOption: { width: '23%', minHeight: 42, borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  yearOptionActive: { borderColor: colors.primary, backgroundColor: colors.goldLight },
+  yearOptionText: { color: colors.dark, fontSize: typography.sizes.sm, fontWeight: typography.weights.semibold },
+  yearOptionTextActive: { color: colors.primaryDark, fontWeight: typography.weights.bold },
+  clearYearButton: { alignItems: 'center', paddingTop: spacing.md },
   driverRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
   driverAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.goldLight, alignItems: 'center', justifyContent: 'center' },
   driverInitial: { color: colors.primaryDark, fontWeight: typography.weights.bold },

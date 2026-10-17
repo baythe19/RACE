@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import {
   Bell,
@@ -13,11 +13,10 @@ import {
   CloudUpload,
   FileSearch,
   Info,
+  Landmark,
   MapPin,
-  ShieldCheck,
   TrendingUp,
   Truck,
-  UserCheck,
   Users,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -778,19 +777,16 @@ export default function PartnerHomeScreen() {
 
       <View style={styles.quickActions} testID="vendorQuickActions">
         <PartnerText style={styles.sectionLabel}>Quick Actions</PartnerText>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.quickActionsRow}>
+        <View style={styles.quickActionsRow}>
           <Pressable
-            testID="vendorQuickManageDrivers"
-            onPress={() => navigation.navigate('PartnerDrivers' as any)}
+            testID="vendorQuickPayout"
+            onPress={() => goAccountScreen('PartnerBankDetails')}
             style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
-            accessibilityRole="button" accessibilityLabel="Manage drivers">
-            <View style={[styles.quickActionIcon, { backgroundColor: '#EEF2FF' }]}>
-              <UserCheck size={19} color="#4F46E5" strokeWidth={2.2} />
+            accessibilityRole="button" accessibilityLabel="Payout and bank">
+            <View style={[styles.quickActionIcon, { backgroundColor: '#ECFDF5' }]}>
+              <Landmark size={19} color="#059669" strokeWidth={2.2} />
             </View>
-            <PartnerText style={styles.quickActionLabel}>Manage drivers</PartnerText>
+            <PartnerText style={styles.quickActionLabel}>Payout &amp; bank</PartnerText>
           </Pressable>
           <Pressable
             testID="vendorQuickManageVehicles"
@@ -802,18 +798,7 @@ export default function PartnerHomeScreen() {
             </View>
             <PartnerText style={styles.quickActionLabel}>Manage vehicles</PartnerText>
           </Pressable>
-          <Pressable
-            testID="vendorQuickVerification"
-            onPress={() => goAccountScreen('VendorVerificationStatus')}
-            style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
-            accessibilityRole="button" accessibilityLabel={`Verification, ${verification.badge}`}>
-            <View style={[styles.quickActionIcon, { backgroundColor: '#ECFDF5' }]}>
-              <ShieldCheck size={19} color="#059669" strokeWidth={2.2} />
-            </View>
-            <PartnerText style={styles.quickActionLabel}>Verification</PartnerText>
-            {!vendorLoading && verification.tone !== 'completed' ? <View style={styles.verificationDot} /> : null}
-          </Pressable>
-      </ScrollView>
+        </View>
       </View>
 
 
@@ -1511,14 +1496,13 @@ const styles = StyleSheet.create({
   fleetMetricValue: { color: colors.dark, fontSize: 18, lineHeight: 22, fontWeight: '700' },
   fleetMetricSub: { fontSize: 9.5, lineHeight: 13, fontWeight: '600', marginTop: 2 },
   quickActions: { marginBottom: 16 },
-  quickActionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 12 },
+  quickActionsRow: { flexDirection: 'row', gap: 8 },
   quickActionTile: {
-    flexGrow: 1, flexBasis: 0, minWidth: 132, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 8,
+    flex: 1, minWidth: 0, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 10, paddingVertical: 14, backgroundColor: '#FFFFFF', borderWidth: 1,
     borderColor: colors.border, borderRadius: 14,
   },
   quickActionIcon: { width: 36, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   quickActionLabel: { flex: 1, minWidth: 0, color: colors.dark, fontSize: 11.5, lineHeight: 16, fontWeight: '600' },
-  verificationDot: { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#F97316' },
 
 });

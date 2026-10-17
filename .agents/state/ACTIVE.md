@@ -5,6 +5,13 @@
 
 ---
 
+## Latest session — Vendor Vehicle UI polish (2026-10-17, branch v4.5.0-uichanges)
+
+- Replaced the duplicate native VendorVehicles headers across Account, Jobs, and Drivers stacks so the screen owns one centered “Vehicles” header.
+- Added four generated transparent vehicle images for the fleet list and type selector; replaced the cycling filter pills with explicit status/type/sort choices.
+- Added common make/model suggestions, a manufacturing-year grid picker, and moved required RC/insurance uploads above metadata and optional documents.
+- Verification: mobile `npm run lint` (`tsc --noEmit`) and `git diff --check` passed. Peach visual review could not run because Playwright Chrome and the local CUA runtime were unavailable. No commit or push.
+
 ## Latest session — Partner Fleet Vehicle Registration Flow (2026-10-17, branch v4.5.0-uichanges)
 
 - Added a dedicated two-step vehicle registration/edit screen to the Account, Jobs, and Drivers stacks. The fleet list stays behind it, so Back returns to the originating vehicle list.

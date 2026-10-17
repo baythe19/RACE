@@ -18,6 +18,7 @@ import { Pressable, View } from 'react-native';
 import {
   ClipboardList,
   House,
+  Truck,
   User,
   Users,
   type LucideIcon,
@@ -51,6 +52,7 @@ const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob', 'VendorAssignJob']);
 const TAB_CONFIG: Record<TabRouteName, { label: string; Icon: LucideIcon }> = {
   PartnerHome: { label: 'Home', Icon: House },
   PartnerJobs: { label: 'Jobs', Icon: ClipboardList },
+  PartnerVehicles: { label: 'Vehicles', Icon: Truck },
   PartnerDrivers: { label: 'Drivers', Icon: Users },
   PartnerAccount: { label: 'Account', Icon: User },
 };

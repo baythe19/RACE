@@ -45,15 +45,20 @@ export class AuthRepository {
     withinMs: number,
   ): Promise<IOtpLog | null> {
     const since = new Date(Date.now() - withinMs);
-    // In MC mode mobileOtp is not stored; match either by otp OR any verified log with mcVerificationId
+    /**
+     * Idempotent re-verify within the expiry window.
+     * VOC P0.8 fix: the previous `$or: [{mobileOtp: otp}, {mcVerificationId: $exists}]`
+     * accepted ANY submitted code when a recently-verified MessageCentral log
+     * existed — an OTP-replay hole (arbitrary code → new token session).
+     * Replay credit is now given only when the OtpLog carries proof bound to
+     * THIS submission: the stored MC verificationIdHash must equal the hash of
+     * the submitted code, or a hashed hanu/local OTP must match.
+     */
     return OtpLogModel.findOne({
       mobileNumber,
       mobileVerified: true,
       createdAt: { $gte: since },
-      $or: [
-        { mobileOtp: otp },
-        { mcVerificationId: { $exists: true, $ne: null } },
-      ],
+      $or: [{ mobileOtp: otp }, { mcVerificationIdHash: otp }],
     })
       .sort({ createdAt: -1 })
       .exec();

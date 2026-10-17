@@ -33,6 +33,7 @@ import type {
   PartnerDriversStackParamList,
   PartnerJobsStackParamList,
   PartnerTabParamList,
+  PartnerVehiclesStackParamList,
 } from '../types/partnerNavigation';
 import { colors, typography } from '../theme';
 
@@ -43,6 +44,7 @@ const styles = StyleSheet.create({
 const Tab = createBottomTabNavigator<PartnerTabParamList>();
 const AccountStack = createNativeStackNavigator<PartnerAccountStackParamList>();
 const JobsStack = createNativeStackNavigator<PartnerJobsStackParamList>();
+const VehiclesStack = createNativeStackNavigator<PartnerVehiclesStackParamList>();
 const DriversStack = createNativeStackNavigator<PartnerDriversStackParamList>();
 
 const stackScreenOptions = {
@@ -85,7 +87,7 @@ function PartnerJobsStackNavigator() {
       <JobsStack.Screen
         name="VendorVehicles"
         component={VendorVehiclesScreen}
-        options={{ headerTitle: 'Vendor vehicles' }}
+        options={{ headerShown: false }}
       />
       <JobsStack.Screen
         name="VendorVehicleRegistration"
@@ -106,6 +108,23 @@ function PartnerJobsStackNavigator() {
   );
 }
 
+function PartnerVehiclesStackNavigator() {
+  return (
+    <VehiclesStack.Navigator initialRouteName="VendorVehiclesList" screenOptions={stackScreenOptions}>
+      <VehiclesStack.Screen
+        name="VendorVehiclesList"
+        component={VendorVehiclesScreen}
+        options={{ headerShown: false }}
+      />
+      <VehiclesStack.Screen
+        name="VendorVehicleRegistration"
+        component={VendorVehicleRegistrationScreen}
+        options={{ headerShown: false }}
+      />
+    </VehiclesStack.Navigator>
+  );
+}
+
 function PartnerDriversStackNavigator() {
   return (
     <DriversStack.Navigator initialRouteName="VendorDriversList" screenOptions={stackScreenOptions}>
@@ -117,7 +136,7 @@ function PartnerDriversStackNavigator() {
       <DriversStack.Screen
         name="VendorVehicles"
         component={VendorVehiclesScreen}
-        options={{ headerTitle: 'Vendor vehicles' }}
+        options={{ headerShown: false }}
       />
       <DriversStack.Screen
         name="VendorVehicleRegistration"
@@ -189,7 +208,7 @@ function PartnerAccountStackNavigator() {
       <AccountStack.Screen
         name="VendorVehicles"
         component={VendorVehiclesScreen}
-        options={{ headerTitle: 'Vendor vehicles' }}
+        options={{ headerShown: false }}
       />
       <AccountStack.Screen
         name="VendorVehicleRegistration"
@@ -235,6 +254,13 @@ export default function PartnerNavigator() {
           name="PartnerDrivers"
           component={PartnerDriversStackNavigator}
           options={{ title: 'Drivers' }}
+        />
+      ) : null}
+      {!isDriver ? (
+        <Tab.Screen
+          name="PartnerVehicles"
+          component={PartnerVehiclesStackNavigator}
+          options={{ title: 'Vehicles' }}
         />
       ) : null}
       <Tab.Screen

@@ -1,6 +1,7 @@
 import { BadRequestError, NotFoundError } from '../../utils/src/errors';
 import { UserModel } from '../../models/src/user';
 import { driverRepository } from './driverRepository';
+import { storageService } from '../../storage/src/index';
 import { z } from 'zod';
 
 export const registerDriverSelfSchema = z.object({
@@ -158,6 +159,82 @@ export class DriverSelfService {
       fullName: user.fullName,
       status,
       isProfileCompleted: true,
+    };
+  }
+
+  /**
+   * Self-driver KYC upload (BUG-05 / PA-2 fix): stores the file via the same
+   * storage pipeline used for vendor-managed drivers and attaches it to the
+   * caller's own driverProfile.documents. Registration no longer needs to
+   * fabricate local device URIs — upload first, then register referencing
+   * the returned fileUrl.
+   */
+  async uploadSelfDocument(
+    userId: string,
+    documentType: string,
+    file: { buffer: Buffer; mimetype: string; originalname: string },
+  ) {
+    const user = await UserModel.findById(userId).exec();
+    if (!user) throw new NotFoundError('User not found');
+    if (user.role === 'vendor') {
+      throw new BadRequestError('Vendor accounts use the vendor document upload path');
+    }
+
+    const upload = await storageService.uploadDriverDocument({
+      driverId: userId,
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      originalName: file.originalname,
+      documentType,
+    });
+
+    if (!user.driverProfile) {
+      // Pre-registration upload: park the document on a minimal profile so
+      // register() (existing-driver branch) will keep it.
+      const count = await driverRepository.count();
+      user.driverProfile = {
+        driverCode: user.driverProfile?.driverCode ?? `DRV${String(count + 1).padStart(4, '0')}`,
+        licenseNo: 'PENDING',
+        driverType: 'Tow Driver',
+        city: 'Bhubaneswar',
+        state: 'Odisha',
+        status: 'PENDING',
+        rating: 0,
+        reviewCount: 0,
+        totalTrips: 0,
+        documents: [],
+      } as NonNullable<typeof user.driverProfile>;
+    }
+    if (!user.driverProfile.documents?.length) {
+      user.driverProfile.documents = [];
+    }
+
+    const existingIndex = user.driverProfile.documents.findIndex((d) => d.type === documentType);
+    if (existingIndex >= 0) {
+      user.driverProfile.documents[existingIndex].url = upload.fileUrl;
+      user.driverProfile.documents[existingIndex].status = 'PENDING';
+      user.driverProfile.documents[existingIndex].uploadedAt = new Date();
+    } else {
+      user.driverProfile.documents.push({
+        type: documentType,
+        url: upload.fileUrl,
+        status: 'PENDING',
+        uploadedAt: new Date(),
+      });
+    }
+
+    // A fresh upload always returns the application to admin review.
+    if (user.role === 'driver' && user.driverProfile.status === 'APPROVED') {
+      user.driverProfile.status = 'PENDING';
+      user.driverProfile.statusHistory?.push({ status: 'PENDING', changedAt: new Date() });
+    }
+
+    await user.save();
+    return {
+      uploaded: true,
+      documentType,
+      fileUrl: upload.fileUrl,
+      documents: user.driverProfile.documents,
     };
   }
 }

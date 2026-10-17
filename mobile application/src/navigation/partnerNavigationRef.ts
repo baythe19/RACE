@@ -58,7 +58,7 @@ export function openPartnerNotifications(): void {
 
 /** Opens any tab in PartnerMain. */
 export function jumpToPartnerMainTab(
-  tab: 'PartnerHome' | 'PartnerJobs' | 'PartnerDrivers' | 'PartnerAccount',
+  tab: 'PartnerHome' | 'PartnerJobs' | 'PartnerVehicles' | 'PartnerDrivers' | 'PartnerAccount',
 ): void {
   if (!partnerNavigationRef.isReady()) return;
   if (tab === 'PartnerAccount') {

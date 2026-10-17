@@ -2,7 +2,7 @@ import multer from 'multer';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 
-export const vendorDocumentUpload = multer({
+const documentUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
@@ -14,3 +14,8 @@ export const vendorDocumentUpload = multer({
     cb(null, true);
   },
 });
+
+export const vendorDocumentUpload = documentUpload;
+
+/** Self-driver KYC upload — same MIME + size policy as vendor documents. */
+export const driverDocumentUpload = documentUpload;

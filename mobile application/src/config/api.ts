@@ -84,4 +84,5 @@ export const API_ENDPOINTS = {
   vendorBookingVerifyTripOtp: (id: string) => `/api/v1/vendor/bookings/${id}/verify-trip-otp`,
   driverBookingOffers: '/api/v1/driver/bookings/offers',
   driverRegister: '/api/v1/driver/register',
+  driverUploadDocument: '/api/v1/driver/upload-document',
 } as const;

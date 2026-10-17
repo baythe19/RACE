@@ -4,6 +4,8 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Vie
 import {
   ArrowLeft,
   Calendar,
+  Car,
+  Check,
   CheckCircle2,
   ChevronDown,
   MoreVertical,
@@ -17,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { jumpToPartnerAccountScreen } from '../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
-import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
+import VendorVehicleImage from '../../components/partner/VendorVehicleImage';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { FleetDriver } from '../../services/vendor/vendorDriversApi';
@@ -41,6 +43,7 @@ const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 type StatusFilter = 'all' | FleetVehicleStatus;
 type SortKey = 'newest' | 'oldest' | 'reg';
+type FilterPicker = 'status' | 'type' | 'sort' | null;
 
 function normalizeReg(value?: string) {
   return (value ?? '').replace(/[\s-]+/g, '').toUpperCase();
@@ -64,14 +67,13 @@ function typeBadge(type: string) {
   return { bg: colors.goldLight, text: colors.primaryDark, label: type };
 }
 
-/** Same buckets as the Home leads card — picks the SVG truck artwork per vehicle type. */
-function artworkForVehicleType(type: string): 'flatbed' | 'wheel_lift' | 'heavy_tow' | 'car' {
+function artworkForVehicleType(type: string): 'flatbed' | 'wheel_lift' | 'heavy_tow' | 'other' {
   const label = (type ?? '').toLowerCase();
   if (label.includes('flatbed') || label.includes('flat')) return 'flatbed';
   if (label.includes('wheel')) return 'wheel_lift';
   if (label.includes('heavy') || label.includes('recovery') || label.includes('truck'))
     return 'heavy_tow';
-  return 'car';
+  return 'other';
 }
 
 function statusMeta(status: string, driverBusy?: boolean) {
@@ -123,6 +125,7 @@ export default function VendorVehiclesScreen() {
   const [sortBy, setSortBy] = useState<SortKey>('newest');
   const [menuVehicle, setMenuVehicle] = useState<FleetVehicle | null>(null);
   const [assignVehicle, setAssignVehicle] = useState<FleetVehicle | null>(null);
+  const [filterPicker, setFilterPicker] = useState<FilterPicker>(null);
 
   const driverByReg = useMemo(() => {
     const map = new Map<string, FleetDriver>();
@@ -263,23 +266,6 @@ export default function VendorVehiclesScreen() {
     setAssignVehicle(vehicle);
   };
 
-  const cycleStatusFilter = () => {
-    const order: StatusFilter[] = ['all', 'ACTIVE', 'UNDER_MAINTENANCE', 'INACTIVE'];
-    const next = order[(order.indexOf(statusFilter) + 1) % order.length] ?? 'all';
-    setStatusFilter(next);
-  };
-
-  const cycleTypeFilter = () => {
-    const idx = typeOptions.indexOf(typeFilter);
-    const next = typeOptions[(idx + 1) % typeOptions.length] ?? 'all';
-    setTypeFilter(next);
-  };
-
-  const cycleSort = () => {
-    const order: SortKey[] = ['newest', 'oldest', 'reg'];
-    setSortBy(order[(order.indexOf(sortBy) + 1) % order.length] ?? 'newest');
-  };
-
   const statusFilterLabel =
     statusFilter === 'all'
       ? 'All status'
@@ -291,6 +277,36 @@ export default function VendorVehiclesScreen() {
 
   const sortLabel =
     sortBy === 'newest' ? 'Newest' : sortBy === 'oldest' ? 'Oldest' : 'Plate no.';
+
+  const filterOptions = filterPicker === 'status'
+    ? [
+        { value: 'all', label: 'All status' },
+        { value: 'ACTIVE', label: 'Active' },
+        { value: 'UNDER_MAINTENANCE', label: 'Under maintenance' },
+        { value: 'INACTIVE', label: 'Inactive' },
+      ]
+    : filterPicker === 'type'
+      ? typeOptions.map(value => ({ value, label: value === 'all' ? 'All vehicle types' : value }))
+      : filterPicker === 'sort'
+        ? [
+            { value: 'newest', label: 'Newest first' },
+            { value: 'oldest', label: 'Oldest first' },
+            { value: 'reg', label: 'Registration number' },
+          ]
+        : [];
+
+  const activeFilterOption = filterPicker === 'status'
+    ? statusFilter
+    : filterPicker === 'type'
+      ? typeFilter
+      : sortBy;
+
+  const selectFilterOption = (value: string) => {
+    if (filterPicker === 'status') setStatusFilter(value as StatusFilter);
+    if (filterPicker === 'type') setTypeFilter(value);
+    if (filterPicker === 'sort') setSortBy(value as SortKey);
+    setFilterPicker(null);
+  };
 
   return (
     <AppScreenLayout
@@ -314,17 +330,10 @@ export default function VendorVehiclesScreen() {
                 <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
               </Pressable>
             ) : null}
-            <View style={{ flex: 1 }}>
-              <PartnerText style={[styles.title, navigation?.canGoBack?.() ? styles.titleWithBack : styles.titleRoot]}>
-                {navigation?.canGoBack?.() ? 'Vendor vehicles' : 'Vehicles'}
-              </PartnerText>
-              {!navigation?.canGoBack?.() ? (
-                <PartnerText style={styles.subtitle}>
-                  Manage your fleet vehicles
-                </PartnerText>
-              ) : null}
+            {!navigation?.canGoBack?.() ? <View style={styles.backSpacer} /> : null}
+            <View pointerEvents="none" style={styles.titleContainer}>
+              <PartnerText style={styles.title}>Vehicles</PartnerText>
             </View>
-            {navigation?.canGoBack?.() ? <View style={{ width: 34 }} /> : null}
             <View style={styles.headerRightActions}>
               <Pressable
                 testID="vendorVehiclesAddBtn"
@@ -351,7 +360,7 @@ export default function VendorVehiclesScreen() {
             <View style={styles.statCard}>
               <View style={styles.statTop}>
                 <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
-                  <VehicleTypeArtwork type="car" size={17} />
+                  <Car size={16} color="#2563EB" strokeWidth={2.2} />
                 </View>
                 <PartnerText style={styles.statLabel} numberOfLines={1}>Total</PartnerText>
               </View>
@@ -392,27 +401,27 @@ export default function VendorVehiclesScreen() {
             </View>
           </View>
 
-          <View style={styles.filterRow}>
-            <Pressable onPress={cycleStatusFilter} style={styles.filterPill}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterRow}>
+            <Pressable onPress={() => setFilterPicker('status')} style={styles.filterPill}>
               <PartnerText style={styles.filterText}>{statusFilterLabel}</PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
-            <Pressable onPress={cycleTypeFilter} style={styles.filterPill}>
+            <Pressable onPress={() => setFilterPicker('type')} style={styles.filterPill}>
               <PartnerText style={styles.filterText}>
                 {typeFilter === 'all' ? 'All vehicle types' : typeFilter}
               </PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
-            <Pressable onPress={cycleSort} style={styles.filterPill}>
+            <Pressable onPress={() => setFilterPicker('sort')} style={styles.filterPill}>
               <PartnerText style={styles.filterText}>Sort: {sortLabel}</PartnerText>
               <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
             </Pressable>
-          </View>
+          </ScrollView>
 
           {filtered.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.iconWrap}>
-                <VehicleTypeArtwork type="flatbed" size={54} />
+                <VendorVehicleImage type="flatbed" size={58} />
               </View>
               <PartnerText style={styles.emptyTitle}>No vendor vehicles yet</PartnerText>
               <PartnerText style={styles.emptySubtitle}>
@@ -428,7 +437,7 @@ export default function VendorVehiclesScreen() {
                 <View key={vehicle.id} style={styles.vehicleCard}>
                   <View style={styles.vehicleTop}>
                     <View style={styles.thumb}>
-                      <VehicleTypeArtwork type={artworkForVehicleType(vehicle.type)} size={56} />
+                      <VendorVehicleImage type={artworkForVehicleType(vehicle.type)} size={58} />
                     </View>
                     <View style={styles.vehicleMain}>
                       <View style={styles.plateRow}>
@@ -502,7 +511,7 @@ export default function VendorVehiclesScreen() {
                             status.key === 'active' && { color: '#15803D' },
                             status.key === 'service' && { color: '#B45309' },
                           ]}>
-                          {status.key === 'active' ? (driver ? 'On duty' : 'Available') : status.label}
+                          {status.key === 'active' ? status.sub : status.label}
                         </PartnerText>
                       </View>
                     </View>
@@ -514,6 +523,26 @@ export default function VendorVehiclesScreen() {
 
         </View>
       )}
+
+      <Modal
+        visible={Boolean(filterPicker)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFilterPicker(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setFilterPicker(null)}>
+          <View style={styles.sheet}>
+            <PartnerText style={styles.sheetTitle}>
+              {filterPicker === 'status' ? 'Filter by status' : filterPicker === 'type' ? 'Filter by vehicle type' : 'Sort vehicles'}
+            </PartnerText>
+            {filterOptions.map(option => (
+              <Pressable key={option.value} style={styles.filterOption} onPress={() => selectFilterOption(option.value)}>
+                <PartnerText style={[styles.sheetItemText, option.value === activeFilterOption && styles.filterOptionActive]}>{option.label}</PartnerText>
+                {option.value === activeFilterOption ? <Check size={18} color={colors.primaryDark} strokeWidth={2.6} /> : null}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       <Modal
         visible={Boolean(menuVehicle)}
@@ -633,40 +662,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     minHeight: 44,
     gap: 0,
+    position: 'relative',
   },
   listBackButton: {
-    width: 106,
+    width: 36,
     alignItems: 'flex-start',
     paddingLeft: 6,
   },
+  backSpacer: { width: 36 },
+  titleContainer: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   title: {
-    color: colors.dark,
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.extrabold,
-  },
-  titleRoot: {
-    textAlign: 'left',
-    fontSize: 20,
-    fontWeight: typography.weights.extrabold,
-    color: colors.dark,
-  },
-  titleWithBack: {
     textAlign: 'center',
     fontSize: 18,
     fontWeight: typography.weights.extrabold,
     color: colors.dark,
   },
   headerRightActions: {
+    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-  },
-  subtitle: {
-    marginTop: spacing.xs,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
-    paddingRight: spacing.sm,
   },
   registerBtn: {
     flexDirection: 'row',
@@ -755,8 +770,8 @@ const styles = StyleSheet.create({
   },
   filterRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing.sm,
+    paddingRight: spacing.xs,
   },
   filterPill: {
     flexDirection: 'row',
@@ -978,6 +993,16 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.semibold,
     fontSize: typography.sizes.md,
   },
+  filterOption: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  filterOptionActive: { color: colors.primaryDark, fontWeight: typography.weights.bold },
   assignHint: {
     color: colors.grey,
     fontSize: typography.sizes.sm,
