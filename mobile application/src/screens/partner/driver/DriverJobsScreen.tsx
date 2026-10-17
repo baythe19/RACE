@@ -14,8 +14,8 @@ import { PartnerText } from '../../../components/partner/PartnerText';
  * [STATES] loading · empty per segment · error via alert · success → active job
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Animated, Image, Linking, Pressable, ScrollView, View } from 'react-native';
 import {
   ArrowRight,
   Bell,
@@ -50,6 +50,7 @@ import {
   useDriverJobsQuery,
   useDriverProfileQuery,
   useRejectDriverJobMutation,
+  useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
 import { useNotificationsQuery } from '../../../services/useNotificationQueries';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
@@ -1067,6 +1068,7 @@ function JobsCount({
 
 export default function DriverJobsScreen({ navigation }: Props) {
   const px = useScreenPx();
+  useRefreshDriverDataOnFocus(true);
   const insets = useSafeAreaInsets();
   const { data: profile, isLoading: profileLoading } = useDriverProfileQuery(true);
   const isApproved = buildDriverVerification(profile).isApproved;
@@ -1669,8 +1671,19 @@ function EmptyState({
 }
 
 function JobsSkeleton({ px }: { px: (value: number) => number }) {
+  const opacity = useRef(new Animated.Value(0.55)).current;
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 0.9, duration: 650, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.55, duration: 650, useNativeDriver: true }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [opacity]);
   return (
-    <View accessibilityLabel="Loading jobs" style={{ paddingTop: px(4) }}>
+    <Animated.View accessibilityLabel="Loading jobs" style={[{ paddingTop: px(4) }, { opacity }]}>
       {[0, 1, 2].map(index => (
         <View
           key={index}
@@ -1715,6 +1728,6 @@ function JobsSkeleton({ px }: { px: (value: number) => number }) {
           ) : null}
         </View>
       ))}
-    </View>
+    </Animated.View>
   );
 }

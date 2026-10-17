@@ -66,6 +66,11 @@ async function runReport(): Promise<void> {
     const position = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
+    useDriverPresenceStore.getState().setDriverLocation({
+      latitude: position.coords.latitude,
+      longitude: position.coords.longitude,
+      updatedAt: Date.now(),
+    });
     await updateDriverLocation(position.coords.latitude, position.coords.longitude);
     const sentAt = Date.now();
     lastSentAt = sentAt;

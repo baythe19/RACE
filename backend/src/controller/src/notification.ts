@@ -8,7 +8,6 @@ import { notificationService } from '../../services/src/notification';
 export class NotificationController {
   list = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
-    await notificationService.seedWelcomeNotifications(user.id);
     const notifications = await notificationService.listForUser(user.id);
     const unreadCount = await notificationService.getUnreadCount(user.id);
     return sendSuccess(res, { notifications, unreadCount });

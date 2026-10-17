@@ -16,6 +16,7 @@ import type { PartnerAccountStackParamList } from '../../../types/partnerNavigat
 import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuccessDialog';
 import PartnerUploadSheet from '../../../components/partner/dialogs/PartnerUploadSheet';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 
 import PartnerPermissionDialog, { type PermissionType } from '../../../components/partner/dialogs/PartnerPermissionDialog';
 
@@ -25,7 +26,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const user = useAppSelector(state => state.auth.user);
-  const { data: profile } = useDriverProfileQuery();
+  const { data: profile, isLoading: profileLoading } = useDriverProfileQuery();
 
   const [fullName, setFullName] = useState(profile?.fullName || user?.fullName || 'Partner');
   const [email, setEmail] = useState(profile?.email || user?.email || '');
@@ -196,6 +197,14 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       setSaving(false);
     }
   };
+
+  if (profileLoading && !profile) {
+    return (
+      <PartnerScreenLayout title="Edit Profile" onBack={() => navigation.goBack()}>
+        <DriverDataSkeleton variant="profile" />
+      </PartnerScreenLayout>
+    );
+  }
 
   return (
     <PartnerScreenLayout

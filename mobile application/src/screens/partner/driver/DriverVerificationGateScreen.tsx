@@ -15,13 +15,23 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import DriverVerificationView from '../../../components/partner/DriverVerificationView';
-import { useDriverProfileQuery } from '../../../services/driver/useDriverQueries';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
+import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { useDriverProfileQuery, useRefreshDriverDataOnFocus } from '../../../services/driver/useDriverQueries';
 import type { PartnerRootStackParamList } from '../../../types/partnerNavigation';
 import { buildDriverVerification } from '../../../utils/driverVerification';
 
 export default function DriverVerificationGateScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<PartnerRootStackParamList>>();
-  const { data: profile, refetch, isRefetching } = useDriverProfileQuery();
+  const { data: profile, refetch, isRefetching, isLoading } = useDriverProfileQuery();
+  useRefreshDriverDataOnFocus(true);
+  if (isLoading && !profile) {
+    return (
+      <PartnerScreenLayout title="Review status">
+        <DriverDataSkeleton variant="verification" />
+      </PartnerScreenLayout>
+    );
+  }
 
   const verification = useMemo(() => buildDriverVerification(profile), [profile]);
 

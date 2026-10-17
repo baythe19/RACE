@@ -501,7 +501,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
+    // '85%' resolves against an auto-height parent in some RN Modal hosts and
+    // collapses the sheet to ~195px (content unscrollable). Absolute height
+    // keeps the screen list reachable on every host.
+    height: 640,
     paddingTop: 16,
   },
   sheetHeader: {

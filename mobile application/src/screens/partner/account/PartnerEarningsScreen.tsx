@@ -20,6 +20,7 @@ import {
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import { usePartnerPayoutStore } from '../../../store/partnerPayoutStore';
 import {
   usePayoutAccountQuery,
@@ -105,11 +106,9 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
 
       {activeTab === 'payouts' ? (
         <PayoutsTabBody />
-      ) : earnings.isLoading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="small" color={driverColors.amber} />
-        </View>
-      ) : earnings.isError ? (
+      ) : earnings.isLoading && !earnings.data ? (
+        <DriverDataSkeleton variant="earnings" />
+      ) : earnings.isError && !earnings.data ? (
         <View style={styles.errorBox}>
           <AlertCircle size={16} color="#DC2626" strokeWidth={2.2} />
           <PartnerText style={styles.errorText}>
@@ -271,11 +270,7 @@ function PayoutsTabBody() {
   );
 
   if (hiddenAccount) {
-    return (
-      <View style={styles.loaderWrap}>
-        <ActivityIndicator size="small" color={driverColors.amber} />
-      </View>
-    );
+    return <DriverDataSkeleton variant="bank" />;
   }
 
   return (

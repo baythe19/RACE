@@ -8,6 +8,7 @@ import { TowingBookingModel } from '../../models/src/towingBooking';
 import { UserModel } from '../../models/src/user';
 
 let io: SocketIOServer | null = null;
+const DRIVER_OFFER_ROOM = 'drivers:open-offers';
 
 interface SocketPrincipal {
   userId: string;
@@ -145,6 +146,9 @@ export function initializeSocket(httpServer: import('http').Server): void {
     const principal = socket.data.principal;
     if (!principal) return;
 
+    socket.join(`user:${principal.userId}`);
+    if (principal.role === 'driver') socket.join(DRIVER_OFFER_ROOM);
+
     socket.on('driver:join', async (data: { driverId: string }) => {
       const driverId = String(data?.driverId ?? '');
       if (!driverId) return;
@@ -185,6 +189,44 @@ export function emitToDriver(driverId: string, event: string, data: unknown): vo
   getIO().to(`driver:${driverId}`).emit(event, data);
 }
 
+/** Broadcast a data-free invalidation signal only to authenticated driver sessions. */
+export function emitDriverOffersUpdated(): void {
+  if (!io) return;
+  io.to(DRIVER_OFFER_ROOM).emit('job:offer', { updatedAt: new Date().toISOString() });
+}
+
+/** Deliver a data-free notification refresh signal to one authenticated user. */
+export function emitToUser(userId: string, event: string, data: unknown): void {
+  if (!io) return;
+  io.to(`user:${userId}`).emit(event, data);
+}
+
+async function emitAssignedDriverBookingUpdate(
+  bookingId: string,
+  status: string,
+): Promise<void> {
+  try {
+    const [driverBooking, towingBooking] = await Promise.all([
+      DriverBookingModel.findById(bookingId).select('driverId').lean().exec(),
+      TowingBookingModel.findById(bookingId).select('driverId').lean().exec(),
+    ]);
+    const driverId = (driverBooking ?? towingBooking)?.driverId?.toString();
+    if (!driverId) return;
+
+    emitToDriver(driverId, 'booking:status', {
+      bookingId,
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    logger.warn('Could not emit booking update to assigned driver', {
+      bookingId,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export function emitToBooking(bookingId: string, event: string, data: unknown): void {
   if (!io) return;
   getIO().to(`booking:${bookingId}`).emit(event, data);
@@ -210,10 +252,13 @@ export function emitBookingStatusUpdate(
   status: string,
   data?: Record<string, unknown>,
 ): void {
+  if (!io) return;
   emitToBooking(bookingId, 'booking:status', {
     bookingId,
     status,
     updatedAt: new Date().toISOString(),
     ...(data ?? {}),
   });
+  if (status === 'CONFIRMED') emitDriverOffersUpdated();
+  void emitAssignedDriverBookingUpdate(bookingId, status);
 }

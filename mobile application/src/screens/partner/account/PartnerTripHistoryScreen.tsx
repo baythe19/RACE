@@ -4,30 +4,26 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Truck, ChevronRight } from 'lucide-react-native';
 
-import { useDriverJobsQuery } from '../../../services/driver/useDriverQueries';
+import { useDriverJobsQuery, useRefreshDriverDataOnFocus } from '../../../services/driver/useDriverQueries';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { isCancelledBookingStatus, isClosedBookingStatus } from '../../../utils/driverBookingStatus';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerTripHistory'>;
 
 type StatusTab = 'All' | 'Completed' | 'Cancelled';
 
-const HISTORY_DATA = [
-  { id: '1', bookingNumber: '#TOW-10048', time: '12 Oct, 5:24 pm', fare: '₹1,650', status: 'Completed' },
-  { id: '2', bookingNumber: '#TOW-10047', time: '12 Oct, 1:10 pm', fare: '₹1,200', status: 'Completed' },
-  { id: '3', bookingNumber: '#TOW-10046', time: '11 Oct, 8:40 pm', fare: '₹1,850', status: 'Completed' },
-  { id: '4', bookingNumber: '#TOW-10045', time: '11 Oct, 12:15 pm', fare: '₹1,400', status: 'Completed' },
-  { id: '5', bookingNumber: '#TOW-10044', time: '10 Oct, 6:22 pm', fare: '₹1,200', status: 'Cancelled' },
-];
-
 export default function PartnerTripHistoryScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<StatusTab>('All');
-  const { data: realJobs = [] } = useDriverJobsQuery();
+  const jobsQuery = useDriverJobsQuery();
+  const { data: realJobs = [] } = jobsQuery;
+  useRefreshDriverDataOnFocus(true);
 
   const tripList = useMemo(() => {
     if (realJobs.length > 0) {
-      return realJobs.map(job => {
+      return realJobs.filter(job => isClosedBookingStatus(job.status)).map(job => {
         const d = new Date(job.createdAt);
         const dateStr = !isNaN(d.getTime())
           ? `${d.toLocaleDateString([], { day: '2-digit', month: 'short' })}, ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
@@ -36,12 +32,12 @@ export default function PartnerTripHistoryScreen({ navigation }: Props) {
           id: job.id,
           bookingNumber: job.bookingNumber ? `#${job.bookingNumber}` : `#${job.id.slice(-6)}`,
           time: dateStr,
-          fare: typeof job.estimatedFare === 'number' ? `₹${Math.round(job.estimatedFare).toLocaleString('en-IN')}` : '₹—',
-          status: job.status === 'COMPLETED' ? 'Completed' : job.status === 'CANCELLED' ? 'Cancelled' : 'Completed',
+          fare: typeof (job.finalFare ?? job.estimatedFare) === 'number' ? `₹${Math.round(job.finalFare ?? job.estimatedFare ?? 0).toLocaleString('en-IN')}` : '₹—',
+          status: isCancelledBookingStatus(job.status) ? 'Cancelled' : 'Completed',
         };
       });
     }
-    return HISTORY_DATA;
+    return [];
   }, [realJobs]);
 
   const filtered = tripList.filter(item => {
@@ -75,6 +71,19 @@ export default function PartnerTripHistoryScreen({ navigation }: Props) {
       </View>
 
       {/* Trip List */}
+      {jobsQuery.isLoading && !jobsQuery.data ? (
+        <DriverDataSkeleton variant="history" />
+      ) : jobsQuery.isError && !jobsQuery.data ? (
+        <Pressable onPress={() => void jobsQuery.refetch()} style={styles.emptyState} accessibilityRole="button">
+          <PartnerText style={styles.emptyTitle}>Couldn’t load trips</PartnerText>
+          <PartnerText style={styles.emptySubtitle}>Tap to retry.</PartnerText>
+        </Pressable>
+      ) : filtered.length === 0 ? (
+        <View style={styles.emptyState}>
+          <PartnerText style={styles.emptyTitle}>No trips yet</PartnerText>
+          <PartnerText style={styles.emptySubtitle}>Completed and cancelled jobs will appear here.</PartnerText>
+        </View>
+      ) : (
       <View style={styles.tripList}>
         {filtered.map(trip => {
           const isCancelled = trip.status === 'Cancelled';
@@ -127,11 +136,15 @@ export default function PartnerTripHistoryScreen({ navigation }: Props) {
           );
         })}
       </View>
+      )}
     </PartnerScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  emptyState: { paddingVertical: 32, alignItems: 'center', gap: 6 },
+  emptyTitle: { fontSize: 15, fontWeight: '700', color: driverColors.ink },
+  emptySubtitle: { fontSize: 12, color: driverColors.grey, textAlign: 'center' },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: driverColors.light,

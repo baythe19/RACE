@@ -5,9 +5,7 @@ import {
   ArrowLeft,
   Calendar,
   Car,
-  Check,
   CheckCircle2,
-  ChevronDown,
   MoreVertical,
   Plus,
   Search,
@@ -42,8 +40,6 @@ import { colors, radius, spacing, typography } from '../../theme';
 const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 type StatusFilter = 'all' | FleetVehicleStatus;
-type SortKey = 'newest' | 'oldest' | 'reg';
-type FilterPicker = 'status' | 'type' | 'sort' | null;
 
 function normalizeReg(value?: string) {
   return (value ?? '').replace(/[\s-]+/g, '').toUpperCase();
@@ -121,11 +117,8 @@ export default function VendorVehiclesScreen() {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<SortKey>('newest');
   const [menuVehicle, setMenuVehicle] = useState<FleetVehicle | null>(null);
   const [assignVehicle, setAssignVehicle] = useState<FleetVehicle | null>(null);
-  const [filterPicker, setFilterPicker] = useState<FilterPicker>(null);
 
   const driverByReg = useMemo(() => {
     const map = new Map<string, FleetDriver>();
@@ -147,16 +140,10 @@ export default function VendorVehiclesScreen() {
     return { total: vehicles.length, available, service, inactive };
   }, [vehicles, driverByReg]);
 
-  const typeOptions = useMemo(() => {
-    const set = new Set(vehicles.map(v => v.type).filter(Boolean));
-    return ['all', ...Array.from(set)];
-  }, [vehicles]);
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    let list = vehicles.filter(v => {
+    const list = vehicles.filter(v => {
       if (statusFilter !== 'all' && v.status !== statusFilter) return false;
-      if (typeFilter !== 'all' && v.type !== typeFilter) return false;
       if (!q) return true;
       return (
         v.registrationNo.toLowerCase().includes(q) ||
@@ -165,15 +152,14 @@ export default function VendorVehiclesScreen() {
       );
     });
 
-    list = [...list].sort((a, b) => {
-      if (sortBy === 'reg') return a.registrationNo.localeCompare(b.registrationNo);
+    return [...list].sort((a, b) => {
       const aTime = +new Date(a.createdAt ?? 0);
       const bTime = +new Date(b.createdAt ?? 0);
-      return sortBy === 'oldest' ? aTime - bTime : bTime - aTime;
+      return bTime - aTime;
     });
 
     return list;
-  }, [vehicles, search, statusFilter, typeFilter, sortBy]);
+  }, [vehicles, search, statusFilter]);
 
   const goDrivers = () => {
     jumpToPartnerAccountScreen('VendorDrivers');
@@ -264,48 +250,6 @@ export default function VendorVehiclesScreen() {
       return;
     }
     setAssignVehicle(vehicle);
-  };
-
-  const statusFilterLabel =
-    statusFilter === 'all'
-      ? 'All status'
-      : statusFilter === 'ACTIVE'
-        ? 'Active'
-        : statusFilter === 'UNDER_MAINTENANCE'
-          ? 'Under maintenance'
-          : 'Inactive';
-
-  const sortLabel =
-    sortBy === 'newest' ? 'Newest' : sortBy === 'oldest' ? 'Oldest' : 'Plate no.';
-
-  const filterOptions = filterPicker === 'status'
-    ? [
-        { value: 'all', label: 'All status' },
-        { value: 'ACTIVE', label: 'Active' },
-        { value: 'UNDER_MAINTENANCE', label: 'Under maintenance' },
-        { value: 'INACTIVE', label: 'Inactive' },
-      ]
-    : filterPicker === 'type'
-      ? typeOptions.map(value => ({ value, label: value === 'all' ? 'All vehicle types' : value }))
-      : filterPicker === 'sort'
-        ? [
-            { value: 'newest', label: 'Newest first' },
-            { value: 'oldest', label: 'Oldest first' },
-            { value: 'reg', label: 'Registration number' },
-          ]
-        : [];
-
-  const activeFilterOption = filterPicker === 'status'
-    ? statusFilter
-    : filterPicker === 'type'
-      ? typeFilter
-      : sortBy;
-
-  const selectFilterOption = (value: string) => {
-    if (filterPicker === 'status') setStatusFilter(value as StatusFilter);
-    if (filterPicker === 'type') setTypeFilter(value);
-    if (filterPicker === 'sort') setSortBy(value as SortKey);
-    setFilterPicker(null);
   };
 
   return (
@@ -532,26 +476,6 @@ export default function VendorVehiclesScreen() {
       )}
 
       <Modal
-        visible={Boolean(filterPicker)}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setFilterPicker(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setFilterPicker(null)}>
-          <View style={styles.sheet}>
-            <PartnerText style={styles.sheetTitle}>
-              {filterPicker === 'status' ? 'Filter by status' : filterPicker === 'type' ? 'Filter by vehicle type' : 'Sort vehicles'}
-            </PartnerText>
-            {filterOptions.map(option => (
-              <Pressable key={option.value} style={styles.filterOption} onPress={() => selectFilterOption(option.value)}>
-                <PartnerText style={[styles.sheetItemText, option.value === activeFilterOption && styles.filterOptionActive]}>{option.label}</PartnerText>
-                {option.value === activeFilterOption ? <Check size={18} color={colors.primaryDark} strokeWidth={2.6} /> : null}
-              </Pressable>
-            ))}
-          </View>
-        </Pressable>
-      </Modal>
-
-      <Modal
         visible={Boolean(menuVehicle)}
         transparent
         animationType="fade"
@@ -687,6 +611,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  subtitle: {
+    marginTop: 2,
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
+  },
   registerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -781,17 +711,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: colors.border,
     borderRadius: radius.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
-    backgroundColor: colors.background,
+    backgroundColor: PAGE_BG,
+  },
+  filterPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterText: {
     color: colors.grey,
     fontSize: typography.sizes.xs,
     fontWeight: typography.weights.semibold,
+  },
+  filterTextActive: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
   },
   empty: {
     alignItems: 'center',

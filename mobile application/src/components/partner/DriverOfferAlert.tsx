@@ -37,6 +37,8 @@ import {
   useDriverProfileQuery,
   useRejectDriverJobMutation,
 } from '../../services/driver/useDriverQueries';
+import { useDriverRealtimeSync } from '../../services/driver/useDriverRealtimeSync';
+import { useNotificationsQuery } from '../../services/useNotificationQueries';
 import type { DriverJobBooking } from '../../services/driver/driverApi';
 import { useDriverPresenceStore } from '../../store/driverPresenceStore';
 import { openDriverActiveJob } from '../../navigation/partnerNavigationRef';
@@ -72,14 +74,19 @@ function formatCountdown(ms: number) {
 export default function DriverOfferAlert() {
   const px = useScreenPx();
   const insets = useSafeAreaInsets();
-  const role = useAppSelector(state => state.auth.user?.role);
-  const isDriver = role === 'driver';
+  const user = useAppSelector(state => state.auth.user);
+  const isDriver = user?.role === 'driver';
   const isOnline = useDriverPresenceStore(state => state.isOnline);
 
   const { data: profile } = useDriverProfileQuery(isDriver);
   const isApproved = buildDriverVerification(profile).isApproved;
+  // This host is mounted above the tab navigator, so job and notification events
+  // keep syncing while the driver moves between tabs and nested screens.
+  useDriverRealtimeSync(isDriver && isApproved, user?.id);
   const { data: offers = [] } = useDriverJobOffersQuery(isDriver && isApproved);
   const { data: activeJob } = useDriverActiveJobQuery(isDriver && isApproved);
+  // Keep the notification cache live while the driver is in any nested screen.
+  useNotificationsQuery(isDriver && isApproved);
   const acceptMutation = useAcceptDriverJobMutation();
   const rejectMutation = useRejectDriverJobMutation();
 

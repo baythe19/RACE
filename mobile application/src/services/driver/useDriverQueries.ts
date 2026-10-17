@@ -1,3 +1,5 @@
+import { useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getProfile } from '../profileService';
@@ -30,6 +32,9 @@ export function useDriverProfileQuery(enabled = true) {
     queryFn: getProfile,
     enabled,
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -38,7 +43,10 @@ export function useDriverJobsQuery(enabled = true) {
     queryKey: driverQueryKeys.jobs,
     queryFn: () => listDriverJobs(),
     enabled,
-    refetchInterval: 15_000,
+    refetchInterval: query => query.state.status === 'error' ? 30_000 : 10_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -47,7 +55,10 @@ export function useDriverJobOffersQuery(enabled = true) {
     queryKey: driverQueryKeys.offers,
     queryFn: listDriverJobOffers,
     enabled,
-    refetchInterval: 8_000,
+    refetchInterval: query => query.state.status === 'error' ? 20_000 : 5_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -56,8 +67,23 @@ export function useDriverActiveJobQuery(enabled = true) {
     queryKey: driverQueryKeys.active,
     queryFn: getDriverActiveJob,
     enabled,
-    refetchInterval: 10_000,
+    refetchInterval: query => query.state.status === 'error' ? 20_000 : 5_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
+}
+
+/** Refresh cached driver data immediately whenever a driver screen regains focus. */
+export function useRefreshDriverDataOnFocus(enabled = true) {
+  const queryClient = useQueryClient();
+  useFocusEffect(
+    useCallback(() => {
+      if (enabled) {
+        void queryClient.invalidateQueries({ queryKey: ['driver'], refetchType: 'active' });
+      }
+    }, [enabled, queryClient]),
+  );
 }
 
 export function useDriverAvailabilityMutation() {

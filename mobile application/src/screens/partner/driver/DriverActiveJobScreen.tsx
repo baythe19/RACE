@@ -64,22 +64,23 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import DeliveryNavMap from '../../../components/booking/DeliveryNavMap';
-import LiveTripMap, { type RouteMeta } from '../../../components/booking/LiveTripMap';
+import LiveTripMap from '../../../components/booking/LiveTripMap';
 import { images } from '../../../assets';
 import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../../constants/preview';
 import { updateMockActiveJobStatus } from '../../../data/mockPartnerData';
 import { useScreenPx } from '../../../hooks/useScreenPx';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import { useDriverLocationReporting } from '../../../hooks/useDriverLocationReporting';
 import {
   useDriverActiveJobQuery,
   useUpdateDriverBookingStatusMutation,
+  useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
-import { getGoogleMapsApiKey } from '../../../utils/googleMaps';
+import { useDriverPresenceStore } from '../../../store/driverPresenceStore';
 import {
   driverColors as C,
   driverMetrics as M,
@@ -392,6 +393,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const bookingId = route.params?.bookingId;
   const { data: activeJob, isLoading, isError, refetch } = useDriverActiveJobQuery(true);
   const statusMutation = useUpdateDriverBookingStatusMutation();
+  useRefreshDriverDataOnFocus(true);
 
   const [acting, setActing] = useState(false);
   const [completedJob, setCompletedJob] = useState<DriverJobBooking | null>(null);
@@ -399,11 +401,10 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const [otpError, setOtpError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
-  const [mapRouteMeta, setMapRouteMeta] = useState<RouteMeta | null>(null);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [sheetCollapsed, setSheetCollapsed] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const otpInputRef = useRef<TextInput>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const driverLocation = useDriverPresenceStore(state => state.driverLocation);
 
   const toggleSheet = useCallback(() => {
     setSheetCollapsed(prev => !prev);
@@ -423,7 +424,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   // Once completion is confirmed, keep the local server-confirmed snapshot in
   // front of any stale/partially-shaped active-query payload returned during
-  // invalidation. This prevents the earnings card from reverting to estimate.
+  // invalidation. This keeps the confirmed fare from reverting to its estimate.
   const job =
     completedJob && (!bookingId || completedJob.id === bookingId)
       ? completedJob
@@ -432,20 +433,21 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         : null;
   const step: Step = job ? stepForStatus(job.status) : 'en_route';
 
-  /**
-   * Keep the inputs and action button comfortably visible when the numeric keyboard opens.
-   */
+  // Hide the map while the number pad is open so OTP and its action stay visible.
   useEffect(() => {
-    const sub = Keyboard.addListener(
+    const show = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => {
-        if (step === 'verify_otp') {
-          scrollViewRef.current?.scrollToEnd({ animated: true });
-        }
-      },
+      () => setKeyboardVisible(true),
     );
-    return () => sub.remove();
-  }, [step]);
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   /**
    * Android Hardware Back Button:
@@ -593,31 +595,47 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   /** The backend confirms the amount at completion; only then is it final. */
   const backendConfirmedFare = typeof job?.finalFare === 'number';
-  const earningsAmount = job
+  const fareAmount = job
     ? (job.finalFare ?? job.estimatedFare ?? null)
     : null;
   const tripDuration = tripDurationLabel(job?.statusHistory);
-  const mapDistanceKm = mapRouteMeta?.distanceKm ?? job?.distanceKm;
-  const mapDurationLabel = mapRouteMeta?.durationMinutes
-    ? `${mapRouteMeta.durationMinutes} min`
-    : undefined;
+  const mapDistanceKm = job?.distanceKm;
+  const activeDestination = step === 'in_progress' ? job?.dropoff : job?.pickup;
+  const activeDestinationPoint =
+    activeDestination?.latitude != null && activeDestination?.longitude != null
+      ? {
+          latitude: activeDestination.latitude,
+          longitude: activeDestination.longitude,
+          label: step === 'in_progress' ? 'Drop-off' : 'Pickup',
+        }
+      : null;
+  const freshDriverLocation =
+    driverLocation && Date.now() - driverLocation.updatedAt < 60_000
+      ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude, label: 'You' }
+      : null;
 
-  const onMapRouteMetaChange = useCallback((meta: RouteMeta | null) => {
-    setMapRouteMeta(meta);
-  }, []);
+  const openExternalDirections = useCallback(async () => {
+    if (!job) return;
+    const destination = step === 'in_progress' ? job.dropoff : job.pickup;
+    const coordinateQuery =
+      destination?.latitude != null && destination.longitude != null
+        ? `${destination.latitude},${destination.longitude}`
+        : '';
+    const query = coordinateQuery || destination?.address || destination?.label || '';
+    if (!query) {
+      Alert.alert('Directions unavailable', 'This job does not include a pickup or drop-off location.');
+      return;
+    }
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(query)}&travelmode=driving&dir_action=navigate`;
+    try {
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert('Could not open directions', 'Please open Google Maps and search for the job location.');
+    }
+  }, [job, step]);
 
-  const mapsApiKey = getGoogleMapsApiKey();
-  const usePreviewMap =
-    !mapsApiKey && UI_PREVIEW_MODE && process.env.EXPO_PUBLIC_UI_PREVIEW_REAL_MAP !== 'true';
-
-  const toggleInAppNavigation = useCallback(() => {
-    setIsNavigating(prev => !prev);
-    setSheetCollapsed(true);
-    setRecenterTrigger(c => c + 1);
-  }, []);
-
-  const handleMapPress = useCallback(() => {
-    setSheetCollapsed(true);
+  const recenterMap = useCallback(() => {
+    setRecenterTrigger(current => current + 1);
   }, []);
 
   /* ------------------------------------------------------------- renderers */
@@ -770,25 +788,40 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         : px(270);
 
   const mapBlock = (
-    <View style={{ marginHorizontal: 0, height: mapHeight, position: 'relative' }}>
-      <DeliveryNavMap
-        pickupLabel={pickup || 'Saheed Nagar, Bhubaneswar'}
-        dropoffLabel={dropoff || 'Mancheswar, Bhubaneswar'}
-        isNavigating={isNavigating}
-        distanceKm={mapDistanceKm ?? job?.distanceKm ?? 5.4}
-        durationMinutes={mapRouteMeta?.durationMinutes ?? 12}
-        step={step}
+    <View style={{ height: mapHeight, position: 'relative' }}>
+      <LiveTripMap
+        style={StyleSheet.absoluteFill}
+        borderRadius={0}
+        showsUserLocation
+        driverLocation={freshDriverLocation}
+        activeDestination={activeDestinationPoint}
         recenterTrigger={recenterTrigger}
-        onToggleNavigation={toggleInAppNavigation}
-        onMapPress={handleMapPress}
       />
-
+      <Pressable
+        onPress={recenterMap}
+        accessibilityRole="button"
+        accessibilityLabel="Recenter map"
+        hitSlop={8}
+        style={({ pressed }) => ({
+          position: 'absolute',
+          right: px(16),
+          top: px(14),
+          width: px(42),
+          height: px(42),
+          borderRadius: px(21),
+          backgroundColor: pressed ? '#F1F5F9' : C.white,
+          alignItems: 'center',
+          justifyContent: 'center',
+          elevation: 3,
+        })}>
+        <LocateFixed size={px(19)} color={C.ink} strokeWidth={2.3} />
+      </Pressable>
       {step === 'verify_otp' ? (
         <View
           pointerEvents="none"
           style={{
             ...StyleSheet.absoluteFill,
-            backgroundColor: 'rgba(12, 16, 24, 0.42)',
+            backgroundColor: 'rgba(12, 16, 24, 0.34)',
           }}
         />
       ) : null}
@@ -797,8 +830,8 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   if (isLoading && !job) {
     return (
-      <View style={{ flex: 1, backgroundColor: C.pageBg, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={C.amber} size="large" />
+      <View style={{ flex: 1, backgroundColor: C.pageBg, padding: px(16), paddingTop: insets.top + px(12) }}>
+        <DriverDataSkeleton variant="active-job" />
       </View>
     );
   }
@@ -920,17 +953,33 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
         {/* Full-bleed interactive navigation map container */}
         <View style={{ flex: 1, position: 'relative' }}>
-          <DeliveryNavMap
-            pickupLabel={pickup || 'Saheed Nagar, Bhubaneswar'}
-            dropoffLabel={dropoff || 'Mancheswar, Bhubaneswar'}
-            isNavigating={isNavigating}
-            distanceKm={mapDistanceKm ?? job.distanceKm ?? 5.4}
-            durationMinutes={mapRouteMeta?.durationMinutes ?? 12}
-            step={step}
+          <LiveTripMap
+            style={StyleSheet.absoluteFill}
+            borderRadius={0}
+            showsUserLocation
+            driverLocation={freshDriverLocation}
+            activeDestination={activeDestinationPoint}
             recenterTrigger={recenterTrigger}
-            onToggleNavigation={toggleInAppNavigation}
-            onMapPress={handleMapPress}
           />
+          <Pressable
+            onPress={recenterMap}
+            accessibilityRole="button"
+            accessibilityLabel="Recenter map"
+            hitSlop={8}
+            style={({ pressed }) => ({
+              position: 'absolute',
+              right: px(16),
+              top: px(14),
+              width: px(42),
+              height: px(42),
+              borderRadius: px(21),
+              backgroundColor: pressed ? '#F1F5F9' : C.white,
+              alignItems: 'center',
+              justifyContent: 'center',
+              elevation: 3,
+            })}>
+            <LocateFixed size={px(19)} color={C.ink} strokeWidth={2.3} />
+          </Pressable>
 
           {/* Floating Bottom Sheet Card firmly docked at bottom without empty void */}
           <View
@@ -1088,9 +1137,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       marginBottom: px(8),
                     }}>
                     <StatusChip label="EN ROUTE TO PICKUP" tone="info" px={px} />
-                    <PartnerText style={[T.small, { fontSize: px(12), fontWeight: '700', color: '#2563EB' }]}>
-                      {mapDistanceKm != null ? `${mapDistanceKm} km away` : '5.4 km away'}
-                    </PartnerText>
+                    {mapDistanceKm != null ? (
+                      <PartnerText style={[T.small, { fontSize: px(12), fontWeight: '700', color: '#2563EB' }]}>
+                        {mapDistanceKm} km trip
+                      </PartnerText>
+                    ) : null}
                   </View>
                 ) : null}
 
@@ -1175,25 +1226,27 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                         />
                       ))}
                     </View>
-                    <View
-                      style={{
-                        marginLeft: px(8),
-                        backgroundColor: '#EFF6FF',
-                        borderWidth: 1,
-                        borderColor: '#BFDBFE',
-                        paddingHorizontal: px(7),
-                        paddingVertical: px(1.5),
-                        borderRadius: px(10),
-                      }}>
-                      <PartnerText
+                    {mapDistanceKm != null ? (
+                      <View
                         style={{
-                          fontSize: px(10.5),
-                          fontWeight: '700',
-                          color: '#1D4ED8',
+                          marginLeft: px(8),
+                          backgroundColor: '#EFF6FF',
+                          borderWidth: 1,
+                          borderColor: '#BFDBFE',
+                          paddingHorizontal: px(7),
+                          paddingVertical: px(1.5),
+                          borderRadius: px(10),
                         }}>
-                        {mapDistanceKm ?? job?.distanceKm ?? 5.4} km trip
-                      </PartnerText>
-                    </View>
+                        <PartnerText
+                          style={{
+                            fontSize: px(10.5),
+                            fontWeight: '700',
+                            color: '#1D4ED8',
+                          }}>
+                          {mapDistanceKm} km trip
+                        </PartnerText>
+                      </View>
+                    ) : null}
                   </View>
 
                   {/* Drop Row */}
@@ -1287,23 +1340,19 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   </Pressable>
                 </View>
 
-                {/* Action Buttons */}
+                {/* Launch real turn-by-turn directions instead of simulated maneuvers. */}
                 <View style={{ marginTop: px(12) }}>
-                  {step === 'en_route' ? (
+                  {(step === 'en_route' || step === 'in_progress') ? (
                     <Pressable
-                      onPress={toggleInAppNavigation}
+                      onPress={() => void openExternalDirections()}
                       accessibilityRole="button"
-                      accessibilityLabel={
-                        isNavigating
-                          ? 'Exit on-screen navigation'
-                          : 'Start on-screen navigation'
-                      }
+                      accessibilityLabel="Open Google Maps directions"
                       style={({ pressed }) => ({
                         height: px(44),
                         borderRadius: px(R.button),
                         borderWidth: 1.5,
-                        borderColor: isNavigating ? '#059669' : C.amberBorder,
-                        backgroundColor: isNavigating ? '#ECFDF5' : '#FFFFFF',
+                        borderColor: C.amberBorder,
+                        backgroundColor: pressed ? '#FFF7E6' : '#FFFFFF',
                         alignItems: 'center',
                         justifyContent: 'center',
                         flexDirection: 'row',
@@ -1312,22 +1361,16 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       })}>
                       <Navigation
                         size={px(16)}
-                        color={isNavigating ? '#059669' : C.ink}
+                        color={C.ink}
                         strokeWidth={2.4}
                         style={{ marginRight: px(7) }}
                       />
                       <PartnerText
                         style={[
                           T.button,
-                          {
-                            fontSize: px(14),
-                            fontWeight: '700',
-                            color: isNavigating ? '#059669' : C.ink,
-                          },
+                          { fontSize: px(14), fontWeight: '700', color: C.ink },
                         ]}>
-                        {isNavigating
-                          ? 'Navigation Active · Tap to Exit'
-                          : 'Start On-Screen Navigation'}
+                        Open Google Maps directions
                       </PartnerText>
                     </Pressable>
                   ) : null}
@@ -1374,7 +1417,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     );
   }
 
-  const showMap = step !== 'completed';
+  const showMap = step !== 'completed' && !(step === 'verify_otp' && keyboardVisible);
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
@@ -1385,7 +1428,6 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + px(54) : 0}>
         <ScrollView
-          ref={scrollViewRef}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -1405,8 +1447,8 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               borderTopLeftRadius: px(24),
               borderTopRightRadius: px(24),
               paddingHorizontal: px(M.pagePadding),
-              paddingTop: px(20),
-              paddingBottom: Math.max(insets.bottom + px(8), px(16)),
+              paddingTop: keyboardVisible ? px(12) : px(20),
+              paddingBottom: keyboardVisible ? px(8) : Math.max(insets.bottom + px(8), px(16)),
               alignItems: 'center',
             }}>
             <View
@@ -1416,15 +1458,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 height: px(4),
                 borderRadius: px(2),
                 backgroundColor: '#D9DBDE',
-                marginBottom: px(12),
+                marginBottom: keyboardVisible ? px(6) : px(12),
               }}
             />
             {/* Upgraded Layered Security Badge */}
             <View
               style={{
-                width: px(60),
-                height: px(60),
-                borderRadius: px(30),
+                width: keyboardVisible ? px(46) : px(60),
+                height: keyboardVisible ? px(46) : px(60),
+                borderRadius: keyboardVisible ? px(23) : px(30),
                 backgroundColor: '#FEF3C7',
                 borderWidth: 2,
                 borderColor: '#FDE68A',
@@ -1433,9 +1475,9 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               }}>
               <View
                 style={{
-                  width: px(44),
-                  height: px(44),
-                  borderRadius: px(22),
+                  width: keyboardVisible ? px(34) : px(44),
+                  height: keyboardVisible ? px(34) : px(44),
+                  borderRadius: keyboardVisible ? px(17) : px(22),
                   backgroundColor: '#FEA701',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -1445,7 +1487,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   shadowRadius: 4,
                   elevation: 2,
                 }}>
-                <ShieldCheck size={px(24)} color="#FFFFFF" strokeWidth={2.5} />
+                <ShieldCheck size={keyboardVisible ? px(18) : px(24)} color="#FFFFFF" strokeWidth={2.5} />
               </View>
             </View>
 
@@ -1453,16 +1495,16 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               style={[
                 T.sectionTitle,
                 {
-                  fontSize: px(19),
-                  lineHeight: px(25),
+                  fontSize: keyboardVisible ? px(17) : px(19),
+                  lineHeight: keyboardVisible ? px(22) : px(25),
                   color: C.ink,
-                  marginTop: px(14),
+                  marginTop: keyboardVisible ? px(8) : px(14),
                   textAlign: 'center',
                 },
               ]}>
               Confirm customer pickup
             </PartnerText>
-            <PartnerText
+            {!keyboardVisible ? <PartnerText
               style={[
                 T.body,
                 {
@@ -1475,19 +1517,19 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 },
               ]}>
               Ask the customer for the 4-digit code shown in their RACE app.
-            </PartnerText>
+            </PartnerText> : null}
 
             {/* OTP Boxes with transparent overlay input for reliable tap & IME cursor */}
             <Pressable
-              onPress={() => {
-                otpInputRef.current?.focus();
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollToEnd({ animated: true });
-                }, 100);
-              }}
+              onPress={() => otpInputRef.current?.focus()}
               accessibilityRole="button"
               accessibilityLabel="Trip OTP input"
-              style={{ flexDirection: 'row', marginTop: px(18), gap: px(12), position: 'relative' }}>
+              style={{
+                flexDirection: 'row',
+                marginTop: keyboardVisible ? px(12) : px(18),
+                gap: px(12),
+                position: 'relative',
+              }}>
               {Array.from({ length: OTP_LENGTH }, (_, index) => {
                 const char = tripOtp[index] ?? '';
                 const focused = tripOtp.length === index;
@@ -1495,8 +1537,8 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   <View
                     key={index}
                     style={{
-                      width: px(54),
-                      height: px(54),
+                      width: keyboardVisible ? px(48) : px(54),
+                      height: keyboardVisible ? px(48) : px(54),
                       borderRadius: px(14),
                       borderWidth: 1.5,
                       borderColor: otpError ? C.red : focused ? C.amber : '#CBD5E1',
@@ -1519,6 +1561,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               <PartnerTextInput
                 ref={otpInputRef}
                 value={tripOtp}
+                testID="tripOtpInput"
                 onChangeText={text => {
                   setOtpError('');
                   setTripOtp(text.replace(/\D/g, '').slice(0, OTP_LENGTH));
@@ -1547,8 +1590,8 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                marginTop: px(16),
-                paddingVertical: px(10),
+                marginTop: keyboardVisible ? px(10) : px(16),
+                paddingVertical: keyboardVisible ? px(7) : px(10),
                 paddingHorizontal: px(12),
                 borderRadius: px(12),
                 backgroundColor: '#EFF6FF',
@@ -1590,7 +1633,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               style={({ pressed }) => ({
                 alignSelf: 'stretch',
                 height: px(50),
-                marginTop: px(16),
+                marginTop: keyboardVisible ? px(10) : px(16),
                 borderRadius: px(R.button),
                 backgroundColor: acting ? C.amberBorder : C.amber,
                 alignItems: 'center',
@@ -1607,7 +1650,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             </Pressable>
 
             {/* Need Help link cleanly placed below button */}
-            <Pressable
+            {!keyboardVisible ? <Pressable
               onPress={() => void Linking.openURL(SUPPORT_NUMBER)}
               hitSlop={8}
               accessibilityRole="button"
@@ -1628,7 +1671,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 }}>
                 Need help? Call Support
               </PartnerText>
-            </Pressable>
+            </Pressable> : null}
           </View>
         ) : null}
 
@@ -1833,7 +1876,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 </View>
               </View>
 
-              {earningsAmount != null ? (
+              {fareAmount != null ? (
                 <View
                   style={{
                     flexDirection: 'row',
@@ -1860,14 +1903,14 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                         T.metricValue,
                         { fontSize: px(22), lineHeight: px(27), color: C.ink },
                       ]}>
-                      {formatInr(earningsAmount)}
+                      {formatInr(fareAmount)}
                     </PartnerText>
                     <PartnerText
                       style={[
                         T.meta,
                         { fontSize: px(12.5), lineHeight: px(17), color: C.greySoft, marginTop: px(2) },
                       ]}>
-                      {backendConfirmedFare ? 'Final earnings' : 'Estimated earnings'}
+                      {backendConfirmedFare ? 'Final trip fare' : 'Estimated trip fare'}
                     </PartnerText>
                   </View>
                   {backendConfirmedFare ? (
@@ -1896,7 +1939,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                             textAlign: 'center',
                           },
                         ]}>
-                        Added to earnings
+                        Fare confirmed
                       </PartnerText>
                     </View>
                   ) : null}

@@ -41,9 +41,12 @@ class TrackingService {
   private listeners = new Map<string, Set<TrackingListener>>();
   private intervals = new Map<string, ReturnType<typeof setInterval>>();
   private socketBound = new Set<string>();
+  private latestUpdates = new Map<string, TrackingUpdate>();
 
   private pushUpdate(bookingId: string, update: TrackingUpdate): void {
-    this.listeners.get(bookingId)?.forEach((cb) => cb(update));
+    const latest = { ...this.latestUpdates.get(bookingId), ...update };
+    this.latestUpdates.set(bookingId, latest);
+    this.listeners.get(bookingId)?.forEach((cb) => cb(latest));
   }
 
   private bindSocket(bookingId: string, bookingType?: BookingType): void {
@@ -70,13 +73,10 @@ class TrackingService {
 
     onBookingStatus((data) => {
       if (data.bookingId !== bookingId) return;
-      this.pushUpdate(bookingId, {
-        bookingId,
-        latitude: 20.2961,
-        longitude: 85.8245,
-        etaMinutes: 15,
-        status: data.status,
-      });
+      const latest = this.latestUpdates.get(bookingId);
+      // Status events have no coordinates. Keep the last real position; before
+      // the first tracking response, let the immediate REST poll establish it.
+      if (latest) this.pushUpdate(bookingId, { ...latest, status: data.status });
     });
   }
 
@@ -163,6 +163,7 @@ class TrackingService {
         this.intervals.delete(bookingId);
         this.listeners.delete(bookingId);
         this.socketBound.delete(bookingId);
+        this.latestUpdates.delete(bookingId);
         offDriverLocation();
         offBookingStatus();
       }
@@ -178,6 +179,7 @@ class TrackingService {
     this.intervals.clear();
     this.listeners.clear();
     this.socketBound.clear();
+    this.latestUpdates.clear();
     offDriverLocation();
     offBookingStatus();
   }

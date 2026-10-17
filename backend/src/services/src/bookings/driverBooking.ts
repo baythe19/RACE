@@ -387,6 +387,15 @@ export class DriverBookingService {
       throw new NotFoundError('Driver booking not found');
     }
 
+    emitBookingStatusUpdate(bookingId, updated.status, {
+      paymentStatus: updated.paymentStatus,
+      statusHistory: updated.statusHistory.map((entry) => ({
+        status: entry.status,
+        timestamp: entry.timestamp.toISOString(),
+        note: entry.note,
+      })),
+    });
+
     return mapDriverBookingWithDriver(updated);
   }
 

@@ -155,7 +155,7 @@ export const savePayoutAccountSchema = z
     accountHolderName: z.string().trim().min(3).max(80),
     bank: z
       .object({
-        accountNumber: z.string().trim().regex(/^\d{9,18}$/, 'Account number must be 9-18 digits'),
+        accountNumber: z.string().trim().regex(/^\d{9,18}$/, 'Account number must be 9-18 digits').optional(),
         ifsc: z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code'),
         bankName: z.string().trim().min(2).max(80),
       })

@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Truck,
@@ -15,6 +15,7 @@ import {
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import {
   useNotificationsQuery,
   useMarkAllNotificationsReadMutation,
@@ -28,7 +29,7 @@ type CategoryFilter = 'All' | 'Job Updates' | 'Drivers & Vehicles' | 'Account' |
 
 export default function PartnerNotificationsScreen({ navigation }: Props) {
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
-  const { data, isLoading, refetch } = useNotificationsQuery();
+  const { data, isLoading, isError, refetch } = useNotificationsQuery();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
   const markReadMutation = useMarkNotificationReadMutation();
 
@@ -203,10 +204,14 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
         })}
       </View>
 
-      {isLoading ? (
-        <View style={styles.loaderCenter}>
-          <ActivityIndicator size="small" color={driverColors.amber} />
-        </View>
+      {isLoading && !data ? (
+        <DriverDataSkeleton variant="notifications" />
+      ) : isError && !data ? (
+        <Pressable onPress={() => void refetch()} style={styles.emptyContainer} accessibilityRole="button">
+          <Bell size={36} color={driverColors.greySoft} strokeWidth={1.5} />
+          <PartnerText style={styles.emptyTitle}>Couldn’t load notifications</PartnerText>
+          <PartnerText style={styles.emptySubtitle}>Tap to retry.</PartnerText>
+        </Pressable>
       ) : filteredNotifications.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Bell size={40} color={driverColors.greySoft} strokeWidth={1.5} />

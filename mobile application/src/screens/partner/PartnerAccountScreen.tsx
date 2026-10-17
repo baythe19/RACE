@@ -28,6 +28,7 @@ import { useAuthActions } from '../../hooks/useAuth';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { usePartnerOnboardingStore } from '../../store/partnerOnboardingStore';
 import { useDriverProfileQuery } from '../../services/driver/useDriverQueries';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import { UI_PREVIEW_MODE, switchMockRole } from '../../config/uiPreviewMode';
 import { usePartnerPayoutStore } from '../../store/partnerPayoutStore';
@@ -52,7 +53,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
   const isVendor = user?.role === 'vendor';
   const isDriver = user?.role === 'driver';
 
-  const { data: driverProfile } = useDriverProfileQuery(isDriver);
+  const { data: driverProfile, isLoading: driverProfileLoading } = useDriverProfileQuery(isDriver);
   const { data: vendor } = useVendorStatusQuery(isVendor);
   const { data: notifData } = useNotificationsQuery();
 
@@ -124,6 +125,10 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           { paddingBottom: insets.bottom + 90 },
         ]}
         showsVerticalScrollIndicator={false}>
+        {isDriver && driverProfileLoading && !driverProfile ? (
+          <DriverDataSkeleton variant="profile" />
+        ) : (
+          <>
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileTopRow}>
@@ -506,6 +511,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           <LogOut size={16} color={driverColors.red} strokeWidth={2.4} />
           <PartnerText style={styles.logoutText}>Log out</PartnerText>
         </Pressable>
+          </>
+        )}
       </ScrollView>
 
       {/* Supporting Dialogs & Sheets */}

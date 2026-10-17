@@ -1,4 +1,4 @@
-import { AppError, ConflictError, NotFoundError } from '../../utils/src/errors';
+import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../utils/src/errors';
 import { notificationService } from './eventNotification';
 import { storageService } from '../../storage/src/index';
 import { BookingModel } from '../../models/src/booking';
@@ -490,12 +490,21 @@ export class VendorService {
 
     const now = new Date();
     const existing = user.vendorProfile?.bankDetails;
+    const accountNumber =
+      dto.payoutMethod === 'bank'
+        ? dto.bank?.accountNumber ??
+          (existing && (existing.payoutMethod ?? 'bank') === 'bank' ? existing.accountNumber : undefined)
+        : undefined;
+    if (dto.payoutMethod === 'bank' && !accountNumber) {
+      throw new BadRequestError('Bank account number is required for a new payout account');
+    }
     const isSameAccount =
       existing &&
       dto.payoutMethod === (existing.payoutMethod ?? 'bank') &&
+      dto.accountHolderName === existing.accountHolderName &&
       (dto.payoutMethod === 'upi'
         ? dto.upi?.upiId === existing.upiId
-        : dto.bank?.accountNumber === existing.accountNumber && dto.bank?.ifsc === existing.ifsc);
+        : accountNumber === existing.accountNumber && dto.bank?.ifsc === existing.ifsc);
     // Re-verification only required when the destination account changes.
     const keepVerified = Boolean(isSameAccount && existing?.isVerified);
 
@@ -508,7 +517,7 @@ export class VendorService {
       updatedAt: now,
     };
     if (dto.payoutMethod === 'bank' && dto.bank) {
-      bankDetails.accountNumber = dto.bank.accountNumber;
+      bankDetails.accountNumber = accountNumber;
       bankDetails.ifsc = dto.bank.ifsc;
       bankDetails.bankName = dto.bank.bankName;
     }

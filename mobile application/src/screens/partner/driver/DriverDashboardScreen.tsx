@@ -42,6 +42,7 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { partnerAccountParams, partnerJobsParams } from '../../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../../components/ui/AppScreenLayout';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
@@ -61,6 +62,7 @@ import {
   useDriverJobOffersQuery,
   useDriverJobsQuery,
   useDriverProfileQuery,
+  useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
 import { useNotificationsQuery } from '../../../services/useNotificationQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
@@ -889,20 +891,24 @@ export default function DriverDashboardScreen() {
 
   const {
     data: jobs = [],
+    isLoading: jobsLoading,
     isError: jobsError,
     refetch: refetchJobs,
   } = useDriverJobsQuery(isApproved);
   const {
     data: offers = [],
+    isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
   } = useDriverJobOffersQuery(isApproved);
   const {
     data: activeJob,
+    isLoading: activeLoading,
     isError: activeError,
     refetch: refetchActive,
   } = useDriverActiveJobQuery(isApproved);
   const availabilityMutation = useDriverAvailabilityMutation();
+  useRefreshDriverDataOnFocus(true);
 
   const [isOnline, setIsOnline] = useState(false);
   const [period, setPeriod] = useState<Period>('week');
@@ -1028,6 +1034,10 @@ export default function DriverDashboardScreen() {
   /** Location problem copy — null while location is healthy or not yet checked. */
   const locationIssue = locationHealthCopy(locationHealth);
   const dataIssue = jobsError || offersError || activeError;
+  const initialLoading = (loadingProfile && !profile) ||
+    (isApproved && !jobs.length && jobsLoading) ||
+    (isApproved && !offers.length && offersLoading) ||
+    (isApproved && !activeJob && activeLoading);
 
   return (
     <AppScreenLayout
@@ -1185,6 +1195,8 @@ export default function DriverDashboardScreen() {
           </View>
         </View>
       }>
+      {initialLoading ? <DriverDataSkeleton variant="dashboard" /> : (
+        <>
       {/* greeting -------------------------------------------------------- */}
       <PartnerText
         style={[
@@ -2100,6 +2112,8 @@ export default function DriverDashboardScreen() {
         onClose={() => setPeriodOpen(false)}
         px={px}
       />
+        </>
+      )}
     </AppScreenLayout>
   );
 }

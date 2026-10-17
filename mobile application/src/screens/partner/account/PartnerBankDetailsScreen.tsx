@@ -18,6 +18,7 @@ import { colors } from '../../../theme';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuccessDialog';
 import { useAppDispatch } from '../../../redux/hooks';
 import { updateUser } from '../../../redux/auth/authSlice';
@@ -101,7 +102,13 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
         setErrorMsg('Account holder name is required');
         return;
       }
-      if (!/^\d{9,18}$/.test(accountNumber.trim())) {
+      const hasSavedBankNumber =
+        savedAccount?.payoutMethod === 'bank' && Boolean(savedAccount.accountNumberMasked);
+      if (!accountNumber.trim() && !hasSavedBankNumber) {
+        setErrorMsg('Bank account number is required');
+        return;
+      }
+      if (accountNumber.trim() && !/^\d{9,18}$/.test(accountNumber.trim())) {
         setErrorMsg('Account number must be 9-18 digits');
         return;
       }
@@ -120,7 +127,7 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
           payoutMethod: 'bank',
           accountHolderName: holderName.trim(),
           bank: {
-            accountNumber: accountNumber.trim(),
+            ...(accountNumber.trim() ? { accountNumber: accountNumber.trim() } : {}),
             ifsc: ifsc.trim().toUpperCase(),
             bankName: bankName.trim(),
           },
@@ -177,9 +184,7 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
   if (query.isLoading) {
     return (
       <PartnerScreenLayout title="Bank & Payouts" onBack={() => navigation.goBack()}>
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="small" color={driverColors.amber} />
-        </View>
+        <DriverDataSkeleton variant="bank" />
       </PartnerScreenLayout>
     );
   }
@@ -286,14 +291,14 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               )}
               <PartnerText
                 style={[styles.verifiedTagText, !isVerified && { color: colors.primaryDark }]}>
-                {isVerified ? 'Active' : 'Pending'}
+                {isVerified ? 'Verified' : 'Pending'}
               </PartnerText>
             </View>
           </View>
           <PartnerText style={[styles.kycSubtitle, !isVerified && { color: colors.grey }]}>
             {isVerified
-              ? 'This account receives your completed-job settlements.'
-              : 'Details are saved once you submit. Our team verifies them before payouts begin — usually within 24 hours.'}
+              ? 'Your bank or UPI destination has passed verification.'
+              : 'Details are saved once you submit. Our team must verify them before payouts can be enabled.'}
             {updatedAt ? ` Last updated ${updatedAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}.` : ''}
           </PartnerText>
         </View>
@@ -344,6 +349,11 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
                 keyboardType="number-pad"
               />
             </View>
+            {savedAccount?.payoutMethod === 'bank' && savedAccount.accountNumberMasked ? (
+              <PartnerText style={{ marginTop: 6, fontSize: 12, color: '#64748B' }}>
+                Saved account {savedAccount.accountNumberMasked}. Leave blank to keep it, or enter a new number to replace it.
+              </PartnerText>
+            ) : null}
           </View>
 
           {/* IFSC Code with Find IFSC link */}
@@ -473,7 +483,7 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
         title={successTitle || 'Saved'}
         message={
           isVerified
-            ? 'Your payout account is updated and ready to receive settlements.'
+            ? 'Your payout details have passed verification.'
             : 'Details submitted. Our team will verify them before payouts begin.'
         }
         onDismiss={() => {

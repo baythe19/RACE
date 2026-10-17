@@ -383,6 +383,15 @@ export class TowingBookingService {
       throw new NotFoundError('Towing booking not found');
     }
 
+    emitBookingStatusUpdate(bookingId, updated.status, {
+      paymentStatus: updated.paymentStatus,
+      statusHistory: updated.statusHistory.map((entry) => ({
+        status: entry.status,
+        timestamp: entry.timestamp.toISOString(),
+        note: entry.note,
+      })),
+    });
+
     return mapTowingBookingWithDriver(updated);
   }
 

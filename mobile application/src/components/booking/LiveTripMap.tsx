@@ -28,6 +28,9 @@ export type RouteMeta = {
 type Props = {
   pickup?: MapPoint | null;
   dropoff?: MapPoint | null;
+  /** Active-trip mode: route from the driver's latest device fix to this destination. */
+  driverLocation?: MapPoint | null;
+  activeDestination?: MapPoint | null;
   style?: StyleProp<ViewStyle>;
   borderRadius?: number;
   showsUserLocation?: boolean;
@@ -126,6 +129,8 @@ type GoogleDirectionsResponse = {
 export default function LiveTripMap({
   pickup,
   dropoff,
+  driverLocation,
+  activeDestination,
   style,
   borderRadius = 16,
   showsUserLocation = true,
@@ -140,29 +145,37 @@ export default function LiveTripMap({
   const mapRef = useRef<MapView>(null);
   const [roadRoute, setRoadRoute] = useState<MapPoint[]>([]);
 
+  const routeOrigin = useMemo(
+    () =>
+      isValidPoint(driverLocation)
+        ? driverLocation
+        : isValidPoint(pickup)
+          ? pickup
+          : null,
+    [driverLocation, pickup],
+  );
+  const routeDestination = useMemo(
+    () =>
+      isValidPoint(activeDestination)
+        ? activeDestination
+        : isValidPoint(dropoff)
+          ? dropoff
+          : null,
+    [activeDestination, dropoff],
+  );
+
   const points = useMemo(() => {
     const list: MapPoint[] = [];
-    if (isValidPoint(pickup)) list.push(pickup);
-    if (isValidPoint(dropoff)) list.push(dropoff);
+    if (routeOrigin) list.push(routeOrigin);
+    if (routeDestination) list.push(routeDestination);
     return list;
-  }, [pickup, dropoff]);
+  }, [routeDestination, routeOrigin]);
 
   const region = useMemo(() => regionForPoints(points), [points]);
 
-  const straightRouteCoords = useMemo(() => {
-    const coords: Array<{ latitude: number; longitude: number }> = [];
-    if (isValidPoint(pickup)) {
-      coords.push({ latitude: pickup.latitude, longitude: pickup.longitude });
-    }
-    if (isValidPoint(dropoff)) {
-      coords.push({ latitude: dropoff.latitude, longitude: dropoff.longitude });
-    }
-    return coords.length >= 2 ? coords : [];
-  }, [pickup, dropoff]);
-
   useEffect(() => {
-    const origin = isValidPoint(pickup) ? pickup : null;
-    const destination = isValidPoint(dropoff) ? dropoff : null;
+    const origin = routeOrigin;
+    const destination = routeDestination;
     if (previewMap || !routeApiEnabled || !origin || !destination) {
       setRoadRoute([]);
       onRouteMetaChange?.(null);
@@ -231,9 +244,10 @@ export default function LiveTripMap({
       cancelled = true;
       controller.abort();
     };
-  }, [dropoff, onRouteMetaChange, pickup, previewMap, routeApiEnabled]);
+  }, [onRouteMetaChange, previewMap, routeApiEnabled, routeDestination, routeOrigin]);
 
-  const displayRouteCoords = roadRoute.length >= 2 ? roadRoute : straightRouteCoords;
+  // Do not draw a straight-line approximation as if it were a navigable road.
+  const displayRouteCoords = roadRoute.length >= 2 ? roadRoute : [];
 
   const preview = previewMap ? (
     <PreviewMap
@@ -294,7 +308,7 @@ export default function LiveTripMap({
             <Polyline coordinates={displayRouteCoords} strokeColor={routeColor} strokeWidth={4} />
           ) : null}
 
-          {isValidPoint(pickup) ? (
+          {!activeDestination && isValidPoint(pickup) ? (
             <Marker
               coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}
               title={pickup.label || 'Pickup'}
@@ -302,7 +316,18 @@ export default function LiveTripMap({
             />
           ) : null}
 
-          {isValidPoint(dropoff) ? (
+          {activeDestination && isValidPoint(routeDestination) ? (
+            <Marker
+              coordinate={{
+                latitude: routeDestination.latitude,
+                longitude: routeDestination.longitude,
+              }}
+              title={routeDestination.label || 'Destination'}
+              pinColor={dropoffColor}
+            />
+          ) : null}
+
+          {!activeDestination && isValidPoint(dropoff) ? (
             <Marker
               coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}
               title={dropoff.label || 'Drop-off'}

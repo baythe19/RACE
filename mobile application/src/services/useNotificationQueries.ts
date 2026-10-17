@@ -18,7 +18,10 @@ export function useNotificationsQuery(enabled = true) {
     queryKey: notificationQueryKeys.list,
     queryFn: getNotifications,
     enabled,
-    refetchInterval: 20_000,
+    refetchInterval: query => query.state.status === 'error' ? 30_000 : 10_000,
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: 'always',
   });
 }
 

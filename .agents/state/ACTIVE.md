@@ -5,6 +5,14 @@
 
 ---
 
+
+## Latest session — Driver loading skeletons and realtime refresh (2026-10-17, branch v5.0.0--productions--works)
+
+- Audited Driver Dashboard, Jobs, Active Job, verification, Account/Profile, notifications, earnings, bank, and trip history: data-backed screens already use first-load skeletons; Jobs now has a pulsing skeleton as well.
+- Kept the existing authenticated Socket.IO invalidation plus React Query foreground/resume refresh and 5-second offers/active-job, 10-second jobs/notifications polling. Notifications stay observed from the always-mounted driver offer layer, including while nested account pages are open.
+- Added 20–30 second retry polling backoff when live endpoints fail; successful polling intervals remain fast and background polling stays disabled.
+- **Verified in the Codespace:** partner `npm run lint`, `npx expo export --platform android`, and `git diff --check` pass. No device screenshot was captured; app-closed push delivery remains outside this change and requires Expo/FCM configuration.
+
 ## Latest session — Vendor Vehicle UI polish (2026-10-17, branch v4.5.0-uichanges)
 
 - Replaced the duplicate native VendorVehicles headers across Account, Jobs, and Drivers stacks so the screen owns one centered “Vehicles” header.
@@ -376,3 +384,20 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 - Live partner npm run lint (tsc --noEmit) and git diff --check passed after the dashboard update. Temporary handler checks passed for >5 drivers, step/back/input preservation, required document validation, repeated Save, failed-upload retry, file validation and preview/progress state. Handler checks mock native/API dependencies.
 - Peach headless preview became unresponsive/disconnected, so new screenshots, physical keyboard alignment, native picker/PDF viewer and real server uploads remain unverified. Existing UI preview API fallbacks remain; no production-readiness claim. No Expo/Peach server restart, commit or push.
 - Local review: outputs/peach-review/driver-dashboard-45.md in this Codex workspace. Older Jobs/Assign refinements remain separate; do not reapply superseded driver patches blindly.
+
+
+## Latest session — Driver Android skeletons, refresh and live sync (2026-10-17, branch v5.0.0--productions--works)
+
+- Added a reusable pulsing skeleton component and wired first-load placeholders into driver dashboard, active job, verification, account/profile, registration status, notifications, earnings/payout, bank and trip-history data views. Existing Jobs screen already had a card skeleton and remains intact.
+- React Query now receives React Native app foreground state; driver screens invalidate their shared queries on focus, active offers/job refresh every 5 seconds, and notifications every 10 seconds while foregrounded. Cached responses remain visible during refresh; polling pauses in background.
+- Added authenticated Socket.IO driver-room connection on the driver dashboard, refreshes data after private trip-OTP events, and reconnects with the current secure token. Open offers still use polling because backend does not currently emit a driver offer event.
+- Removed sample trip-history rows; history now shows only real closed bookings and prefers backend-confirmed final fare.
+- Verified: mobile `npm run lint` (TypeScript) and Android `npx expo export --platform android` passed; `git diff --check` passed. Background push remains unimplemented: backend notification service is a logging stub and requires an FCM/Expo push integration and credentials.
+
+
+- Follow-up realtime pass: the authenticated socket host now lives in the always-mounted driver offer overlay, so it stays connected across tabs; socket reconnect triggers an immediate REST refresh. Backend sends data-free offer invalidations to authenticated driver sockets when a booking becomes CONFIRMED, sends assigned-driver booking status invalidations, and emits private notification refresh signals after persisted user/admin notifications. Jobs refresh fallback is now 10s; offers/active booking 5s; notifications 10s while foregrounded.
+- Notification list no longer creates sample welcome records on read. Android bundle export and mobile/backend TypeScript checks pass after the realtime pass. Socket polling stops in background and refreshes on resume; remote push delivery while the app is backgrounded or closed still requires Expo/FCM push configuration and credentials.
+
+
+- Cross-surface booking refresh recheck: advance/final payment writes in both towing and driver booking services now emit the shared status update after persistence. A CONFIRMED payment therefore triggers the authenticated driver offer invalidation; assigned drivers receive status invalidations. Customer tracking status events now retain the last real coordinate instead of injecting a fallback Bhubaneswar marker.
+- Final validation after these changes: Customer, Partner and Backend TypeScript checks pass; Android Expo exports pass for both mobile apps; `git diff --check` passes. No live DB-backed booking/payment acceptance run was performed, and background/closed-app push still needs Expo/FCM configuration.

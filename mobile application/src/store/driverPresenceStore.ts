@@ -20,12 +20,20 @@ export type DriverLocationHealth =
   /** Permission granted, GPS on, but the fix or the API call failed. */
   | 'error';
 
+export interface DriverCoordinates {
+  latitude: number;
+  longitude: number;
+  updatedAt: number;
+}
+
 interface DriverPresenceState {
   /** Backend-reported availability. */
   isOnline: boolean;
   locationHealth: DriverLocationHealth;
   /** Epoch ms of the last successful report to the backend. */
   lastLocationAt: number | null;
+  /** Most recent device fix, used to center the active-trip map. */
+  driverLocation: DriverCoordinates | null;
   /** True while a location report is in flight. */
   isReporting: boolean;
   setOnline: (isOnline: boolean) => void;
@@ -33,12 +41,14 @@ interface DriverPresenceState {
     health: DriverLocationHealth,
     options?: { lastLocationAt?: number | null; isReporting?: boolean },
   ) => void;
+  setDriverLocation: (location: DriverCoordinates) => void;
 }
 
 export const useDriverPresenceStore = create<DriverPresenceState>((set) => ({
   isOnline: false,
   locationHealth: 'unknown',
   lastLocationAt: null,
+  driverLocation: null,
   isReporting: false,
   setOnline: (isOnline) => set({ isOnline }),
   setLocationHealth: (locationHealth, options) =>
@@ -48,6 +58,7 @@ export const useDriverPresenceStore = create<DriverPresenceState>((set) => ({
         options?.lastLocationAt !== undefined ? options.lastLocationAt : state.lastLocationAt,
       isReporting: options?.isReporting !== undefined ? options.isReporting : state.isReporting,
     })),
+  setDriverLocation: (driverLocation) => set({ driverLocation }),
 }));
 
 /** Human copy for a location problem — used by the dashboard health card. */

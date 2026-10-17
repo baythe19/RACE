@@ -14,6 +14,8 @@ import { Alert } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import DriverVerificationView from '../../../components/partner/DriverVerificationView';
+import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
+import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
 import { finishPartnerSignup } from '../../../redux/onboarding/onboardingSlice';
 import { useDriverProfileQuery } from '../../../services/driver/useDriverQueries';
@@ -32,7 +34,7 @@ type Props = NativeStackScreenProps<
 export default function DriverVerificationPendingScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector(state => state.auth.accessToken);
-  const { data: profile, refetch, isRefetching } = useDriverProfileQuery();
+  const { data: profile, refetch, isRefetching, isLoading } = useDriverProfileQuery();
   const { driverPersonal, driverVehicle, driverDocuments } = usePartnerRegistrationStore();
 
   const verification = useMemo(
@@ -75,6 +77,14 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
       isResubmit: true,
     });
   }, [navigation, route.params?.mobileNumber, route.params?.role]);
+
+  if (isLoading && !profile) {
+    return (
+      <PartnerScreenLayout title="Application status">
+        <DriverDataSkeleton variant="verification" />
+      </PartnerScreenLayout>
+    );
+  }
 
   return (
     <DriverVerificationView

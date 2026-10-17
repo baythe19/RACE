@@ -2,6 +2,7 @@ import { API_CONFIG, API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { VendorProfileResponse, VendorRegistrationRequest } from '../../types/vendor';
 import { apiClient } from '../api/apiClient';
+import axios from 'axios';
 import { UI_PREVIEW_MODE } from '../../constants/preview';
 import {
   MOCK_VENDOR_DASHBOARD,
@@ -114,7 +115,7 @@ export interface PayoutAccount {
 export interface SavePayoutAccountRequest {
   payoutMethod: 'bank' | 'upi';
   accountHolderName: string;
-  bank?: { accountNumber: string; ifsc: string; bankName: string };
+  bank?: { accountNumber?: string; ifsc: string; bankName: string };
   upi?: { upiId: string };
 }
 
@@ -125,27 +126,97 @@ export interface VendorEarnings {
   dailyEarnings: Array<{ date: string; amount: number }>;
 }
 
-/** 404 from this endpoint = no payout saved yet — callers treat it as empty state. */
+/**
+ * 404 from this endpoint = no payout saved yet — callers treat it as empty
+ * state. In UI-preview mode a mock saved account keeps the Bank & Payouts
+ * screen functional when the real API is unreachable.
+ */
 export async function getPayoutAccount(): Promise<PayoutAccount> {
-  const { data } = await apiClient.get<ApiSuccessResponse<PayoutAccount>>(
-    API_ENDPOINTS.vendorPayoutAccount,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<PayoutAccount>>(
+      API_ENDPOINTS.vendorPayoutAccount,
+    );
+    return data.data;
+  } catch (error) {
+    // Preview mode: both 404 (nothing saved) and 401 (mock vendor token is not
+    // valid on the real API) mean the screen should stay functional with a
+    // demo saved-account instead of a dead Retry screen.
+    if (
+      UI_PREVIEW_MODE &&
+      axios.isAxiosError(error) &&
+      (error.response?.status === 404 || error.response?.status === 401)
+    ) {
+      return {
+        payoutMethod: 'bank',
+        accountHolderName: MOCK_VENDOR_STATUS.bankDetails?.accountHolderName ?? 'Kalinga Towing Services',
+        accountNumberMasked: '************7890',
+        ifsc: MOCK_VENDOR_STATUS.bankDetails?.ifsc ?? 'SBIN0001234',
+        bankName: MOCK_VENDOR_STATUS.bankDetails?.bankName ?? 'State Bank of India',
+        isVerified: false,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    throw error;
+  }
 }
 
 export async function savePayoutAccount(payload: SavePayoutAccountRequest): Promise<PayoutAccount> {
-  const { data } = await apiClient.put<ApiSuccessResponse<PayoutAccount>>(
-    API_ENDPOINTS.vendorPayoutAccount,
-    payload,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.put<ApiSuccessResponse<PayoutAccount>>(
+      API_ENDPOINTS.vendorPayoutAccount,
+      payload,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE && axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      // Same preview contract as getPayoutAccount (401/404/403 → demo echo).
+      if (status === 404 || status === 401 || status === 403) {
+        return {
+          payoutMethod: payload.payoutMethod,
+          accountHolderName: payload.accountHolderName,
+          accountNumberMasked:
+            payload.payoutMethod === 'bank' && payload.bank?.accountNumber
+              ? `************${payload.bank.accountNumber.slice(-4)}`
+              : undefined,
+          ifsc: payload.payoutMethod === 'bank' ? payload.bank?.ifsc : undefined,
+          bankName: payload.payoutMethod === 'bank' ? payload.bank?.bankName : undefined,
+          upiId: payload.payoutMethod === 'upi' ? payload.upi?.upiId : undefined,
+          isVerified: false,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    }
+    throw error;
+  }
 }
 
 export async function getVendorEarnings(): Promise<VendorEarnings> {
-  const { data } = await apiClient.get<ApiSuccessResponse<VendorEarnings>>(
-    API_ENDPOINTS.vendorEarnings,
-  );
-  return data.data;
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<VendorEarnings>>(
+      API_ENDPOINTS.vendorEarnings,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE && axios.isAxiosError(error)) {
+      const status = error.response?.status;
+      if (status === 404 || status === 401 || status === 403) {
+        // Demo vendor: honest zero-state instead of a dead Retry screen.
+        const dashes = Array.from({ length: 7 }, (_, i) => {
+          const day = new Date();
+          day.setDate(day.getDate() - (6 - i));
+          return { date: day.toISOString().slice(0, 10), amount: 0 };
+        });
+        return {
+          currency: 'INR',
+          totals: { today: 0, week: 0, month: 0, allTime: 0 },
+          payouts: [],
+          dailyEarnings: dashes,
+        };
+      }
+    }
+    throw error;
+  }
 }
 
 export interface VendorDashboardStats {

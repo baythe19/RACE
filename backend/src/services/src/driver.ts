@@ -252,8 +252,8 @@ export class DriverService {
       assertTripStartOtp(booking, dto.tripOtp);
     }
 
-    // The backend — not the app — confirms what the driver earned. Written in the
-    // same atomic update as the status so the two can never disagree.
+    // The backend — not the app — confirms the final trip fare. Payment and
+    // payout settlement are separate flows and are not performed by this update.
     const breakdownTotal =
       booking.fareBreakdown && 'totalFare' in booking.fareBreakdown
         ? (booking.fareBreakdown as { totalFare?: number }).totalFare
