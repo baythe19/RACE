@@ -427,3 +427,5 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 
 - Admin booking list now exposes Edit/Delete only for legacy records because those endpoints only mutate the legacy Booking model. Service booking rows retain View and their detail page uses booking-type-aware operations.
 - Verified Admin web and Backend TypeScript checks, Admin production build, and repo git diff --check. Admin bundle builds successfully with a 1.12 MB main JS chunk warning.
+
+- Admin booking tabs now group legacy and service booking statuses consistently: CREATED joins Pending; assigned/en-route/service/payment states are counted as Active exactly as the filter displays them. Backend returns a typed active count. Backend typecheck and Admin production build pass (with existing large-main-chunk warning).
