@@ -1221,7 +1221,7 @@ const styles = StyleSheet.create({
     color: colors.dark,
     fontSize: 18,
     fontWeight: typography.weights.extrabold,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   titleRoot: {
     textAlign: 'left',
@@ -1230,7 +1230,7 @@ const styles = StyleSheet.create({
     color: colors.dark,
   },
   titleWithBack: {
-    textAlign: 'center',
+    textAlign: 'left',
     fontSize: 18,
     fontWeight: typography.weights.extrabold,
     color: colors.dark,

@@ -330,9 +330,15 @@ export default function VendorVehiclesScreen() {
                 <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
               </Pressable>
             ) : null}
-            {!navigation?.canGoBack?.() ? <View style={styles.backSpacer} /> : null}
-            <View pointerEvents="none" style={styles.titleContainer}>
-              <PartnerText style={styles.title}>Vehicles</PartnerText>
+            <View style={{ flex: 1 }}>
+              <PartnerText style={styles.title}>
+                {navigation?.canGoBack?.() ? 'Vendor vehicles' : 'Vehicles'}
+              </PartnerText>
+              {!navigation?.canGoBack?.() ? (
+                <PartnerText style={styles.subtitle}>
+                  Manage your fleet vehicles
+                </PartnerText>
+              ) : null}
             </View>
             <View style={styles.headerRightActions}>
               <Pressable
@@ -402,20 +408,21 @@ export default function VendorVehiclesScreen() {
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterRow}>
-            <Pressable onPress={() => setFilterPicker('status')} style={styles.filterPill}>
-              <PartnerText style={styles.filterText}>{statusFilterLabel}</PartnerText>
-              <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
-            </Pressable>
-            <Pressable onPress={() => setFilterPicker('type')} style={styles.filterPill}>
-              <PartnerText style={styles.filterText}>
-                {typeFilter === 'all' ? 'All vehicle types' : typeFilter}
-              </PartnerText>
-              <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
-            </Pressable>
-            <Pressable onPress={() => setFilterPicker('sort')} style={styles.filterPill}>
-              <PartnerText style={styles.filterText}>Sort: {sortLabel}</PartnerText>
-              <ChevronDown size={14} color={colors.grey} strokeWidth={2.4} />
-            </Pressable>
+            {([
+              ['all', `All (${vehicles.length})`],
+              ['ACTIVE', `Available (${stats.available})`],
+              ['UNDER_MAINTENANCE', `In service (${stats.service})`],
+              ['INACTIVE', `Inactive (${stats.inactive})`],
+            ] as Array<[StatusFilter, string]>).map(([key, label]) => (
+              <Pressable
+                key={key}
+                onPress={() => setStatusFilter(key)}
+                style={[styles.filterPill, statusFilter === key && styles.filterPillActive]}>
+                <PartnerText style={[styles.filterText, statusFilter === key && styles.filterTextActive]}>
+                  {label}
+                </PartnerText>
+              </Pressable>
+            ))}
           </ScrollView>
 
           {filtered.length === 0 ? (
@@ -669,16 +676,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingLeft: 6,
   },
-  backSpacer: { width: 36 },
-  titleContainer: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   title: {
-    textAlign: 'center',
+    textAlign: 'left',
     fontSize: 18,
     fontWeight: typography.weights.extrabold,
     color: colors.dark,
   },
   headerRightActions: {
-    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
