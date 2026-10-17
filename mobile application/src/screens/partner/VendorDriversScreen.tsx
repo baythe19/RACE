@@ -632,14 +632,6 @@ export default function VendorDriversScreen({ navigation }: any) {
                   <Car size={13} color="#92400E" strokeWidth={2.4} />
                   <PartnerText style={styles.headerVehicleLabel}>Vehicles</PartnerText>
                 </Pressable>
-                <Pressable
-                  onPress={onToggleForm}
-                  style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Add driver">
-                  <Plus size={15} color={colors.dark} strokeWidth={2.6} />
-                  <PartnerText style={styles.addLabel}>Add driver</PartnerText>
-                </Pressable>
               </View>
             ) : <View style={{ width: 34 }} />}
           </View>
