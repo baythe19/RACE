@@ -112,7 +112,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
                 }}>
                 {name}
               </Text>
-              {hasDriver ? (
+              {hasDriver && rating != null ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
                   <Star size={t.px(16)} color={colors.primary} fill={colors.primary} />
                   <Text
@@ -124,11 +124,11 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
                     {rating.toFixed(1)}
                   </Text>
                 </View>
-              ) : (
+              ) : !hasDriver ? (
                 <Text style={{ fontSize: t.caption, color: colors.grey }}>
                   Finding nearest tow driver…
                 </Text>
-              )}
+              ) : null}
             </View>
           </View>
 
@@ -140,7 +140,11 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
               color: colors.primary,
               textAlign: 'center',
             }}>
-            {hasDriver ? `Arriving in ${etaMinutes} min` : `ETA: ${etaLabel}`}
+            {hasDriver
+              ? etaMinutes == null
+                ? 'ETA updating'
+                : 'Arriving in ' + etaMinutes + ' min'
+              : 'ETA: ' + etaLabel}
           </Text>
 
           {tripOtp ? (

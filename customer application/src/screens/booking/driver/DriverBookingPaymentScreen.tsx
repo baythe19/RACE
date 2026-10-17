@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Pressable, Text, View } from 'react-native';
-import { Check, ChevronDown, ChevronUp, Smartphone, Wallet } from 'lucide-react-native';
+import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
+import { Check, ChevronDown, ChevronUp, Smartphone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
@@ -24,7 +24,7 @@ import { colors, shadows, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingPayment'>;
 
-type PaymentMethodId = 'upi' | 'cash';
+type PaymentMethodId = 'upi';
 
 const PAYMENT_METHODS: Array<{
   id: PaymentMethodId;
@@ -34,15 +34,9 @@ const PAYMENT_METHODS: Array<{
 }> = [
   {
     id: 'upi',
-    label: 'UPI',
-    description: 'PhonePe / GPay / Paytm',
+    label: __DEV__ ? 'UPI demo' : 'UPI',
+    description: __DEV__ ? 'Simulated in development; no charge' : 'Online payment unavailable',
     Icon: Smartphone,
-  },
-  {
-    id: 'cash',
-    label: 'Cash on Service',
-    description: 'Pay when the driver arrives',
-    Icon: Wallet,
   },
 ];
 
@@ -120,6 +114,10 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
       if (__DEV__) {
         console.warn('[DriverBookingPayment] confirm booking failed', error);
       }
+      Alert.alert(
+        'Payment not completed',
+        error instanceof Error ? error.message : 'Online payment is unavailable. Please try again later.',
+      );
     }
   };
 
@@ -145,7 +143,10 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
               fontWeight: typography.weights.bold,
               color: colors.success,
             }}>
-            Payment successful!
+            Demo booking confirmed
+          </Text>
+          <Text style={{ fontSize: t.body, color: colors.grey, textAlign: 'center' }}>
+            No real money was charged. This is a development preview.
           </Text>
           {confirmedFare ? (
             <View style={{ width: '100%', marginTop: t.px(8) }}>
@@ -312,9 +313,21 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
         })}
       </View>
 
+      <Text
+        style={{
+          fontSize: t.caption,
+          color: colors.grey,
+          textAlign: 'center',
+          marginBottom: t.px(10),
+        }}>
+        {__DEV__
+          ? 'Development demo only — no real money is charged.'
+          : 'Online payments are not configured yet.'}
+      </Text>
+
       <Pressable
         onPress={() => void handleConfirm(paymentMethod)}
-        disabled={isConfirming || !readyToPay}
+        disabled={isConfirming || !readyToPay || !__DEV__}
         style={{
           minHeight: t.buttonHeight,
           borderRadius: t.cardRadius,
@@ -332,23 +345,14 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
             fontWeight: typography.weights.bold,
             color: colors.dark,
           }}>
-          {isConfirming ? 'Processing...' : `Pay ${formatRupee(advance)} & Confirm Booking`}
+          {isConfirming
+            ? 'Processing...'
+            : __DEV__
+              ? 'Simulate ' + formatRupee(advance) + ' demo payment'
+              : 'Payments unavailable'}
         </Text>
       </Pressable>
 
-      <Pressable
-        onPress={() => void handleConfirm('cash')}
-        disabled={isConfirming || !readyToPay}
-        style={{ alignItems: 'center', padding: t.px(8), opacity: isConfirming || !readyToPay ? 0.5 : 1 }}>
-        <Text
-          style={{
-            fontSize: t.body,
-            fontWeight: typography.weights.semibold,
-            color: colors.grey,
-          }}>
-          Pay Cash on Service
-        </Text>
-      </Pressable>
     </TowingBookingLayout>
   );
 }

@@ -9,7 +9,7 @@ function getBaseUrl(): string {
 }
 
 export function connectSocket(): Socket {
-  if (socket?.connected) return socket;
+  if (socket) return socket;
 
   socket = io(getBaseUrl(), {
     transports: ['websocket'],
@@ -52,6 +52,13 @@ export function trackBooking(bookingId: string, bookingType: string): void {
   });
 }
 
+export function onSocketConnected(callback: () => void): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('connect', callback);
+  if (activeSocket.connected) callback();
+  return () => activeSocket.off('connect', callback);
+}
+
 export function onDriverLocation(
   callback: (data: {
     bookingId: string;
@@ -60,20 +67,16 @@ export function onDriverLocation(
     longitude: number;
     updatedAt: string;
   }) => void,
-): void {
-  connectSocket().on('driver:location', callback);
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('driver:location', callback);
+  return () => activeSocket.off('driver:location', callback);
 }
 
 export function onBookingStatus(
   callback: (data: { bookingId: string; status: string }) => void,
-): void {
-  connectSocket().on('booking:status', callback);
-}
-
-export function offDriverLocation(): void {
-  socket?.off('driver:location');
-}
-
-export function offBookingStatus(): void {
-  socket?.off('booking:status');
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('booking:status', callback);
+  return () => activeSocket.off('booking:status', callback);
 }

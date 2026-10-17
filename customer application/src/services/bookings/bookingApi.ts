@@ -74,8 +74,6 @@ function mapServiceBookingToBooking(
           name: item.driver.name,
           rating: item.driver.rating,
           phone: item.driver.phone,
-          experience: 'RACE verified',
-          verified: true,
         }
       : undefined,
     vendorId: item.vendorId,
@@ -150,7 +148,7 @@ export async function submitBookingRating(
 export interface BookingTracking {
   bookingId: string;
   status: string;
-  etaMinutes: number;
+  etaMinutes?: number;
   driver?: Booking['driver'];
   driverLocation?: { latitude: number; longitude: number };
   pickup: Booking['pickup'];
@@ -165,7 +163,6 @@ export async function getBookingTracking(bookingId: string): Promise<BookingTrac
     return {
       bookingId: towing.bookingId,
       status: towing.status,
-      etaMinutes: 15,
       driverLocation: towing.driverLocation,
       pickup: toBookingLocation(towing.pickup),
       dropoff: towing.dropoff ? toBookingLocation(towing.dropoff) : undefined,
@@ -178,7 +175,6 @@ export async function getBookingTracking(bookingId: string): Promise<BookingTrac
       return {
         bookingId: driver.bookingId,
         status: driver.status,
-        etaMinutes: 15,
         driverLocation: driver.driverLocation,
         pickup: toBookingLocation(driver.pickup),
         dropoff: driver.dropoff ? toBookingLocation(driver.dropoff) : undefined,

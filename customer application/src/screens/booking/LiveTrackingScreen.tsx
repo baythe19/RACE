@@ -21,7 +21,7 @@ type Props = NativeStackScreenProps<BookingsStackParamList, 'LiveTracking'>;
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
   const booking = useBookingQuery(route.params.bookingId);
-  const [eta, setEta] = useState(booking?.etaMinutes ?? 25);
+  const [eta, setEta] = useState<number | null>(booking?.etaMinutes ?? null);
   const [driverLocation, setDriverLocation] = useState<
     { latitude: number; longitude: number } | undefined
   >();
@@ -30,20 +30,22 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
     if (!booking) return;
     trackingService.connect();
     const unsubscribe = trackingService.subscribe(booking.id, update => {
-      setEta(update.etaMinutes);
+      if (update.etaMinutes != null) setEta(update.etaMinutes);
       if (update.driverLocation) {
         setDriverLocation({
           latitude: update.driverLocation.latitude,
           longitude: update.driverLocation.longitude,
         });
       }
-      dispatch(
-        updateBookingStatus({
-          id: booking.id,
-          status: update.status as BookingStatus,
-          etaMinutes: update.etaMinutes,
-        }),
-      );
+      if (update.status) {
+        dispatch(
+          updateBookingStatus({
+            id: booking.id,
+            status: update.status as BookingStatus,
+            ...(update.etaMinutes != null ? { etaMinutes: update.etaMinutes } : {}),
+          }),
+        );
+      }
     });
     return () => {
       unsubscribe();
@@ -101,15 +103,17 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
             </Text>
           </View>
           <View style={styles.etaBubble}>
-            <Text style={styles.etaText}>{eta} min away</Text>
+            <Text style={styles.etaText}>{eta == null ? 'ETA updating' : eta + ' min away'}</Text>
           </View>
         </View>
 
         <ScrollView style={styles.sheet}>
           <ScreenContent>
             <View style={styles.sheetHandle} />
-            <Text style={styles.etaLarge}>{eta} min away</Text>
-            <Text style={styles.liveBadge}>● Updating live</Text>
+            <Text style={styles.etaLarge}>{eta == null ? 'ETA updating' : eta + ' min away'}</Text>
+            <Text style={styles.liveBadge}>
+              {driverLocation ? '● Driver location live' : 'Waiting for driver location'}
+            </Text>
 
             {booking.driver ? (
               <Card style={styles.driverCard}>

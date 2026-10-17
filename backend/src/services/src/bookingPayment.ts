@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
+import { AppError, BadRequestError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
+import { env } from '../../config/env';
 import { logger } from '../../utils/src/logger';
 import { assertValidStatusTransition } from './bookings/booking';
 import type { UnifiedBookingStatus } from './bookingStatusConstants';
@@ -29,6 +30,19 @@ interface BookingPaymentSnapshot {
   paymentStatus: string;
   advanceAmount: number;
   remainingAmount: number;
+}
+
+/**
+ * This service currently simulates gateway sessions. Never let that simulation
+ * mark real production bookings as paid; replace this guard when a gateway is wired.
+ */
+function assertStubPaymentsEnabled(): void {
+  if (env.NODE_ENV === 'production') {
+    throw new AppError(
+      'Online booking payments are not configured. No payment was processed.',
+      503,
+    );
+  }
 }
 
 /**
@@ -96,6 +110,7 @@ export class BookingPaymentService {
     customerId: string,
     dto: InitiateBookingPaymentDto,
   ): Promise<BookingPaymentSessionDto> {
+    assertStubPaymentsEnabled();
     const booking = await loadBookingSnapshot(dto.bookingId, dto.bookingType);
     if (!booking) {
       throw new NotFoundError('Booking not found');
@@ -131,6 +146,7 @@ export class BookingPaymentService {
     customerId: string,
     dto: VerifyBookingPaymentDto,
   ): Promise<BookingPaymentSessionDto> {
+    assertStubPaymentsEnabled();
     const transaction = await PaymentTransactionModel.findById(dto.transactionId);
     if (!transaction || transaction.customerId.toString() !== customerId) {
       throw new NotFoundError('Payment transaction not found');
@@ -193,6 +209,7 @@ export class BookingPaymentService {
     customerId: string,
     dto: InitiateBookingPaymentDto,
   ): Promise<BookingPaymentSessionDto> {
+    assertStubPaymentsEnabled();
     const booking = await loadBookingSnapshot(dto.bookingId, dto.bookingType);
     if (!booking) {
       throw new NotFoundError('Booking not found');
@@ -236,6 +253,7 @@ export class BookingPaymentService {
     customerId: string,
     dto: VerifyBookingPaymentDto,
   ): Promise<BookingPaymentSessionDto> {
+    assertStubPaymentsEnabled();
     const transaction = await PaymentTransactionModel.findById(dto.transactionId);
     if (!transaction || transaction.customerId.toString() !== customerId) {
       throw new NotFoundError('Payment transaction not found');

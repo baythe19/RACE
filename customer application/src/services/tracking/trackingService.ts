@@ -4,8 +4,7 @@
 import { getBookingTracking } from '../bookings/bookingApi';
 import { getDriverBookingTracking, getTowingBookingTracking } from '../bookings/serviceBookingApi';
 import {
-  offBookingStatus,
-  offDriverLocation,
+  onSocketConnected,
   onBookingStatus,
   onDriverLocation,
   trackBooking,
@@ -13,17 +12,15 @@ import {
 
 export interface TrackingUpdate {
   bookingId: string;
-  latitude: number;
-  longitude: number;
-  etaMinutes: number;
-  status: string;
+  etaMinutes?: number;
+  status?: string;
   tripStartOtp?: string;
   assignedFleetVehicleLabel?: string;
   driver?: {
     id: string;
     name: string;
     phone: string;
-    rating: number;
+    rating?: number;
   };
   driverLocation?: {
     latitude: number;
@@ -41,6 +38,7 @@ class TrackingService {
   private listeners = new Map<string, Set<TrackingListener>>();
   private intervals = new Map<string, ReturnType<typeof setInterval>>();
   private socketBound = new Set<string>();
+  private socketCleanups = new Map<string, Array<() => void>>();
   private latestUpdates = new Map<string, TrackingUpdate>();
 
   private pushUpdate(bookingId: string, update: TrackingUpdate): void {
@@ -53,31 +51,28 @@ class TrackingService {
     if (this.socketBound.has(bookingId)) return;
     this.socketBound.add(bookingId);
 
-    trackBooking(bookingId, bookingType ?? 'towing');
+    const cleanups: Array<() => void> = [];
+    cleanups.push(onSocketConnected(() => trackBooking(bookingId, bookingType ?? 'towing')));
 
-    onDriverLocation((data) => {
+    cleanups.push(onDriverLocation((data) => {
       if (data.bookingId !== bookingId) return;
       this.pushUpdate(bookingId, {
         bookingId,
-        latitude: data.latitude,
-        longitude: data.longitude,
-        etaMinutes: 15,
-        status: 'DRIVER_EN_ROUTE',
         driverLocation: {
           latitude: data.latitude,
           longitude: data.longitude,
           updatedAt: data.updatedAt,
         },
       });
-    });
+    }));
 
-    onBookingStatus((data) => {
+    cleanups.push(onBookingStatus((data) => {
       if (data.bookingId !== bookingId) return;
-      const latest = this.latestUpdates.get(bookingId);
-      // Status events have no coordinates. Keep the last real position; before
-      // the first tracking response, let the immediate REST poll establish it.
-      if (latest) this.pushUpdate(bookingId, { ...latest, status: data.status });
-    });
+      // Status is valid independently of GPS and may arrive before the first poll.
+      this.pushUpdate(bookingId, { bookingId, status: data.status });
+    }));
+
+    this.socketCleanups.set(bookingId, cleanups);
   }
 
   subscribe(bookingId: string, listener: TrackingListener, bookingType?: BookingType): () => void {
@@ -93,9 +88,7 @@ class TrackingService {
         if (legacy) {
           const update: TrackingUpdate = {
             bookingId,
-            latitude: legacy.driverLocation?.latitude ?? 20.2961,
-            longitude: legacy.driverLocation?.longitude ?? 85.8245,
-            etaMinutes: legacy.etaMinutes,
+            ...(legacy.etaMinutes != null ? { etaMinutes: legacy.etaMinutes } : {}),
             status: legacy.status,
             driverLocation: legacy.driverLocation,
             tripStartOtp: legacy.tripStartOtp,
@@ -113,9 +106,6 @@ class TrackingService {
           }
           const update: TrackingUpdate = {
             bookingId,
-            latitude: towing.driverLocation?.latitude ?? 20.2961,
-            longitude: towing.driverLocation?.longitude ?? 85.8245,
-            etaMinutes: 15,
             status: towing.status,
             driver: towing.driver,
             driverLocation: towing.driverLocation,
@@ -132,9 +122,6 @@ class TrackingService {
           const driver = await getDriverBookingTracking(bookingId);
           const update: TrackingUpdate = {
             bookingId,
-            latitude: driver.driverLocation?.latitude ?? 20.2961,
-            longitude: driver.driverLocation?.longitude ?? 85.8245,
-            etaMinutes: 15,
             status: driver.status,
             driver: driver.driver,
             driverLocation: driver.driverLocation,
@@ -164,8 +151,8 @@ class TrackingService {
         this.listeners.delete(bookingId);
         this.socketBound.delete(bookingId);
         this.latestUpdates.delete(bookingId);
-        offDriverLocation();
-        offBookingStatus();
+        this.socketCleanups.get(bookingId)?.forEach((cleanup) => cleanup());
+        this.socketCleanups.delete(bookingId);
       }
     };
   }
@@ -179,9 +166,9 @@ class TrackingService {
     this.intervals.clear();
     this.listeners.clear();
     this.socketBound.clear();
+    this.socketCleanups.forEach((cleanups) => cleanups.forEach((cleanup) => cleanup()));
+    this.socketCleanups.clear();
     this.latestUpdates.clear();
-    offDriverLocation();
-    offBookingStatus();
   }
 }
 

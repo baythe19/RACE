@@ -9,6 +9,8 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|----------------|
 | codex-partner-navigation | partner | Parent-child routes and deterministic back destinations | 2026-10-17 |
+| codex-backend-booking-counts | backend | Align booking status count groups with admin filters | 2026-10-17 |
+| codex-admin-booking-counts | admin | Match booking tab counts to displayed status filters | 2026-10-17 |
 
 
 

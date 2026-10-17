@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import { Check, ShieldCheck } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation } from '@tanstack/react-query';
 
@@ -15,6 +15,7 @@ import { ROADSIDE_ACCENT } from '../../constants/roadsideBooking';
 import type { HomeStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
 import { initiateAdvancePayment, verifyAdvancePayment } from '../../services/bookings/serviceBookingApi';
+import { getApiErrorMessage } from '../../services/api';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'BookingPayment'>;
 
@@ -40,53 +41,77 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
     },
   });
 
-  const handlePay = async () => {
-    if (!bookingId || !bookingType) {
-      Alert.alert('Payment unavailable', 'Booking details are missing. Please retry from booking review.');
-      return;
-    }
-    await payMutation.mutateAsync();
-    Alert.alert('Booking Confirmed', 'Driver being assigned...');
+  const continueAfterPayment = () => {
     const next = NEXT_ROUTE[flow];
     if (flow === 'towing') {
       navigation.navigate('TowingConfirmed', {
-        bookingId,
-        apiBookingId: bookingId,
+        bookingId: bookingId!,
+        apiBookingId: bookingId!,
         service: 'Towing',
         eta: '60–90 min',
       });
       return;
     }
     if (flow === 'driver') {
-      navigation.navigate('DriverAssigned', { bookingId, bookingType: 'driver' });
+      navigation.navigate('DriverAssigned', { bookingId: bookingId!, bookingType: 'driver' });
       return;
     }
     navigation.navigate(next as 'RoadsideHelpOnWay');
   };
 
+  const handlePay = async () => {
+    if (!bookingId || !bookingType) {
+      Alert.alert('Payment unavailable', 'Booking details are missing. Please retry from booking review.');
+      return;
+    }
+    if (!__DEV__) {
+      Alert.alert(
+        'Payments unavailable',
+        'Online payment processing is not configured yet. No payment has been taken.',
+      );
+      return;
+    }
+
+    try {
+      const payment = await payMutation.mutateAsync();
+      if (payment.status !== 'success') {
+        Alert.alert('Payment incomplete', 'The demo payment was not confirmed.');
+        return;
+      }
+      Alert.alert(
+        'Demo payment recorded',
+        'No real money was charged. This preview confirms bookings in development only.',
+        [{ text: 'Continue', onPress: continueAfterPayment }],
+      );
+    } catch (error) {
+      Alert.alert(
+        'Payment not completed',
+        getApiErrorMessage(error, 'Could not complete the demo payment. Please try again.'),
+      );
+    }
+  };
+
   return (
     <TowingBookingLayout
-      title="Secure Payment"
+      title={__DEV__ ? 'Payment preview' : 'Payment unavailable'}
       step={flow === 'towing' ? 6 : flow === 'driver' ? 5 : 4}
       accentColor={accent}
       onBack={() => navigation.goBack()}
-      buttonLabel={payMutation.isPending ? 'Processing...' : `Pay ₹${amount}`}
+      buttonLabel={
+        payMutation.isPending
+          ? 'Processing...'
+          : __DEV__
+            ? 'Simulate demo payment ₹' + amount
+            : 'Payments unavailable'
+      }
       onContinue={() => void handlePay()}
-      continueDisabled={payMutation.isPending}
+      continueDisabled={payMutation.isPending || !__DEV__}
       footerNoteBelow={
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: t.px(6),
-            marginTop: t.px(4),
-          }}>
-          <ShieldCheck size={t.px(14)} color={colors.grey} />
-          <Text style={{ fontSize: t.caption, color: colors.grey }}>
-            256-bit encrypted · PCI compliant
-          </Text>
-        </View>
+        <Text style={{ fontSize: t.caption, color: colors.grey, textAlign: 'center' }}>
+          {__DEV__
+            ? 'Development demo only — no real money is charged.'
+            : 'Online payments are not configured yet.'}
+        </Text>
       }>
       <View style={{ flex: 1 }}>
         <View

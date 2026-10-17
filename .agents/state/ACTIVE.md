@@ -401,3 +401,29 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 
 - Cross-surface booking refresh recheck: advance/final payment writes in both towing and driver booking services now emit the shared status update after persistence. A CONFIRMED payment therefore triggers the authenticated driver offer invalidation; assigned drivers receive status invalidations. Customer tracking status events now retain the last real coordinate instead of injecting a fallback Bhubaneswar marker.
 - Final validation after these changes: Customer, Partner and Backend TypeScript checks pass; Android Expo exports pass for both mobile apps; `git diff --check` passes. No live DB-backed booking/payment acceptance run was performed, and background/closed-app push still needs Expo/FCM configuration.
+
+## Latest session — Payment stub safety recheck (2026-10-17, branch v5.0.0--productions--works)
+
+- Confirmed the payment provider is still a stub: the app sent a success status itself, while the backend trusted it and marked the booking paid/confirmed. In the driver payment screen, selecting Cash also ran this same simulated payment path.
+- Stub initiation and verification now return HTTP 503 in production, before any transaction or booking payment-state update. Development preview remains available, and both customer payment screens label it as a no-charge demo; production controls are disabled with an explanation. The unsupported Cash option was removed from the driver advance-payment screen.
+- Booking confirmation hooks now fail before creating a booking when demo payment is unavailable, avoiding orphan bookings in production.
+- Verification: backend and customer TypeScript checks pass; customer Android Expo export and git diff --check pass. Still not integrated: real gateway, signed webhook/verification, refunds, and final-payment collection.
+
+
+
+## Customer live tracking follow-up - 2026-10-17
+
+- Removed fabricated 15-minute ETA and Bhubaneswar fallback coordinates from customer live-tracking responses and screens; status and location now update independently from actual backend/socket data. Until the backend supplies a route ETA, the UI says ETA updating.
+
+- Customer tracking socket rejoins authorized booking rooms after reconnect and cleans up only its own event handlers; one booking screen no longer removes other booking listeners. Status events are accepted even if they arrive before the first REST poll.
+- Removed fabricated 4.8 driver ratings and unconditional RACE-verified claims from customer active/assigned booking views; real rating/experience appears only when returned by backend. Tracking state resets per booking, and Socket.IO keeps its singleton while disconnected so reconnect can rejoin the authorized room.
+
+- Rechecked payment-stub safety: local preview payment is development-only; production blocks before creating towing/driver/roadside bookings. Real gateway/webhook remains unimplemented.
+
+- Verified customer npm run lint, Android npx expo export --platform android, and repo git diff --check. No live database/device scenario was run. No commit or push.
+
+
+## Admin booking action contract - 2026-10-17
+
+- Admin booking list now exposes Edit/Delete only for legacy records because those endpoints only mutate the legacy Booking model. Service booking rows retain View and their detail page uses booking-type-aware operations.
+- Verified Admin web and Backend TypeScript checks, Admin production build, and repo git diff --check. Admin bundle builds successfully with a 1.12 MB main JS chunk warning.

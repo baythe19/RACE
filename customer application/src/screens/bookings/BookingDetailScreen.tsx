@@ -270,12 +270,19 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
             <Text style={{ fontSize: px(15), fontWeight: typography.weights.bold, color: colors.dark }}>
               {booking.driver?.name ?? 'Assigning soon'}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4), marginTop: px(2) }}>
-              <Star size={px(12)} color={colors.primary} fill={colors.primary} />
-              <Text style={{ fontSize: px(12), color: colors.grey }}>
-                {booking.driver?.rating ?? 4.8} · {booking.driver?.experience ?? 'RACE verified'}
+            {booking.driver?.rating != null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4), marginTop: px(2) }}>
+                <Star size={px(12)} color={colors.primary} fill={colors.primary} />
+                <Text style={{ fontSize: px(12), color: colors.grey }}>
+                  {booking.driver.rating.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
+            {booking.driver?.experience ? (
+              <Text style={{ fontSize: px(12), color: colors.grey, marginTop: px(2) }}>
+                {booking.driver.experience}
               </Text>
-            </View>
+            ) : null}
             {booking.assignedFleetVehicleLabel ? (
               <Text style={{ fontSize: px(12), color: colors.grey, marginTop: px(4) }}>
                 Vehicle: {booking.assignedFleetVehicleLabel}

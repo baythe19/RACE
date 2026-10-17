@@ -15,6 +15,11 @@ import {
 import { useRoadsideBooking } from '../../../context/RoadsideBookingContext';
 import { useServiceBookingPayment } from '../../../hooks/useServiceBookingPayment';
 import { createRoadsideBooking } from '../../../services/bookings/serviceBookingApi';
+import {
+  isPreviewBookingMode,
+  previewAdvancePayment,
+  previewTowingBooking,
+} from '../../../services/bookings/previewBooking';
 import { useVehicleStore } from '../../../store/vehicleStore';
 import { buildRoadsideBookingRequest } from '../../../utils/serviceBookingPayload';
 import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
@@ -102,6 +107,25 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
     try {
       const serviceType = roadsideServiceIdToSlug(booking.serviceId);
       const payload = buildRoadsideBookingRequest(booking, vehicles, serviceType);
+
+      // BUG-C1: preview vehicles are local ids the backend rejects — demo the
+      // whole roadside confirm in preview mode.
+      if (__DEV__ && isPreviewBookingMode()) {
+        const previewBooking = previewTowingBooking({
+          vehicleId: payload.vehicleId,
+          pickup: payload.pickup,
+          dropoff: payload.dropoff ?? payload.pickup,
+          towingMode: 'instant',
+        });
+        previewAdvancePayment(previewBooking.id, 'towing');
+        resetBooking();
+        navigation.navigate('RoadsideHelpOnWay');
+        return;
+      }
+
+      if (!__DEV__) {
+        throw new Error('Online booking payments are not configured yet.');
+      }
       const response = await createRoadsideBooking(payload);
 
       if (!response.available) {

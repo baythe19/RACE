@@ -514,6 +514,7 @@ export interface BookingStatusCounts {
   created: number;
   assigned: number;
   enRoute: number;
+  active: number;
   completed: number;
   cancelled: number;
   pending?: number;

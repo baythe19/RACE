@@ -17,6 +17,7 @@ import {
 import { formatReadableAddress } from '../../utils/readableAddress';
 import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
+import { spacing } from '../../theme';
 
 type Props = NativeStackScreenProps<PartnerJobsStackParamList, 'VendorAssignJob'>;
 
@@ -102,6 +103,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     <PartnerScreenLayout
       title="Assign vehicle"
       onBack={() => navigation.goBack()}
+      contentTopSpacing={spacing.sm}
       footer={
         <Pressable
           style={({ pressed }) => [

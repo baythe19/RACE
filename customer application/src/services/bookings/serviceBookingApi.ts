@@ -204,6 +204,9 @@ export async function completeFinalPayment(
 export async function createTowingBookingWithPayment(
   payload: CreateTowingBookingRequest,
 ): Promise<{ booking: ServiceBooking; payment: PaymentSession }> {
+  if (!__DEV__) {
+    throw new Error('Online booking payments are not configured yet.');
+  }
   const booking = await createTowingBooking(payload);
   const payment = await completeAdvancePayment(booking.id, 'towing');
   return { booking, payment };
@@ -212,6 +215,9 @@ export async function createTowingBookingWithPayment(
 export async function createDriverBookingWithPayment(
   payload: CreateDriverBookingRequest,
 ): Promise<{ booking: ServiceBooking; payment: PaymentSession }> {
+  if (!__DEV__) {
+    throw new Error('Online booking payments are not configured yet.');
+  }
   const booking = await createDriverBooking(payload);
   const payment = await completeAdvancePayment(booking.id, 'driver');
   return { booking, payment };

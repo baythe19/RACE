@@ -56,10 +56,20 @@ function statusMatches(status: string, filter?: string): boolean {
     return ['COMPLETED', 'RATED', 'SERVICE_COMPLETED', 'PAID'].includes(status);
   }
   if (filter === 'ACTIVE') {
-    return ['CREATED', 'ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'SERVICE_STARTED', 'PAYMENT_PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(status);
+    return [
+      'ASSIGNED',
+      'ACCEPTED',
+      'EN_ROUTE',
+      'ARRIVED',
+      'SERVICE_STARTED',
+      'PAYMENT_PENDING',
+      'DRIVER_EN_ROUTE',
+      'DRIVER_ARRIVED',
+      'IN_PROGRESS',
+    ].includes(status);
   }
   if (filter === 'PENDING') {
-    return ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED'].includes(status);
+    return ['CREATED', 'PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED'].includes(status);
   }
   return status === filter;
 }
@@ -282,6 +292,7 @@ export const adminBookingsService = {
       legacyCreated,
       legacyAssigned,
       legacyEnRoute,
+      legacyInProgress,
       legacyCompleted,
       legacyCancelled,
       legacyRefunded,
@@ -300,6 +311,7 @@ export const adminBookingsService = {
       BookingModel.countDocuments({ status: 'CREATED' }),
       BookingModel.countDocuments({ status: { $in: ['ASSIGNED', 'ACCEPTED'] } }),
       BookingModel.countDocuments({ status: { $in: ['EN_ROUTE', 'ARRIVED'] } }),
+      BookingModel.countDocuments({ status: { $in: ['SERVICE_STARTED', 'PAYMENT_PENDING'] } }),
       BookingModel.countDocuments({ status: { $in: COMPLETED_STATUSES } }),
       BookingModel.countDocuments({ status: 'CANCELLED' }),
       BookingModel.countDocuments({ status: 'REFUNDED' }),
@@ -328,10 +340,11 @@ export const adminBookingsService = {
       created: legacyCreated,
       assigned: legacyAssigned,
       enRoute: legacyEnRoute + towingActive + driverActive,
+      active: legacyAssigned + legacyEnRoute + legacyInProgress + towingActive + driverActive,
       completed: legacyCompleted + towingCompleted + driverCompleted,
       cancelled: legacyCancelled + towingCancelled + driverCancelled,
       refunded: legacyRefunded,
-      pending: towingPending + driverPending,
+      pending: legacyCreated + towingPending + driverPending,
     };
   },
 

@@ -2,6 +2,7 @@ import type {
   BookingDetail,
   BookingListFilters,
   BookingListItem,
+  BookingStatusCounts,
   PaginatedResponse,
 } from '@race/types';
 
@@ -13,8 +14,8 @@ export async function getBookings(
   return apiGet<PaginatedResponse<BookingListItem>>('/bookings', filters as Record<string, unknown>);
 }
 
-export async function getBookingStatusCountsApi() {
-  return apiGet<Record<string, number>>('/bookings/counts');
+export async function getBookingStatusCountsApi(): Promise<BookingStatusCounts> {
+  return apiGet<BookingStatusCounts>('/bookings/counts');
 }
 
 export async function getBookingById(id: string): Promise<BookingDetail> {

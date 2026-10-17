@@ -7,6 +7,12 @@ import {
   createDriverBooking,
   createTowingBooking,
 } from '../services/bookings/serviceBookingApi';
+import {
+  isPreviewBookingMode,
+  previewAdvancePayment,
+  previewDriverBooking,
+  previewTowingBooking,
+} from '../services/bookings/previewBooking';
 import type {
   CreateDriverBookingRequest,
   CreateTowingBookingRequest,
@@ -26,6 +32,16 @@ export function useServiceBookingPayment() {
     setIsConfirming(true);
     setError(null);
     try {
+      // BUG-C1: wizard vehicles are local preview ids the real backend
+      // rejects; in preview mode the whole confirm is demoed locally.
+      if (__DEV__ && isPreviewBookingMode()) {
+        const booking = previewTowingBooking(payload);
+        previewAdvancePayment(booking.id, 'towing');
+        return { booking } satisfies ConfirmResult;
+      }
+      if (!__DEV__) {
+        throw new Error('Online booking payments are not configured yet.');
+      }
       const booking = await createTowingBooking(payload);
       await completeAdvancePayment(booking.id, 'towing');
       return { booking } satisfies ConfirmResult;
@@ -43,6 +59,14 @@ export function useServiceBookingPayment() {
     setIsConfirming(true);
     setError(null);
     try {
+      if (__DEV__ && isPreviewBookingMode()) {
+        const booking = previewDriverBooking(payload);
+        previewAdvancePayment(booking.id, 'driver');
+        return { booking } satisfies ConfirmResult;
+      }
+      if (!__DEV__) {
+        throw new Error('Online booking payments are not configured yet.');
+      }
       const booking = await createDriverBooking(payload);
       await completeAdvancePayment(booking.id, 'driver');
       return { booking } satisfies ConfirmResult;
@@ -61,9 +85,16 @@ export function useServiceBookingPayment() {
       setIsConfirming(true);
       setError(null);
       try {
+        if (__DEV__ && isPreviewBookingMode()) {
+          previewAdvancePayment(bookingId, bookingType);
+          return;
+        }
+        if (!__DEV__) {
+          throw new Error('Online booking payments are not configured yet.');
+        }
         await completeAdvancePayment(bookingId, bookingType);
       } catch (err) {
-        const message = getApiErrorMessage(err, 'Payment failed');
+        const message = getApiErrorMessage(err, 'Unable to record advance payment');
         setError(message);
         Alert.alert('Payment failed', message);
         throw err;
@@ -74,11 +105,5 @@ export function useServiceBookingPayment() {
     [],
   );
 
-  return {
-    confirmTowing,
-    confirmDriver,
-    confirmExistingBooking,
-    isConfirming,
-    error,
-  };
+  return { confirmTowing, confirmDriver, confirmExistingBooking, isConfirming, error };
 }

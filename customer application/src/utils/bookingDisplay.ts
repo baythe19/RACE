@@ -67,19 +67,17 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
       formatLocationDisplay(booking.dropoff) === '—'
         ? 'On-site service'
         : formatLocationDisplay(booking.dropoff),
-    eta: booking.etaMinutes ? `${booking.etaMinutes} min` : '15 min',
+    eta: booking.etaMinutes != null ? `${booking.etaMinutes} min` : 'Updating',
     driver: booking.driver
       ? {
           name: booking.driver.name,
           rating: booking.driver.rating,
           photo: booking.driver.avatarUrl ?? null,
-          experience: booking.driver.experience ?? 'RACE verified',
+          experience: booking.driver.experience,
         }
       : {
-          name: 'Assigning driver',
-          rating: 4.8,
+          name: 'Finding a driver',
           photo: null,
-          experience: 'RACE verified',
         },
     bookingType: booking.bookingType ?? 'towing',
     tripStartOtp: booking.tripStartOtp,

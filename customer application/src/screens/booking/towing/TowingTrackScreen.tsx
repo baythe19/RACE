@@ -246,7 +246,7 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
               }}>
               {displayDriverName}
             </Text>
-            {hasAssignedDriver ? (
+            {hasAssignedDriver && driverRating != null ? (
               <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>
                 ★ {driverRating.toFixed(1)} · Tow driver
               </Text>

@@ -128,7 +128,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
                     }}>
                     {name}
                   </Text>
-                  {hasDriver ? (
+                  {hasDriver && rating != null ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
                       <Star size={t.px(14)} color={colors.primary} fill={colors.primary} />
                       <Text
@@ -180,7 +180,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
                   fontWeight: typography.weights.extrabold,
                   color: colors.primary,
                 }}>
-                {etaMinutes} min
+                {etaMinutes != null ? etaMinutes + ' min' : 'Updating'}
               </Text>
             </View>
           </View>
