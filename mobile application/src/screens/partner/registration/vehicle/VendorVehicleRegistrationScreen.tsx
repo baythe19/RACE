@@ -428,14 +428,15 @@ export default function VendorVehicleRegistrationScreen() {
       keyboardAvoiding
       keyboardDismissMode="on-drag"
       edges={['top', 'bottom']}
+      horizontalPadding={12}
       header={
         <View style={styles.header}>
           <Pressable onPress={back} hitSlop={10} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Back">
-            <ArrowLeft size={21} color={colors.dark} strokeWidth={2.3} />
+            <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
           </Pressable>
           <View style={styles.headerCopy}>
             <PartnerText style={styles.title}>{editingVehicle ? 'Edit vehicle' : 'Add vehicle'}</PartnerText>
-            <PartnerText style={styles.subtitle}>Register a vehicle in your fleet</PartnerText>
+            <PartnerText style={styles.subtitle}>{editingVehicle ? 'Update this vehicle in your fleet.' : 'Register a new vehicle to your fleet'}</PartnerText>
           </View>
         </View>
       }
@@ -459,19 +460,19 @@ export default function VendorVehicleRegistrationScreen() {
         </View>
       }>
       <View style={styles.content}>
-        <View style={styles.progressCard}>
-          <View style={styles.progressRow}>
-            <View style={[styles.progressNode, styles.progressNodeActive]}>
-              {step === 'registration' ? <Check size={15} color={colors.dark} strokeWidth={3} /> : <PartnerText style={styles.progressNumber}>1</PartnerText>}
-            </View>
-            <View style={[styles.progressLine, step === 'registration' && styles.progressLineDone]} />
-            <View style={[styles.progressNode, step === 'registration' && styles.progressNodeActive]}>
-              <PartnerText style={[styles.progressNumber, step === 'registration' && styles.progressNumberActive]}>2</PartnerText>
-            </View>
+        <View
+          style={styles.progressTrack}
+          accessibilityRole="progressbar"
+          accessibilityLabel="Add vehicle step"
+          accessibilityValue={{ min: 1, max: 2, now: step === 'vehicle' ? 1 : 2 }}>
+          <View style={styles.progressRail} />
+          <View style={[styles.progressFill, step === 'registration' && styles.progressComplete]} />
+          <View style={styles.progressStep}>
+            {step === 'registration' ? <Check size={14} color={colors.dark} strokeWidth={3} /> :
+              <PartnerText style={styles.progressStepText}>1</PartnerText>}
           </View>
-          <View style={styles.progressLabels}>
-            <PartnerText style={[styles.progressLabel, step === 'vehicle' && styles.progressLabelActive]}>Vehicle details</PartnerText>
-          <PartnerText style={[styles.progressLabel, step === 'registration' && styles.progressLabelActive]}>Documents</PartnerText>
+          <View style={[styles.progressStep, styles.progressStepEnd, step === 'registration' && styles.progressStepDone]}>
+            <PartnerText style={styles.progressStepText}>2</PartnerText>
           </View>
         </View>
 
@@ -708,18 +709,61 @@ export default function VendorVehicleRegistrationScreen() {
   );
 }
 
-const PAGE_BG = '#F7F7F5';
+const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: 16, paddingTop: spacing.xs, paddingBottom: spacing.md, backgroundColor: PAGE_BG },
-  backButton: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
+  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: 16, paddingTop: spacing.xs, paddingBottom: spacing.sm, backgroundColor: PAGE_BG },
+  backButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   headerCopy: { flex: 1 },
-  title: { color: colors.dark, fontSize: typography.sizes.xl, fontWeight: typography.weights.extrabold },
-  subtitle: { marginTop: 2, color: colors.grey, fontSize: typography.sizes.sm },
+  title: { color: colors.dark, fontSize: typography.sizes.lg, fontWeight: typography.weights.extrabold, textAlign: 'center' },
+  subtitle: { marginTop: 2, color: colors.grey, fontSize: typography.sizes.xs, textAlign: 'center' },
   content: { gap: spacing.md, paddingBottom: spacing.xl },
-  progressCard: { backgroundColor: colors.background, borderRadius: 14, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
-  progressRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  progressTrack: {
+    width: 144,
+    alignSelf: 'center',
+    height: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    marginBottom: 16,
+    position: 'relative',
+  },
+  progressRail: { position: 'absolute', left: 12, right: 12, height: 2, backgroundColor: '#E5E7EB' },
+  progressFill: {
+    position: 'absolute',
+    left: 12,
+    width: 60,
+    height: 2,
+    backgroundColor: colors.primary,
+  },
+  progressComplete: {
+    width: 120,
+  },
+  progressStep: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressStepEnd: {
+    position: 'absolute',
+    right: 0,
+    backgroundColor: colors.lightGrey,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  progressStepDone: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  progressStepText: {
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
+    color: colors.dark,
+  },
   progressNode: { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' },
   progressNodeActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   progressNumber: { color: colors.grey, fontWeight: typography.weights.bold, fontSize: typography.sizes.sm },

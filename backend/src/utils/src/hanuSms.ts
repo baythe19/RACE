@@ -92,7 +92,7 @@ export function isHanuConfigured(): boolean {
 /** Roles (comma-separated env) that route OTPs through HanuOTP. */
 export function hanuRoles(): Set<string> {
   return new Set(
-    (process.env.HANU_OTP_ROLES ?? 'vendor,driver')
+    (process.env.HANU_OTP_ROLES ?? 'customer,vendor,driver')
       .split(',')
       .map(role => role.trim().toLowerCase())
       .filter(Boolean),

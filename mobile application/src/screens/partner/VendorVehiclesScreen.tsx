@@ -2,6 +2,7 @@ import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerT
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
+  ArrowLeft,
   Calendar,
   CheckCircle2,
   ChevronDown,
@@ -12,6 +13,7 @@ import {
   Wrench,
 } from 'lucide-react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { jumpToPartnerAccountScreen } from '../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
@@ -35,7 +37,7 @@ import type {
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
 import { colors, radius, spacing, typography } from '../../theme';
 
-const PAGE_BG = '#F7F7F5';
+const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 type StatusFilter = 'all' | FleetVehicleStatus;
 type SortKey = 'newest' | 'oldest' | 'reg';
@@ -99,6 +101,7 @@ function statusMeta(status: string, driverBusy?: boolean) {
 
 export default function VendorVehiclesScreen() {
   const navigation = useNavigation<NavigationProp<PartnerAccountStackParamList & PartnerJobsStackParamList & PartnerDriversStackParamList>>();
+  const insets = useSafeAreaInsets();
   const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
   const isApproved = vendor?.status === 'approved';
 
@@ -301,18 +304,36 @@ export default function VendorVehiclesScreen() {
       header={
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
+            {navigation?.canGoBack?.() ? (
+              <Pressable
+                onPress={() => navigation.goBack()}
+                hitSlop={10}
+                style={styles.listBackButton}
+                accessibilityRole="button"
+                accessibilityLabel="Back">
+                <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
+              </Pressable>
+            ) : null}
             <View style={{ flex: 1 }}>
-              <PartnerText style={styles.title}>Vehicles</PartnerText>
-              <PartnerText style={styles.subtitle}>
-                Manage your fleet vehicles
+              <PartnerText style={[styles.title, navigation?.canGoBack?.() ? styles.titleWithBack : styles.titleRoot]}>
+                {navigation?.canGoBack?.() ? 'Vendor vehicles' : 'Vehicles'}
               </PartnerText>
+              {!navigation?.canGoBack?.() ? (
+                <PartnerText style={styles.subtitle}>
+                  Manage your fleet vehicles
+                </PartnerText>
+              ) : null}
             </View>
-            <Pressable
-              onPress={openForm}
-              style={({ pressed }) => [styles.registerBtn, pressed && styles.pressed]}>
-              <Plus size={15} color={colors.dark} strokeWidth={2.8} />
-              <PartnerText style={styles.registerLabel}>Add vehicle</PartnerText>
-            </Pressable>
+            {navigation?.canGoBack?.() ? <View style={{ width: 34 }} /> : null}
+            <View style={styles.headerRightActions}>
+              <Pressable
+                testID="vendorVehiclesAddBtn"
+                onPress={openForm}
+                style={({ pressed }) => [styles.registerBtn, pressed && styles.pressed]}>
+                <Plus size={15} color={colors.dark} strokeWidth={2.8} />
+                <PartnerText style={styles.registerLabel}>Add vehicle</PartnerText>
+              </Pressable>
+            </View>
           </View>
         </View>
       }>
@@ -326,7 +347,6 @@ export default function VendorVehiclesScreen() {
             </View>
           ) : null}
 
-          <PartnerText style={styles.statsHeading}>Fleet summary</PartnerText>
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <View style={styles.statTop}>
@@ -605,18 +625,41 @@ const styles = StyleSheet.create({
   headerPad: {
     paddingHorizontal: 12,
     paddingTop: spacing.xs,
-    paddingBottom: spacing.sm,
+    paddingBottom: 10,
     backgroundColor: PAGE_BG,
   },
   titleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+    gap: 0,
+  },
+  listBackButton: {
+    width: 106,
     alignItems: 'flex-start',
-    gap: spacing.md,
+    paddingLeft: 6,
   },
   title: {
     color: colors.dark,
     fontSize: typography.sizes.xxl,
     fontWeight: typography.weights.extrabold,
+  },
+  titleRoot: {
+    textAlign: 'left',
+    fontSize: 20,
+    fontWeight: typography.weights.extrabold,
+    color: colors.dark,
+  },
+  titleWithBack: {
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: typography.weights.extrabold,
+    color: colors.dark,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   subtitle: {
     marginTop: spacing.xs,
@@ -659,12 +702,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     paddingVertical: 2,
-  },
-  statsHeading: {
-    color: colors.dark,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.bold,
-    marginBottom: -spacing.xs,
   },
   statCard: {
     flex: 1,

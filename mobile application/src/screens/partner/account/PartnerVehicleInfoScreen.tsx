@@ -382,6 +382,7 @@ export default function PartnerVehicleInfoScreen({ navigation }: Props) {
       {/* Sheets & Dialogs */}
       <PartnerUploadSheet
         visible={uploadSheetVisible}
+        subtitle="Vehicle photo"
         onTakePhoto={() => void handleTakePhoto()}
         onPickGallery={() => void handlePickGallery()}
         onClose={() => setUploadSheetVisible(false)}

@@ -50,9 +50,16 @@ export type PartnerDriversStackParamList = {
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
 };
 
+export type PartnerVehiclesStackParamList = {
+  VendorVehiclesList: undefined;
+  VendorVehicles: undefined;
+  VendorVehicleRegistration: { vehicleId?: string } | undefined;
+};
+
 export type PartnerTabParamList = {
   PartnerHome: undefined;
   PartnerJobs: NavigatorScreenParams<PartnerJobsStackParamList> | undefined;
+  PartnerVehicles: NavigatorScreenParams<PartnerVehiclesStackParamList> | undefined;
   PartnerDrivers: NavigatorScreenParams<PartnerDriversStackParamList> | undefined;
   PartnerAccount: NavigatorScreenParams<PartnerAccountStackParamList> | undefined;
 };

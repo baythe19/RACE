@@ -45,7 +45,7 @@ const envSchema = z.object({
   HANU_BASE_URL: z.string().default('https://api.hanuotp.in'),
   HANU_TEMPLATE_ID: z.string().default('default'),
   /** Comma-separated app roles that use HanuOTP; everything else keeps MessageCentral. */
-  HANU_OTP_ROLES: z.string().default('vendor,driver'),
+  HANU_OTP_ROLES: z.string().default('customer,vendor,driver'),
   /** Pepper mixed into the OTP hash stored in the DB (falls back to a project constant). */
   OTP_PEPPER: z.string().optional(),
   // Twilio (legacy / fallback — kept optional)

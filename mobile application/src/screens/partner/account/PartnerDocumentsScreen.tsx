@@ -155,6 +155,7 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
       <PartnerUploadSheet
         visible={uploadSheetVisible}
         hasExistingPreview={true}
+        subtitle={selectedDoc?.name}
         onTakePhoto={() => {
           setUploadSheetVisible(false);
           Alert.alert('Upload', `${selectedDoc?.name} photo updated.`);

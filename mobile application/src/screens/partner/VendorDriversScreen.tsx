@@ -51,6 +51,7 @@ import {
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
+import PartnerDialog, { PartnerDialogPresets, type PartnerDialogProps } from '../../components/partner/dialogs/PartnerDialog';
 import { colors, radius, spacing, typography } from '../../theme';
 
 type Props = { navigation?: any; route?: any };
@@ -209,6 +210,9 @@ export default function VendorDriversScreen({ navigation }: any) {
   const [menuDriver, setMenuDriver] = useState<FleetDriver | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<FleetDriver | null>(null);
   const [newPassword, setNewPassword] = useState('');
+  const [dialog, setDialog] = useState<Partial<PartnerDialogProps> | null>(null);
+
+  const showResultDialog = (preset: Partial<PartnerDialogProps>) => setDialog(preset);
 
   const phoneDigits = phone.replace(/\D/g, '');
 
@@ -239,7 +243,7 @@ export default function VendorDriversScreen({ navigation }: any) {
     if (!isValidIndianMobile(phoneDigits)) next.phone = 'Enter a valid 10-digit mobile';
     if (licenseNo.trim().length < 4) next.licenseNo = 'Enter a valid license number';
     if (!/^[a-zA-Z0-9._-]{4,40}$/.test(loginId.trim())) {
-      next.loginId = 'Login ID: 4�40 chars (letters, numbers, . _ -)';
+      next.loginId = 'Login ID: 4-40 chars (letters, numbers, . _ -)';
     }
     if (password.length < 6) next.password = 'Password must be at least 6 characters';
     setErrors(next);
@@ -308,7 +312,7 @@ export default function VendorDriversScreen({ navigation }: any) {
     }
     if (licenseNo.trim().length < 4) next.licenseNo = 'Enter a valid license number';
     if (!/^[a-zA-Z0-9._-]{4,40}$/.test(loginId.trim())) {
-      next.loginId = 'Login ID: 4�40 chars (letters, numbers, . _ -)';
+      next.loginId = 'Login ID: 4-40 chars (letters, numbers, . _ -)';
     }
     if (password.length < 6) next.password = 'Password must be at least 6 characters';
     setErrors(next);
@@ -318,7 +322,11 @@ export default function VendorDriversScreen({ navigation }: any) {
   const onToggleForm = () => {
     if (savingDriverRef.current) return;
     if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
+      showResultDialog({
+        tone: 'info',
+        title: 'Approval required',
+        message: PARTNER_WAITING_ADMIN_APPROVAL,
+      });
       return;
     }
     if (showForm) {
@@ -329,10 +337,13 @@ export default function VendorDriversScreen({ navigation }: any) {
         resetForm();
       };
       if (createdDriverId && docUploadFailures.length) {
-        Alert.alert('Leave unfinished uploads?', 'The driver account is already saved, but some documents have not uploaded.', [
-          { text: 'Stay', style: 'cancel' },
-          { text: 'Leave', onPress: leaveForm },
-        ]);
+        showResultDialog({
+          tone: 'warning',
+          title: 'Leave unfinished uploads?',
+          message: 'The driver account is already saved, but some documents have not uploaded.',
+          primaryAction: { label: 'Leave', onPress: leaveForm },
+          secondaryAction: { label: 'Stay', onPress: () => {} },
+        });
       } else leaveForm();
     } else {
       setShowForm(true);
@@ -362,7 +373,11 @@ export default function VendorDriversScreen({ navigation }: any) {
   const submitCreate = async () => {
     if (savingDriverRef.current) return;
     if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
+      showResultDialog({
+        tone: 'info',
+        title: 'Approval required',
+        message: PARTNER_WAITING_ADMIN_APPROVAL,
+      });
       return;
     }
     if (!validate()) return;
@@ -372,10 +387,11 @@ export default function VendorDriversScreen({ navigation }: any) {
       ),
     );
     if (missingDocuments.length) {
-      Alert.alert(
-        'Required documents missing',
-        `Upload ${missingDocuments.map(document => document.label).join(' and ')} to continue.`,
-      );
+      showResultDialog({
+        tone: 'warning',
+        title: 'Required documents missing',
+        message: `Upload ${missingDocuments.map(document => document.label).join(' and ')} to continue.`,
+      });
       return;
     }
 
@@ -427,30 +443,28 @@ export default function VendorDriversScreen({ navigation }: any) {
         return selectedFiles.length > 0 && selectedFiles.every(file => failedDocs.includes(file.label));
       });
       if (failedRequiredDocs.length) {
-        Alert.alert(
-          'Required upload failed',
-          `${failedRequiredDocs.map(document => document.label).join(', ')} could not be uploaded. Your driver is pending verification. Tap Retry uploads to finish.`,
+        showResultDialog(
+          PartnerDialogPresets.requiredUploadFailed(failedRequiredDocs.map(document => document.label)),
         );
         return;
       }
 
       if (failedDocs.length) {
-        Alert.alert('Uploads incomplete', 'The driver account is saved. Retry the failed document uploads to finish.');
+        showResultDialog(PartnerDialogPresets.uploadsIncomplete());
         return;
       }
 
-      Alert.alert(
-        failedDocs.length ? 'Driver added � some documents failed' : 'Vendor driver added',
-        failedDocs.length
-          ? `${name.trim()} was added, but ${failedDocs.join(', ')} could not be uploaded and can be retried later.`
-          : `${name.trim()} can sign in with Login ID �${loginId.trim()}�. Share the password securely. Documents stay pending until admin approves.`,
-      );
+      showResultDialog(PartnerDialogPresets.driverAdded(name, loginId));
       resetForm();
       setShowForm(false);
       navigation.setParams({ fullScreen: false });
       setFormStep(1);
     } catch (error) {
-      Alert.alert('Could not add', getApiErrorMessage(error, 'Add driver failed'));
+      showResultDialog({
+        tone: 'error',
+        title: 'Could not add',
+        message: getApiErrorMessage(error, 'Add driver failed'),
+      });
     } finally {
       savingDriverRef.current = false;
       setIsSavingDriver(false);
@@ -466,29 +480,31 @@ export default function VendorDriversScreen({ navigation }: any) {
       });
       setLinkTarget(null);
       await refetch();
-      Alert.alert(
-        reg ? 'Vehicle linked' : 'Vehicle unlinked',
-        reg ? `Linked to ${reg}.` : `${linkTarget.name} is no longer linked to a vehicle.`,
+      showResultDialog(
+        reg ? PartnerDialogPresets.vehicleLinked(reg) : PartnerDialogPresets.vehicleUnlinked(linkTarget.name),
       );
     } catch (error) {
-      Alert.alert('Link failed', getApiErrorMessage(error, 'Please try again'));
+      showResultDialog({
+        tone: 'error',
+        title: 'Link failed',
+        message: getApiErrorMessage(error, 'Please try again'),
+      });
     }
   };
 
   const onRemove = (driver: FleetDriver) => {
     setMenuDriver(null);
-    Alert.alert('Remove driver?', `Unlink ${driver.name} from your vendor team?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: () => {
-          void removeMutation.mutateAsync(driver.id).catch(error => {
-            Alert.alert('Remove failed', getApiErrorMessage(error, 'Could not remove'));
+    showResultDialog(
+      PartnerDialogPresets.removeDriver(driver.name, () => {
+        void removeMutation.mutateAsync(driver.id).catch(error => {
+          showResultDialog({
+            tone: 'error',
+            title: 'Remove failed',
+            message: getApiErrorMessage(error, 'Could not remove'),
           });
-        },
-      },
-    ]);
+        });
+      }),
+    );
   };
 
   const onResetPassword = (driver: FleetDriver) => {
@@ -502,20 +518,21 @@ export default function VendorDriversScreen({ navigation }: any) {
     if (!driver) return;
     const trimmed = newPassword.trim();
     if (trimmed.length < 6) {
-      Alert.alert('Too short', 'Password must be at least 6 characters.');
+      showResultDialog(PartnerDialogPresets.passwordTooShort());
       return;
     }
     void resetPasswordMutation
       .mutateAsync({ driverId: driver.id, password: trimmed })
       .then(() => {
         setPasswordTarget(null);
-        Alert.alert(
-          'Password updated',
-          'Share the new password securely with ' + driver.name + '. They can sign in with the same Login ID.',
-        );
+        showResultDialog(PartnerDialogPresets.passwordUpdated(driver.name));
       })
       .catch(error => {
-        Alert.alert('Reset failed', getApiErrorMessage(error, 'Could not reset password'));
+        showResultDialog({
+          tone: 'error',
+          title: 'Reset failed',
+          message: getApiErrorMessage(error, 'Could not reset password'),
+        });
       });
   };
 
@@ -681,7 +698,7 @@ export default function VendorDriversScreen({ navigation }: any) {
                   testID="vendorDriverMobile"
                   label="Mobile"
                   required
-                  leftElement={<PartnerText style={styles.phonePrefix}>????  +91  ?</PartnerText>}
+                  leftElement={<PartnerText style={styles.phonePrefix}>+91</PartnerText>}
                   value={phone}
                   onChangeText={text => {
                     setPhone(text.replace(/\D/g, '').slice(0, 10));
@@ -754,7 +771,7 @@ export default function VendorDriversScreen({ navigation }: any) {
                         }}
                         style={styles.vehicleOption}>
                         <PartnerText style={styles.vehicleOptionText}>
-                          {formatPlate(vehicle.registrationNo)} � {vehicle.model}
+                          {formatPlate(vehicle.registrationNo)} · {vehicle.model}
                         </PartnerText>
                       </Pressable>
                     ))}
@@ -961,7 +978,7 @@ export default function VendorDriversScreen({ navigation }: any) {
                       <Phone size={12} color={colors.grey} strokeWidth={2.2} />
                       <PartnerText style={styles.metaText}>{formatPhone(driver.phone)}</PartnerText>
                     </View>
-                    <PartnerText style={styles.loginLine}>Login ID: {driver.loginId || '�'}</PartnerText>
+                    <PartnerText style={styles.loginLine}>Login ID: {driver.loginId || '—'}</PartnerText>
                     <Pressable
                       onPress={() => setLinkTarget(driver)}
                       style={styles.compactVehicleBlock}
@@ -1012,10 +1029,12 @@ export default function VendorDriversScreen({ navigation }: any) {
                 const driver = menuDriver;
                 setMenuDriver(null);
                 if (driver) {
-                  Alert.alert(
-                    driver.name,
-                    `${formatPhone(driver.phone)}\nDL: ${driver.licenseNo || '�'}\nStatus: ${driverUiStatus(driver).label}`,
-                  );
+                  showResultDialog({
+                    tone: 'info',
+                    icon: UserCog,
+                    title: driver.name,
+                    message: `Phone: ${formatPhone(driver.phone)}\nDL: ${driver.licenseNo || '—'}\nStatus: ${driverUiStatus(driver).label}`,
+                  });
                 }
               }}>
               <PartnerText style={styles.sheetItemText}>View details</PartnerText>
@@ -1115,7 +1134,7 @@ export default function VendorDriversScreen({ navigation }: any) {
         <Pressable style={styles.modalOverlay} onPress={() => setLinkTarget(null)}>
           <Pressable style={styles.linkSheet} onPress={e => e.stopPropagation()}>
             <PartnerText style={styles.sheetTitle}>
-              Link vehicle{linkTarget ? ` � ${linkTarget.name}` : ''}
+              Link vehicle{linkTarget ? ` · ${linkTarget.name}` : ''}
             </PartnerText>
             <PartnerText style={styles.assignHint}>
               Choose one of your active fleet vehicles for this driver.
@@ -1131,7 +1150,7 @@ export default function VendorDriversScreen({ navigation }: any) {
                   <View style={{ flex: 1 }}>
                     <PartnerText style={styles.vehiclePlate}>{formatPlate(vehicle.registrationNo)}</PartnerText>
                     <PartnerText style={styles.vehicleModel}>
-                      {vehicle.model} � {vehicle.type}
+                      {vehicle.model} · {vehicle.type}
                     </PartnerText>
                   </View>
                   <PartnerText style={styles.assignLink}>Link</PartnerText>
@@ -1158,13 +1177,33 @@ export default function VendorDriversScreen({ navigation }: any) {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Styled in-app dialog (replaces system alerts) */}
+      <PartnerDialog
+        visible={dialog !== null}
+        tone={dialog?.tone ?? 'info'}
+        icon={dialog?.icon}
+        title={dialog?.title ?? ''}
+        message={dialog?.message}
+        primaryAction={
+          dialog?.primaryAction
+            ? { label: dialog.primaryAction.label, onPress: () => setDialog(null) }
+            : { label: 'OK', onPress: () => setDialog(null) }
+        }
+        secondaryAction={
+          dialog?.secondaryAction
+            ? { label: dialog.secondaryAction.label, onPress: () => setDialog(null) }
+            : undefined
+        }
+        onClose={() => setDialog(null)}
+      />
     </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
   headerPad: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingBottom: 10,
     backgroundColor: PAGE_BG,
   },

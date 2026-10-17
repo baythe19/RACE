@@ -245,7 +245,6 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
               </PartnerText>
               <View style={styles.phoneRow}>
                 <View style={styles.countryBox}>
-                  <PartnerText style={styles.flag}>🇮🇳</PartnerText>
                   <PartnerText style={styles.countryCode}>+91</PartnerText>
                   <ChevronDown size={14} color={colors.grey} strokeWidth={2.5} />
                 </View>
@@ -496,7 +495,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  flag: { fontSize: 16 },
   countryCode: {
     color: colors.dark,
     fontWeight: typography.weights.bold,

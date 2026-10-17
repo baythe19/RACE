@@ -356,7 +356,6 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                       paddingHorizontal: px(12),
                     },
                   ]}>
-                  <PartnerText style={[styles.flagEmoji, { fontSize: px(16) }]}>🇮🇳</PartnerText>
                   <PartnerText style={[styles.countryCode, { fontSize: px(15) }]}>+91</PartnerText>
                   <ChevronDown size={px(16)} color="#6B7280" strokeWidth={2.4} />
                 </View>
@@ -632,9 +631,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: '#E5E7EB',
     gap: 6,
-  },
-  flagEmoji: {
-    includeFontPadding: false,
   },
   countryCode: {
     fontWeight: '600',

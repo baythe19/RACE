@@ -173,7 +173,9 @@ export class OtpService {
     }
 
     // ─── MessageCentral server-side verification ──────────────────────────
-    if (log.provider === 'messagecentral' && log.mcVerificationId) {
+    // Legacy logs (created before provider field existed) carry mcVerificationId
+    // without provider — treat any log with an mcVerificationId as MC-routed.
+    if (log.mcVerificationId) {
       try {
         const correct = await mcValidateOtp(mobileNumber, log.mcVerificationId, otp);
 

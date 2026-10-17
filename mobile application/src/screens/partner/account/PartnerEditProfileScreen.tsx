@@ -386,6 +386,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       {/* Supporting Dialogs */}
       <PartnerUploadSheet
         visible={uploadSheetVisible}
+        subtitle="Profile photo"
         onTakePhoto={() => void handleTakePhoto()}
         onPickGallery={() => void handlePickGallery()}
         onClose={() => setUploadSheetVisible(false)}

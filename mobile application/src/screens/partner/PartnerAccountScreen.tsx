@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
     backgroundColor: driverColors.pageBg,
   },
   headerPad: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: driverColors.hairline,
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 16,
   },
   profileCard: {

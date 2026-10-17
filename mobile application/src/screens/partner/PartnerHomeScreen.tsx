@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 import {
   Bell,
@@ -778,14 +778,17 @@ export default function PartnerHomeScreen() {
 
       <View style={styles.quickActions} testID="vendorQuickActions">
         <PartnerText style={styles.sectionLabel}>Quick Actions</PartnerText>
-        <View style={styles.quickActionsRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.quickActionsRow}>
           <Pressable
             testID="vendorQuickManageDrivers"
             onPress={() => navigation.navigate('PartnerDrivers' as any)}
             style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
             accessibilityRole="button" accessibilityLabel="Manage drivers">
-            <View style={[styles.quickActionIcon, { backgroundColor: '#E0F2FE' }]}>
-              <UserCheck size={20} color="#0284C7" strokeWidth={2.2} />
+            <View style={[styles.quickActionIcon, { backgroundColor: '#EEF2FF' }]}>
+              <UserCheck size={19} color="#4F46E5" strokeWidth={2.2} />
             </View>
             <PartnerText style={styles.quickActionLabel}>Manage drivers</PartnerText>
           </Pressable>
@@ -794,8 +797,8 @@ export default function PartnerHomeScreen() {
             onPress={() => goAccountScreen('VendorVehicles')}
             style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
             accessibilityRole="button" accessibilityLabel="Manage vehicles">
-            <View style={[styles.quickActionIcon, { backgroundColor: '#FFEDD5' }]}>
-              <Car size={20} color="#EA580C" strokeWidth={2.2} />
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FFF4E5' }]}>
+              <Car size={19} color="#D97706" strokeWidth={2.2} />
             </View>
             <PartnerText style={styles.quickActionLabel}>Manage vehicles</PartnerText>
           </Pressable>
@@ -804,13 +807,13 @@ export default function PartnerHomeScreen() {
             onPress={() => goAccountScreen('VendorVerificationStatus')}
             style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
             accessibilityRole="button" accessibilityLabel={`Verification, ${verification.badge}`}>
-            <View style={[styles.quickActionIcon, { backgroundColor: '#DCFCE7' }]}>
-              <ShieldCheck size={20} color="#16A34A" strokeWidth={2.2} />
+            <View style={[styles.quickActionIcon, { backgroundColor: '#ECFDF5' }]}>
+              <ShieldCheck size={19} color="#059669" strokeWidth={2.2} />
             </View>
             <PartnerText style={styles.quickActionLabel}>Verification</PartnerText>
             {!vendorLoading && verification.tone !== 'completed' ? <View style={styles.verificationDot} /> : null}
           </Pressable>
-        </View>
+      </ScrollView>
       </View>
 
 
@@ -1508,14 +1511,13 @@ const styles = StyleSheet.create({
   fleetMetricValue: { color: colors.dark, fontSize: 18, lineHeight: 22, fontWeight: '700' },
   fleetMetricSub: { fontSize: 9.5, lineHeight: 13, fontWeight: '600', marginTop: 2 },
   quickActions: { marginBottom: 16 },
-  quickActionsRow: { flexDirection: 'row', gap: 8 },
+  quickActionsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 12 },
   quickActionTile: {
-    flex: 1, minWidth: 0, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 8,
+    flexGrow: 1, flexBasis: 0, minWidth: 132, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 10, paddingVertical: 14, backgroundColor: '#FFFFFF', borderWidth: 1,
-    borderColor: '#EEEEEE', borderRadius: 13,
-    shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1.5,
+    borderColor: colors.border, borderRadius: 14,
   },
-  quickActionIcon: { width: 36, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  quickActionIcon: { width: 36, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   quickActionLabel: { flex: 1, minWidth: 0, color: colors.dark, fontSize: 11.5, lineHeight: 16, fontWeight: '600' },
   verificationDot: { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#F97316' },
 
