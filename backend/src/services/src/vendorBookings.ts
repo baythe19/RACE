@@ -1,5 +1,6 @@
 import {
   BadRequestError,
+  ConflictError,
   ForbiddenError,
   NotFoundError,
 } from '../../utils/src/errors';
@@ -21,7 +22,6 @@ import type {
   VendorVerifyTripOtpDto,
 } from './vendorBookingsValidator';
 import { assertTripStartOtp } from './bookings/tripOtp';
-import { appendStatusHistory } from './bookings/booking';
 import { emitBookingStatusUpdate } from './socket';
 
 /** One booking row for the vendor portal list. */
@@ -296,28 +296,39 @@ export class VendorBookingsService {
 
     assertTripStartOtp(booking, dto.tripOtp);
 
+    const expected = {
+      _id: bookingId,
+      vendorId: vendorUserId,
+      status: 'DRIVER_ARRIVED',
+      driverId: booking.driverId,
+      tripStartOtp: booking.tripStartOtp,
+      tripStartOtpVerified: { $ne: true },
+    };
+    const verifiedAt = new Date();
+    const update = {
+      $set: {
+        status: 'IN_PROGRESS',
+        tripStartOtpVerified: true,
+      },
+      $push: {
+        statusHistory: {
+          status: 'IN_PROGRESS',
+          timestamp: verifiedAt,
+        },
+      },
+    };
     const updated =
       dto.bookingType === 'towing'
-        ? await TowingBookingModel.findByIdAndUpdate(
-            bookingId,
-            {
-              status: 'IN_PROGRESS',
-              tripStartOtpVerified: true,
-              statusHistory: appendStatusHistory(booking.statusHistory, 'IN_PROGRESS'),
-            },
-            { new: true },
-          ).exec()
-        : await DriverBookingModel.findByIdAndUpdate(
-            bookingId,
-            {
-              status: 'IN_PROGRESS',
-              tripStartOtpVerified: true,
-              statusHistory: appendStatusHistory(booking.statusHistory, 'IN_PROGRESS'),
-            },
-            { new: true },
-          ).exec();
+        ? await TowingBookingModel.findOneAndUpdate(expected, update, {
+            new: true,
+            runValidators: true,
+          }).exec()
+        : await DriverBookingModel.findOneAndUpdate(expected, update, {
+            new: true,
+            runValidators: true,
+          }).exec();
 
-    if (!updated) throw new NotFoundError('Booking not found');
+    if (!updated) throw new ConflictError('Booking changed before trip OTP verification was saved');
 
     emitBookingStatusUpdate(bookingId, 'IN_PROGRESS', {
       message: 'Trip started — OTP verified',

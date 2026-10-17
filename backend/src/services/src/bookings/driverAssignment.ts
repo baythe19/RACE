@@ -6,7 +6,6 @@ import { UserModel, type IUser } from '../../../models/src/user';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { canTransition } from '../bookingStatusConstants';
-import { appendStatusHistory } from './booking';
 import { emitBookingStatusUpdate, emitToDriver } from '../socket';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
 import { generateTripStartOtp } from './tripOtp';
@@ -16,6 +15,8 @@ const FALLBACK_DISTANCE_KM = 999;
 const EARTH_RADIUS_KM = 6371;
 /** Open-offer radius (km). Drivers without GPS still see all eligible offers. */
 const DEFAULT_OFFER_RADIUS_KM = 50;
+/** A GPS fix older than this is not safe to use for automatic dispatch. */
+const MAX_DRIVER_LOCATION_AGE_MS = 90_000;
 
 /**
  * Decision window for an open marketplace offer, in milliseconds.
@@ -135,17 +136,35 @@ function haversineDistanceKm(
   return Math.round(c * EARTH_RADIUS_KM * 10) / 10;
 }
 
+function hasFreshDriverLocation(driver: IUser, now = Date.now()): boolean {
+  const location = driver.currentLocation;
+  const latitude = location?.latitude;
+  const longitude = location?.longitude;
+  const updatedAt = location?.updatedAt?.getTime();
+  if (
+    typeof latitude !== 'number' ||
+    typeof longitude !== 'number' ||
+    typeof updatedAt !== 'number' ||
+    !Number.isFinite(updatedAt) ||
+    latitude < -90 ||
+    latitude > 90 ||
+    longitude < -180 ||
+    longitude > 180
+  ) {
+    return false;
+  }
+  const age = now - updatedAt;
+  return age >= -30_000 && age <= MAX_DRIVER_LOCATION_AGE_MS;
+}
+
 function driverDistanceFromPickup(
   driver: IUser,
   pickupLatitude: number,
   pickupLongitude: number,
-): number {
-  const lat = driver.currentLocation?.latitude;
-  const lng = driver.currentLocation?.longitude;
-  if (lat !== undefined && lng !== undefined) {
-    return haversineDistanceKm(pickupLatitude, pickupLongitude, lat, lng);
-  }
-  return FALLBACK_DISTANCE_KM;
+): number | undefined {
+  if (!hasFreshDriverLocation(driver)) return undefined;
+  const { latitude, longitude } = driver.currentLocation!;
+  return haversineDistanceKm(pickupLatitude, pickupLongitude, latitude!, longitude!);
 }
 
 export type OpenBookingOffer = {
@@ -363,7 +382,7 @@ export async function listOpenBookingOffers(options?: {
       if (!skipRadiusFilter && distanceKm > radiusKm) return;
     } else if (options?.forDriver && lat !== undefined && lng !== undefined) {
       distanceKm = driverDistanceFromPickup(options.forDriver, lat, lng);
-      if (!skipRadiusFilter && distanceKm !== FALLBACK_DISTANCE_KM && distanceKm > radiusKm) {
+      if (!skipRadiusFilter && distanceKm !== undefined && distanceKm > radiusKm) {
         return;
       }
     }
@@ -643,9 +662,14 @@ export async function findNearestAvailableDriver(
       driverId: driver.id,
       distanceKm: driverDistanceFromPickup(driver, pickupLatitude, pickupLongitude),
     }))
+    .filter((driver): driver is { driverId: string; distanceKm: number } =>
+      typeof driver.distanceKm === 'number',
+    )
     .sort((a, b) => a.distanceKm - b.distanceKm);
 
-  return ranked[0];
+  // Do not auto-assign from stale or missing GPS. The booking remains open for
+  // an eligible driver/vendor to claim once a real location is available.
+  return ranked[0] ?? null;
 }
 
 export async function assignDriverToBooking(
@@ -685,11 +709,18 @@ export async function assignDriverToBooking(
     );
   }
 
+  const bookingVendorId = booking.vendorId?.toString() ?? null;
+  const driverVendorId = driver.driverProfile?.vendorUserId?.toString() ?? null;
+  if (bookingVendorId !== driverVendorId) {
+    throw new ForbiddenError('Assign a driver from the booking vendor fleet');
+  }
+
   const driverObjectId = new Types.ObjectId(driverId);
   const bookingObjectId = new Types.ObjectId(bookingId);
   const filter = {
     _id: bookingObjectId,
     status: booking.status,
+    vendorId: booking.vendorId ?? null,
     $or: [{ driverId: null }, { driverId: { $exists: false } }],
   };
   const update = {
@@ -702,7 +733,7 @@ export async function assignDriverToBooking(
     },
   };
 
-  await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType);
+  await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, bookingVendorId);
   try {
     const assigned =
       bookingType === 'towing'
@@ -747,28 +778,35 @@ export async function unassignDriverFromBooking(
   bookingType: ActiveBookingType,
   driverId: string,
 ): Promise<void> {
-  if (bookingType === 'towing') {
-    const booking = await TowingBookingModel.findById(bookingId).exec();
-    if (!booking) throw new NotFoundError('Booking not found');
-    if (!booking.driverId || booking.driverId.toString() !== driverId) {
-      throw new BadRequestError('Booking is not assigned to this driver');
-    }
-    await TowingBookingModel.findByIdAndUpdate(bookingId, {
-      $unset: { driverId: 1 },
-      status: 'CONFIRMED',
-      statusHistory: appendStatusHistory(booking.statusHistory, 'CONFIRMED'),
-    }).exec();
-  } else {
-    const booking = await DriverBookingModel.findById(bookingId).exec();
-    if (!booking) throw new NotFoundError('Booking not found');
-    if (!booking.driverId || booking.driverId.toString() !== driverId) {
-      throw new BadRequestError('Booking is not assigned to this driver');
-    }
-    await DriverBookingModel.findByIdAndUpdate(bookingId, {
-      $unset: { driverId: 1 },
-      status: 'CONFIRMED',
-      statusHistory: appendStatusHistory(booking.statusHistory, 'CONFIRMED'),
-    }).exec();
+  const filter = {
+    _id: new Types.ObjectId(bookingId),
+    driverId: new Types.ObjectId(driverId),
+    status: 'DRIVER_ASSIGNED',
+  };
+  const update = {
+    $set: { status: 'CONFIRMED' },
+    $unset: { driverId: 1 },
+    $push: {
+      statusHistory: {
+        status: 'CONFIRMED',
+        timestamp: new Date(),
+        note: 'Driver rejected assignment',
+      },
+    },
+  };
+  const unassigned =
+    bookingType === 'towing'
+      ? await TowingBookingModel.findOneAndUpdate(filter, update, {
+          new: true,
+          runValidators: true,
+        }).exec()
+      : await DriverBookingModel.findOneAndUpdate(filter, update, {
+          new: true,
+          runValidators: true,
+        }).exec();
+
+  if (!unassigned) {
+    throw new ConflictError('Booking changed before the driver rejection was saved');
   }
 
   await releaseDriver(driverId, bookingId);
@@ -816,6 +854,7 @@ export async function listAvailableDrivers(options?: {
   latitude?: number;
   longitude?: number;
   bookingType?: ActiveBookingType;
+  bookingId?: string;
 }): Promise<AvailableDriverSummary[]> {
   const filter: Record<string, unknown> = {
     role: 'driver',
@@ -826,6 +865,18 @@ export async function listAvailableDrivers(options?: {
 
   if (options?.bookingType) {
     filter['driverProfile.driverType'] = { $in: [...driverTypesForBooking(options.bookingType)] };
+  }
+
+  if (options?.bookingId) {
+    if (!options.bookingType) {
+      throw new BadRequestError('bookingType is required when filtering drivers for a booking');
+    }
+    const booking =
+      options.bookingType === 'towing'
+        ? await TowingBookingModel.findById(options.bookingId).select('vendorId').exec()
+        : await DriverBookingModel.findById(options.bookingId).select('vendorId').exec();
+    if (!booking) throw new NotFoundError('Booking not found');
+    filter['driverProfile.vendorUserId'] = booking.vendorId ?? null;
   }
 
   const drivers = await UserModel.find(filter).exec();

@@ -43,6 +43,7 @@ export interface ITowingBooking extends Document {
   advancePaymentId?: string;
   remainingAmount: number;
   remainingPaid: boolean;
+  finalPaymentId?: string;
   paymentStatus: BookingPaymentStatus;
   status: UnifiedBookingStatus;
   vendorId?: Types.ObjectId;
@@ -107,6 +108,7 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     advancePaymentId: { type: String },
     remainingAmount: { type: Number, required: true },
     remainingPaid: { type: Boolean, default: false },
+    finalPaymentId: { type: String },
     paymentStatus: {
       type: String,
       enum: BOOKING_PAYMENT_STATUSES,

@@ -1,12 +1,9 @@
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
-import { emitBookingStatusUpdate } from './socket';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
+import { emitBookingStatusUpdate, emitDriverLocation } from './socket';
 import { userRepository } from './userRepository';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
-import {
-  appendStatusHistory,
-  assertValidStatusTransition,
-} from './bookings/booking';
+import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
 import { assertTripStartOtp } from './bookings/tripOtp';
 import { UserModel } from '../../models/src/user';
@@ -117,15 +114,52 @@ export class DriverService {
   ): Promise<{ location: { latitude: number; longitude: number }; updatedAt: string }> {
     assertDriverRole(role);
 
+    await assertDriverApproved(driverId);
     const updatedAt = new Date();
-    // TODO: Replace with WebSocket when live tracking is implemented (Sprint 5)
-    await userRepository.updateById(driverId, {
-      currentLocation: {
-        latitude: dto.latitude,
-        longitude: dto.longitude,
-        updatedAt,
+    const updated = await UserModel.findOneAndUpdate(
+      { _id: driverId, role: 'driver' },
+      {
+        $set: {
+          currentLocation: {
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            updatedAt,
+          },
+        },
       },
-    });
+      { new: true },
+    )
+      .select('activeBookingId')
+      .exec();
+    if (!updated) throw new NotFoundError('Driver not found');
+
+    const activeBookingId = updated.activeBookingId?.toString();
+    if (activeBookingId) {
+      const activeStatus = {
+        $in: ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'],
+      };
+      const [towingBooking, driverBooking] = await Promise.all([
+        TowingBookingModel.findOne({
+          _id: activeBookingId,
+          driverId,
+          status: activeStatus,
+        })
+          .select('_id')
+          .lean()
+          .exec(),
+        DriverBookingModel.findOne({
+          _id: activeBookingId,
+          driverId,
+          status: activeStatus,
+        })
+          .select('_id')
+          .lean()
+          .exec(),
+      ]);
+      if (towingBooking || driverBooking) {
+        emitDriverLocation(activeBookingId, driverId, dto.latitude, dto.longitude);
+      }
+    }
 
     return {
       location: { latitude: dto.latitude, longitude: dto.longitude },
@@ -295,27 +329,29 @@ export class DriverService {
           }
         : undefined;
 
+    const startsTrip = dto.status === 'IN_PROGRESS' && booking.status === 'DRIVER_ARRIVED';
+    const transitionExtra = {
+      ...(completionExtra ?? {}),
+      ...(startsTrip ? { tripStartOtpVerified: true } : {}),
+    };
     const updated = await Model.updateStatus(
       bookingId,
+      booking.status,
       dto.status,
-      appendStatusHistory(booking.statusHistory, dto.status),
-      completionExtra,
+      Object.keys(transitionExtra).length > 0 ? transitionExtra : undefined,
+      {
+        driverId,
+        ...(startsTrip
+          ? {
+              tripStartOtp: booking.tripStartOtp,
+              tripStartOtpVerified: { $ne: true },
+            }
+          : {}),
+      },
     );
 
     if (!updated) {
-      throw new NotFoundError('Booking not found');
-    }
-
-    if (dto.status === 'IN_PROGRESS' && booking.status === 'DRIVER_ARRIVED') {
-      if (dto.bookingType === 'towing') {
-        await TowingBookingModel.findByIdAndUpdate(bookingId, {
-          tripStartOtpVerified: true,
-        }).exec();
-      } else {
-        await DriverBookingModel.findByIdAndUpdate(bookingId, {
-          tripStartOtpVerified: true,
-        }).exec();
-      }
+      throw new ConflictError('Booking changed before the status update was saved');
     }
 
     if (dto.status === 'COMPLETED') {

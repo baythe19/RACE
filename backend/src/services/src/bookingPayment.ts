@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { AppError, BadRequestError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
+import { AppError, BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
 import { env } from '../../config/env';
 import { logger } from '../../utils/src/logger';
 import { assertValidStatusTransition } from './bookings/booking';
@@ -26,7 +26,9 @@ interface BookingPaymentSnapshot {
   customerId: string;
   status: string;
   advancePaid: boolean;
+  advancePaymentId?: string;
   remainingPaid: boolean;
+  finalPaymentId?: string;
   paymentStatus: string;
   advanceAmount: number;
   remainingAmount: number;
@@ -84,7 +86,9 @@ async function loadBookingSnapshot(
       customerId: booking.customerId.toString(),
       status: booking.status,
       advancePaid: booking.advancePaid,
+      advancePaymentId: booking.advancePaymentId,
       remainingPaid: booking.remainingPaid,
+      finalPaymentId: booking.finalPaymentId,
       paymentStatus: booking.paymentStatus,
       advanceAmount: booking.advanceAmount,
       remainingAmount: booking.remainingAmount,
@@ -98,11 +102,52 @@ async function loadBookingSnapshot(
     customerId: booking.customerId.toString(),
     status: booking.status,
     advancePaid: booking.advancePaid,
+    advancePaymentId: booking.advancePaymentId,
     remainingPaid: booking.remainingPaid,
+    finalPaymentId: booking.finalPaymentId,
     paymentStatus: booking.paymentStatus,
     advanceAmount: booking.advanceAmount,
     remainingAmount: booking.remainingAmount,
   };
+}
+
+
+async function setPaymentTransactionStatus(
+  transactionId: string,
+  customerId: string,
+  paymentType: PaymentTransactionType,
+  status: 'success' | 'failed',
+) {
+  const updated = await PaymentTransactionModel.findOneAndUpdate(
+    {
+      _id: transactionId,
+      customerId,
+      paymentType,
+      status: 'initiated',
+    },
+    { $set: { status } },
+    { new: true, runValidators: true },
+  ).exec();
+  if (updated) return updated;
+
+  const existing = await PaymentTransactionModel.findOne({
+    _id: transactionId,
+    customerId,
+    paymentType,
+  }).exec();
+  if (!existing) throw new NotFoundError('Payment transaction not found');
+  if (existing.status === status) return existing;
+  throw new ConflictError('Payment transaction was already processed');
+}
+
+async function markUnappliedStubPaymentFailed(transactionId: string): Promise<void> {
+  // The stub cannot capture funds. If another payment session won the booking
+  // compare-and-set, do not leave this simulated success in financial totals.
+  await PaymentTransactionModel.findOneAndUpdate(
+    { _id: transactionId, status: 'success' },
+    { $set: { status: 'failed' } },
+    { new: false },
+  ).exec();
 }
 
 export class BookingPaymentService {
@@ -123,6 +168,16 @@ export class BookingPaymentService {
     if (booking.advancePaid) {
       throw new BadRequestError('Advance payment already completed');
     }
+
+    const existingTransaction = await PaymentTransactionModel.findOne({
+      bookingId: dto.bookingId,
+      bookingType: dto.bookingType,
+      paymentType: 'advance',
+      status: 'initiated',
+    })
+      .sort({ createdAt: -1 })
+      .exec();
+    if (existingTransaction) return mapTransaction(existingTransaction);
 
     const gatewayReferenceId = await createGatewayPaymentSession(
       booking.advanceAmount,
@@ -151,58 +206,86 @@ export class BookingPaymentService {
     if (!transaction || transaction.customerId.toString() !== customerId) {
       throw new NotFoundError('Payment transaction not found');
     }
-
     if (transaction.paymentType !== 'advance') {
       throw new BadRequestError('Transaction is not an advance payment');
-    }
-
-    transaction.status = dto.status;
-    await transaction.save();
-
-    if (dto.status !== 'success') {
-      return mapTransaction(transaction);
     }
 
     const booking = await loadBookingSnapshot(
       transaction.bookingId.toString(),
       transaction.bookingType,
     );
-    if (!booking) {
-      throw new NotFoundError('Booking not found');
-    }
+    if (!booking) throw new NotFoundError('Booking not found');
 
+    if (
+      dto.status === 'success' &&
+      transaction.status === 'success' &&
+      booking.advancePaid &&
+      booking.advancePaymentId === transaction.id
+    ) {
+      return mapTransaction(transaction);
+    }
+    if (transaction.status !== 'initiated' && transaction.status !== 'success') {
+      throw new ConflictError('Payment transaction was already processed');
+    }
+    if (dto.status === 'failed') {
+      return mapTransaction(
+        await setPaymentTransactionStatus(transaction.id, customerId, 'advance', 'failed'),
+      );
+    }
     if (booking.advancePaid) {
-      throw new BadRequestError('Advance payment already completed');
+      throw new ConflictError('Another payment session already paid this booking advance');
     }
 
     assertValidStatusTransition(booking.status as UnifiedBookingStatus, 'CONFIRMED');
+    const successfulTransaction = await setPaymentTransactionStatus(
+      transaction.id,
+      customerId,
+      'advance',
+      'success',
+    );
 
-    if (transaction.bookingType === 'towing') {
-      await towingBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
-        advancePaid: true,
-        advancePaymentId: transaction.id,
-        paymentStatus: 'ADVANCE_PAID',
-        status: 'CONFIRMED',
-      });
-
-      // Leave as CONFIRMED open offer — nearby drivers/vendors race to accept (Uber-style).
-      logger.info(
-        `Towing booking ${transaction.bookingId} confirmed — open for nearby partner accept`,
+    try {
+      if (transaction.bookingType === 'towing') {
+        await towingBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
+          advancePaid: true,
+          advancePaymentId: transaction.id,
+          paymentStatus: 'ADVANCE_PAID',
+          status: 'CONFIRMED',
+        });
+      } else {
+        await driverBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
+          advancePaid: true,
+          advancePaymentId: transaction.id,
+          paymentStatus: 'ADVANCE_PAID',
+          status: 'CONFIRMED',
+        });
+      }
+    } catch (error) {
+      const currentBooking = await loadBookingSnapshot(
+        transaction.bookingId.toString(),
+        transaction.bookingType,
       );
-    } else {
-      await driverBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
-        advancePaid: true,
-        advancePaymentId: transaction.id,
-        paymentStatus: 'ADVANCE_PAID',
-        status: 'CONFIRMED',
-      });
-
-      logger.info(
-        `Driver booking ${transaction.bookingId} confirmed — open for nearby partner accept`,
-      );
+      if (
+        currentBooking?.advancePaid &&
+        currentBooking.advancePaymentId === transaction.id
+      ) {
+        return mapTransaction(successfulTransaction);
+      }
+      try {
+        await markUnappliedStubPaymentFailed(transaction.id);
+      } catch (rollbackError) {
+        logger.error('Could not roll back an unapplied stub advance payment', {
+          transactionId: transaction.id,
+          rollbackError,
+        });
+      }
+      throw error;
     }
 
-    return mapTransaction(transaction);
+    logger.info(
+      `${transaction.bookingType === 'towing' ? 'Towing' : 'Driver'} booking ${transaction.bookingId} confirmed; open for nearby partner accept`,
+    );
+    return mapTransaction(successfulTransaction);
   }
 
   async initiateFinal(
@@ -226,6 +309,16 @@ export class BookingPaymentService {
     if (booking.remainingPaid) {
       throw new BadRequestError('Final payment already completed');
     }
+
+    const existingTransaction = await PaymentTransactionModel.findOne({
+      bookingId: dto.bookingId,
+      bookingType: dto.bookingType,
+      paymentType: 'final',
+      status: 'initiated',
+    })
+      .sort({ createdAt: -1 })
+      .exec();
+    if (existingTransaction) return mapTransaction(existingTransaction);
 
     if (booking.status !== 'COMPLETED') {
       throw new BadRequestError('Final payment is only allowed after booking is completed');
@@ -258,44 +351,85 @@ export class BookingPaymentService {
     if (!transaction || transaction.customerId.toString() !== customerId) {
       throw new NotFoundError('Payment transaction not found');
     }
-
     if (transaction.paymentType !== 'final') {
       throw new BadRequestError('Transaction is not a final payment');
-    }
-
-    transaction.status = dto.status;
-    await transaction.save();
-
-    if (dto.status !== 'success') {
-      return mapTransaction(transaction);
     }
 
     const booking = await loadBookingSnapshot(
       transaction.bookingId.toString(),
       transaction.bookingType,
     );
-    if (!booking) {
-      throw new NotFoundError('Booking not found');
-    }
+    if (!booking) throw new NotFoundError('Booking not found');
 
+    if (
+      dto.status === 'success' &&
+      transaction.status === 'success' &&
+      booking.remainingPaid &&
+      booking.finalPaymentId === transaction.id
+    ) {
+      return mapTransaction(transaction);
+    }
+    if (transaction.status !== 'initiated' && transaction.status !== 'success') {
+      throw new ConflictError('Payment transaction was already processed');
+    }
+    if (dto.status === 'failed') {
+      return mapTransaction(
+        await setPaymentTransactionStatus(transaction.id, customerId, 'final', 'failed'),
+      );
+    }
     if (booking.remainingPaid) {
-      throw new BadRequestError('Final payment already completed');
+      throw new ConflictError('Another payment session already paid this booking balance');
+    }
+    if (booking.status !== 'COMPLETED') {
+      throw new ConflictError('Booking is no longer eligible for final payment');
     }
 
-    if (transaction.bookingType === 'towing') {
-      await towingBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
-        remainingPaid: true,
-        paymentStatus: 'FULLY_PAID',
-      });
-    } else {
-      await driverBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
-        remainingPaid: true,
-        paymentStatus: 'FULLY_PAID',
-      });
+    const successfulTransaction = await setPaymentTransactionStatus(
+      transaction.id,
+      customerId,
+      'final',
+      'success',
+    );
+
+    try {
+      if (transaction.bookingType === 'towing') {
+        await towingBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
+          remainingPaid: true,
+          finalPaymentId: transaction.id,
+          paymentStatus: 'FULLY_PAID',
+        });
+      } else {
+        await driverBookingService.applyPaymentUpdate(transaction.bookingId.toString(), {
+          remainingPaid: true,
+          finalPaymentId: transaction.id,
+          paymentStatus: 'FULLY_PAID',
+        });
+      }
+    } catch (error) {
+      const currentBooking = await loadBookingSnapshot(
+        transaction.bookingId.toString(),
+        transaction.bookingType,
+      );
+      if (
+        currentBooking?.remainingPaid &&
+        currentBooking.finalPaymentId === transaction.id
+      ) {
+        return mapTransaction(successfulTransaction);
+      }
+      try {
+        await markUnappliedStubPaymentFailed(transaction.id);
+      } catch (rollbackError) {
+        logger.error('Could not roll back an unapplied stub final payment', {
+          transactionId: transaction.id,
+          rollbackError,
+        });
+      }
+      throw error;
     }
 
-    return mapTransaction(transaction);
+    return mapTransaction(successfulTransaction);
   }
+
 }
 
 export const bookingPaymentService = new BookingPaymentService();

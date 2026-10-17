@@ -17,9 +17,16 @@ interface VehicleState {
   clearVehicles: () => void;
 }
 
+// BUG-C1 fix: booking endpoints validate vehicleId as a 24-char MongoDB
+// ObjectId (zod regex). Demo ids like "veh_sample_1" made every preview
+// booking fail with "Invalid vehicle id" — so demo vehicles now carry
+// ObjectId-shaped ids that pass validation end-to-end.
+export const DEMO_VEHICLE_ID_1 = '6aa0000000000000000000a1';
+export const DEMO_VEHICLE_ID_2 = '6aa0000000000000000000a2';
+
 export const DEFAULT_VEHICLES: Vehicle[] = [
   {
-    id: 'veh_sample_1',
+    id: DEMO_VEHICLE_ID_1,
     customerId: 'cust_sample_1',
     vehicleType: 'car',
     vehicleSubtype: 'SUV',
@@ -33,7 +40,7 @@ export const DEFAULT_VEHICLES: Vehicle[] = [
     updatedAt: '2026-01-01T00:00:00.000Z',
   },
   {
-    id: 'veh_sample_2',
+    id: DEMO_VEHICLE_ID_2,
     customerId: 'cust_sample_1',
     vehicleType: 'car',
     vehicleSubtype: 'Hatchback',

@@ -185,7 +185,7 @@ export function BookingDetailContent({
     queryFn: () =>
       getAvailableDrivers(
         resolvedBookingType === 'towing' || resolvedBookingType === 'driver'
-          ? { bookingType: resolvedBookingType }
+          ? { bookingType: resolvedBookingType, bookingId }
           : undefined,
       ),
     enabled: resolvedBookingType === 'towing' || resolvedBookingType === 'driver',

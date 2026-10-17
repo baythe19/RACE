@@ -376,10 +376,11 @@ export const adminBookingsService = {
           : await DriverBookingModel.findById(id).lean();
       if (!booking) throw new NotFoundError('Booking not found');
 
-      const [customer, driver, vehicle, paymentTransactions] = await Promise.all([
+      const [customer, driver, vehicle, vendor, paymentTransactions] = await Promise.all([
         UserModel.findById(booking.customerId).lean(),
         booking.driverId ? UserModel.findById(booking.driverId).lean() : null,
         booking.vehicleId ? VehicleModel.findById(booking.vehicleId).lean() : null,
+        booking.vendorId ? UserModel.findById(booking.vendorId).lean() : null,
         PaymentTransactionModel.find({ bookingId: booking._id, bookingType: type }).sort({ createdAt: -1 }).lean(),
       ]);
 
@@ -391,9 +392,9 @@ export const adminBookingsService = {
         customerName: customer?.fullName ?? 'Customer',
         customerPhone: customer?.mobileNumber ?? '—',
         customerEmail: customer?.email ?? '',
-        vendorId: '',
-        vendorName: '—',
-        vendorPhone: '—',
+        vendorId: booking.vendorId?.toString() ?? '',
+        vendorName: vendor?.vendorProfile?.businessName ?? vendor?.fullName ?? 'N/A',
+        vendorPhone: vendor?.mobileNumber ?? 'N/A',
         driverId: booking.driverId?.toString(),
         driverName: driver?.fullName,
         driverPhone: driver?.mobileNumber,
@@ -441,7 +442,10 @@ export const adminBookingsService = {
           amount: booking.estimatedFare ?? 0,
           method: 'online',
           status: booking.paymentStatus,
-          transactionId: paymentTransactions[0]?._id?.toString() ?? '—',
+          transactionId:
+            paymentTransactions.find((transaction) => transaction.status === 'success')?._id?.toString() ?? 'N/A',
+          paidAt:
+            paymentTransactions.find((transaction) => transaction.status === 'success')?.createdAt?.toISOString(),
         },
         fareBreakdown: booking.fareBreakdown,
         packageHours: (booking as unknown as { packageHours?: number }).packageHours,

@@ -1,7 +1,6 @@
 import {
   DriverBookingModel,
   type IDriverBooking,
-  type IDriverStatusHistoryEntry,
 } from '../../models/src/driverBooking';
 import type { UnifiedBookingStatus } from './bookingStatusConstants';
 
@@ -49,14 +48,18 @@ export class DriverBookingRepository {
 
   async updateStatus(
     id: string,
+    expectedStatus: UnifiedBookingStatus,
     status: UnifiedBookingStatus,
-    statusHistory: IDriverStatusHistoryEntry[],
     extra?: Partial<IDriverBooking>,
+    expectedFields: Record<string, unknown> = {},
   ): Promise<IDriverBooking | null> {
-    return DriverBookingModel.findByIdAndUpdate(
-      id,
-      { status, statusHistory, ...extra },
-      { new: true },
+    return DriverBookingModel.findOneAndUpdate(
+      { _id: id, status: expectedStatus, ...expectedFields },
+      {
+        $set: { status, ...(extra ?? {}) },
+        $push: { statusHistory: { status, timestamp: new Date() } },
+      },
+      { new: true, runValidators: true },
     );
   }
 

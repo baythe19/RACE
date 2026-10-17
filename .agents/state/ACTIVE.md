@@ -439,3 +439,31 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 - Aligned availability state: drivers cannot toggle availability during active bookings; new driver records start offline; unapproved/busy drivers no longer appear online in profile/vendor mappings; admin available-driver search excludes active bookings.
 - Removed newly generated placeholder Bhubaneswar coordinates from self/vendor driver registration. Vendor fleet mutation, driver registration/KYC update, and admin driver record edits/removal now guard active-booking state.
 - Verified backend npm run lint, gate-lint, and git diff --check. No live DB/device run; destructive seed:fresh was not run against an unverified database. Partner source writes remain stopped under the active Cursor lock.
+
+
+## Cross-app logic audit follow-up - 2026-10-17
+
+- Fixed a second booking race found during the action-flow recheck: customer cancellation in both towing and driver services now uses a status/payment compare-and-set and atomically appends status history. A concurrent assignment or payment update causes a conflict response instead of a stale save; only a successful cancellation releases that booking's driver.
+- Fixed a missing Mongoose Types import in vendor payment aggregation. Backend and admin-web TypeScript checks pass; repository git diff --check passes.
+- Admin docs/booking/vendor data paths were also reconciled with persisted service bookings and uploaded documents. Refunds remain initiated stubs and vendor payouts are not integrated.
+- Current gate status: G0 and G7 automated gates pass; G1-G6 and G8 require remaining manual cross-surface traces/runtime verification. No live database/device test was run.
+
+
+## Cross-app audit - finance projection follow-up (2026-10-17)
+
+- Admin finance previously omitted current booking PaymentTransaction rows from its transaction list, summary, and reports. It now merges payment sources with global date ordering/filtering, maps current booking payment/refund states, and includes successful booking payments/refunds in finance and monthly revenue projections.
+- Pending refund stubs remain pending; no service-booking commission or real payout is inferred. Those settlement flows and live database/provider verification remain open.
+- Backend and admin-web TypeScript checks and git diff --check pass.
+
+
+## Cross-app audit - booking payment race follow-up (2026-10-17)
+
+- Reused pending development payment sessions and made advance/final verification compare-and-set both the payment record and booking state. Persisted advance/final transaction ids allow safe retry handling; competing stub sessions cannot both mark one booking paid or count as successful finance rows.
+- Production payment remains blocked until provider integration. Real gateway capture/reconciliation, provider webhooks, and database-backed concurrency tests remain open.
+- Backend TypeScript check passes.
+
+
+## Cross-app audit - admin booking projection follow-up (2026-10-17)
+
+- Admin current service-booking detail now resolves vendor id/name/phone from the persisted vendor user and reports the latest successful booking transaction as the payment transaction id/paid time.
+- Backend TypeScript check passes; no live database record was available for projection verification.

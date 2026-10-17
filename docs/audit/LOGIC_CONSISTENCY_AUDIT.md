@@ -72,3 +72,33 @@ This audit follows each consequential action from its screen control through API
 - Repository git diff --check: passed.
 - Automated gate re-verification: G0 (ledger lint) and G7 (backend typecheck) pass. G1-G6 and G8 remain pending until the full manual action-to-screen traces and available runtime scenarios are verified; a clean typecheck is not a substitute.
 - Not established: live database concurrency/payment/refund behavior, real document retrieval against deployed object storage, physical Android keyboard/native picker behavior, socket behavior across real accounts, and closed-app push delivery.
+
+
+### Customer cancellation race follow-up
+
+- Both customer cancellation paths previously loaded a booking, changed fields on the stale document, and saved it, which could race with driver assignment or payment-state changes. They now atomically cancel only when the persisted booking status and advance-payment fields still match the policy inputs; status history is appended atomically.
+- If another action wins the race, the API returns a conflict instead of overwriting the newer booking state. The matching active driver reservation is released only after cancellation succeeds.
+- Backend TypeScript check and repository git diff --check pass after this fix. No live MongoDB concurrency test was run.
+
+
+### Admin finance and revenue projection follow-up
+
+- The admin finance endpoints previously queried only legacy Transaction records; current towing/driver advance, final, and refund rows live in PaymentTransaction. A successful booking payment therefore appeared in booking details/customer or partner data but was absent from finance totals and transaction list.
+- Finance list now merges both sources in date order, applies type/status/date/search filters to each source, and reports stable pagination totals. Current booking advances/final payments map to PAYMENT; refunds map to REFUND. initiated maps to PENDING, success to COMPLETED, and failed to FAILED.
+- Finance summary and monthly revenue reports now include only successful current booking advance/final payments and successful current booking refunds. Initiated refund stubs are excluded from completed refund totals. Commission and payout metrics still reflect the legacy transaction engine; current service-booking commission and settlement are not implemented and are not inferred.
+- Backend and admin-web TypeScript checks pass; git diff --check passes. No database-backed finance fixture or live payment-provider test was available.
+
+
+### Booking payment verification race follow-up
+
+- Advance/final initiation reuses an existing initiated stub session for the same booking and payment stage when available. Verification now compare-and-sets the transaction from initiated to success/failed and applies booking payment flags only when the persisted booking is still unpaid in the expected state.
+- The winning transaction id is persisted for both advance and final payments. Repeated verification of the same successful payment is idempotent; a different session that loses the booking compare-and-set is marked failed so the development stub does not inflate finance totals.
+- This rollback is safe only because the current gateway is a non-production stub and production verification returns HTTP 503. A real gateway must use signed provider confirmation and reconcile captured money with booking updates (preferably with durable idempotency/outbox or database transactions); this was not tested against a live provider/database.
+- Backend TypeScript check and repository git diff --check pass.
+
+
+### Admin service-booking projection follow-up
+
+- Current towing/driver booking details now resolve the persisted vendor user and expose its business name, phone, and id instead of blank placeholders.
+- The payment summary now selects a successful payment transaction for its transaction id and paid-at timestamp; an initiated stub session is not presented as a completed transaction.
+- Backend TypeScript check passes. This projection was not verified against live account records.

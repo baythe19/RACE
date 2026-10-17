@@ -66,6 +66,7 @@ export async function updateBookingStatus(
 
 export async function getAvailableDrivers(params?: {
   bookingType?: 'towing' | 'driver';
+  bookingId?: string;
   lat?: number;
   lng?: number;
 }) {
