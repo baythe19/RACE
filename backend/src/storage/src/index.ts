@@ -34,6 +34,7 @@ const DOCUMENT_FOLDER: Record<string, string> = {
   police_verification: 'documents/verification',
   medical_certificate: 'documents/verification',
   vehicle_insurance: 'documents/insurance',
+  vehicle_rc: 'documents/vehicle',
   fitness_certificate: 'documents/permits',
   puc: 'documents/permits',
   commercial_permit: 'documents/permits',
@@ -74,6 +75,12 @@ function resolveFolder(vendorType: string, documentType: string): string {
 function resolveDriverFolder(driverId: string, documentType: string): string {
   const docFolder = DOCUMENT_FOLDER[documentType] ?? 'documents/other';
   return `drivers/${driverId}/${docFolder}`;
+}
+
+function resolveVehicleFolder(vendorType: string, vendorId: string, vehicleId: string, documentType: string): string {
+  const vendorFolder = VENDOR_TYPE_FOLDER[vendorType] ?? 'vendors';
+  const docFolder = (DOCUMENT_FOLDER[documentType] ?? 'documents/other').replace(/^documents\//, '');
+  return `vendors/${vendorFolder}/${vendorId}/vehicles/${vehicleId}/${docFolder}`;
 }
 
 function getLocalUploadsRoot(): string {
@@ -181,6 +188,29 @@ export class StorageService {
       storagePath,
       fileName,
     );
+  }
+
+  async uploadVendorVehicleDocument(
+    input: UploadFileInput & { vendorId: string; vehicleId: string },
+  ): Promise<UploadResult> {
+    this.validateFile(input.buffer, input.mimeType);
+    const storagePath = resolveVehicleFolder(
+      input.vendorType,
+      input.vendorId,
+      input.vehicleId,
+      input.documentType,
+    );
+    const fileName = buildFileName(input.originalName);
+
+    if (gcsConfig.isConfigured) {
+      try {
+        return await uploadToGcs(input, storagePath, fileName);
+      } catch (error) {
+        logger.warn('GCS vehicle document upload failed, falling back to local storage', { error });
+      }
+    }
+
+    return uploadToLocal(input, storagePath, fileName);
   }
 
   getLocalFileStream(relativePath: string) {

@@ -1,3 +1,5 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
+
 export type PartnerRole = 'vendor' | 'driver';
 
 export type PartnerRegistrationStackParamList = {
@@ -37,15 +39,22 @@ export type PartnerAuthStackParamList = {
 export type PartnerRootStackParamList = {
   PartnerBootstrap: undefined;
   PartnerRegistration: { role: PartnerRole; mobileNumber?: string };
-  PartnerMain: undefined;
+  PartnerMain: NavigatorScreenParams<PartnerTabParamList> | undefined;
   /** Gate shown while a driver's application is not approved yet. */
   PartnerDriverVerification: undefined;
 };
 
+export type PartnerDriversStackParamList = {
+  VendorDriversList: { fullScreen?: boolean } | undefined;
+  VendorVehicles: undefined;
+  VendorVehicleRegistration: { vehicleId?: string } | undefined;
+};
+
 export type PartnerTabParamList = {
   PartnerHome: undefined;
-  PartnerJobs: undefined;
-  PartnerAccount: undefined;
+  PartnerJobs: NavigatorScreenParams<PartnerJobsStackParamList> | undefined;
+  PartnerDrivers: NavigatorScreenParams<PartnerDriversStackParamList> | undefined;
+  PartnerAccount: NavigatorScreenParams<PartnerAccountStackParamList> | undefined;
 };
 
 export type PartnerJobsStackParamList = {
@@ -55,6 +64,8 @@ export type PartnerJobsStackParamList = {
     bookingType?: 'towing' | 'driver';
   };
   VendorVehicles: undefined;
+  VendorVehicleRegistration: { vehicleId?: string } | undefined;
+  VendorDrivers: { fullScreen?: boolean } | undefined;
   VendorAssignJob: {
     bookingId: string;
     bookingType: 'towing' | 'driver';
@@ -80,4 +91,5 @@ export type PartnerAccountStackParamList = {
   VendorVerificationStatus: undefined;
   VendorDrivers: { fullScreen?: boolean } | undefined;
   VendorVehicles: undefined;
+  VendorVehicleRegistration: { vehicleId?: string } | undefined;
 };

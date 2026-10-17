@@ -34,6 +34,7 @@ export type VendorBookingListItem = {
   dropoff?: { label?: string; address?: string; latitude?: number; longitude?: number } | null;
   estimatedFare?: number;
   finalFare?: number;
+  distanceKm?: number;
   createdAt: string;
   scheduledAt?: string;
   serviceLabel: string;
@@ -166,6 +167,7 @@ export class VendorBookingsService {
       dropoff?: { address?: string; label?: string; latitude?: number; longitude?: number } | null;
       estimatedFare?: number;
       finalFare?: number;
+      distanceKm?: number;
       createdAt: Date;
       scheduledAt?: Date | null;
       towingMode?: 'instant' | 'scheduled' | 'emergency';
@@ -188,6 +190,7 @@ export class VendorBookingsService {
       dropoff: booking.dropoff ?? null,
       estimatedFare: booking.estimatedFare,
       finalFare: booking.finalFare,
+      distanceKm: booking.distanceKm,
       createdAt: booking.createdAt.toISOString(),
       scheduledAt: booking.scheduledAt?.toISOString(),
       serviceLabel:

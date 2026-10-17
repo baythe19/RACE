@@ -111,8 +111,8 @@ export const driverType = {
 
 /** Key layout metrics measured from the boards. */
 export const driverMetrics = {
-  /** Screen side gutter. */
-  pagePadding: 15,
+  /** Screen side gutter (aligned with vendor screens). */
+  pagePadding: 12,
   /** Vertical gap between cards. */
   cardGap: 12,
   /** Inner padding of a white card. */

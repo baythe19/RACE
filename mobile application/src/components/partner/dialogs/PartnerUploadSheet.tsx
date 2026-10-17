@@ -1,15 +1,17 @@
 import { PartnerText } from '../PartnerText';
 import React from 'react';
 import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import { Camera, Image as ImageIcon, Eye } from 'lucide-react-native';
+import { Camera, Image as ImageIcon, Eye, FileText } from 'lucide-react-native';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 
 interface PartnerUploadSheetProps {
   visible: boolean;
   onTakePhoto: () => void;
   onPickGallery: () => void;
+  onPickFile?: () => void;
   onPreview?: () => void;
   onClose: () => void;
+  onDismiss?: () => void;
   hasExistingPreview?: boolean;
 }
 
@@ -17,8 +19,10 @@ export default function PartnerUploadSheet({
   visible,
   onTakePhoto,
   onPickGallery,
+  onPickFile,
   onPreview,
   onClose,
+  onDismiss,
   hasExistingPreview = false,
 }: PartnerUploadSheetProps) {
   return (
@@ -26,6 +30,7 @@ export default function PartnerUploadSheet({
       transparent
       animationType="slide"
       visible={visible}
+      onDismiss={onDismiss}
       onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.sheet} onPress={e => e.stopPropagation()}>
@@ -63,6 +68,17 @@ export default function PartnerUploadSheet({
               </View>
               <PartnerText style={styles.optionText}>Choose from Gallery</PartnerText>
             </Pressable>
+
+            {onPickFile ? (
+              <Pressable
+                style={({ pressed }) => [styles.optionRow, getPressableFeedback(pressed)]}
+                onPress={() => { onClose(); onPickFile(); }}>
+                <View style={[styles.iconCircle, { backgroundColor: '#FFF7E6' }]}>
+                  <FileText size={20} color="#D97706" strokeWidth={2.2} />
+                </View>
+                <PartnerText style={styles.optionText}>Browse Files</PartnerText>
+              </Pressable>
+            ) : null}
 
             {hasExistingPreview && onPreview ? (
               <Pressable

@@ -15,3 +15,4 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 Surfaces: `customer` | `partner` | `admin` | `backend` | `docs` | `memory`
 
 Keep at most **one claim per surface**.
+| cursor-agent-otp | backend | HanuOTP provider routing (otp.ts/sms.ts/env — vehicle-doc files नहीं) | 2026-10-17 |

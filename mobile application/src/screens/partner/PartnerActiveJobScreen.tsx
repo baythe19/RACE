@@ -257,7 +257,7 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   headerPad: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 12,
     paddingBottom: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,

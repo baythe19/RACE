@@ -1,6 +1,15 @@
 import { Schema, model, type Document, Types } from 'mongoose';
 
 export type VendorVehicleStatus = 'ACTIVE' | 'UNDER_MAINTENANCE' | 'INACTIVE';
+export type VendorVehicleDocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+export interface IVendorVehicleDocument {
+  type: string;
+  url: string;
+  fileName: string;
+  status: VendorVehicleDocumentStatus;
+  uploadedAt: Date;
+}
 
 export interface IVendorVehicle extends Document {
   vendorId: Types.ObjectId;
@@ -11,6 +20,7 @@ export interface IVendorVehicle extends Document {
   status: VendorVehicleStatus;
   insuranceExpiry?: Date;
   maintenanceNote?: string;
+  documents?: IVendorVehicleDocument[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,6 +40,16 @@ const VendorVehicleSchema = new Schema<IVendorVehicle>(
     },
     insuranceExpiry: { type: Date },
     maintenanceNote: { type: String },
+    documents: {
+      type: [{
+        type: { type: String, required: true },
+        url: { type: String, required: true },
+        fileName: { type: String, required: true },
+        status: { type: String, enum: ['PENDING', 'VERIFIED', 'REJECTED'], default: 'PENDING' },
+        uploadedAt: { type: Date, default: Date.now },
+      }],
+      default: [],
+    },
   },
   { timestamps: true },
 );

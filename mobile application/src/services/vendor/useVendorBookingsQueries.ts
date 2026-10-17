@@ -13,8 +13,10 @@ import {
   listVendorVehicles,
   removeVendorVehicle,
   updateVendorVehicle,
+  uploadVendorVehicleDocument,
   type CreateFleetVehicleInput,
   type UpdateFleetVehicleInput,
+  type VendorVehicleDocumentType,
 } from './vendorVehiclesApi';
 import {
   createVendorDriver,
@@ -92,6 +94,26 @@ export function useUpdateVendorVehicleMutation() {
       vehicleId: string;
       payload: UpdateFleetVehicleInput;
     }) => updateVendorVehicle(vehicleId, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.vehicles });
+    },
+  });
+}
+
+export function useUploadVendorVehicleDocumentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      vehicleId,
+      documentType,
+      file,
+      onProgress,
+    }: {
+      vehicleId: string;
+      documentType: VendorVehicleDocumentType;
+      file: { uri: string; name: string; mimeType: string };
+      onProgress?: (loaded: number, total?: number) => void;
+    }) => uploadVendorVehicleDocument(vehicleId, documentType, file, onProgress),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.vehicles });
     },

@@ -196,6 +196,19 @@ export class VendorController {
     return sendSuccess(res, result);
   });
 
+  uploadVehicleDocument = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const file = req.file;
+    if (!file) throw new AppError('No file uploaded', 400);
+    const vehicle = await vendorVehiclesService.uploadDocument(
+      user.id,
+      getParamId(req.params.id),
+      req.body.documentType,
+      { buffer: file.buffer, mimetype: file.mimetype, originalname: file.originalname },
+    );
+    return sendSuccess(res, vehicle, 201);
+  });
+
   listBookingOffers = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const offers = await vendorBookingsService.listOffers(user.id);

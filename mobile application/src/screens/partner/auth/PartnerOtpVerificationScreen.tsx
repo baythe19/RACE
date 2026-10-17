@@ -27,7 +27,7 @@ import {
   isVendorDriverLoginError,
   VENDOR_DRIVER_LOGIN_HINT,
 } from '../../../utils/vendorDriverLoginError';
-import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
 import { isUiTestPermissiveMode } from '../../../constants/preview';
 import { colors, radius, spacing, typography } from '../../../theme';
 
@@ -128,14 +128,14 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
 
   const handleVerify = useCallback(
     async (code: string) => {
-      const finalCode =
+      const finalCode: string | undefined =
         code && code.length === 6
           ? code
           : isUiTestPermissiveMode()
-            ? (devOtp ?? '123456')
-            : code;
+            ? devOtp
+            : undefined;
 
-      if (verified || loading || verifyLockRef.current || finalCode.length !== 6) {
+      if (!finalCode || verified || loading || verifyLockRef.current || finalCode.length !== 6) {
         return;
       }
 
@@ -235,6 +235,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
     }
 
     setError('');
+    setVendorDriverCta(false);
     verifyLockRef.current = false;
 
     try {

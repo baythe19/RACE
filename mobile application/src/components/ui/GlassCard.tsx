@@ -7,12 +7,14 @@ interface GlassCardProps {
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
   padded?: boolean;
+  /** Omit the drop shadow (flat border-only card). */
+  flat?: boolean;
 }
 
 /** Light RACE card surface (matches customer app card treatment). */
-export default function GlassCard({ children, style, padded = true }: GlassCardProps) {
+export default function GlassCard({ children, style, padded = true, flat = false }: GlassCardProps) {
   return (
-    <View style={[styles.card, padded && styles.padded, style]}>
+    <View style={[styles.card, !flat && styles.shadow, padded && styles.padded, style]}>
       {children}
     </View>
   );
@@ -25,6 +27,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+  },
+  shadow: {
     ...shadows.card,
   },
   padded: {

@@ -1,6 +1,6 @@
-import { createNavigationContainerRef } from '@react-navigation/native';
+import { createNavigationContainerRef, type NavigatorScreenParams } from '@react-navigation/native';
 
-import type { PartnerRootStackParamList } from '../types/partnerNavigation';
+import type { PartnerAccountStackParamList, PartnerJobsStackParamList, PartnerRootStackParamList } from '../types/partnerNavigation';
 
 /**
  * Container-level navigation handle.
@@ -12,60 +12,85 @@ import type { PartnerRootStackParamList } from '../types/partnerNavigation';
  */
 export const partnerNavigationRef = createNavigationContainerRef<PartnerRootStackParamList>();
 
+type StackScreenArgs<Params> = {
+  [Screen in keyof Params]: undefined extends Params[Screen]
+    ? [screen: Screen, params?: Params[Screen]]
+    : [screen: Screen, params: Params[Screen]];
+}[keyof Params];
+
+function childStackState(root: string, screen: string, params?: object) {
+  const routes = screen === root
+    ? [{ name: root }]
+    : [{ name: root }, { name: screen, params }];
+  return { state: { index: routes.length - 1, routes } };
+}
+
+/** Cross-tab entry always has Account underneath its child, even on a warm stack. */
+export function partnerAccountParams(
+  ...[screen, params]: StackScreenArgs<PartnerAccountStackParamList>
+): NavigatorScreenParams<PartnerAccountStackParamList> {
+  return childStackState('PartnerAccountMain', screen, params);
+}
+
+export function partnerJobsParams(
+  ...[screen, params]: StackScreenArgs<PartnerJobsStackParamList>
+): NavigatorScreenParams<PartnerJobsStackParamList> {
+  return childStackState('PartnerJobsList', screen, params);
+}
+
 /** Opens the focused job-cycle screen for a booking. */
 export function openDriverActiveJob(
   bookingId?: string,
   bookingType?: 'towing' | 'driver',
 ): void {
-  if (!partnerNavigationRef.isReady()) return;
-  partnerNavigationRef.navigate(
-    'PartnerMain',
-    {
-      screen: 'PartnerJobs',
-      params: { screen: 'PartnerActiveJob', params: { bookingId, bookingType } },
-    } as never,
-  );
+  jumpToPartnerJobsScreen('PartnerActiveJob', { bookingId, bookingType });
 }
 
 /** Opens the Jobs tab (request list). */
 export function openDriverJobs(): void {
-  if (!partnerNavigationRef.isReady()) return;
-  partnerNavigationRef.navigate('PartnerMain', { screen: 'PartnerJobs' } as never);
+  jumpToPartnerJobsScreen('PartnerJobsList');
 }
 
 /** Opens the canonical Notifications screen in the Account stack. */
 export function openPartnerNotifications(): void {
-  if (!partnerNavigationRef.isReady()) return;
-  partnerNavigationRef.navigate(
-    'PartnerMain',
-    {
-      screen: 'PartnerAccount',
-      params: { screen: 'PartnerNotifications' },
-    } as never,
-  );
+  jumpToPartnerAccountScreen('PartnerNotifications');
 }
 
 /** Opens any tab in PartnerMain. */
 export function jumpToPartnerMainTab(
-  tab: 'PartnerHome' | 'PartnerJobs' | 'PartnerAccount',
+  tab: 'PartnerHome' | 'PartnerJobs' | 'PartnerDrivers' | 'PartnerAccount',
 ): void {
   if (!partnerNavigationRef.isReady()) return;
-  partnerNavigationRef.navigate('PartnerMain', { screen: tab } as never);
+  if (tab === 'PartnerAccount') {
+    jumpToPartnerAccountScreen('PartnerAccountMain');
+  } else {
+    partnerNavigationRef.navigate('PartnerMain', { screen: tab });
+  }
 }
 
 /** Opens any subpage in the PartnerAccount stack. */
 export function jumpToPartnerAccountScreen(
-  screen: string,
-  params?: Record<string, unknown>,
+  ...args: StackScreenArgs<PartnerAccountStackParamList>
 ): void {
   if (!partnerNavigationRef.isReady()) return;
   partnerNavigationRef.navigate(
     'PartnerMain',
     {
       screen: 'PartnerAccount',
-      params: { screen, params },
-    } as never,
+      params: partnerAccountParams(...args),
+    },
   );
+}
+
+/** Opens Jobs-owned pages with the Jobs list underneath, without resetting other tabs. */
+export function jumpToPartnerJobsScreen(
+  ...args: StackScreenArgs<PartnerJobsStackParamList>
+): void {
+  if (!partnerNavigationRef.isReady()) return;
+  partnerNavigationRef.navigate('PartnerMain', {
+    screen: 'PartnerJobs',
+    params: partnerJobsParams(...args),
+  });
 }
 
 /** Opens the Registration stack directly at any step. */

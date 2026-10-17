@@ -17,6 +17,7 @@ import PartnerAccountScreen from '../screens/partner/PartnerAccountScreen';
 import PartnerVerificationStatusScreen from '../screens/partner/PartnerVerificationStatusScreen';
 import VendorDriversScreen from '../screens/partner/VendorDriversScreen';
 import VendorVehiclesScreen from '../screens/partner/VendorVehiclesScreen';
+import VendorVehicleRegistrationScreen from '../screens/partner/registration/vehicle/VendorVehicleRegistrationScreen';
 import VendorAssignJobScreen from '../screens/partner/VendorAssignJobScreen';
 import PartnerEditProfileScreen from '../screens/partner/account/PartnerEditProfileScreen';
 import PartnerVehicleInfoScreen from '../screens/partner/account/PartnerVehicleInfoScreen';
@@ -29,6 +30,7 @@ import PartnerBankDetailsScreen from '../screens/partner/account/PartnerBankDeta
 import PartnerTripHistoryScreen from '../screens/partner/account/PartnerTripHistoryScreen';
 import type {
   PartnerAccountStackParamList,
+  PartnerDriversStackParamList,
   PartnerJobsStackParamList,
   PartnerTabParamList,
 } from '../types/partnerNavigation';
@@ -41,6 +43,7 @@ const styles = StyleSheet.create({
 const Tab = createBottomTabNavigator<PartnerTabParamList>();
 const AccountStack = createNativeStackNavigator<PartnerAccountStackParamList>();
 const JobsStack = createNativeStackNavigator<PartnerJobsStackParamList>();
+const DriversStack = createNativeStackNavigator<PartnerDriversStackParamList>();
 
 const stackScreenOptions = {
   headerStyle: {
@@ -66,7 +69,7 @@ function PartnerJobsStackNavigator() {
   const isDriver = useAppSelector(state => state.auth.user?.role === 'driver');
 
   return (
-    <JobsStack.Navigator screenOptions={stackScreenOptions}>
+    <JobsStack.Navigator initialRouteName="PartnerJobsList" screenOptions={stackScreenOptions}>
       {/* Drivers get the board-01 job list and the 4-step job cycle; vendors keep
           the existing screens. */}
       <JobsStack.Screen
@@ -85,6 +88,16 @@ function PartnerJobsStackNavigator() {
         options={{ headerTitle: 'Vendor vehicles' }}
       />
       <JobsStack.Screen
+        name="VendorVehicleRegistration"
+        component={VendorVehicleRegistrationScreen}
+        options={{ headerShown: false }}
+      />
+      <JobsStack.Screen
+        name="VendorDrivers"
+        component={VendorDriversScreen}
+        options={{ headerTitle: 'Vendor drivers' }}
+      />
+      <JobsStack.Screen
         name="VendorAssignJob"
         component={VendorAssignJobScreen}
         options={{ headerShown: false }}
@@ -93,9 +106,31 @@ function PartnerJobsStackNavigator() {
   );
 }
 
+function PartnerDriversStackNavigator() {
+  return (
+    <DriversStack.Navigator initialRouteName="VendorDriversList" screenOptions={stackScreenOptions}>
+      <DriversStack.Screen
+        name="VendorDriversList"
+        component={VendorDriversScreen}
+        options={{ headerShown: false }}
+      />
+      <DriversStack.Screen
+        name="VendorVehicles"
+        component={VendorVehiclesScreen}
+        options={{ headerTitle: 'Vendor vehicles' }}
+      />
+      <DriversStack.Screen
+        name="VendorVehicleRegistration"
+        component={VendorVehicleRegistrationScreen}
+        options={{ headerShown: false }}
+      />
+    </DriversStack.Navigator>
+  );
+}
+
 function PartnerAccountStackNavigator() {
   return (
-    <AccountStack.Navigator screenOptions={stackScreenOptions}>
+    <AccountStack.Navigator initialRouteName="PartnerAccountMain" screenOptions={stackScreenOptions}>
       <AccountStack.Screen
         name="PartnerAccountMain"
         component={PartnerAccountScreen}
@@ -157,6 +192,11 @@ function PartnerAccountStackNavigator() {
         options={{ headerTitle: 'Vendor vehicles' }}
       />
       <AccountStack.Screen
+        name="VendorVehicleRegistration"
+        component={VendorVehicleRegistrationScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
         name="VendorVerificationStatus"
         component={PartnerVerificationStatusScreen}
         options={{ headerShown: false }}
@@ -188,6 +228,13 @@ export default function PartnerNavigator() {
           name="PartnerJobs"
           component={PartnerJobsStackNavigator}
           options={{ title: 'Jobs' }}
+        />
+      ) : null}
+      {!isDriver ? (
+        <Tab.Screen
+          name="PartnerDrivers"
+          component={PartnerDriversStackNavigator}
+          options={{ title: 'Drivers' }}
         />
       ) : null}
       <Tab.Screen

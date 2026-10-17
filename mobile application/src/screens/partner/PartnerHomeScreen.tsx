@@ -1,10 +1,11 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Polyline } from 'react-native-svg';
+import Svg, { Circle, Polyline } from 'react-native-svg';
 import {
   Bell,
   Briefcase,
+  Car,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -12,16 +13,16 @@ import {
   CloudUpload,
   FileSearch,
   Info,
-  Landmark,
   MapPin,
   ShieldCheck,
   TrendingUp,
   Truck,
+  UserCheck,
   Users,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
-import { openPartnerNotifications } from '../../navigation/partnerNavigationRef';
+import { openPartnerNotifications, partnerAccountParams } from '../../navigation/partnerNavigationRef';
 import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
@@ -33,6 +34,7 @@ import {
   useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
 import { useVendorDashboardQuery, useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
+import { useNotificationsQuery } from '../../services/useNotificationQueries';
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
 import type { VerificationStage, VendorProfileResponse } from '../../types/vendor';
 import { formatReadableAddress } from '../../utils/readableAddress';
@@ -108,33 +110,51 @@ function buildWeeklySeries(today: number, total: number): number[] {
 }
 
 function WeeklySparkline({ values }: { values: number[] }) {
+  // Measure the real card width so the line spans edge-to-edge.
+  const [chartWidth, setChartWidth] = useState(0);
+  const EDGE = 16; // Mon/Sun dot centers sit 16px inside the card edges (never clipped)
   if (values.length < 2) return null;
-  const width = 332;
-  const height = 88;
-  const PAD_TOP = 26; // room for the peak bubble
-  const PAD_BOTTOM = 10;
+  const width = chartWidth || 332;
+  const height = 76;
+  const PAD_TOP = 22; // room for the peak bubble
+  const PAD_BOTTOM = 8;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const span = Math.max(max - min, 1);
-  const stepX = width / (values.length - 1);
-  // Edges connected: first point at x=0, last at x=width (Mon & Sun touch card edges).
+  const stepX = (width - EDGE * 2) / (values.length - 1);
+  // Day points: Mon at x=EDGE … Sun at x=width-EDGE (centers above their labels).
   const coords = values.map((value, idx) => ({
-    x: idx * stepX,
+    x: EDGE + idx * stepX,
     y: PAD_TOP + (1 - (value - min) / span) * (height - PAD_TOP - PAD_BOTTOM),
   }));
-  const points = coords.map(({ x, y }) => `${x},${y}`).join(' ');
+  // Continuous line: small tail past Mon (left) and Sun (right) — subtle, keeps
+  // the flow obvious without eating into the Mon/Sun dots' space.
+  const OVERHANG = 5;
+  const clampY = (y: number) => Math.min(Math.max(y, 6), height - 6);
+  const slopeStart = (coords[0].y - coords[1].y) / (coords[1].x - coords[0].x);
+  const last = coords.length - 1;
+  const slopeEnd =
+    (coords[last].y - coords[last - 1].y) / (coords[last].x - coords[last - 1].x);
+  const leadPoint = { x: 0, y: clampY(coords[0].y - slopeStart * OVERHANG) };
+  const tailPoint = { x: width, y: clampY(coords[last].y + slopeEnd * OVERHANG) };
+  const points = [leadPoint, ...coords, tailPoint].map(({ x, y }) => `${x},${y}`).join(' ');
   const peakIdx = values.indexOf(max);
   const peak = coords[peakIdx];
   return (
-    <View>
-      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
+    <View
+      style={{ width: '100%' }}
+      onLayout={e => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 0 && Math.abs(w - chartWidth) > 1) setChartWidth(w);
+      }}>
+      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         {/* soft area fill under the line */}
         <Polyline
           points={`0,${height} ${points} ${width},${height}`}
           fill="rgba(245,166,0,0.12)"
           stroke="none"
         />
-        {/* amber line spanning the full card width */}
+        {/* amber line — continuous, running edge to edge through all 7 day points */}
         <Polyline
           points={points}
           fill="none"
@@ -143,9 +163,9 @@ function WeeklySparkline({ values }: { values: number[] }) {
           strokeLinejoin="round"
           strokeLinecap="round"
         />
-        {/* dot on EVERY point (reference board style) */}
+        {/* dot on EVERY day point (Mon–Sun), safely inside the edges */}
         {coords.map((c, idx) => (
-          <circle
+          <Circle
             key={idx}
             cx={c.x}
             cy={c.y}
@@ -235,19 +255,57 @@ function verificationCopy(vendor?: VendorProfileResponse | null) {
 type ActivityItem = {
   id: string;
   title: string;
-  description: string;
+  meta1?: string;
+  meta2?: string;
   at?: string;
-  status: 'Completed' | 'In progress' | 'New';
+  status: 'Completed' | 'In progress' | 'New' | 'Pending';
   tone: 'green' | 'yellow' | 'blue' | 'purple';
   Icon: typeof CloudUpload;
 };
 
+/** Readable "place" part of a pickup/dropoff — label wins over raw address. */
+function activityPlaceText(loc?: {
+  label?: string;
+  address?: string;
+} | null): string {
+  if (!loc) return '';
+  if (loc.label?.trim()) return loc.label.trim();
+  if (loc.address?.trim()) return formatReadableAddress(loc.address);
+  return '';
+}
+
 function buildActivity(args: {
   vendor?: VendorProfileResponse | null;
   drivers: Array<{ id: string; name: string }>;
+  offers?: Array<{
+    id: string;
+    bookingNumber?: string;
+    serviceLabel?: string;
+    pickup?: { label?: string; address?: string } | null;
+    dropoff?: { label?: string; address?: string } | null;
+    status?: string;
+    createdAt?: string;
+    assignedFleetVehicleLabel?: string;
+  }>;
 }): ActivityItem[] {
   const items: ActivityItem[] = [];
 
+  // 1. Live leads — "New booking lead received" (reference header row style)
+  for (const offer of args.offers ?? []) {
+    const place = activityPlaceText(offer.pickup) || activityPlaceText(offer.dropoff);
+    items.push({
+      id: `lead-${offer.id}`,
+      title: 'New booking lead received',
+      meta1: `#${offer.bookingNumber || offer.id.slice(-6)}${place ? ` · ${place}` : ''}`,
+      meta2: offer.serviceLabel || 'Towing',
+      at: offer.createdAt,
+      status: 'New',
+      tone: 'blue',
+      Icon: ClipboardList,
+    });
+  }
+
+  // 2. Vendor verification history — approvals / document review
   for (const entry of args.vendor?.statusHistory ?? []) {
     const stage = entry.status as VerificationStage;
     const isReview = stage === 'document_review';
@@ -255,15 +313,17 @@ function buildActivity(args: {
       id: `hist-${entry.status}-${entry.changedAt}`,
       title: isReview
         ? 'Document review started'
-        : stage === 'submitted'
-          ? 'Document submitted'
-          : STAGE_LABELS[stage] ?? entry.status.replace(/_/g, ' '),
-      description:
+        : stage === 'approved'
+          ? 'Approved'
+          : stage === 'submitted'
+            ? 'Document submitted'
+            : STAGE_LABELS[stage] ?? entry.status.replace(/_/g, ' '),
+      meta2:
         entry.note ||
         (isReview
-          ? 'Our team has started reviewing your documents'
+          ? 'Document verification completed'
           : stage === 'submitted'
-            ? 'Registration submitted successfully'
+            ? 'Registration documents submitted'
             : 'Status updated'),
       at: entry.changedAt,
       status: stage === 'approved' || stage === 'submitted' ? 'Completed' : 'In progress',
@@ -272,26 +332,31 @@ function buildActivity(args: {
     });
   }
 
-  for (const doc of args.vendor?.documents ?? []) {
+  // 3. Fleet vehicle assignments from booking rows (latest 2)
+  const assigned = (args.offers ?? []).filter(o => o.assignedFleetVehicleLabel).slice(0, 2);
+  for (const b of assigned) {
     items.push({
-      id: `doc-${doc.id}`,
-      title: 'Document submitted',
-      description: `${doc.documentType.replace(/_/g, ' ')} uploaded successfully`,
-      at: doc.uploadedAt,
+      id: `assign-${b.id}`,
+      title: 'Vehicle assigned',
+      meta1: `#${b.bookingNumber || b.id.slice(-6)} · ${b.assignedFleetVehicleLabel}`,
+      meta2: b.serviceLabel || 'Towing',
+      at: b.createdAt,
       status: 'Completed',
       tone: 'green',
-      Icon: CloudUpload,
+      Icon: Truck,
     });
   }
 
-  for (const driver of args.drivers.slice(0, 2)) {
+  // 4. Document uploads under review
+  for (const doc of args.vendor?.documents ?? []) {
     items.push({
-      id: `driver-${driver.id}`,
-      title: 'Driver added',
-      description: `${driver.name} has been added to your vendor team`,
-      status: 'Completed',
-      tone: 'purple',
-      Icon: Users,
+      id: `doc-${doc.id}`,
+      title: 'Document review updated',
+      meta2: `${doc.documentType.replace(/_/g, ' ')} · Under review`,
+      at: doc.uploadedAt,
+      status: 'Pending',
+      tone: 'yellow',
+      Icon: FileSearch,
     });
   }
 
@@ -300,40 +365,14 @@ function buildActivity(args: {
     .slice(0, 4);
 }
 
-function QuickAction({
-  title,
-  subtitle,
-  Icon,
-  onPress,
-}: {
-  title: string;
-  subtitle: string;
-  Icon: typeof ClipboardList;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}
-      accessibilityRole="button"
-      accessibilityLabel={title}>
-      <View style={styles.actionIcon}>
-        <Icon size={18} color={colors.primaryDark} strokeWidth={2.2} />
-      </View>
-      <View style={styles.actionCopy}>
-        <PartnerText style={styles.actionTitle}>{title}</PartnerText>
-        <PartnerText style={styles.actionSubtitle}>{subtitle}</PartnerText>
-      </View>
-      <ChevronRight size={18} color={colors.grey} strokeWidth={2.2} />
-    </Pressable>
-  );
-}
-
 function statusPill(status: ActivityItem['status']) {
   if (status === 'Completed') {
     return { wrap: styles.pillCompleted, text: styles.pillCompletedText };
   }
   if (status === 'In progress') {
+    return { wrap: styles.pillProgress, text: styles.pillProgressText };
+  }
+  if (status === 'Pending') {
     return { wrap: styles.pillProgress, text: styles.pillProgressText };
   }
   return { wrap: styles.pillNew, text: styles.pillNewText };
@@ -361,6 +400,8 @@ export default function PartnerHomeScreen() {
   const { data: offers = [], refetch: refetchOffers } = useVendorBookingOffersQuery(isVendor);
   const { data: drivers = [], refetch: refetchDrivers } = useVendorFleetDriversQuery(isVendor);
   const { data: vehicles = [], refetch: refetchVehicles } = useVendorFleetVehiclesQuery(isVendor);
+  const { data: notifData } = useNotificationsQuery(isVendor);
+  const unreadNotifCount = notifData?.unreadCount ?? 0;
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -391,7 +432,7 @@ export default function PartnerHomeScreen() {
 
   const verification = verificationCopy(vendorLoading ? null : vendor);
   const activity = useMemo(
-    () => buildActivity({ vendor, drivers }),
+    () => buildActivity({ vendor, drivers, offers }),
     [vendor, drivers],
   );
 
@@ -416,7 +457,7 @@ export default function PartnerHomeScreen() {
   const goAccountScreen = (
     screen: 'VendorDrivers' | 'VendorVehicles' | 'VendorVerificationStatus' | 'PartnerBankDetails',
   ) => {
-    navigation.navigate('PartnerAccount', { screen } as never);
+    navigation.navigate('PartnerAccount', partnerAccountParams(screen));
   };
 
   return (
@@ -434,9 +475,21 @@ export default function PartnerHomeScreen() {
                 hitSlop={10}
                 style={styles.bellBtn}
                 accessibilityRole="button"
-                accessibilityLabel="Notifications">
+                accessibilityLabel={
+                  unreadNotifCount > 0
+                    ? `Notifications, ${unreadNotifCount} unread`
+                    : 'Notifications'
+                }>
                 <Bell size={18} color={colors.dark} strokeWidth={2.1} />
-                {offers.length > 0 ? <View style={styles.bellBadge} /> : null}
+                {unreadNotifCount > 0 ? (
+                  <View style={styles.bellCountBadge}>
+                    <PartnerText style={styles.bellCountText}>
+                      {unreadNotifCount > 9 ? '9+' : String(unreadNotifCount)}
+                    </PartnerText>
+                  </View>
+                ) : offers.length > 0 ? (
+                  <View style={styles.bellBadge} />
+                ) : null}
               </Pressable>
               <View style={styles.avatarRow}>
                 <View style={styles.avatar}>
@@ -668,128 +721,98 @@ export default function PartnerHomeScreen() {
         ) : null}
       </View>
 
-      <View style={styles.fleetRow}>
-        <Pressable
-          onPress={() => goAccountScreen('VendorDrivers')}
-          style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
-          accessibilityRole="button">
-          <PartnerText style={styles.fleetMetricLabelTop}>Drivers</PartnerText>
-          <PartnerText style={styles.fleetMetricValue}>{String(drivers.length)}</PartnerText>
-          <View style={styles.fleetSubRow}>
-            <View style={[styles.fleetSubDot, { backgroundColor: SUCCESS_GREEN }]} />
-            <PartnerText style={styles.fleetMetricSub}>
-              {availableDrivers} available
-            </PartnerText>
-          </View>
-        </Pressable>
-        <Pressable
-          onPress={() => goAccountScreen('VendorVehicles')}
-          style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
-          accessibilityRole="button">
-          <PartnerText style={styles.fleetMetricLabelTop}>Vehicles</PartnerText>
-          <PartnerText style={styles.fleetMetricValue}>{String(vehicles.length)}</PartnerText>
-          <View style={styles.fleetSubRow}>
-            <View style={[styles.fleetSubDot, { backgroundColor: colors.primary }]} />
-            <PartnerText style={styles.fleetMetricSub}>{activeVehicles} available</PartnerText>
-          </View>
-        </Pressable>
-        <Pressable
-          onPress={() => navigation.navigate('PartnerJobs')}
-          style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
-          accessibilityRole="button">
-          <PartnerText style={styles.fleetMetricLabelTop}>Jobs</PartnerText>
-          <PartnerText style={styles.fleetMetricValue}>
-            {String(offers.length + onJobDrivers)}
-          </PartnerText>
-          <View style={styles.fleetSubRow}>
-            <View style={[styles.fleetSubDot, { backgroundColor: colors.primary }]} />
-            <PartnerText style={styles.fleetMetricSub}>{openJobs} open</PartnerText>
-          </View>
-        </Pressable>
-      </View>
-
-
-      <View style={styles.chipsRow}>
-        <Pressable
-          style={({ pressed }) => [styles.shortcutChip, pressed && styles.pressed]}
-          onPress={() => goAccountScreen('VendorDrivers')}
-          accessibilityRole="button">
-          <Users size={13} color={colors.dark} strokeWidth={2.3} />
-          <PartnerText style={styles.shortcutChipText}>Manage drivers</PartnerText>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.shortcutChip, pressed && styles.pressed]}
-          onPress={() => goAccountScreen('VendorVehicles')}
-          accessibilityRole="button">
-          <Truck size={13} color={colors.dark} strokeWidth={2.3} />
-          <PartnerText style={styles.shortcutChipText}>Manage vehicles</PartnerText>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.shortcutChip, pressed && styles.pressed]}
-          onPress={() => goAccountScreen('VendorVerificationStatus')}
-          accessibilityRole="button">
-          <ShieldCheck size={13} color={colors.dark} strokeWidth={2.3} />
-          <PartnerText style={styles.shortcutChipText}>Verification</PartnerText>
-        </Pressable>
-      </View>
-
-      <View style={styles.actionsGrid}>
-        <QuickAction
-          title="Manage drivers"
-          subtitle={`${drivers.length} registered driver(s) · ${availableDrivers} available`}
-          Icon={Users}
-          onPress={() => goAccountScreen('VendorDrivers')}
-        />
-        <QuickAction
-          title="Manage vehicles"
-          subtitle={`${vehicles.length} vehicle(s) · ${activeVehicles} active`}
-          Icon={Truck}
-          onPress={() => goAccountScreen('VendorVehicles')}
-        />
-        <QuickAction
-          title="Bank & payouts"
-          subtitle="Manage settlement account & payout readiness"
-          Icon={Landmark}
-          onPress={() => goAccountScreen('PartnerBankDetails')}
-        />
-      </View>
-
-      <View style={styles.statusStack}>
-        <Pressable
-          onPress={() => goAccountScreen('VendorVerificationStatus')}
-          style={({ pressed }) => [styles.statusCard, pressed && styles.pressed]}>
-          <View style={[styles.statusIcon, { backgroundColor: colors.goldLight }]}>
-            <ShieldCheck size={18} color={colors.primaryDark} strokeWidth={2.2} />
-          </View>
-          <View style={styles.statusCopy}>
-            <View style={styles.statusTitleRow}>
-              <PartnerText style={styles.statusTitle} numberOfLines={1}>
-                {verification.title}
-              </PartnerText>
-              <View
-                style={[
-                  styles.badge,
-                  verification.tone === 'completed' && styles.badgeCompleted,
-                  verification.tone === 'rejected' && styles.badgeRejected,
-                  verification.tone === 'progress' && styles.badgeProgress,
-                  verification.tone === 'pending' && styles.badgePending,
-                ]}>
-                <PartnerText
-                  style={[
-                    styles.badgeText,
-                    verification.tone === 'completed' && styles.badgeCompletedText,
-                    verification.tone === 'rejected' && styles.badgeRejectedText,
-                    verification.tone === 'progress' && styles.badgeProgressText,
-                    verification.tone === 'pending' && styles.badgePendingText,
-                  ]}>
-                  {verification.badge}
-                </PartnerText>
-              </View>
+      <View style={styles.fleetSummary} testID="vendorFleetSummary">
+        <PartnerText style={styles.sectionLabel}>Fleet Summary</PartnerText>
+        <View style={styles.fleetRow}>
+          <Pressable
+            testID="vendorFleetDrivers"
+            onPress={() => navigation.navigate('PartnerDrivers' as any)}
+            style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Drivers, ${drivers.length} total, ${availableDrivers} available`}>
+            <View style={[styles.fleetIcon, { backgroundColor: '#EEF2FF' }]}>
+              <Users size={16} color="#4F46E5" strokeWidth={2.2} />
             </View>
-            <PartnerText style={styles.statusHint}>{verification.hint}</PartnerText>
-          </View>
-        </Pressable>
+            <View style={styles.fleetMetricCopy}>
+              <PartnerText style={styles.fleetMetricLabelTop}>Drivers</PartnerText>
+              <PartnerText style={styles.fleetMetricValue} numberOfLines={1} adjustsFontSizeToFit>{String(drivers.length)}</PartnerText>
+              <PartnerText style={[styles.fleetMetricSub, { color: availableDrivers ? '#16A34A' : colors.error }]} numberOfLines={1} adjustsFontSizeToFit>
+                {availableDrivers} available
+              </PartnerText>
+            </View>
+          </Pressable>
+          <Pressable
+            testID="vendorFleetVehicles"
+            onPress={() => goAccountScreen('VendorVehicles')}
+            style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Vehicles, ${vehicles.length} total, ${activeVehicles} available`}>
+            <View style={[styles.fleetIcon, { backgroundColor: '#FEF3C7' }]}>
+              <Truck size={16} color="#D97706" strokeWidth={2.2} />
+            </View>
+            <View style={styles.fleetMetricCopy}>
+              <PartnerText style={styles.fleetMetricLabelTop}>Vehicles</PartnerText>
+              <PartnerText style={styles.fleetMetricValue} numberOfLines={1} adjustsFontSizeToFit>{String(vehicles.length)}</PartnerText>
+              <PartnerText style={[styles.fleetMetricSub, { color: activeVehicles ? '#16A34A' : colors.error }]} numberOfLines={1} adjustsFontSizeToFit>
+                {activeVehicles} available
+              </PartnerText>
+            </View>
+          </Pressable>
+          <Pressable
+            testID="vendorFleetJobs"
+            onPress={() => navigation.navigate('PartnerJobs')}
+            style={({ pressed }) => [styles.fleetTile, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Jobs, ${offers.length + onJobDrivers} total, ${openJobs} open`}>
+            <View style={[styles.fleetIcon, { backgroundColor: '#F3E8FF' }]}>
+              <Briefcase size={15} color="#7C3AED" strokeWidth={2.2} />
+            </View>
+            <View style={styles.fleetMetricCopy}>
+              <PartnerText style={styles.fleetMetricLabelTop}>Jobs</PartnerText>
+              <PartnerText style={styles.fleetMetricValue} numberOfLines={1} adjustsFontSizeToFit>{String(offers.length + onJobDrivers)}</PartnerText>
+              <PartnerText style={[styles.fleetMetricSub, { color: INFO_BLUE }]} numberOfLines={1} adjustsFontSizeToFit>{openJobs} open</PartnerText>
+            </View>
+          </Pressable>
+        </View>
       </View>
+
+      <View style={styles.quickActions} testID="vendorQuickActions">
+        <PartnerText style={styles.sectionLabel}>Quick Actions</PartnerText>
+        <View style={styles.quickActionsRow}>
+          <Pressable
+            testID="vendorQuickManageDrivers"
+            onPress={() => navigation.navigate('PartnerDrivers' as any)}
+            style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
+            accessibilityRole="button" accessibilityLabel="Manage drivers">
+            <View style={[styles.quickActionIcon, { backgroundColor: '#E0F2FE' }]}>
+              <UserCheck size={20} color="#0284C7" strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.quickActionLabel}>Manage drivers</PartnerText>
+          </Pressable>
+          <Pressable
+            testID="vendorQuickManageVehicles"
+            onPress={() => goAccountScreen('VendorVehicles')}
+            style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
+            accessibilityRole="button" accessibilityLabel="Manage vehicles">
+            <View style={[styles.quickActionIcon, { backgroundColor: '#FFEDD5' }]}>
+              <Car size={20} color="#EA580C" strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.quickActionLabel}>Manage vehicles</PartnerText>
+          </Pressable>
+          <Pressable
+            testID="vendorQuickVerification"
+            onPress={() => goAccountScreen('VendorVerificationStatus')}
+            style={({ pressed }) => [styles.quickActionTile, pressed && styles.pressed]}
+            accessibilityRole="button" accessibilityLabel={`Verification, ${verification.badge}`}>
+            <View style={[styles.quickActionIcon, { backgroundColor: '#DCFCE7' }]}>
+              <ShieldCheck size={20} color="#16A34A" strokeWidth={2.2} />
+            </View>
+            <PartnerText style={styles.quickActionLabel}>Verification</PartnerText>
+            {!vendorLoading && verification.tone !== 'completed' ? <View style={styles.verificationDot} /> : null}
+          </Pressable>
+        </View>
+      </View>
+
 
       <View style={styles.activityCard}>
         <View style={styles.activityHeader}>
@@ -812,14 +835,27 @@ export default function PartnerHomeScreen() {
                   <Icon size={16} color={tone.color} strokeWidth={2.2} />
                 </View>
                 <View style={styles.activityCopy}>
-                  <PartnerText style={styles.activityItemTitle}>{item.title}</PartnerText>
-                  <PartnerText style={styles.activityDesc} numberOfLines={2}>
-                    {item.description}
+                  <PartnerText style={styles.activityItemTitle} numberOfLines={1}>
+                    {item.title}
                   </PartnerText>
-                  <PartnerText style={styles.activityTime}>{formatActivityTime(item.at) || '—'}</PartnerText>
+                  {item.meta1 ? (
+                    <PartnerText style={styles.activityMeta1} numberOfLines={1}>
+                      {item.meta1}
+                    </PartnerText>
+                  ) : null}
+                  {item.meta2 ? (
+                    <PartnerText style={styles.activityDesc} numberOfLines={2}>
+                      {item.meta2}
+                    </PartnerText>
+                  ) : null}
                 </View>
-                <View style={pill.wrap}>
-                  <PartnerText style={pill.text}>{item.status}</PartnerText>
+                <View style={styles.activityRight}>
+                  <PartnerText style={styles.activityTime} numberOfLines={1}>
+                    {formatActivityTime(item.at) || '—'}
+                  </PartnerText>
+                  <View style={pill.wrap}>
+                    <PartnerText style={pill.text}>{item.status}</PartnerText>
+                  </View>
                 </View>
               </View>
             );
@@ -832,7 +868,7 @@ export default function PartnerHomeScreen() {
 
 const styles = StyleSheet.create({
   headerPad: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 12,
     paddingBottom: spacing.md,
     backgroundColor: PAGE_BG,
   },
@@ -868,6 +904,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#EF4444',
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
+  },
+  bellCountBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -5,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  bellCountText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '800',
   },
   partnerPill: {
     backgroundColor: colors.goldLight,
@@ -998,7 +1054,7 @@ const styles = StyleSheet.create({
   },
   earningsTitle: {
     color: colors.grey,
-    fontSize: typography.sizes.sm,
+    fontSize: typography.sizes.xs,
     fontWeight: typography.weights.semibold,
   },
   periodPill: {
@@ -1032,106 +1088,6 @@ const styles = StyleSheet.create({
   chartWrap: {
     marginTop: spacing.md,
   },
-  actionsGrid: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: colors.goldLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionCopy: { flex: 1 },
-  actionTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.md,
-  },
-  actionSubtitle: {
-    marginTop: 2,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
-  },
-  statusStack: {
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  statusCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-  },
-  statusIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusCopy: { flex: 1 },
-  statusTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  statusTitle: {
-    flex: 1,
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.md,
-  },
-  statusEyebrow: {
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  statusBig: {
-    marginTop: 2,
-    color: colors.dark,
-    fontSize: 28,
-    fontWeight: typography.weights.extrabold,
-  },
-  statusHint: {
-    marginTop: 4,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-  },
-  badge: {
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-  },
-  badgeProgress: { backgroundColor: colors.goldLight },
-  badgeCompleted: { backgroundColor: '#DCFCE7' },
-  badgeRejected: { backgroundColor: '#FEE2E2' },
-  badgePending: { backgroundColor: colors.lightGrey },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: typography.weights.bold,
-  },
-  badgeProgressText: { color: colors.primaryDark },
-  badgeCompletedText: { color: SUCCESS_GREEN },
-  badgeRejectedText: { color: colors.error },
-  badgePendingText: { color: colors.grey },
   dotRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1184,7 +1140,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   activityIcon: {
     width: 36,
@@ -1193,20 +1149,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activityCopy: { flex: 1 },
+  activityCopy: { flex: 1, minWidth: 0 },
   activityItemTitle: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.sm,
   },
-  activityDesc: {
+  activityMeta1: {
     marginTop: 2,
+    color: colors.dark,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+  },
+  activityDesc: {
+    marginTop: 3,
     color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
+    fontSize: typography.sizes.xs,
+    lineHeight: 15,
+  },
+  activityRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+    flexShrink: 0,
   },
   activityTime: {
-    marginTop: 4,
     color: colors.textMuted,
     fontSize: typography.sizes.xs,
   },
@@ -1464,12 +1430,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 4,
-    paddingHorizontal: spacing.md,
   },
   chartDay: {
     fontSize: 10,
     color: colors.grey,
     fontWeight: '600',
+    width: 32,
+    textAlign: 'center',
   },
   leadsEmptyCard: {
     flexDirection: 'row',
@@ -1520,70 +1487,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
     marginHorizontal: spacing.lg,
   },
-  fleetRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: spacing.md,
+  fleetSummary: {
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EEEEEE',
+    borderRadius: 12,
+    marginBottom: 12,
   },
+  sectionLabel: { fontSize: 12, lineHeight: 17, fontWeight: '500', color: colors.dark, marginBottom: 8 },
+  fleetRow: { flexDirection: 'row', gap: 8 },
   fleetTile: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    gap: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    flex: 1, minWidth: 0, minHeight: 70, flexDirection: 'row', alignItems: 'flex-start',
+    gap: 7, paddingHorizontal: 8, paddingVertical: 9,
+    backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#F0F0F0', borderRadius: 10,
   },
-  fleetMetricLabelTop: {
-    color: colors.grey,
-    fontSize: 11,
-    fontWeight: typography.weights.bold,
+  fleetIcon: { width: 28, height: 30, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  fleetMetricCopy: { flex: 1, minWidth: 0 },
+  fleetMetricLabelTop: { color: colors.grey, fontSize: 10, lineHeight: 13, fontWeight: '500' },
+  fleetMetricValue: { color: colors.dark, fontSize: 18, lineHeight: 22, fontWeight: '700' },
+  fleetMetricSub: { fontSize: 9.5, lineHeight: 13, fontWeight: '600', marginTop: 2 },
+  quickActions: { marginBottom: 16 },
+  quickActionsRow: { flexDirection: 'row', gap: 8 },
+  quickActionTile: {
+    flex: 1, minWidth: 0, minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 10, paddingVertical: 14, backgroundColor: '#FFFFFF', borderWidth: 1,
+    borderColor: '#EEEEEE', borderRadius: 13,
+    shadowColor: '#000000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 3, elevation: 1.5,
   },
-  fleetMetricValue: {
-    color: colors.dark,
-    fontSize: 24,
-    fontWeight: typography.weights.extrabold,
-    textAlign: 'center',
-  },
-  fleetSubRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    justifyContent: 'center',
-  },
-  fleetSubDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  fleetMetricSub: {
-    color: colors.grey,
-    fontSize: 10.5,
-    lineHeight: 13,
-    fontWeight: '600',
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: spacing.lg,
-  },
-  shortcutChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-  },
-  shortcutChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.dark,
-  },
+  quickActionIcon: { width: 36, height: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  quickActionLabel: { flex: 1, minWidth: 0, color: colors.dark, fontSize: 11.5, lineHeight: 16, fontWeight: '600' },
+  verificationDot: { position: 'absolute', top: 8, right: 8, width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#F97316' },
+
 });

@@ -269,17 +269,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   bookingArtworkWrap: {
-    width: 68,
-    height: 58,
-    borderRadius: 12,
+    width: 78,
+    height: 66,
+    borderRadius: 14,
     backgroundColor: '#FFF1CE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   bookingArtwork: {
-    width: 62,
-    height: 48,
+    width: 72,
+    height: 58,
   },
   summaryCopy: {
     flex: 1,
@@ -445,8 +445,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   vehicleArtwork: {
-    width: 60,
-    height: 54,
+    width: 66,
+    height: 60,
   },
   optionDriver: {
     fontSize: 10,

@@ -15,6 +15,7 @@ import {
 import {
   createVendorVehicleSchema,
   updateVendorVehicleSchema,
+  uploadVendorVehicleDocumentSchema,
 } from '../../services/src/vendorVehiclesValidator';
 import { vendorApproveBookingSchema, vendorAssignBookingSchema, vendorVerifyTripOtpSchema } from '../../services/src/vendorBookingsValidator';
 import {
@@ -84,6 +85,13 @@ router.post(
   requireRole('vendor'),
   validate(createVendorVehicleSchema),
   vendorController.createVehicle,
+);
+router.post(
+  '/vehicles/:id/upload-document',
+  requireRole('vendor'),
+  vendorDocumentUpload.single('file'),
+  validate(uploadVendorVehicleDocumentSchema),
+  vendorController.uploadVehicleDocument,
 );
 router.put(
   '/vehicles/:id',

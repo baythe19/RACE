@@ -140,7 +140,7 @@ export class AuthService {
         );
       }
 
-      const otpResult = await otpService.sendOtp(mobileNumber);
+      const otpResult = await otpService.sendOtp(mobileNumber, role);
 
       return {
         ...otpResult,
@@ -153,7 +153,7 @@ export class AuthService {
 
     // Brand new user — create with the requested role (customer / vendor / driver)
     await createUnverifiedUser(mobileNumber, role);
-    const otpResult = await otpService.sendOtp(mobileNumber);
+    const otpResult = await otpService.sendOtp(mobileNumber, role);
 
     return {
       ...otpResult,

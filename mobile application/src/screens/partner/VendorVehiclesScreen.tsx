@@ -3,21 +3,17 @@ import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Calendar,
-  Car,
   CheckCircle2,
   ChevronDown,
-  Info,
   MoreVertical,
   Plus,
   Search,
-  Shield,
   User,
   Wrench,
-  XCircle,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
+import { jumpToPartnerAccountScreen } from '../../navigation/partnerNavigationRef';
 
-import FormField from '../../components/auth/FormField';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
@@ -25,33 +21,27 @@ import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { FleetDriver } from '../../services/vendor/vendorDriversApi';
 import type { FleetVehicle, FleetVehicleStatus } from '../../services/vendor/vendorVehiclesApi';
 import {
-  useCreateVendorVehicleMutation,
   useLinkVendorDriverVehicleMutation,
   useRemoveVendorVehicleMutation,
   useUpdateVendorVehicleMutation,
   useVendorFleetDriversQuery,
   useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
+import type {
+  PartnerAccountStackParamList,
+  PartnerDriversStackParamList,
+  PartnerJobsStackParamList,
+} from '../../types/partnerNavigation';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
 import { colors, radius, spacing, typography } from '../../theme';
 
 const PAGE_BG = '#F7F7F5';
 const SUCCESS_GREEN = '#22C55E';
-const INFO_BLUE = '#2563EB';
-const PAGE_SIZE = 5;
-
-const VEHICLE_TYPES = [
-  'Flatbed Tow Truck',
-  'Wheel-lift Tow Truck',
-  'Heavy Tow Truck',
-  'Other',
-] as const;
-
 type StatusFilter = 'all' | FleetVehicleStatus;
 type SortKey = 'newest' | 'oldest' | 'reg';
 
 function normalizeReg(value?: string) {
-  return (value ?? '').replace(/\s+/g, '').toUpperCase();
+  return (value ?? '').replace(/[\s-]+/g, '').toUpperCase();
 }
 
 function formatPlate(reg: string) {
@@ -108,7 +98,7 @@ function statusMeta(status: string, driverBusy?: boolean) {
 }
 
 export default function VendorVehiclesScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavigationProp<PartnerAccountStackParamList & PartnerJobsStackParamList & PartnerDriversStackParamList>>();
   const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
   const isApproved = vendor?.status === 'approved';
 
@@ -120,31 +110,14 @@ export default function VendorVehiclesScreen() {
   } = useVendorFleetVehiclesQuery(true, false);
   const { data: drivers = [], refetch: refetchDrivers } = useVendorFleetDriversQuery(true);
 
-  const createMutation = useCreateVendorVehicleMutation();
   const updateMutation = useUpdateVendorVehicleMutation();
   const removeMutation = useRemoveVendorVehicleMutation();
   const linkDriverMutation = useLinkVendorDriverVehicleMutation();
-
-  const [showForm, setShowForm] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState<FleetVehicle | null>(null);
-  const [registrationNo, setRegistrationNo] = useState('');
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState('');
-  const [type, setType] = useState<(typeof VEHICLE_TYPES)[number]>('Flatbed Tow Truck');
-  const [assignedDriverId, setAssignedDriverId] = useState<string | null>(null);
-  const [driverPickerOpen, setDriverPickerOpen] = useState(false);
-  const [rcNumber, setRcNumber] = useState('');
-  const [insuranceProvider, setInsuranceProvider] = useState('');
-  const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
-  const [insuranceExpiry, setInsuranceExpiry] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<SortKey>('newest');
-  const [page, setPage] = useState(1);
-
   const [menuVehicle, setMenuVehicle] = useState<FleetVehicle | null>(null);
   const [assignVehicle, setAssignVehicle] = useState<FleetVehicle | null>(null);
 
@@ -158,11 +131,15 @@ export default function VendorVehiclesScreen() {
   }, [drivers]);
 
   const stats = useMemo(() => {
-    const active = vehicles.filter(v => v.status === 'ACTIVE').length;
+    const available = vehicles.filter(
+      vehicle =>
+        vehicle.status === 'ACTIVE' &&
+        !driverByReg.get(normalizeReg(vehicle.registrationNo))?.isBusy,
+    ).length;
     const service = vehicles.filter(v => v.status === 'UNDER_MAINTENANCE').length;
     const inactive = vehicles.filter(v => v.status === 'INACTIVE').length;
-    return { total: vehicles.length, active, service, inactive };
-  }, [vehicles]);
+    return { total: vehicles.length, available, service, inactive };
+  }, [vehicles, driverByReg]);
 
   const typeOptions = useMemo(() => {
     const set = new Set(vehicles.map(v => v.type).filter(Boolean));
@@ -192,19 +169,8 @@ export default function VendorVehiclesScreen() {
     return list;
   }, [vehicles, search, statusFilter, typeFilter, sortBy]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const showingFrom = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const showingTo = Math.min(currentPage * PAGE_SIZE, filtered.length);
-
   const goDrivers = () => {
-    const parent = navigation.getParent();
-    if (parent) {
-      (parent as any).navigate('PartnerAccount', { screen: 'VendorDrivers' });
-      return;
-    }
-    navigation.navigate('VendorDrivers' as never);
+    jumpToPartnerAccountScreen('VendorDrivers');
   };
 
   const unassignedDrivers = useMemo(
@@ -212,60 +178,12 @@ export default function VendorVehiclesScreen() {
     [drivers],
   );
 
-  const validate = () => {
-    const next: Record<string, string> = {};
-    if (registrationNo.trim().length < 4) next.registrationNo = 'Enter registration number';
-    if (model.trim().length < 1) next.model = 'Enter vehicle model';
-    if (year && (Number(year) < 1980 || Number(year) > 2100)) next.year = 'Enter a valid year';
-    if (insuranceExpiry && !/^\d{4}-\d{2}-\d{2}$/.test(insuranceExpiry)) {
-      next.insuranceExpiry = 'Use YYYY-MM-DD date';
-    }
-    setErrors(next);
-    return Object.keys(next).length === 0;
-  };
-
-  const resetForm = () => {
-    setRegistrationNo('');
-    setModel('');
-    setYear('');
-    setType('Flatbed Tow Truck');
-    setAssignedDriverId(null);
-    setRcNumber('');
-    setInsuranceProvider('');
-    setInsurancePolicyNumber('');
-    setInsuranceExpiry('');
-    setErrors({});
-  };
-
-  const openDriverPicker = () => {
-    if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
-      return;
-    }
-    setDriverPickerOpen(true);
-  };
-
   const openForm = () => {
     if (!isApproved) {
       Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
       return;
     }
-    setEditingVehicle(null);
-    resetForm();
-    setShowForm(true);
-  };
-
-  const onToggleForm = () => {
-    if (!showForm) {
-      openForm();
-    } else if (showForm && editingVehicle) {
-      setShowForm(false);
-      setEditingVehicle(null);
-      resetForm();
-    } else {
-      setShowForm(false);
-      resetForm();
-    }
+    navigation.navigate('VendorVehicleRegistration');
   };
 
   const startEdit = (vehicle: FleetVehicle) => {
@@ -274,112 +192,7 @@ export default function VendorVehiclesScreen() {
       return;
     }
     setMenuVehicle(null);
-    setShowForm(true);
-    setEditingVehicle(vehicle);
-    setRegistrationNo(vehicle.registrationNo);
-    setModel(vehicle.model);
-    setYear(vehicle.year ? String(vehicle.year) : '');
-    const matched =
-      VEHICLE_TYPES.find(t => t.toLowerCase() === vehicle.type.toLowerCase()) ??
-      (VEHICLE_TYPES.find(t => vehicle.type.toLowerCase().includes(t.split(' ')[0].toLowerCase())) as
-        | (typeof VEHICLE_TYPES)[number]
-        | undefined);
-    setType(matched ?? 'Other');
-    const linkedDriver = drivers.find(
-      d => normalizeReg(d.vehicleRegistration) === normalizeReg(vehicle.registrationNo),
-    );
-    setAssignedDriverId(linkedDriver?.id ?? null);
-    setRcNumber('');
-    setInsuranceProvider('');
-    setInsurancePolicyNumber('');
-    setInsuranceExpiry(vehicle.insuranceExpiry ? vehicle.insuranceExpiry.slice(0, 10) : '');
-    setErrors({});
-  };
-
-  const insuranceMeta = () => {
-    const parts: string[] = [];
-    if (rcNumber.trim()) parts.push(`RC: ${rcNumber.trim().toUpperCase()}`);
-    if (insuranceProvider.trim()) parts.push(`Insurer: ${insuranceProvider.trim()}`);
-    if (insurancePolicyNumber.trim()) parts.push(`Policy: ${insurancePolicyNumber.trim()}`);
-    return parts.join(' · ') || undefined;
-  };
-
-  const assignedDriverName = useMemo(() => {
-    const driver = drivers.find(d => d.id === assignedDriverId);
-    return driver?.name ?? '';
-  }, [drivers, assignedDriverId]);
-
-  const linkAssignedDriver = async (registrationNo: string) => {
-    if (!assignedDriverId) return;
-    try {
-      await linkDriverMutation.mutateAsync({
-        driverId: assignedDriverId,
-        vehicleRegistration: registrationNo,
-      });
-      await refetchDrivers();
-    } catch (error) {
-      Alert.alert('Driver link failed', getApiErrorMessage(error, 'Please try again'));
-    }
-  };
-
-  const submitCreate = async () => {
-    if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
-      return;
-    }
-    if (!validate()) return;
-    try {
-      const registration = registrationNo.trim().toUpperCase();
-      await createMutation.mutateAsync({
-        registrationNo: registration,
-        type,
-        model: model.trim(),
-        year: year ? Number(year) : undefined,
-        status: 'ACTIVE',
-        rcNumber: rcNumber.trim().toUpperCase() || undefined,
-        insuranceProvider: insuranceProvider.trim() || undefined,
-        insurancePolicyNumber: insurancePolicyNumber.trim() || undefined,
-        insuranceExpiry: insuranceExpiry || undefined,
-      });
-      await linkAssignedDriver(registration);
-      resetForm();
-      setShowForm(false);
-      setEditingVehicle(null);
-      setPage(1);
-      Alert.alert('Vehicle added', 'Vendor vehicle is ready to assign on jobs.');
-    } catch (error) {
-      Alert.alert('Could not add vehicle', getApiErrorMessage(error, 'Please try again'));
-    }
-  };
-
-  const submitEdit = async () => {
-    if (!editingVehicle) return;
-    if (!validate()) return;
-    try {
-      await updateMutation.mutateAsync({
-        vehicleId: editingVehicle.id,
-        payload: {
-          type,
-          model: model.trim(),
-          year: year ? Number(year) : undefined,
-          insuranceExpiry: insuranceExpiry || undefined,
-          maintenanceNote: insuranceMeta(),
-        },
-      });
-      if (assignedDriverId) {
-        await linkDriverMutation.mutateAsync({
-          driverId: assignedDriverId,
-          vehicleRegistration: editingVehicle.registrationNo,
-        });
-        await refetchDrivers();
-      }
-      resetForm();
-      setShowForm(false);
-      setEditingVehicle(null);
-      Alert.alert('Vehicle updated', 'Vehicle details were saved.');
-    } catch (error) {
-      Alert.alert('Could not save', getApiErrorMessage(error, 'Please try again'));
-    }
+    navigation.navigate('VendorVehicleRegistration', { vehicleId: vehicle.id });
   };
 
   const setVehicleStatus = async (vehicle: FleetVehicle, status: FleetVehicleStatus) => {
@@ -451,20 +264,17 @@ export default function VendorVehiclesScreen() {
     const order: StatusFilter[] = ['all', 'ACTIVE', 'UNDER_MAINTENANCE', 'INACTIVE'];
     const next = order[(order.indexOf(statusFilter) + 1) % order.length] ?? 'all';
     setStatusFilter(next);
-    setPage(1);
   };
 
   const cycleTypeFilter = () => {
     const idx = typeOptions.indexOf(typeFilter);
     const next = typeOptions[(idx + 1) % typeOptions.length] ?? 'all';
     setTypeFilter(next);
-    setPage(1);
   };
 
   const cycleSort = () => {
     const order: SortKey[] = ['newest', 'oldest', 'reg'];
     setSortBy(order[(order.indexOf(sortBy) + 1) % order.length] ?? 'newest');
-    setPage(1);
   };
 
   const statusFilterLabel =
@@ -498,7 +308,7 @@ export default function VendorVehiclesScreen() {
               </PartnerText>
             </View>
             <Pressable
-              onPress={onToggleForm}
+              onPress={openForm}
               style={({ pressed }) => [styles.registerBtn, pressed && styles.pressed]}>
               <Plus size={15} color={colors.dark} strokeWidth={2.8} />
               <PartnerText style={styles.registerLabel}>Add vehicle</PartnerText>
@@ -516,169 +326,36 @@ export default function VendorVehiclesScreen() {
             </View>
           ) : null}
 
-          {showForm ? (
-            <View style={styles.formCard}>
-              <PartnerText style={styles.formTitle}>
-                {editingVehicle ? 'Edit vehicle' : 'Add vehicle'}
-              </PartnerText>
-              <PartnerText style={styles.formSubtitle}>Register a new vehicle to your fleet</PartnerText>
-              <FormField
-                testID="vehicleRegInput"
-                label="Registration number"
-                required
-                value={registrationNo}
-                onChangeText={setRegistrationNo}
-                editable={!editingVehicle}
-                autoCapitalize="characters"
-                error={errors.registrationNo}
-                placeholder="e.g. OD02TW1001"
-                Icon={Car}
-                variant="outlined"
-              />
-              <PartnerText style={styles.typeLabel}>
-                Vehicle type{' '}
-                <PartnerText style={{ color: colors.error }}>*</PartnerText>
-              </PartnerText>
-              <View style={styles.typeGrid}>
-                {VEHICLE_TYPES.map(item => {
-                  const active = type === item;
-                  return (
-                    <Pressable
-                      key={item}
-                      onPress={() => setType(item)}
-                      style={[styles.typeCard, active && styles.typeCardActive]}>
-                      <View style={[styles.typeArt, active && styles.typeArtActive]}>
-                        <VehicleTypeArtwork
-                          type={
-                            item.toLowerCase().includes('flat')
-                              ? 'flatbed'
-                              : item.toLowerCase().includes('wheel')
-                                ? 'wheel_lift'
-                                : item.toLowerCase().includes('truck') || item.toLowerCase().includes('heavy')
-                                  ? 'heavy_tow'
-                                  : 'car'
-                          }
-                          size={44}
-                        />
-                      </View>
-                      <PartnerText
-                        style={[styles.typeCardText, active && styles.typeCardTextActive]}
-                        numberOfLines={2}>
-                        {item}
-                      </PartnerText>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <FormField
-                testID="vehicleModelInput"
-                label="Make & model"
-                required
-                value={model}
-                onChangeText={setModel}
-                error={errors.model}
-                placeholder="e.g. Tata 407, Mahindra Bolero"
-                Icon={Car}
-                variant="outlined"
-              />
-              <FormField
-                testID="vehicleYearInput"
-                label="Manufacturing year"
-                optional
-                value={year}
-                onChangeText={text => setYear(text.replace(/\D/g, '').slice(0, 4))}
-                keyboardType="number-pad"
-                error={errors.year}
-                placeholder="e.g. 2022"
-                Icon={Calendar}
-                variant="outlined"
-                rightElement={<ChevronDown size={16} color={colors.grey} strokeWidth={2.2} />}
-              />
-              <FormField
-                label="Assigned driver"
-                optional
-                value={assignedDriverName}
-                editable={false}
-                placeholder="Select driver"
-                Icon={User}
-                variant="outlined"
-                onPress={openDriverPicker}
-                rightElement={<ChevronDown size={16} color={colors.grey} strokeWidth={2.2} />}
-              />
-              <FormField
-                label="Insurance expiry"
-                optional
-                value={insuranceExpiry}
-                onChangeText={text => setInsuranceExpiry(text.replace(/[^0-9-]/g, '').slice(0, 10))}
-                error={errors.insuranceExpiry}
-                placeholder="Select expiry date"
-                Icon={Shield}
-                variant="outlined"
-                rightElement={<Calendar size={16} color={colors.grey} strokeWidth={2.2} />}
-              />
-              <View style={styles.formInfoBanner}>
-                <Info size={15} color={INFO_BLUE} strokeWidth={2.2} />
-                <PartnerText style={styles.formInfoText}>
-                  Required documents depend on vehicle type and verification rules. You can upload
-                  them after saving the vehicle.
-                </PartnerText>
-              </View>
-              <View style={styles.formFooterRow}>
-                <Pressable
-                  onPress={() => {
-                    setShowForm(false);
-                    setEditingVehicle(null);
-                    resetForm();
-                  }}
-                  style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}>
-                  <PartnerText style={styles.cancelLabel}>Cancel</PartnerText>
-                </Pressable>
-                <Pressable
-                  onPress={() => (editingVehicle ? void submitEdit() : void submitCreate())}
-                  disabled={createMutation.isPending || updateMutation.isPending}
-                  style={({ pressed }) => [
-                    styles.saveBtn,
-                    pressed && styles.pressed,
-                    (createMutation.isPending || updateMutation.isPending) && styles.disabled,
-                  ]}>
-                  <PartnerText style={styles.saveLabel}>
-                    {createMutation.isPending || updateMutation.isPending
-                      ? 'Saving…'
-                      : editingVehicle
-                        ? 'Save changes'
-                        : 'Save vehicle'}
-                  </PartnerText>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.statsRow}>
+          <PartnerText style={styles.statsHeading}>Fleet summary</PartnerText>
+          <View style={styles.statsRow}>
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
-                <VehicleTypeArtwork type="car" size={22} />
+              <View style={styles.statTop}>
+                <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
+                  <VehicleTypeArtwork type="car" size={17} />
+                </View>
+                <PartnerText style={styles.statLabel} numberOfLines={1}>Total</PartnerText>
               </View>
               <PartnerText style={styles.statValue}>{String(stats.total)}</PartnerText>
-              <PartnerText style={styles.statLabel} numberOfLines={1}>Total</PartnerText>
             </View>
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: '#DCFCE7' }]}>
-                <CheckCircle2 size={17} color={SUCCESS_GREEN} strokeWidth={2.2} />
+              <View style={styles.statTop}>
+                <View style={[styles.statIcon, { backgroundColor: '#DCFCE7' }]}>
+                  <CheckCircle2 size={16} color={SUCCESS_GREEN} strokeWidth={2.2} />
+                </View>
+                <PartnerText style={styles.statLabel} numberOfLines={1}>Available</PartnerText>
               </View>
-              <PartnerText style={styles.statValue}>{String(stats.active)}</PartnerText>
-              <PartnerText style={styles.statLabel} numberOfLines={1}>Available</PartnerText>
+              <PartnerText style={styles.statValue}>{String(stats.available)}</PartnerText>
             </View>
             <View style={styles.statCard}>
-              <View style={[styles.statIcon, { backgroundColor: colors.goldLight }]}>
-                <Wrench size={17} color={colors.primaryDark} strokeWidth={2.2} />
+              <View style={styles.statTop}>
+                <View style={[styles.statIcon, { backgroundColor: colors.goldLight }]}>
+                  <Wrench size={16} color={colors.primaryDark} strokeWidth={2.2} />
+                </View>
+                <PartnerText style={styles.statLabel} numberOfLines={1}>In service</PartnerText>
               </View>
               <PartnerText style={styles.statValue}>{String(stats.service)}</PartnerText>
-              <PartnerText style={styles.statLabel} numberOfLines={1}>In service</PartnerText>
             </View>
-          </ScrollView>
+          </View>
 
           <View style={styles.searchRow}>
             <View style={styles.searchBox}>
@@ -687,7 +364,6 @@ export default function VendorVehiclesScreen() {
                 value={search}
                 onChangeText={text => {
                   setSearch(text);
-                  setPage(1);
                 }}
                 placeholder="Search by vehicle number or type"
                 placeholderTextColor={colors.textMuted}
@@ -713,7 +389,7 @@ export default function VendorVehiclesScreen() {
             </Pressable>
           </View>
 
-          {pageItems.length === 0 ? (
+          {filtered.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.iconWrap}>
                 <VehicleTypeArtwork type="flatbed" size={54} />
@@ -724,7 +400,7 @@ export default function VendorVehiclesScreen() {
               </PartnerText>
             </View>
           ) : (
-            pageItems.map(vehicle => {
+            filtered.map(vehicle => {
               const driver = driverByReg.get(normalizeReg(vehicle.registrationNo));
               const badge = typeBadge(vehicle.type);
               const status = statusMeta(vehicle.status, driver?.isBusy);
@@ -816,46 +492,6 @@ export default function VendorVehiclesScreen() {
             })
           )}
 
-          {filtered.length > 0 ? (
-            <View style={styles.pagination}>
-              <PartnerText style={styles.pageMeta}>
-                Showing {showingFrom} to {showingTo} of {filtered.length} vehicles
-              </PartnerText>
-              <View style={styles.pageControls}>
-                <Pressable
-                  disabled={currentPage <= 1}
-                  onPress={() => setPage(p => Math.max(1, p - 1))}
-                  style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}>
-                  <PartnerText style={styles.pageBtnText}>‹</PartnerText>
-                </Pressable>
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .slice(0, 4)
-                  .map(num => (
-                    <Pressable
-                      key={num}
-                      onPress={() => setPage(num)}
-                      style={[styles.pageBtn, num === currentPage && styles.pageBtnActive]}>
-                      <PartnerText
-                        style={[
-                          styles.pageBtnText,
-                          num === currentPage && styles.pageBtnTextActive,
-                        ]}>
-                        {String(num)}
-                      </PartnerText>
-                    </Pressable>
-                  ))}
-                <Pressable
-                  disabled={currentPage >= totalPages}
-                  onPress={() => setPage(p => Math.min(totalPages, p + 1))}
-                  style={[
-                    styles.pageBtn,
-                    currentPage >= totalPages && styles.pageBtnDisabled,
-                  ]}>
-                  <PartnerText style={styles.pageBtnText}>›</PartnerText>
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
         </View>
       )}
 
@@ -961,64 +597,13 @@ export default function VendorVehiclesScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={driverPickerOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setDriverPickerOpen(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setDriverPickerOpen(false)}>
-          <Pressable style={styles.assignSheet} onPress={e => e.stopPropagation()}>
-            <PartnerText style={styles.sheetTitle}>Select driver</PartnerText>
-            <PartnerText style={styles.assignHint}>
-              Choose the fleet driver who will operate this vehicle.
-            </PartnerText>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {drivers.length === 0 ? (
-                <PartnerText style={styles.assignHint}>No drivers yet — add one first.</PartnerText>
-              ) : (
-                drivers.map(driver => {
-                  const active = driver.id === assignedDriverId;
-                  return (
-                    <Pressable
-                      key={driver.id}
-                      style={styles.driverPick}
-                      onPress={() => {
-                        setAssignedDriverId(driver.id);
-                        setDriverPickerOpen(false);
-                      }}>
-                      <View style={styles.driverAvatar}>
-                        <PartnerText style={styles.driverInitial}>
-                          {driver.name.charAt(0).toUpperCase()}
-                        </PartnerText>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <PartnerText style={styles.driverName}>{driver.name}</PartnerText>
-                        <PartnerText style={styles.driverPhone}>{driver.phone}</PartnerText>
-                      </View>
-                      {active ? <CheckCircle2 size={20} color={SUCCESS_GREEN} strokeWidth={2.2} /> : null}
-                    </Pressable>
-                  );
-                })
-              )}
-            </ScrollView>
-            <Pressable
-              onPress={() => {
-                setDriverPickerOpen(false);
-                goDrivers();
-              }}
-              style={styles.addDriverLink}>
-              <PartnerText style={styles.assignLink}>Manage drivers</PartnerText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
     </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
   headerPad: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 12,
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
     backgroundColor: PAGE_BG,
@@ -1070,152 +655,48 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     lineHeight: 18,
   },
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  formTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    fontSize: typography.sizes.xl + 2,
-  },
-  formSubtitle: {
-    color: colors.grey,
-    fontSize: typography.sizes.xs,
-    marginTop: -spacing.xs + 2,
-    marginBottom: spacing.sm,
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-    marginBottom: spacing.xs,
-  },
-  typeCard: {
-    width: 78,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xs + 2,
-    paddingHorizontal: 4,
-    gap: 4,
-  },
-  typeCardActive: {
-    borderColor: colors.primary,
-    backgroundColor: '#FFFBEB',
-  },
-  typeArt: {
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeArtActive: {},
-  typeCardText: {
-    fontSize: 9.5,
-    lineHeight: 12,
-    fontWeight: typography.weights.semibold,
-    color: colors.grey,
-    textAlign: 'center',
-  },
-  typeCardTextActive: {
-    color: colors.primaryDark,
-    fontWeight: typography.weights.bold,
-  },
-  typeLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.semibold,
-    fontSize: typography.sizes.sm,
-    marginBottom: 2,
-  },
-  formInfoBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: '#EFF6FF',
-    borderRadius: 10,
-    padding: spacing.sm + 2,
-  },
-  formInfoText: {
-    flex: 1,
-    color: '#1E40AF',
-    fontSize: typography.sizes.xs,
-    lineHeight: 16,
-  },
-  formFooterRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  cancelBtn: {
-    flex: 1,
-    minHeight: 50,
-    borderRadius: radius.button,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  saveBtn: {
-    flex: 2,
-    backgroundColor: colors.primary,
-    borderRadius: radius.button,
-    minHeight: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  disabled: { opacity: 0.6 },
   statsRow: {
+    flexDirection: 'row',
     gap: spacing.sm,
     paddingVertical: 2,
   },
+  statsHeading: {
+    color: colors.dark,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    marginBottom: -spacing.xs,
+  },
   statCard: {
-    width: 110,
+    flex: 1,
+    minWidth: 0,
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.sm + 2,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  statTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   statIcon: {
-    width: 34,
-    height: 26,
+    width: 28,
+    height: 28,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs + 2,
   },
   statValue: {
     color: colors.dark,
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: typography.weights.extrabold,
   },
   statLabel: {
-    marginTop: 1,
     color: colors.grey,
     fontWeight: typography.weights.semibold,
-    fontSize: 11,
-  },
-  statHint: {
-    marginTop: 2,
-    color: colors.grey,
-    fontSize: 11,
-    lineHeight: 14,
+    fontSize: 10.5,
   },
   searchRow: {},
   searchBox: {
@@ -1423,42 +904,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     color: colors.grey,
     fontSize: typography.sizes.xs,
-  },
-  pagination: {
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  pageMeta: {
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-  },
-  pageControls: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  pageBtn: {
-    minWidth: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  pageBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageBtnText: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  pageBtnTextActive: {
-    color: colors.dark,
   },
   modalOverlay: {
     flex: 1,

@@ -39,6 +39,7 @@ import {
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { partnerAccountParams, partnerJobsParams } from '../../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../../components/ui/AppScreenLayout';
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
@@ -970,24 +971,20 @@ export default function DriverDashboardScreen() {
   const badgeCount = Math.max(unreadNotifCount, hasActiveJob ? 0 : pendingRequests);
 
   const openJobs = useCallback(() => {
-    navigation.navigate('PartnerJobs');
+    navigation.navigate('PartnerJobs', partnerJobsParams('PartnerJobsList'));
   }, [navigation]);
 
   const openNotifications = useCallback(() => {
     navigation.navigate(
       'PartnerAccount',
-      {
-        screen: 'PartnerNotifications',
-      } as never,
+      partnerAccountParams('PartnerNotifications'),
     );
   }, [navigation]);
 
   const openProfile = useCallback(() => {
     navigation.navigate(
       'PartnerAccount',
-      {
-        screen: 'PartnerAccountMain',
-      } as never,
+      partnerAccountParams('PartnerAccountMain'),
     );
   }, [navigation]);
 
@@ -998,10 +995,7 @@ export default function DriverDashboardScreen() {
     }
     navigation.navigate(
       'PartnerJobs',
-      {
-        screen: 'PartnerActiveJob',
-        params: { bookingId: activeJob.id, bookingType: activeJob.bookingType },
-      } as never,
+      partnerJobsParams('PartnerActiveJob', { bookingId: activeJob.id, bookingType: activeJob.bookingType }),
     );
   }, [activeJob, navigation, openJobs]);
 

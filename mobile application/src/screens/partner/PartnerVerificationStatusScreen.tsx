@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 12,
   },
   topBar: {
     flexDirection: 'row',

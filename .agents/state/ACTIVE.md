@@ -1,9 +1,47 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-14
+> **Updated:** 2026-10-17
 > **Read this first in every new session.**
 
 ---
+
+## Latest session — Partner Fleet Vehicle Registration Flow (2026-10-17, branch v4.5.0-uichanges)
+
+- Added a dedicated two-step vehicle registration/edit screen to the Account, Jobs, and Drivers stacks. The fleet list stays behind it, so Back returns to the originating vehicle list.
+- Standardized the fleet summary cards and list layout; removed vehicle pagination and kept Add/Edit in the routed flow.
+- Added required RC and insurance uploads, optional fitness/PUC/commercial permit/photo uploads, image/PDF preview, progress, and retry. Failed retries reuse the saved vehicle ID. New vehicles stay inactive until selected uploads finish.
+- Persisted files on the vehicle record under a vendor-owned vehicle storage path; upload route checks vendor approval and vehicle ownership. Backend validates file type/size, and the picker applies its 5 MB limit.
+- Verification: partner mobile and backend `npm run lint` (`tsc --noEmit`) passed; vehicle-document schema checks passed; `git diff --check` passed. Peach/device visual review could not run because Playwright Chrome was unavailable and the local CUA runtime failed to initialize.
+
+## Latest session — Vendor Home Fleet Summary vs Quick Actions Icons & Sizing (2026-10-17, branch v4.5.0-uichanges)
+
+- **Distinct Semantic Icons & Color Badges:** Resolved identical matching icons between Fleet Summary and Quick Actions on `PartnerHomeScreen.tsx`:
+  - **Fleet Summary:**
+    - Drivers: `Users` (16px, indigo `#4F46E5`, `#EEF2FF` soft badge)
+    - Vehicles: `Truck` (16px, amber `#D97706`, `#FEF3C7` soft badge)
+    - Jobs: `Briefcase` (15px, purple `#7C3AED`, `#F3E8FF` soft badge — replaced erroneous `ShieldCheck`)
+  - **Quick Actions:**
+    - Manage drivers: `UserCheck` (18px, sky blue `#0284C7`, `#E0F2FE` soft badge — distinct from `Users`)
+    - Manage vehicles: `Car` (18px, orange `#EA580C`, `#FFEDD5` soft badge — distinct from `Truck`)
+    - Verification: `ShieldCheck` (18px, emerald green `#16A34A`, `#DCFCE7` soft badge)
+- **Increased Quick Actions Card Height & Touch Geometry:**
+  - Expanded `quickActionTile` `minHeight` to **82px** (with `paddingVertical: 14`, `paddingHorizontal: 10`, and `borderRadius: 13`) giving cards a spacious, comfortable touch area.
+  - Scaled `quickActionIcon` container to **36×38px** (`borderRadius: 9`) with 20px icons (`UserCheck`, `Car`, `ShieldCheck`), and set `quickActionLabel` to 11.5px / 16px line-height with 600 weight.
+- **Header Action Buttons (`PartnerJobsScreen.tsx`):**
+  - Replaced the single harsh yellow `+ Vehicle` button with two distinct, color-coded, icon-rich action pill buttons:
+    - **`+ Driver`:** `<UserPlus size={13} color="#0284C7" />` with soft sky badge (`#E0F2FE`, border `#BAE6FD`, text `#0369A1`), tapping directly opens `VendorDrivers`.
+    - **`+ Vehicle`:** `<Car size={13} color="#D97706" />` with soft amber badge (`#FEF3C7`, border `#FDE68A`, text `#92400E`), tapping directly opens `VendorVehicles`.
+  - Added `VendorDrivers` to `PartnerJobsStackParamList` and registered `VendorDriversScreen` in `JobsStack.Navigator` (`PartnerNavigator.tsx`) for fluid stack navigation and back navigation.
+- **Dedicated "Drivers" Bottom Navigation Tab (`PartnerTabBar.tsx` & `PartnerNavigator.tsx`):**
+  - Added a dedicated 4th bottom navigation tab **Drivers** (`PartnerDrivers`) for vendors with `Users` icon (solid amber fill when active, grey outline when inactive).
+  - Wired `PartnerDriversStackNavigator` hosting `VendorDriversScreen` with nested `VendorVehiclesScreen`.
+  - Connected `jumpToPartnerMainTab('PartnerDrivers')` and updated `PartnerHomeScreen` (Fleet Summary "Drivers" card & Quick Actions "Manage drivers") to navigate directly to the new `PartnerDrivers` tab.
+- **Direct Vehicle Connection on Drivers Screen (`VendorDriversScreen.tsx`):**
+  - Added a dedicated **`Vehicles`** header button (`<Car size={13} color="#92400E" />` + soft amber pill) right beside `Add driver` so vendors can jump directly between Drivers and Vehicles.
+- **Fixed Filtered Jobs Alignment & Vertical Centering Bug (`PartnerJobsScreen.tsx`):**
+  - **Root Cause:** The horizontal tabs `<ScrollView>` lacked a style constraint (`flexGrow: 0, flexShrink: 0`). In React Native, unconstrained ScrollViews default to `flex: 1` inside flex parents, splitting screen height 50/50 with the vertical job list. When filtering to 1 job (`New (1)`), the empty bottom half of the tabs ScrollView pushed the card down into the middle of the screen.
+  - **Resolution:** Added `style={styles.tabsScroll}` with `flexGrow: 0, flexShrink: 0` to `<ScrollView horizontal>`, set `contentStyle={styles.content}` to `flex: 1`, set `listScroll` to `flex: 1`, and adjusted `list` to start at `paddingTop: spacing.xs`. All jobs (whether 1 or many) now consistently dock right below the filter tabs with zero floating or vertical displacement.
+- **Verification:** `npx tsc --noEmit` in `mobile application/` = 0 errors; `npm run lint` in `backend/` = 0 errors.
 
 ## Deep-recheck pass — Vendor UI (2026-10-14, branch 3.5.0-new-driver-screeens)
 
@@ -135,7 +173,7 @@ Complete, high-fidelity implementation matching Master Prompt & Reference Boards
 
 ## Active Branch
 
-`3.5.0-new-driver-screeens` (HEAD at last check) — current work branch. `3.0.0-driver-app-development` was the branch during the 2026-10-12 audit; the tree has since switched, and `PartnerHomeScreen.tsx` / `PartnerJobsScreen.tsx` / `VendorAssignJobScreen.tsx` carry uncommitted UI edits.
+`v4.5.0-uichanges` (HEAD at last check). Preserve the existing uncommitted partner-app and backend edits in this Codespace.
 
 ## Phase
 
@@ -321,3 +359,13 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 - Applied mobile npm run lint (tsc --noEmit) passed; git diff --check passed.
 - Final four-file Jobs/Assign/progress/compact-document refinements remain unapplied in /tmp/race-vendor-pending-final-fixes.patch. New offers are currently omitted from the Jobs card list, so the Assign path still needs that fix and a screenshot pass. Patch passed read-only git apply --check and TypeScript in a temporary copy.
 - Stopped partner source writes when Cursor claimed partner; user explicitly confirmed Cursor is still working. Re-read Cursor's finished changes and the lock before reconciling/applying the pending patch.
+
+
+## Vendor dashboard and driver follow-up — 2026-10-17, v4.5.0-uichanges
+
+- Applied compact icon-based Fleet Summary, exactly three Quick Actions (drivers, vehicles, verification), and removed duplicated large management/status rows. Preserved the concurrent WeeklySparkline change. Counts and navigation remain connected to existing query data/routes.
+- Removed driver pagination and five-row slicing. Fixed the wizard progress rail, removed repeated captions/Back-to-details, made header/footer Back step-aware, preserved entered values, and added keyboard dismissal/drag behavior.
+- Added selected-file preview, reused the upload sheet with file selection, genuine per-document transfer status/progress, picker error handling, Aadhaar/PAN replacement and retry that reuses the created driver and skips successful uploads. No native dependency/config changes.
+- Live partner npm run lint (tsc --noEmit) and git diff --check passed after the dashboard update. Temporary handler checks passed for >5 drivers, step/back/input preservation, required document validation, repeated Save, failed-upload retry, file validation and preview/progress state. Handler checks mock native/API dependencies.
+- Peach headless preview became unresponsive/disconnected, so new screenshots, physical keyboard alignment, native picker/PDF viewer and real server uploads remain unverified. Existing UI preview API fallbacks remain; no production-readiness claim. No Expo/Peach server restart, commit or push.
+- Local review: outputs/peach-review/driver-dashboard-45.md in this Codex workspace. Older Jobs/Assign refinements remain separate; do not reapply superseded driver patches blindly.

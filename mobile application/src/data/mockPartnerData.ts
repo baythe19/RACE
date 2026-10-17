@@ -422,6 +422,23 @@ export const MOCK_VENDOR_VEHICLES: FleetVehicle[] = [
 /** Preview-only fleet bookings list (awaiting driver / assigned / completed states). */
 export const MOCK_VENDOR_BOOKINGS: VendorBookingItem[] = [
   {
+    // Fresh customer lead — not yet assigned, so it lands in "New leads".
+    bookingType: 'towing',
+    id: 'RACE-VND-BKG-004',
+    bookingNumber: 'TOW-10051',
+    status: 'REQUESTED',
+    serviceLabel: 'Accident Recovery',
+    pickup: {
+      address: 'Patia Square, Bhubaneswar',
+    },
+    dropoff: {
+      address: 'Infocity, Bhubaneswar',
+    },
+    estimatedFare: 1899,
+    distanceKm: 8.4,
+    createdAt: new Date(now.getTime() - 1000 * 60 * 12).toISOString(),
+  },
+  {
     bookingType: 'towing',
     id: 'RACE-VND-BKG-001',
     bookingNumber: 'TOW-10048',
@@ -434,6 +451,8 @@ export const MOCK_VENDOR_BOOKINGS: VendorBookingItem[] = [
       address: 'Sector B, Mancheswar, Bhubaneswar',
     },
     estimatedFare: 1650,
+    finalFare: 1650,
+    distanceKm: 12.5,
     createdAt: new Date(now.getTime() - 1000 * 60 * 40).toISOString(),
     assignedFleetVehicleLabel: 'OD 02 TOW 1001 · Flatbed Tow Truck · Tata 407 Recovery',
     driver: {
@@ -457,6 +476,7 @@ export const MOCK_VENDOR_BOOKINGS: VendorBookingItem[] = [
     },
     estimatedFare: 1250,
     finalFare: 1250,
+    distanceKm: 9.2,
     createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 26).toISOString(),
     assignedFleetVehicleLabel: 'OD 02 TOW 1002 · Wheel-Lift Tow Truck · Mahindra Bolero Maxi Truck',
     driver: {
@@ -476,6 +496,7 @@ export const MOCK_VENDOR_BOOKINGS: VendorBookingItem[] = [
       address: 'Khandagiri Square, Bhubaneswar',
     },
     estimatedFare: 2400,
+    distanceKm: 6.1,
     createdAt: new Date(now.getTime() - 1000 * 60 * 90).toISOString(),
     driver: {
       id: 'mock-driver-002',

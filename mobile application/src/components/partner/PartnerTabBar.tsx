@@ -19,6 +19,7 @@ import {
   ClipboardList,
   House,
   User,
+  Users,
   type LucideIcon,
 } from 'lucide-react-native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
@@ -33,6 +34,7 @@ import { useAppSelector } from '../../redux/hooks';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
 import { buildDriverVerification } from '../../utils/driverVerification';
+import { partnerAccountParams } from '../../navigation/partnerNavigationRef';
 
 const AMBER = '#FEA701';
 const AMBER_TEXT = '#F58A00';
@@ -49,6 +51,7 @@ const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob', 'VendorAssignJob']);
 const TAB_CONFIG: Record<TabRouteName, { label: string; Icon: LucideIcon }> = {
   PartnerHome: { label: 'Home', Icon: House },
   PartnerJobs: { label: 'Jobs', Icon: ClipboardList },
+  PartnerDrivers: { label: 'Drivers', Icon: Users },
   PartnerAccount: { label: 'Account', Icon: User },
 };
 
@@ -101,7 +104,11 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
             canPreventDefault: true,
           });
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
+            if (routeName === 'PartnerAccount') {
+              navigation.navigate('PartnerAccount', partnerAccountParams('PartnerAccountMain'));
+            } else {
+              navigation.navigate(route.name);
+            }
           }
         };
 

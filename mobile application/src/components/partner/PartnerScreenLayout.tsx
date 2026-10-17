@@ -180,9 +180,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: HEADER_SIDE / 2,
-    backgroundColor: colors.lightGrey,
-    borderWidth: 1,
-    borderColor: colors.border,
     flexShrink: 0,
   },
   sideSlot: {

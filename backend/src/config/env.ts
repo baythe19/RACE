@@ -40,6 +40,14 @@ const envSchema = z.object({
   MC_CUSTOMER_ID: z.string().optional(),
   MC_AUTH_TOKEN: z.string().optional(),
   MC_BASE_URL: z.string().default('https://cpaas.messagecentral.com'),
+  // HanuOTP SMS OTP service (non-DLT; we generate the OTP and Hanu delivers it)
+  HANU_API_KEY: z.string().optional(),
+  HANU_BASE_URL: z.string().default('https://api.hanuotp.in'),
+  HANU_TEMPLATE_ID: z.string().default('default'),
+  /** Comma-separated app roles that use HanuOTP; everything else keeps MessageCentral. */
+  HANU_OTP_ROLES: z.string().default('vendor,driver'),
+  /** Pepper mixed into the OTP hash stored in the DB (falls back to a project constant). */
+  OTP_PEPPER: z.string().optional(),
   // Twilio (legacy / fallback — kept optional)
   TWILIO_ACCOUNT_SID: z.string().optional(),
   TWILIO_AUTH_TOKEN: z.string().optional(),

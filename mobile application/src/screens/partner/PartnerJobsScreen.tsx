@@ -11,6 +11,7 @@ import {
   Phone,
   Plus,
   Truck,
+  UserPlus,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +20,7 @@ import { openPartnerNotifications } from '../../navigation/partnerNavigationRef'
 
 import GlassCard from '../../components/ui/GlassCard';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
 import { useAppSelector } from '../../redux/hooks';
 import {
   useAcceptDriverJobMutation,
@@ -55,8 +57,6 @@ const DRIVER_TABS: Array<{ key: JobTab; label: string }> = [
 const VENDOR_TABS: Array<{ key: JobTab; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'new', label: 'New' },
-  { key: 'nearby', label: 'Nearby' },
-  { key: 'assigned', label: 'Assigned' },
   { key: 'in_progress', label: 'In progress' },
   { key: 'completed', label: 'Completed' },
 ];
@@ -122,6 +122,7 @@ function vendorBookingToCard(item: VendorBookingItem): DriverJobBooking {
     dropoff: item.dropoff,
     estimatedFare: item.estimatedFare,
     finalFare: item.finalFare,
+    distanceKm: item.distanceKm,
     createdAt: item.createdAt,
     serviceLabel: item.serviceLabel,
     assignedFleetVehicleLabel: item.assignedFleetVehicleLabel,
@@ -282,18 +283,11 @@ export default function PartnerJobsScreen() {
   }, [cards, filter, isVendor]);
 
   const summary = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const jobsToday = cards.filter(({ job }) => {
-      if (!job.createdAt) return false;
-      return new Date(job.createdAt) >= todayStart;
-    }).length;
     return {
-      jobsToday,
       open: counts.new + counts.nearby,
       inProgress: counts.assigned + counts.in_progress,
     };
-  }, [cards, counts]);
+  }, [counts]);
 
   const onAccept = async (job: DriverJobBooking) => {
     if (counts.in_progress > 0) {
@@ -359,6 +353,7 @@ export default function PartnerJobsScreen() {
     return (
       <GlassCard
         key={`${isOffer ? 'o' : 'm'}-${job.bookingType}-${job.id}`}
+        flat
         style={[styles.jobCard, isOffer && isDriver && styles.driverOfferCard]}>
         {/* status badge + booking ref */}
         <View style={styles.cardHeadRow}>
@@ -430,7 +425,13 @@ export default function PartnerJobsScreen() {
               <PartnerText style={styles.driverChipName} numberOfLines={1}>
                 {job.driver.name}
               </PartnerText>
-              <PartnerText style={styles.driverChipMeta}>Fleet driver on this job</PartnerText>
+              <PartnerText style={styles.driverChipMeta}>
+                {ACTIVE_STATUSES.has(job.status)
+                  ? 'On the way to pickup'
+                  : job.status === 'COMPLETED' || job.status === 'RATED'
+                    ? 'Completed this job'
+                    : 'Assigned driver'}
+              </PartnerText>
             </View>
             {job.driver.phone ? (
               <Pressable
@@ -448,8 +449,8 @@ export default function PartnerJobsScreen() {
           </View>
         ) : null}
 
-        {/* vehicle hint (assigned cards) */}
-        {job.assignedFleetVehicleLabel ? (
+        {/* vehicle hint — only for jobs already underway */}
+        {job.assignedFleetVehicleLabel && !isOffer && ACTIVE_STATUSES.has(job.status) ? (
           <PartnerText style={styles.vehicleHint} numberOfLines={1}>
             Vehicle: {job.assignedFleetVehicleLabel}
           </PartnerText>
@@ -538,25 +539,29 @@ export default function PartnerJobsScreen() {
       header={
         <View style={styles.headerPad}>
           <View style={styles.headerTop}>
-            <View style={styles.headerCopy}>
-              <View>
-                <PartnerText style={styles.brandRace}>RACE</PartnerText>
-                <PartnerText style={styles.brandPartner}>PARTNER</PartnerText>
-              </View>
-              <PartnerText style={styles.subtitle} numberOfLines={1}>
-                {isVendor
-                  ? 'Manage and assign roadside assistance requests.'
-                  : 'Trips approved by your vendor appear here — accept to start.'}
-              </PartnerText>
-            </View>
+            <PartnerHeaderLogo width={76} />
             <View style={styles.headerActions}>
               {isVendor ? (
-                <Pressable
-                  onPress={() => navigation.navigate('VendorVehicles')}
-                  style={styles.addVehicleBtn}>
-                  <Plus size={16} color={colors.dark} strokeWidth={2.6} />
-                  <PartnerText style={styles.addVehicleLabel}>Vehicle</PartnerText>
-                </Pressable>
+                <>
+                  <Pressable
+                    testID="vendorJobsAddDriver"
+                    onPress={() => navigation.navigate('VendorDrivers')}
+                    style={({ pressed }) => [styles.addDriverBtn, pressed && styles.btnPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add driver">
+                    <UserPlus size={13} color="#0284C7" strokeWidth={2.4} />
+                    <PartnerText style={styles.addDriverLabel}>+ Driver</PartnerText>
+                  </Pressable>
+                  <Pressable
+                    testID="vendorJobsAddVehicle"
+                    onPress={() => navigation.navigate('VendorVehicles')}
+                    style={({ pressed }) => [styles.addVehicleBtn, pressed && styles.btnPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add vehicle">
+                    <Car size={13} color="#D97706" strokeWidth={2.4} />
+                    <PartnerText style={styles.addVehicleLabel}>+ Vehicle</PartnerText>
+                  </Pressable>
+                </>
               ) : null}
               <Pressable
                 onPress={openPartnerNotifications}
@@ -564,26 +569,55 @@ export default function PartnerJobsScreen() {
                 style={styles.bellBtn}
                 accessibilityRole="button"
                 accessibilityLabel="Notifications">
-                <Bell size={20} color={colors.dark} strokeWidth={2.2} />
+                <Bell size={18} color={colors.dark} strokeWidth={2.1} />
               </Pressable>
             </View>
           </View>
 
+          <PartnerText style={styles.subtitle} numberOfLines={1}>
+            {isVendor
+              ? 'Review new leads and dispatch your fleet.'
+              : 'Trips approved by your vendor appear here — accept to start.'}
+          </PartnerText>
+
           {isVendor ? (
-            <View style={styles.summaryCard}>
-              <View style={styles.summaryIcon}>
-                <Briefcase size={18} color="#2563EB" strokeWidth={2.2} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PartnerText style={styles.summaryTitle}>
-                  Jobs today: <PartnerText style={styles.summaryCount}>{summary.jobsToday}</PartnerText>
+            <View style={styles.summarySplitRow}>
+              <Pressable
+                onPress={() => setFilter('new')}
+                style={styles.summaryTile}
+                accessibilityRole="button"
+                accessibilityLabel="View new leads">
+                <View style={[styles.summaryTileIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Truck size={15} color="#2563EB" strokeWidth={2.2} />
+                </View>
+                <View style={styles.summaryTileCopy}>
+                  <PartnerText style={styles.summaryTileTitle}>New leads</PartnerText>
+                  <PartnerText style={styles.summaryTileMeta} numberOfLines={1}>
+                    Tap to review & assign
+                  </PartnerText>
+                </View>
+                <PartnerText style={[styles.summaryTileCount, { color: '#2563EB' }]}>
+                  {summary.open}
                 </PartnerText>
-                <PartnerText style={styles.summaryMeta}>
-                  <PartnerText style={styles.openMeta}>{summary.open} Open</PartnerText>
-                  {' · '}
-                  <PartnerText style={styles.progressMeta}>{summary.inProgress} In progress</PartnerText>
+              </Pressable>
+              <Pressable
+                onPress={() => setFilter('in_progress')}
+                style={styles.summaryTile}
+                accessibilityRole="button"
+                accessibilityLabel="View assigned jobs in progress">
+                <View style={[styles.summaryTileIcon, { backgroundColor: colors.goldLight }]}>
+                  <Navigation size={15} color={colors.primaryDark} strokeWidth={2.2} />
+                </View>
+                <View style={styles.summaryTileCopy}>
+                  <PartnerText style={styles.summaryTileTitle}>In progress</PartnerText>
+                  <PartnerText style={styles.summaryTileMeta} numberOfLines={1}>
+                    Assigned & underway
+                  </PartnerText>
+                </View>
+                <PartnerText style={[styles.summaryTileCount, { color: colors.primaryDark }]}>
+                  {summary.inProgress}
                 </PartnerText>
-              </View>
+              </Pressable>
             </View>
           ) : null}
 
@@ -611,6 +645,7 @@ export default function PartnerJobsScreen() {
         </View>
       }
       scrollable={false}
+      horizontalPadding={12}
       contentStyle={styles.content}>
       {!isDriver && !isVendor ? (
         <View style={styles.empty}>
@@ -631,6 +666,7 @@ export default function PartnerJobsScreen() {
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
+            style={styles.tabsScroll}
             contentContainerStyle={styles.tabsRow}>
             {tabs.map(tab => {
               const active = filter === tab.key;
@@ -651,7 +687,9 @@ export default function PartnerJobsScreen() {
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
           ) : (
             <ScrollView
+              style={styles.listScroll}
               contentContainerStyle={styles.list}
+              scrollIndicatorInsets={{ right: 0 }}
               refreshControl={
                 <RefreshControl refreshing={isRefetching} onRefresh={refetchAll} />
               }>
@@ -715,7 +753,7 @@ export default function PartnerJobsScreen() {
 
 const styles = StyleSheet.create({
   headerPad: {
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: 12,
     paddingBottom: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
@@ -724,61 +762,108 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
   },
-  headerCopy: { flex: 1 },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   bellBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    color: colors.dark,
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.extrabold,
-  },
-  brandRace: {
-    color: colors.dark,
-    fontSize: 17,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 0.5,
-  },
-  brandPartner: {
-    color: colors.primary,
-    fontSize: 9,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 2.5,
-  },
   subtitle: {
-    marginTop: 6,
     color: colors.grey,
     fontSize: typography.sizes.xs,
     lineHeight: 15,
+    marginTop: -2,
+  },
+  addDriverBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  addDriverLabel: {
+    color: '#0369A1',
+    fontWeight: typography.weights.bold,
+    fontSize: 11,
+    lineHeight: 14,
   },
   addVehicleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: colors.primary,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
   },
   addVehicleLabel: {
+    color: '#92400E',
+    fontWeight: typography.weights.bold,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  btnPressed: {
+    opacity: 0.75,
+  },
+  summarySplitRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  summaryTile: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+  },
+  summaryTileIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  summaryTileCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  summaryTileCount: {
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.extrabold,
+  },
+  summaryTileTitle: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.sm,
+  },
+  summaryTileMeta: {
+    color: colors.grey,
+    fontSize: 10,
+    marginTop: 1,
   },
   summaryCard: {
     flexDirection: 'row',
@@ -812,19 +897,34 @@ const styles = StyleSheet.create({
   },
   openMeta: { color: '#2563EB', fontWeight: typography.weights.semibold },
   progressMeta: { color: colors.primaryDark, fontWeight: typography.weights.semibold },
-  content: { flexGrow: 1 },
-  tabsRow: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    gap: 6,
+  content: { flex: 1 },
+  tabsScroll: {
     flexGrow: 0,
     flexShrink: 0,
-    alignItems: 'flex-start',
+  },
+  tabsRow: {
+    paddingHorizontal: 0,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.sm,
+    gap: 6,
+    flexDirection: 'row',
+    flexWrap: 'nowrap',
+    alignItems: 'center',
+  },
+  listScroll: { flex: 1 },
+  list: {
+    paddingHorizontal: 0,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xxl,
+    gap: spacing.md,
+    backgroundColor: PAGE_BG,
   },
   tab: {
-    height: 28,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
+    height: 30,
+    flexGrow: 0,
+    flexShrink: 0,
+    borderRadius: 8,
+    paddingHorizontal: 12,
     paddingVertical: 0,
     alignItems: 'center',
     justifyContent: 'center',
@@ -842,12 +942,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   tabTextActive: { color: colors.dark },
-  list: {
-    paddingHorizontal: spacing.xl,
-    paddingBottom: spacing.xxl,
-    gap: spacing.md,
-    backgroundColor: PAGE_BG,
-  },
   sectionHeading: {
     color: colors.dark,
     fontWeight: typography.weights.extrabold,

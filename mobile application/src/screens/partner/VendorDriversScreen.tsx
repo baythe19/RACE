@@ -1,9 +1,11 @@
 import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ArrowLeft,
   BadgeCheck,
+  Car,
+  Check,
   CheckCircle2,
   ChevronDown,
   Eye,
@@ -27,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FormField from '../../components/auth/FormField';
 import PartnerDocumentUploadList, {
   type PartnerDocumentFieldConfig,
+  type PartnerDocumentUploadState,
 } from '../../components/partner/PartnerDocumentUploadList';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { useAppSelector } from '../../redux/hooks';
@@ -50,12 +53,11 @@ import type { PartnerAccountStackParamList } from '../../types/partnerNavigation
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
 import { colors, radius, spacing, typography } from '../../theme';
 
-type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'VendorDrivers'>;
+type Props = { navigation?: any; route?: any };
 
 const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
 const INFO_BLUE = '#2563EB';
-const PAGE_SIZE = 5;
 
 const DRIVER_TYPES = ['Tow Driver', 'Full-Time', 'Part-Time'] as const;
 
@@ -162,7 +164,7 @@ function driverUiStatus(driver: FleetDriver): {
   };
 }
 
-export default function VendorDriversScreen({ navigation }: Props) {
+export default function VendorDriversScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const user = useAppSelector(state => state.auth.user);
   const isVendor = user?.role === 'vendor';
@@ -194,6 +196,8 @@ export default function VendorDriversScreen({ navigation }: Props) {
   const [docUploadFailures, setDocUploadFailures] = useState<string[]>([]);
   const [createdDriverId, setCreatedDriverId] = useState<string | null>(null);
   const [isSavingDriver, setIsSavingDriver] = useState(false);
+  const [documentUploadStates, setDocumentUploadStates] = useState<Record<string, PartnerDocumentUploadState>>({});
+  const driverDetailsLocked = isSavingDriver || createdDriverId !== null;
   const savingDriverRef = useRef(false);
   const [newVehicleReg, setNewVehicleReg] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState<FleetDriver | null>(null);
@@ -202,12 +206,20 @@ export default function VendorDriversScreen({ navigation }: Props) {
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [page, setPage] = useState(1);
   const [menuDriver, setMenuDriver] = useState<FleetDriver | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<FleetDriver | null>(null);
   const [newPassword, setNewPassword] = useState('');
 
   const phoneDigits = phone.replace(/\D/g, '');
+
+  const selectDocument = (id: string, uri: string, fileName: string, mimeType?: string) => {
+    const group = VENDOR_DRIVER_DOCUMENTS.find(document => document.id === id || document.alternatives?.some(option => option.id === id));
+    const replacedIds = [id, ...(group?.alternatives?.map(option => option.id) ?? [])];
+    const label = documentLabelFor(id);
+    setDriverDocuments(previous => [...previous.filter(document => !replacedIds.includes(document.id)), { id, label, uri, name: fileName, mimeType }]);
+    setDocumentUploadStates(previous => Object.fromEntries(Object.entries(previous).filter(([key]) => !replacedIds.includes(key))));
+    setDocUploadFailures(previous => previous.filter(failed => !replacedIds.some(key => documentLabelFor(key) === failed)));
+  };
 
   const generateLoginId = () => {
     const namePart = name
@@ -231,7 +243,10 @@ export default function VendorDriversScreen({ navigation }: Props) {
     }
     if (password.length < 6) next.password = 'Password must be at least 6 characters';
     setErrors(next);
-    if (Object.keys(next).length === 0) setFormStep(2);
+    if (Object.keys(next).length === 0) {
+      Keyboard.dismiss();
+      setFormStep(2);
+    }
   };
 
   const vehicleByReg = useMemo(() => {
@@ -280,12 +295,6 @@ export default function VendorDriversScreen({ navigation }: Props) {
     return list;
   }, [drivers, search, statusFilter]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-  const showingFrom = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
-  const showingTo = Math.min(currentPage * PAGE_SIZE, filtered.length);
-
   const validate = () => {
     const next: Record<string, string> = {};
     if (name.trim().length < 2) next.name = 'Enter driver full name';
@@ -307,15 +316,24 @@ export default function VendorDriversScreen({ navigation }: Props) {
   };
 
   const onToggleForm = () => {
+    if (savingDriverRef.current) return;
     if (!isApproved) {
       Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
       return;
     }
     if (showForm) {
-      setShowForm(false);
-      navigation.setParams({ fullScreen: false });
-      setFormStep(1);
-      resetForm();
+      const leaveForm = () => {
+        setShowForm(false);
+        navigation.setParams({ fullScreen: false });
+        setFormStep(1);
+        resetForm();
+      };
+      if (createdDriverId && docUploadFailures.length) {
+        Alert.alert('Leave unfinished uploads?', 'The driver account is already saved, but some documents have not uploaded.', [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', onPress: leaveForm },
+        ]);
+      } else leaveForm();
     } else {
       setShowForm(true);
       navigation.setParams({ fullScreen: true });
@@ -334,6 +352,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
     setNewVehicleReg(null);
     setDriverDocuments([]);
     setDocUploadFailures([]);
+    setDocumentUploadStates({});
     setCreatedDriverId(null);
     setShowPassword(false);
     setShowVehicleOptions(false);
@@ -379,15 +398,24 @@ export default function VendorDriversScreen({ navigation }: Props) {
 
       const failedDocs: string[] = [];
       for (const doc of driverDocuments) {
+        if (documentUploadStates[doc.id]?.status === 'uploaded') continue;
+        setDocumentUploadStates(previous => ({ ...previous, [doc.id]: { status: 'uploading' } }));
         try {
           await uploadVendorDriverDocument(created.id, doc.id, {
             uri: doc.uri,
             name: doc.name,
             mimeType: doc.mimeType ?? 'image/jpeg',
+          }, (loaded, total) => {
+            setDocumentUploadStates(previous => ({
+              ...previous,
+              [doc.id]: { status: 'uploading', progress: total && total > 0 ? Math.min(100, Math.round(loaded * 100 / total)) : undefined },
+            }));
           });
+          setDocumentUploadStates(previous => ({ ...previous, [doc.id]: { status: 'uploaded', progress: 100 } }));
         } catch {
           // Keep the driver; the failed upload can be re-attempted.
           failedDocs.push(doc.label);
+          setDocumentUploadStates(previous => ({ ...previous, [doc.id]: { status: 'error' } }));
         }
       }
       setDocUploadFailures(failedDocs);
@@ -406,6 +434,11 @@ export default function VendorDriversScreen({ navigation }: Props) {
         return;
       }
 
+      if (failedDocs.length) {
+        Alert.alert('Uploads incomplete', 'The driver account is saved. Retry the failed document uploads to finish.');
+        return;
+      }
+
       Alert.alert(
         failedDocs.length ? 'Driver added � some documents failed' : 'Vendor driver added',
         failedDocs.length
@@ -416,7 +449,6 @@ export default function VendorDriversScreen({ navigation }: Props) {
       setShowForm(false);
       navigation.setParams({ fullScreen: false });
       setFormStep(1);
-      setPage(1);
     } catch (error) {
       Alert.alert('Could not add', getApiErrorMessage(error, 'Add driver failed'));
     } finally {
@@ -509,13 +541,22 @@ export default function VendorDriversScreen({ navigation }: Props) {
   return (
     <AppScreenLayout
       backgroundColor={PAGE_BG}
-      horizontalPadding={16}
-      keyboardAvoiding
+      horizontalPadding={12}
+      keyboardAvoiding={showForm}
+      keyboardDismissMode="on-drag"
       scrollable
       footer={showForm ? (
         <View style={[styles.formFooter, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-          <Pressable onPress={onToggleForm} disabled={isSavingDriver} style={styles.cancelButton}>
-            <PartnerText style={styles.cancelLabel}>Cancel</PartnerText>
+          <Pressable
+            testID="vendorDriverBack"
+            onPress={() => {
+              Keyboard.dismiss();
+              if (formStep === 2) setFormStep(1);
+              else onToggleForm();
+            }}
+            disabled={isSavingDriver}
+            style={styles.cancelButton}>
+            <PartnerText style={styles.cancelLabel}>Back</PartnerText>
           </Pressable>
           <Pressable
             testID={formStep === 1 ? 'vendorDriverContinue' : 'vendorDriverSave'}
@@ -537,33 +578,52 @@ export default function VendorDriversScreen({ navigation }: Props) {
       header={
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
-            <Pressable
-              onPress={() => {
-                if (showForm) onToggleForm();
-                else if (navigation.canGoBack()) navigation.goBack();
-                else navigation.navigate('PartnerAccountMain');
-              }}
-              hitSlop={10}
-              style={[styles.formBackButton, !showForm && styles.listBackButton]}
-              accessibilityRole="button"
-              accessibilityLabel={showForm ? 'Back to drivers' : 'Back'}>
-              <ArrowLeft size={20} color={colors.dark} />
-            </Pressable>
+            {showForm || navigation?.canGoBack?.() ? (
+              <Pressable
+                onPress={() => {
+                  Keyboard.dismiss();
+                  if (showForm && formStep === 2) setFormStep(1);
+                  else if (showForm) onToggleForm();
+                  else if (navigation?.canGoBack?.()) navigation.goBack();
+                }}
+                disabled={isSavingDriver}
+                hitSlop={10}
+                style={styles.formBackButton}
+                accessibilityRole="button"
+                accessibilityLabel={showForm && formStep === 2 ? 'Back to driver details' : showForm ? 'Back to drivers' : 'Back'}>
+                <ArrowLeft size={20} color={colors.dark} />
+              </Pressable>
+            ) : null}
             <View style={{ flex: 1 }}>
-              <PartnerText style={[styles.title, showForm && styles.formPageTitle]}>
+              <PartnerText style={[styles.title, (showForm || navigation?.canGoBack?.()) ? styles.titleWithBack : styles.titleRoot]}>
                 {showForm ? 'Add driver' : 'Drivers'}
               </PartnerText>
-              {showForm ? <PartnerText style={styles.subtitle}>
-                {formStep === 1 ? 'Create an account for a driver in your fleet.' : 'Upload clear, readable files for review.'}
-              </PartnerText> : null}
+              {showForm ? (
+                <PartnerText style={styles.subtitle}>
+                  {formStep === 1 ? 'Create an account for a driver in your fleet.' : 'Upload clear, readable files for review.'}
+                </PartnerText>
+              ) : null}
             </View>
             {!showForm ? (
-              <Pressable
-                onPress={onToggleForm}
-                style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}>
-                <Plus size={16} color={colors.dark} strokeWidth={2.6} />
-                <PartnerText style={styles.addLabel}>Add driver</PartnerText>
-              </Pressable>
+              <View style={styles.headerRightActions}>
+                <Pressable
+                  testID="vendorDriversVehiclesBtn"
+                  onPress={() => navigation?.navigate?.('VendorVehicles')}
+                  style={({ pressed }) => [styles.headerVehicleBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="View vehicles">
+                  <Car size={13} color="#92400E" strokeWidth={2.4} />
+                  <PartnerText style={styles.headerVehicleLabel}>Vehicles</PartnerText>
+                </Pressable>
+                <Pressable
+                  onPress={onToggleForm}
+                  style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Add driver">
+                  <Plus size={15} color={colors.dark} strokeWidth={2.6} />
+                  <PartnerText style={styles.addLabel}>Add driver</PartnerText>
+                </Pressable>
+              </View>
             ) : <View style={{ width: 34 }} />}
           </View>
         </View>
@@ -577,26 +637,34 @@ export default function VendorDriversScreen({ navigation }: Props) {
 
         {showForm && isApproved ? (
           <View style={styles.formCard}>
-            <View style={styles.progressTrack}>
+            <View
+              style={styles.progressTrack}
+              accessibilityRole="progressbar"
+              accessibilityLabel="Add driver step"
+              accessibilityValue={{ min: 1, max: 2, now: formStep }}>
               <View style={styles.progressRail} />
               <View style={[styles.progressFill, formStep === 2 && styles.progressComplete]} />
-              <View style={[styles.progressStep, formStep === 2 && styles.progressStepDone]}>
-                <PartnerText style={styles.progressStepText}>{formStep === 2 ? '?' : '1'}</PartnerText>
+              <View style={styles.progressStep}>
+                {formStep === 2 ? <Check size={14} color={colors.dark} strokeWidth={3} /> :
+                  <PartnerText style={styles.progressStepText}>1</PartnerText>}
               </View>
               <View style={[styles.progressStep, styles.progressStepEnd, formStep === 2 && styles.progressStepDone]}>
-                <PartnerText style={styles.progressStepText}>{formStep === 2 ? '2' : '2'}</PartnerText>
+                <PartnerText style={styles.progressStepText}>2</PartnerText>
               </View>
             </View>
-            <PartnerText style={styles.stepCaption}>
-              {formStep === 1 ? 'Driver details � 1 of 2' : 'Driver documents � 2 of 2'}
-            </PartnerText>
 
             {formStep === 1 ? (
               <>
+                {createdDriverId ? <View style={styles.docInfoBanner}>
+                  <PartnerText style={styles.docInfoText}>Driver account saved. Continue to documents to finish the uploads.</PartnerText>
+                </View> : null}
                 <FormField
                   compact scale={0.9}
+                  editable={!driverDetailsLocked}
                   testID="vendorDriverFullName"
                   label="Full name"
+                  autoCapitalize="words"
+                  textContentType="name"
                   required
                   Icon={User}
                   value={name}
@@ -609,6 +677,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
                 />
                 <FormField
                   compact scale={0.9}
+                  editable={!driverDetailsLocked}
                   testID="vendorDriverMobile"
                   label="Mobile"
                   required
@@ -625,6 +694,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
                 />
                 <FormField
                   compact scale={0.9}
+                  editable={!driverDetailsLocked}
                   testID="vendorDriverLicence"
                   label="Driving licence number"
                   required
@@ -643,6 +713,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
                   {DRIVER_TYPES.map(type => (
                     <Pressable
                       key={type}
+                      disabled={driverDetailsLocked}
                       onPress={() => setDriverType(type)}
                       style={[styles.typeChip, driverType === type && styles.typeChipActive]}>
                       <PartnerText
@@ -655,6 +726,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
 
                 <PartnerText style={styles.typeLabel}>Assigned vehicle (Optional)</PartnerText>
                 <Pressable
+                  disabled={driverDetailsLocked}
                   onPress={() => setShowVehicleOptions(value => !value)}
                   style={styles.selectField}>
                   <Truck size={17} color={colors.grey} />
@@ -663,7 +735,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
                   </PartnerText>
                   <ChevronDown size={17} color={colors.grey} />
                 </Pressable>
-                {showVehicleOptions ? (
+                {showVehicleOptions && !driverDetailsLocked ? (
                   <View style={styles.vehicleOptions}>
                     <Pressable
                       onPress={() => {
@@ -690,12 +762,13 @@ export default function VendorDriversScreen({ navigation }: Props) {
                 ) : null}
                 <FormField
                   compact scale={0.9}
+                  editable={!driverDetailsLocked}
                   testID="vendorDriverLoginId"
                   label="Login ID"
                   required
                   Icon={KeyRound}
                   rightElement={(
-                    <Pressable onPress={generateLoginId} style={styles.generateButton}>
+                    <Pressable disabled={driverDetailsLocked} onPress={generateLoginId} style={styles.generateButton}>
                       <PartnerText style={styles.generateLabel}>Generate</PartnerText>
                     </Pressable>
                   )}
@@ -711,6 +784,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
                 />
                 <FormField
                   compact scale={0.9}
+                  editable={!driverDetailsLocked}
                   testID="vendorDriverPassword"
                   label="Password"
                   required
@@ -726,6 +800,10 @@ export default function VendorDriversScreen({ navigation }: Props) {
                     if (errors.password) setErrors(prev => ({ ...prev, password: '' }));
                   }}
                   secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  returnKeyType="done"
+                  onSubmitEditing={continueToDocuments}
                   placeholder="Minimum 6 characters"
                   error={errors.password}
                 />
@@ -746,11 +824,10 @@ export default function VendorDriversScreen({ navigation }: Props) {
                     hideTitle
                     documents={REQUIRED_DRIVER_DOCUMENTS}
                     uploadedIds={driverDocuments.map(d => d.id)}
-                    onUpload={(id, uri, fileName, mimeType) => {
-                      const label = documentLabelFor(id);
-                      setDriverDocuments(prev => [...prev.filter(d => d.id !== id), { id, label, uri, name: fileName, mimeType }]);
-                      setDocUploadFailures(prev => prev.filter(f => f !== label));
-                    }}
+                    selectedFiles={driverDocuments}
+                    uploadStates={documentUploadStates}
+                    disabled={isSavingDriver}
+                    onUpload={selectDocument}
                   />
                 </View>
 
@@ -763,11 +840,10 @@ export default function VendorDriversScreen({ navigation }: Props) {
                     hideTitle
                     documents={OPTIONAL_DRIVER_DOCUMENTS}
                     uploadedIds={driverDocuments.map(d => d.id)}
-                    onUpload={(id, uri, fileName, mimeType) => {
-                      const label = documentLabelFor(id);
-                      setDriverDocuments(prev => [...prev.filter(d => d.id !== id), { id, label, uri, name: fileName, mimeType }]);
-                      setDocUploadFailures(prev => prev.filter(f => f !== label));
-                    }}
+                    selectedFiles={driverDocuments}
+                    uploadStates={documentUploadStates}
+                    disabled={isSavingDriver}
+                    onUpload={selectDocument}
                   />
                 </View>
 
@@ -779,11 +855,6 @@ export default function VendorDriversScreen({ navigation }: Props) {
                   </PartnerText>
                 </View>
 
-                <Pressable
-                  onPress={() => setFormStep(1)}
-                  style={styles.backStepLink}>
-                  <PartnerText style={styles.backStepText}>�  Back to details</PartnerText>
-                </Pressable>
               </>
             )}
           </View>
@@ -822,10 +893,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
           <Search size={16} color={colors.grey} strokeWidth={2.2} />
           <PartnerTextInput
             value={search}
-            onChangeText={text => {
-              setSearch(text);
-              setPage(1);
-            }}
+            onChangeText={setSearch}
             placeholder="Search by name, mobile or vehicle"
             placeholderTextColor={colors.textMuted}
             style={styles.searchInput}
@@ -842,10 +910,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
           ] as Array<[StatusFilter, string]>).map(([key, label]) => (
             <Pressable
               key={key}
-              onPress={() => {
-                setStatusFilter(key);
-                setPage(1);
-              }}
+              onPress={() => setStatusFilter(key)}
               style={[styles.filterPill, statusFilter === key && styles.filterPillActive]}>
               <PartnerText style={[styles.filterText, statusFilter === key && styles.filterTextActive]}>
                 {label}
@@ -856,7 +921,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
 
         {isLoading || vendorLoading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
-        ) : pageItems.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.iconWrap}>
               <Users size={36} color={colors.primary} strokeWidth={2} />
@@ -867,7 +932,7 @@ export default function VendorDriversScreen({ navigation }: Props) {
             </PartnerText>
           </View>
         ) : (
-          pageItems.map(driver => {
+          filtered.map(driver => {
             const ui = driverUiStatus(driver);
             const vehicle = vehicleByReg.get(normalizeReg(driver.vehicleRegistration));
             const plate = formatPlate(driver.vehicleRegistration);
@@ -897,15 +962,23 @@ export default function VendorDriversScreen({ navigation }: Props) {
                       <PartnerText style={styles.metaText}>{formatPhone(driver.phone)}</PartnerText>
                     </View>
                     <PartnerText style={styles.loginLine}>Login ID: {driver.loginId || '�'}</PartnerText>
-                    <View style={styles.compactVehicleBlock}>
-                      <Truck size={14} color={colors.grey} />
+                    <Pressable
+                      onPress={() => setLinkTarget(driver)}
+                      style={styles.compactVehicleBlock}
+                      accessibilityRole="button"
+                      accessibilityLabel={plate ? `Assigned vehicle ${plate}, tap to change` : 'No vehicle assigned, tap to assign vehicle'}>
+                      <Truck size={14} color={plate ? '#D97706' : colors.grey} />
                       <View style={{ flex: 1 }}>
-                        <PartnerText style={styles.vehiclePlate}>{plate || 'Not assigned'}</PartnerText>
-                        {plate ? <PartnerText style={styles.vehicleModel} numberOfLines={1}>
-                          {vehicle ? `${vehicle.model} � ${vehicle.type}` : driver.driverType}
-                        </PartnerText> : null}
+                        <PartnerText style={[styles.vehiclePlate, !plate && styles.vehiclePlateUnassigned]}>
+                          {plate || 'Assign vehicle →'}
+                        </PartnerText>
+                        {plate ? (
+                          <PartnerText style={styles.vehicleModel} numberOfLines={1}>
+                            {vehicle ? `${vehicle.model} • ${vehicle.type}` : driver.driverType}
+                          </PartnerText>
+                        ) : null}
                       </View>
-                    </View>
+                    </Pressable>
                   </View>
 
                   <Pressable
@@ -921,43 +994,6 @@ export default function VendorDriversScreen({ navigation }: Props) {
           })
         )}
 
-        {filtered.length > 0 ? (
-          <View style={styles.pagination}>
-            <PartnerText style={styles.pageMeta}>
-              Showing {showingFrom} to {showingTo} of {filtered.length} drivers
-            </PartnerText>
-            <View style={styles.pageControls}>
-              <Pressable
-                disabled={currentPage <= 1}
-                onPress={() => setPage(p => Math.max(1, p - 1))}
-                style={[styles.pageBtn, currentPage <= 1 && styles.pageBtnDisabled]}>
-                <PartnerText style={styles.pageBtnText}>�</PartnerText>
-              </Pressable>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .slice(0, 4)
-                .map(num => (
-                  <Pressable
-                    key={num}
-                    onPress={() => setPage(num)}
-                    style={[styles.pageBtn, num === currentPage && styles.pageBtnActive]}>
-                    <PartnerText
-                      style={[
-                        styles.pageBtnText,
-                        num === currentPage && styles.pageBtnTextActive,
-                      ]}>
-                      {String(num)}
-                    </PartnerText>
-                  </Pressable>
-                ))}
-              <Pressable
-                disabled={currentPage >= totalPages}
-                onPress={() => setPage(p => Math.min(totalPages, p + 1))}
-                style={[styles.pageBtn, currentPage >= totalPages && styles.pageBtnDisabled]}>
-                <PartnerText style={styles.pageBtnText}>�</PartnerText>
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
           </>
         ) : null}
       </View>
@@ -1156,6 +1192,40 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.extrabold,
     textAlign: 'center',
   },
+  titleRoot: {
+    textAlign: 'left',
+    fontSize: 20,
+    fontWeight: typography.weights.extrabold,
+    color: colors.dark,
+  },
+  titleWithBack: {
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: typography.weights.extrabold,
+    color: colors.dark,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerVehicleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: radius.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  headerVehicleLabel: {
+    color: '#92400E',
+    fontWeight: typography.weights.bold,
+    fontSize: 11,
+    lineHeight: 14,
+  },
   subtitle: {
     marginTop: spacing.xs,
     color: colors.grey,
@@ -1169,13 +1239,18 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.primary,
     borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   addLabel: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.sm,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  vehiclePlateUnassigned: {
+    color: INFO_BLUE,
+    fontWeight: '700',
   },
   content: {
     gap: 10,
@@ -1537,42 +1612,6 @@ const styles = StyleSheet.create({
     color: colors.grey,
     fontSize: 10,
   },
-  pagination: {
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-  },
-  pageMeta: {
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-  },
-  pageControls: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    flexWrap: 'wrap',
-  },
-  pageBtn: {
-    minWidth: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  pageBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  pageBtnDisabled: { opacity: 0.4 },
-  pageBtnText: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  pageBtnTextActive: {
-    color: colors.dark,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
@@ -1612,20 +1651,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
-    marginBottom: 8,
+    marginBottom: 16,
     position: 'relative',
   },
   progressRail: { position: 'absolute', left: 12, right: 12, height: 2, backgroundColor: '#E5E7EB' },
-  stepCaption: { color: colors.grey, fontSize: 11, textAlign: 'center', marginBottom: 14 },
   progressFill: {
     position: 'absolute',
     left: 12,
-    width: '48%',
+    width: 60,
     height: 2,
     backgroundColor: colors.primary,
   },
   progressComplete: {
-    width: '96%',
+    width: 120,
   },
   progressStep: {
     width: 24,
@@ -1660,12 +1698,6 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: radius.pill,
     overflow: 'hidden',
-  },
-  backStepLink: { alignSelf: 'flex-start', paddingVertical: spacing.xs },
-  backStepText: {
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
   },
   assignHint: {
     color: colors.grey,

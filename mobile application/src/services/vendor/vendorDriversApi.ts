@@ -163,6 +163,7 @@ export async function uploadVendorDriverDocument(
   driverId: string,
   documentType: string,
   file: { uri: string; name: string; mimeType: string },
+  onProgress?: (loaded: number, total?: number) => void,
 ): Promise<VendorDriver> {
   try {
     const formData = new FormData();
@@ -184,6 +185,7 @@ export async function uploadVendorDriverDocument(
       API_ENDPOINTS.vendorDriverUploadDocument(driverId),
       formData,
       {
+        onUploadProgress: onProgress ? ({ loaded, total }) => onProgress(loaded, total) : undefined,
         headers: {
           'Content-Type': 'multipart/form-data',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),

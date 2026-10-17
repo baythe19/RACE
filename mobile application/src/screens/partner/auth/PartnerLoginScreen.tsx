@@ -135,6 +135,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
   const handleSendOtp = async () => {
     setError('');
+    setVendorDriverCta(false);
 
     let phoneToUse = mobileNumber;
     if (isUiTestPermissiveMode() && !phoneToUse) {
@@ -375,9 +376,10 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                     testID="partnerLoginMobile"
                     value={mobileNumber}
                     onChangeText={(text) => {
-                      setMobileNumber(text.replace(/\D/g, '').slice(0, 10));
-                      if (error) setError('');
-                    }}
+                    setMobileNumber(text.replace(/\D/g, '').slice(0, 10));
+                    if (error) setError('');
+                    if (vendorDriverCta) setVendorDriverCta(false);
+                  }}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
                     keyboardType="phone-pad"

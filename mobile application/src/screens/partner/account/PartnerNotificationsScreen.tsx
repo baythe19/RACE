@@ -24,7 +24,7 @@ import type { PartnerNotificationItem } from '../../../services/notificationServ
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerNotifications'>;
 
-type CategoryFilter = 'All' | 'Job Updates' | 'Account' | 'Earnings';
+type CategoryFilter = 'All' | 'Job Updates' | 'Drivers & Vehicles' | 'Account' | 'Earnings';
 
 export default function PartnerNotificationsScreen({ navigation }: Props) {
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
@@ -33,19 +33,32 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
   const markReadMutation = useMarkNotificationReadMutation();
 
   const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? notifications.filter(n => !n.isRead).length;
 
   const filteredNotifications = useMemo(() => {
     if (activeFilter === 'All') return notifications;
     if (activeFilter === 'Job Updates') {
       return notifications.filter(
-        n => n.type === 'JOB_OFFER' || n.type === 'BOOKING_UPDATE',
+        n => n.type === 'JOB_OFFER' || n.type === 'BOOKING_UPDATE' || n.type === 'BOOKING_CONFIRMED' || n.type === 'BOOKING_COMPLETED',
+      );
+    }
+    if (activeFilter === 'Drivers & Vehicles') {
+      return notifications.filter(
+        n =>
+          n.type === 'DRIVER_ACTIVITY' ||
+          n.type === 'VEHICLE_ACTIVITY' ||
+          n.metadata?.entityType === 'driver' ||
+          n.metadata?.entityType === 'vehicle' ||
+          n.title?.toLowerCase().includes('driver') ||
+          n.title?.toLowerCase().includes('vehicle') ||
+          n.title?.toLowerCase().includes('assigned'),
       );
     }
     if (activeFilter === 'Account') {
-      return notifications.filter(n => n.type === 'ACCOUNT');
+      return notifications.filter(n => n.type === 'ACCOUNT' || n.type === 'SERVICE_RATING');
     }
     if (activeFilter === 'Earnings') {
-      return notifications.filter(n => n.type === 'PAYMENT');
+      return notifications.filter(n => n.type === 'PAYMENT' || n.type === 'PAYMENT_SUCCESS');
     }
     return notifications;
   }, [notifications, activeFilter]);
@@ -151,7 +164,7 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
 
   return (
     <PartnerScreenLayout
-      title="Notifications"
+      title={unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications'}
       onBack={() => navigation.goBack()}
       headerRight={
         <Pressable
@@ -171,7 +184,7 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
       }>
       {/* Category Filter Chips */}
       <View style={styles.filterRow}>
-        {(['All', 'Job Updates', 'Account', 'Earnings'] as CategoryFilter[]).map(cat => {
+        {(['All', 'Job Updates', 'Drivers & Vehicles', 'Account', 'Earnings'] as CategoryFilter[]).map(cat => {
           const isSelected = activeFilter === cat;
           return (
             <Pressable
@@ -238,10 +251,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     marginBottom: 16,
-    flexWrap: 'wrap',
   },
   filterChip: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: driverRadius.pill,
     backgroundColor: driverColors.light,
@@ -253,7 +265,7 @@ const styles = StyleSheet.create({
     borderColor: driverColors.amber,
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: driverColors.grey,
   },

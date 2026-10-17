@@ -24,6 +24,7 @@ export type VendorBookingItem = {
   dropoff?: { label?: string; address?: string; latitude?: number; longitude?: number } | null;
   estimatedFare?: number;
   finalFare?: number;
+  distanceKm?: number;
   createdAt: string;
   scheduledAt?: string;
   serviceLabel: string;

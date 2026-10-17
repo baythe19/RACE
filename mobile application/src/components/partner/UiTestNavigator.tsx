@@ -29,6 +29,7 @@ import { ensureMockDriverActiveJob } from '../../data/mockPartnerData';
 import {
   jumpToDriverVerificationGate,
   jumpToPartnerAccountScreen,
+  jumpToPartnerJobsScreen,
   jumpToPartnerAuth,
   jumpToPartnerMainTab,
   jumpToPartnerRegistration,
@@ -308,7 +309,7 @@ export default function UiTestNavigator() {
                   sub="Select vehicle & dispatch to driver"
                   onPress={() =>
                     ensureVendorAndNavigate(() =>
-                      jumpToPartnerAccountScreen('VendorAssignJob', {
+                      jumpToPartnerJobsScreen('VendorAssignJob', {
                         bookingId: 'lead-101',
                         bookingType: 'towing',
                         bookingNumber: 'TOW-10048',
@@ -320,11 +321,11 @@ export default function UiTestNavigator() {
                   }
                 />
                 <JumpRow
-                  label="8. Manage Drivers"
+                  label="8. Manage Drivers (Tab)"
                   sub="Fleet driver roster & credentials"
                   onPress={() =>
                     ensureVendorAndNavigate(() =>
-                      jumpToPartnerAccountScreen('VendorDrivers'),
+                      jumpToPartnerMainTab('PartnerDrivers'),
                     )
                   }
                 />

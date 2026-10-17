@@ -16,6 +16,7 @@
 import { env } from '../../config/env';
 import { AppError, TooManyRequestsError } from '../../utils/src/errors';
 import { generateOtp } from '../../utils/src/otp';
+import { createHash } from 'crypto';
 import {
   OTP_EXPIRED_USER_MESSAGE,
   isMcConfigured,
@@ -23,7 +24,14 @@ import {
   mcSendOtp,
   mcValidateOtp,
 } from '../../utils/src/sms';
+import { hanuSendOtp, isHanuConfigured, hanuRoles } from '../../utils/src/hanuSms';
 import { authRepository } from './authRepository';
+
+/** sha256(otp + pepper) — raw OTP digits are never stored for the hanu route. */
+function hashOtp(otp: string): string {
+  const pepper = env.OTP_PEPPER ?? `race-otp::${env.MC_AUTH_TOKEN ?? 'local-dev'}`;
+  return createHash('sha256').update(`${otp}:${pepper}`).digest('hex');
+}
 
 export class OtpService {
   private getExpiryDate(): Date {
@@ -36,6 +44,17 @@ export class OtpService {
       return false;
     }
     return isMcConfigured();
+  }
+
+  /** Which SMS route handles this role? hanu → messagecentral → local-dev. */
+  private pickProvider(role?: string): 'hanu' | 'messagecentral' | 'local' {
+    if (process.env.FORCE_MOCK_OTP !== 'true' && isHanuConfigured() && role && hanuRoles().has(role)) {
+      return 'hanu';
+    }
+    if (this.useMc) {
+      return 'messagecentral';
+    }
+    return 'local';
   }
 
   private async assertResendAllowed(mobileNumber: string): Promise<void> {
@@ -53,11 +72,37 @@ export class OtpService {
 
   async sendOtp(
     mobileNumber: string,
+    role?: string,
   ): Promise<{ message: string; expiresIn: number; devOtp?: string }> {
     await this.assertResendAllowed(mobileNumber);
     await authRepository.invalidatePendingOtps(mobileNumber);
 
-    if (this.useMc) {
+    const provider = this.pickProvider(role);
+
+    if (provider === 'hanu') {
+      // ─── HanuOTP route (we generate the code; Hanu only delivers it) ─────
+      const mobileOtp = generateOtp();
+      await hanuSendOtp(mobileNumber, mobileOtp);
+
+      await authRepository.createOtpLog({
+        mobileNumber,
+        otpHash: hashOtp(mobileOtp),
+        mobileOtpExpiry: this.getExpiryDate(),
+        mobileVerified: false,
+        emailVerified: false,
+        mobileAttempts: 0,
+        emailAttempts: 0,
+        provider: 'hanu',
+      });
+
+      return {
+        message: 'OTP sent to your mobile number',
+        expiresIn: env.OTP_EXPIRY_SECONDS,
+        // No devOtp on the hanu route — production semantics.
+      };
+    }
+
+    if (provider === 'messagecentral') {
       // ─── MessageCentral production path ────────────────────────────────
       const { verificationId } = await mcSendOtp(mobileNumber);
 
@@ -70,6 +115,7 @@ export class OtpService {
         mobileAttempts: 0,
         emailAttempts: 0,
         mcVerificationId: verificationId,
+        provider: 'messagecentral',
       });
 
       return {
@@ -127,7 +173,7 @@ export class OtpService {
     }
 
     // ─── MessageCentral server-side verification ──────────────────────────
-    if (this.useMc && log.mcVerificationId) {
+    if (log.provider === 'messagecentral' && log.mcVerificationId) {
       try {
         const correct = await mcValidateOtp(mobileNumber, log.mcVerificationId, otp);
 
@@ -149,6 +195,19 @@ export class OtpService {
         }
         throw error;
       }
+    }
+
+    // ─── HanuOTP route: OTP digits live only as a peppered hash ───────────
+    if (log.provider === 'hanu') {
+      if (!log.otpHash || hashOtp(otp) !== log.otpHash) {
+        log.mobileAttempts += 1;
+        await log.save();
+        throw new AppError('Incorrect code. Check the SMS and try again.', 400);
+      }
+
+      log.mobileVerified = true;
+      await log.save();
+      return;
     }
 
     // ─── Dev / mock verification ──────────────────────────────────────────

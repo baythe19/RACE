@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View,
   type StyleProp,
+  type ScrollViewProps,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-area-context';
@@ -20,6 +21,7 @@ type Props = {
   children: ReactNode;
   scrollable?: boolean;
   keyboardAvoiding?: boolean;
+  keyboardDismissMode?: ScrollViewProps['keyboardDismissMode'];
   horizontalPadding?: number;
   contentStyle?: StyleProp<ViewStyle>;
   backgroundColor?: string;
@@ -34,6 +36,7 @@ export default function AppScreenLayout({
   children,
   scrollable = true,
   keyboardAvoiding = false,
+  keyboardDismissMode = 'none',
   horizontalPadding,
   contentStyle,
   backgroundColor = colors.background,
@@ -43,13 +46,14 @@ export default function AppScreenLayout({
 }: Props) {
   const insets = useSafeAreaInsets();
   const px = useScreenPx();
-  const paddingX = horizontalPadding ?? px(20);
+  const paddingX = horizontalPadding ?? 12;
 
   const body = scrollable ? (
     <ScrollView
       style={styles.flex}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={keyboardDismissMode}
       refreshControl={
         onRefresh ? (
           <RefreshControl
