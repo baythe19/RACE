@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
+import { readAccessToken } from './api';
 
 let socket: Socket | null = null;
 
@@ -16,6 +17,12 @@ export function connectSocket(): Socket {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 2000,
+    // BUG-03/P0.3: backend rejects unauthenticated handshakes — send the
+    // stored user access token; reconnects re-read it (fresh after refresh).
+    auth: async (cb) => {
+      const token = await readAccessToken();
+      cb({ token: token ?? '' });
+    },
   });
 
   socket.on('connect', () => {

@@ -46,6 +46,24 @@ export class VendorController {
     return sendSuccess(res, stats);
   });
 
+  getPayoutAccount = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const account = await vendorService.getPayoutAccount(user.id);
+    return sendSuccess(res, account);
+  });
+
+  savePayoutAccount = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const account = await vendorService.savePayoutAccount(user.id, req.body);
+    return sendSuccess(res, account);
+  });
+
+  getEarnings = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const earnings = await vendorService.getEarningsHistory(user.id);
+    return sendSuccess(res, earnings);
+  });
+
   uploadDocument = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const file = req.file;

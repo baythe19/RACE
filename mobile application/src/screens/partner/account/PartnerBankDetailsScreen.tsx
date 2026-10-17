@@ -1,5 +1,5 @@
 import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
@@ -9,16 +9,23 @@ import {
   AlertCircle,
   Hash,
   CheckCircle,
-  ShieldCheck,
+  Clock,
   Zap,
 } from 'lucide-react-native';
 
 import { useAppSelector } from '../../../redux/hooks';
+import { colors } from '../../../theme';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuccessDialog';
+import { useAppDispatch } from '../../../redux/hooks';
+import { updateUser } from '../../../redux/auth/authSlice';
 import { usePartnerPayoutStore } from '../../../store/partnerPayoutStore';
+import {
+  usePayoutAccountQuery,
+  useSavePayoutAccountMutation,
+} from '../../../services/vendor/useVendorMutations';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerBankDetails'>;
 
@@ -40,74 +47,165 @@ const POPULAR_UPI_SUFFIXES = [
 ];
 
 export default function PartnerBankDetailsScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
   const user = useAppSelector(state => state.auth.user);
-  const payoutMethod = usePartnerPayoutStore(state => state.payoutMethod);
-  const setPayoutMethod = usePartnerPayoutStore(state => state.setPayoutMethod);
-  const bankDetails = usePartnerPayoutStore(state => state.bankDetails);
+  const query = usePayoutAccountQuery(true);
+  const saveMutation = useSavePayoutAccountMutation();
+  const savedAccount = query.data ?? null;
+
+  // Local Zustand store kept for the Earnings screen header display, but the
+  // source of truth is now the backend payout-account record.
+  const setPayoutMethodStore = usePartnerPayoutStore(state => state.setPayoutMethod);
   const updateBankDetails = usePartnerPayoutStore(state => state.updateBankDetails);
-  const upiDetails = usePartnerPayoutStore(state => state.upiDetails);
   const updateUpiDetails = usePartnerPayoutStore(state => state.updateUpiDetails);
 
-  const [activeTab, setActiveTab] = useState<'bank' | 'upi'>(payoutMethod);
-  const [holderName, setHolderName] = useState(bankDetails.holderName || user?.fullName || 'Om Singh');
-  const [accountNumber, setAccountNumber] = useState(bankDetails.accountNumber || '91881234567890');
-  const [ifsc, setIfsc] = useState(bankDetails.ifsc || 'SBIN0001234');
-  const [bankName, setBankName] = useState(bankDetails.bankName || 'State Bank of India');
+  const [activeTab, setActiveTab] = useState<'bank' | 'upi'>(savedAccount?.payoutMethod ?? 'bank');
+  const [holderName, setHolderName] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [ifsc, setIfsc] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [upiId, setUpiId] = useState('');
+  const [upiHolderName, setUpiHolderName] = useState('');
+  const [touched, setTouched] = useState(false);
 
-  const [upiId, setUpiId] = useState(upiDetails.upiId || 'omsingh.race@okhdfcbank');
-  const [upiHolderName, setUpiHolderName] = useState(upiDetails.holderName || user?.fullName || 'Om Singh');
-
-  const [saving, setSaving] = useState(false);
-  const [successVisible, setSuccessVisible] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [successTitle, setSuccessTitle] = useState('');
+
+  // Seed empty fields from the backend record (masked) and the auth profile.
+  useEffect(() => {
+    if (touched) return;
+    if (savedAccount) {
+      setActiveTab(savedAccount.payoutMethod);
+      setHolderName(savedAccount.accountHolderName);
+      if (savedAccount.payoutMethod === 'bank') {
+        setBankName(savedAccount.bankName ?? '');
+        setIfsc(savedAccount.ifsc ?? '');
+      } else if (savedAccount.upiId) {
+        setUpiId(savedAccount.upiId);
+        setUpiHolderName(savedAccount.accountHolderName);
+      }
+      return;
+    }
+    // Fresh state — prefill holder name from the logged-in profile only.
+    if (user?.fullName && !holderName) setHolderName(user.fullName);
+    if (user?.fullName && !upiHolderName) setUpiHolderName(user.fullName);
+  }, [savedAccount, touched, user?.fullName]);
+
+  const saving = saveMutation.isPending;
 
   const handleSave = () => {
+    setTouched(true);
     if (activeTab === 'bank') {
       if (!holderName.trim()) {
         setErrorMsg('Account holder name is required');
         return;
       }
-      if (!accountNumber.trim() || accountNumber.length < 8) {
-        setErrorMsg('Please enter a valid bank account number (min 8 digits)');
+      if (!/^\d{9,18}$/.test(accountNumber.trim())) {
+        setErrorMsg('Account number must be 9-18 digits');
         return;
       }
-      if (!ifsc.trim() || ifsc.length < 6) {
-        setErrorMsg('Please enter a valid IFSC code (11 characters)');
+      if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc.trim().toUpperCase())) {
+        setErrorMsg('Invalid IFSC — should look like SBIN0001234');
+        return;
+      }
+      if (!bankName.trim()) {
+        setErrorMsg('Bank name is required');
         return;
       }
 
       setErrorMsg(null);
-      setSaving(true);
-      setTimeout(() => {
-        setPayoutMethod('bank');
-        updateBankDetails({
-          holderName: holderName.trim(),
-          accountNumber: accountNumber.trim(),
-          ifsc: ifsc.trim().toUpperCase(),
-          bankName: bankName.trim() || 'Verified Bank',
-        });
-        setSaving(false);
-        setSuccessVisible(true);
-      }, 500);
+      saveMutation.mutate(
+        {
+          payoutMethod: 'bank',
+          accountHolderName: holderName.trim(),
+          bank: {
+            accountNumber: accountNumber.trim(),
+            ifsc: ifsc.trim().toUpperCase(),
+            bankName: bankName.trim(),
+          },
+        },
+        {
+          onSuccess: account => {
+            updateBankDetails({ holderName: account.accountHolderName });
+            setPayoutMethodStore('bank');
+            setSuccessTitle('Bank account saved');
+            setSuccessVisible(true);
+          },
+          onError: error => {
+            setErrorMsg(error instanceof Error ? error.message : 'Could not save bank details');
+          },
+        },
+      );
     } else {
-      if (!upiId.trim() || !upiId.includes('@')) {
-        setErrorMsg('Please enter a valid UPI ID (e.g. mobile@upi or name@bank)');
+      const id = upiId.trim().toLowerCase();
+      if (!/^[\w.\-]{2,64}@[a-zA-Z]{2,32}$/.test(id)) {
+        setErrorMsg('Invalid UPI ID — should look like name@okhdfcbank');
+        return;
+      }
+      if (!upiHolderName.trim()) {
+        setErrorMsg('Name registered on your UPI app is required');
         return;
       }
 
       setErrorMsg(null);
-      setSaving(true);
-      setTimeout(() => {
-        setPayoutMethod('upi');
-        updateUpiDetails({
-          upiId: upiId.trim().toLowerCase(),
-          holderName: upiHolderName.trim() || 'Partner',
-        });
-        setSaving(false);
-        setSuccessVisible(true);
-      }, 500);
+      saveMutation.mutate(
+        {
+          payoutMethod: 'upi',
+          accountHolderName: upiHolderName.trim(),
+          upi: { upiId: id },
+        },
+        {
+          onSuccess: account => {
+            updateUpiDetails({
+              upiId: account.upiId ?? id,
+              holderName: account.accountHolderName,
+            });
+            setPayoutMethodStore('upi');
+            setSuccessTitle('UPI ID saved');
+            setSuccessVisible(true);
+          },
+          onError: error => {
+            setErrorMsg(error instanceof Error ? error.message : 'Could not save UPI ID');
+          },
+        },
+      );
     }
   };
+
+  /* Loading / error states for the initial fetch */
+  if (query.isLoading) {
+    return (
+      <PartnerScreenLayout title="Bank & Payouts" onBack={() => navigation.goBack()}>
+        <View style={styles.loaderWrap}>
+          <ActivityIndicator size="small" color={driverColors.amber} />
+        </View>
+      </PartnerScreenLayout>
+    );
+  }
+
+  if (query.isError && !savedAccount) {
+    return (
+      <PartnerScreenLayout
+        title="Bank & Payouts"
+        onBack={() => navigation.goBack()}
+        footer={
+          <Pressable style={styles.saveButton} onPress={() => void query.refetch()}>
+            <PartnerText style={styles.saveButtonText}>Retry</PartnerText>
+          </Pressable>
+        }>
+        <View style={styles.errorBox}>
+          <AlertCircle size={16} color="#DC2626" strokeWidth={2.2} />
+          <PartnerText style={styles.errorText}>
+            Could not load your payout account. Check your connection and retry.
+          </PartnerText>
+        </View>
+      </PartnerScreenLayout>
+    );
+  }
+
+  const isVerified = Boolean(savedAccount?.isVerified);
+  const updatedAt = savedAccount?.updatedAt ? new Date(savedAccount.updatedAt) : null;
 
   return (
     <PartnerScreenLayout
@@ -126,7 +224,7 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
             <ActivityIndicator size="small" color={driverColors.white} />
           ) : (
             <PartnerText style={styles.saveButtonText}>
-              {activeTab === 'bank' ? 'Save & Verify Bank Account' : 'Save & Link UPI ID'}
+              {activeTab === 'bank' ? 'Save bank account' : 'Save UPI ID'}
             </PartnerText>
           )}
         </Pressable>
@@ -158,21 +256,45 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
-      {/* KYC & Verification Badge */}
-      <View style={styles.kycBanner}>
+      {/* Honest channel status — no fake KYC claims. */}
+      <View
+        style={[
+          styles.kycBanner,
+          isVerified && { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+        ]}>
         <View style={styles.kycIconWrap}>
-          <ShieldCheck size={20} color="#059669" strokeWidth={2.4} />
+          {isVerified ? (
+            <CheckCircle size={20} color="#059669" strokeWidth={2.4} />
+          ) : (
+            <Clock size={20} color={colors.primaryDark} strokeWidth={2.2} />
+          )}
         </View>
         <View style={styles.kycTextCol}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <PartnerText style={styles.kycTitle}>KYC Verified Payout Channel</PartnerText>
-            <View style={styles.verifiedTag}>
-              <CheckCircle size={10} color="#059669" strokeWidth={2.6} />
-              <PartnerText style={styles.verifiedTagText}>Active</PartnerText>
+            <PartnerText style={[styles.kycTitle, !isVerified && { color: colors.primaryDark }]}>
+              {isVerified ? 'Payout account verified' : 'Payout account pending verification'}
+            </PartnerText>
+            <View
+              style={[
+                styles.verifiedTag,
+                !isVerified && { backgroundColor: '#FEF3C7' },
+              ]}>
+              {isVerified ? (
+                <CheckCircle size={10} color="#059669" strokeWidth={2.6} />
+              ) : (
+                <Clock size={10} color={colors.primaryDark} strokeWidth={2.6} />
+              )}
+              <PartnerText
+                style={[styles.verifiedTagText, !isVerified && { color: colors.primaryDark }]}>
+                {isVerified ? 'Active' : 'Pending'}
+              </PartnerText>
             </View>
           </View>
-          <PartnerText style={styles.kycSubtitle}>
-            Direct NEFT/IMPS and UPI transfers occur automatically every Monday morning at 6:00 AM with zero deduction.
+          <PartnerText style={[styles.kycSubtitle, !isVerified && { color: colors.grey }]}>
+            {isVerified
+              ? 'This account receives your completed-job settlements.'
+              : 'Details are saved once you submit. Our team verifies them before payouts begin — usually within 24 hours.'}
+            {updatedAt ? ` Last updated ${updatedAt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}.` : ''}
           </PartnerText>
         </View>
       </View>
@@ -195,7 +317,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <PartnerTextInput
                 style={styles.inputIconText}
                 value={holderName}
-                onChangeText={setHolderName}
+                onChangeText={text => {
+                  setHolderName(text);
+                  setTouched(true);
+                }}
                 placeholder="Full name as in bank account"
                 placeholderTextColor={driverColors.greySoft}
               />
@@ -210,7 +335,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <PartnerTextInput
                 style={styles.inputIconText}
                 value={accountNumber}
-                onChangeText={setAccountNumber}
+                onChangeText={text => {
+                  setAccountNumber(text.replace(/\D/g, '').slice(0, 18));
+                  setTouched(true);
+                }}
                 placeholder="Enter account number"
                 placeholderTextColor={driverColors.greySoft}
                 keyboardType="number-pad"
@@ -226,7 +354,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <PartnerTextInput
                 style={styles.inputIconText}
                 value={ifsc}
-                onChangeText={t => setIfsc(t.toUpperCase())}
+                onChangeText={text => {
+                  setIfsc(text.toUpperCase().slice(0, 11));
+                  setTouched(true);
+                }}
                 placeholder="e.g. SBIN0001234"
                 placeholderTextColor={driverColors.greySoft}
                 autoCapitalize="characters"
@@ -252,7 +383,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <PartnerTextInput
                 style={styles.inputIconText}
                 value={bankName}
-                onChangeText={setBankName}
+                onChangeText={text => {
+                  setBankName(text);
+                  setTouched(true);
+                }}
                 placeholder="Select or enter bank name"
                 placeholderTextColor={driverColors.greySoft}
               />
@@ -260,13 +394,16 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
 
             {/* Popular Bank Chips */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
-              {POPULAR_BANKS.map(b => (
+              {POPULAR_BANKS.map(bank => (
                 <Pressable
-                  key={b}
-                  style={[styles.bankChip, bankName === b && styles.bankChipSelected]}
-                  onPress={() => setBankName(b)}>
-                  <PartnerText style={[styles.bankChipText, bankName === b && styles.bankChipTextSelected]}>
-                    {b}
+                  key={bank}
+                  style={[styles.bankChip, bankName === bank && styles.bankChipSelected]}
+                  onPress={() => {
+                    setBankName(bank);
+                    setTouched(true);
+                  }}>
+                  <PartnerText style={[styles.bankChipText, bankName === bank && styles.bankChipTextSelected]}>
+                    {bank}
                   </PartnerText>
                 </Pressable>
               ))}
@@ -283,7 +420,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <PartnerTextInput
                 style={styles.inputIconText}
                 value={upiId}
-                onChangeText={setUpiId}
+                onChangeText={text => {
+                  setUpiId(text);
+                  setTouched(true);
+                }}
                 placeholder="e.g. mobile@upi or name@okaxis"
                 placeholderTextColor={driverColors.greySoft}
                 autoCapitalize="none"
@@ -293,15 +433,16 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
 
             {/* Quick Suffix Chips */}
             <View style={styles.suffixChipsRow}>
-              {POPULAR_UPI_SUFFIXES.map(s => (
+              {POPULAR_UPI_SUFFIXES.map(suffix => (
                 <Pressable
-                  key={s}
+                  key={suffix}
                   style={styles.suffixChip}
                   onPress={() => {
                     const prefix = upiId.includes('@') ? upiId.split('@')[0] : upiId;
-                    setUpiId(`${prefix}${s}`);
+                    setUpiId(`${prefix}${suffix}`);
+                    setTouched(true);
                   }}>
-                  <PartnerText style={styles.suffixChipText}>{s}</PartnerText>
+                  <PartnerText style={styles.suffixChipText}>{suffix}</PartnerText>
                 </Pressable>
               ))}
             </View>
@@ -315,7 +456,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <PartnerTextInput
                 style={styles.inputIconText}
                 value={upiHolderName}
-                onChangeText={setUpiHolderName}
+                onChangeText={text => {
+                  setUpiHolderName(text);
+                  setTouched(true);
+                }}
                 placeholder="Full name registered on GPay/PhonePe"
                 placeholderTextColor={driverColors.greySoft}
               />
@@ -326,11 +470,11 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
 
       <PartnerSuccessDialog
         visible={successVisible}
-        title={activeTab === 'bank' ? 'Bank Details Saved!' : 'UPI ID Linked!'}
+        title={successTitle || 'Saved'}
         message={
-          activeTab === 'bank'
-            ? 'Your bank account has been verified and set as your primary payout method.'
-            : 'Your UPI ID has been verified for instant weekly earnings settlement.'
+          isVerified
+            ? 'Your payout account is updated and ready to receive settlements.'
+            : 'Details submitted. Our team will verify them before payouts begin.'
         }
         onDismiss={() => {
           setSuccessVisible(false);
@@ -342,6 +486,10 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  loaderWrap: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#F1F5F9',
@@ -379,10 +527,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 12,
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#FFFBEB',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#DCFCE7',
+    borderColor: '#FDE68A',
     padding: 14,
     marginBottom: 16,
   },
@@ -390,7 +538,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#DCFCE7',
+    backgroundColor: colors.goldLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -447,11 +595,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F1F5F9',
     gap: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 3,
-    elevation: 0.5,
   },
   inputGroup: {
     gap: 6,

@@ -10,6 +10,8 @@ export const UNIFIED_BOOKING_STATUSES = [
   'CANCELLED',
 ] as const;
 
+import { ForbiddenError } from '../../utils/src/errors';
+
 export type UnifiedBookingStatus = (typeof UNIFIED_BOOKING_STATUSES)[number];
 
 export const BOOKING_STATUS_FLOW: UnifiedBookingStatus[] = [
@@ -58,4 +60,66 @@ export function canTransition(
   }
 
   return nextIndex === currentIndex + 1;
+}
+
+/**
+ * VOC P0.9 fix — actor-based status mutation policy.
+ *
+ * The generic PATCH /bookings/:id/status endpoint used to let any booking
+ * owner (customer) push a booking to CONFIRMED / IN_PROGRESS / COMPLETED with
+ * no payment proof, driver assignment or trip-OTP check. Now:
+ *  - admins may perform any transition (audited elsewhere);
+ *  - drivers may perform only the operational progression their trip flow
+ *    drives (EN_ROUTE → ARRIVED → IN_PROGRESS → COMPLETED) plus rejection via
+ *    CANCELLED before pickup;
+ *  - customers may ONLY cancel (their dedicated cancel endpoints apply their
+ *    own fee/refund policy) — never confirm, start or complete a job;
+ *  - vendors may cancel fleet-routed jobs, nothing else (approve/assign flow
+ *    uses its own endpoints).
+ */
+export function assertActorMayTransition(
+  actorRole: string,
+  currentStatus: UnifiedBookingStatus,
+  nextStatus: UnifiedBookingStatus,
+): void {
+  const fail = (): never => {
+    throw new ForbiddenError(
+      'This status change is not allowed for your role. Cancellation and rating use their own endpoints.',
+    );
+  };
+
+  if (actorRole === 'admin') return;
+
+  if (nextStatus === 'CANCELLED') {
+    const cancellableRoles = ['customer', 'vendor', 'driver'];
+    if (!cancellableRoleGuard(actorRole, currentStatus, cancellableRoles)) {
+      fail();
+    }
+    return;
+  }
+
+  if (actorRole === 'driver') {
+    const DRIVER_OPERATIONAL: UnifiedBookingStatus[] = [
+      'DRIVER_EN_ROUTE',
+      'DRIVER_ARRIVED',
+      'IN_PROGRESS',
+      'COMPLETED',
+    ];
+    if (!DRIVER_OPERATIONAL.includes(nextStatus)) {
+      fail();
+    }
+    return;
+  }
+
+  // customer / vendor / anything else — no operational transitions.
+  fail();
+}
+
+function cancellableRoleGuard(
+  actorRole: string,
+  currentStatus: UnifiedBookingStatus,
+  allowedRoles: string[],
+): boolean {
+  const notCancellable = ['COMPLETED', 'RATED', 'CANCELLED'].includes(currentStatus);
+  return allowedRoles.includes(actorRole) && !notCancellable;
 }

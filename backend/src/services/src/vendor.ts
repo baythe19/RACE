@@ -4,6 +4,7 @@ import { storageService } from '../../storage/src/index';
 import { BookingModel } from '../../models/src/booking';
 import { TransactionModel } from '../../models/src/transaction';
 import { UserModel } from '../../models/src/user';
+import type { VendorBankDetails } from '../../models/src/userProfileSchema';
 import { userRepository } from './userRepository';
 import { vendorRepository } from './vendorRepository';
 import type { IVendor } from '../../models/src/vendor';
@@ -12,9 +13,12 @@ import {
   type RegisterVendorDto,
   type ReviewDocumentDto,
   type ReviewVendorDto,
+  type SavePayoutAccountDto,
   type SaveVendorDraftDto,
   type UpdateVendorDto,
   type VendorResponseDto,
+  type PayoutAccountDto,
+  type VendorEarningsDto,
 } from './vendorValidator';
 
 async function mapVendor(vendor: IVendor): Promise<VendorResponseDto> {
@@ -469,6 +473,137 @@ export class VendorService {
       jobsToday,
       earningsToday: earningsTodayAgg[0]?.total ?? 0,
       earningsTotal: earningsTotalAgg[0]?.total ?? 0,
+    };
+  }
+
+  /**
+   * Save (upsert) the vendor's payout account on the user profile.
+   * Real validation happens in savePayoutAccountSchema; verification is a
+   * separate step — saving alone never marks the channel verified.
+   */
+  async savePayoutAccount(
+    userId: string,
+    dto: SavePayoutAccountDto,
+  ): Promise<PayoutAccountDto> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+
+    const now = new Date();
+    const existing = user.vendorProfile?.bankDetails;
+    const isSameAccount =
+      existing &&
+      dto.payoutMethod === (existing.payoutMethod ?? 'bank') &&
+      (dto.payoutMethod === 'upi'
+        ? dto.upi?.upiId === existing.upiId
+        : dto.bank?.accountNumber === existing.accountNumber && dto.bank?.ifsc === existing.ifsc);
+    // Re-verification only required when the destination account changes.
+    const keepVerified = Boolean(isSameAccount && existing?.isVerified);
+
+    const bankDetails: VendorBankDetails = {
+      accountHolderName: dto.accountHolderName,
+      payoutMethod: dto.payoutMethod,
+      isVerified: keepVerified,
+      verifiedAt: keepVerified ? existing?.verifiedAt : undefined,
+      source: 'vendor_app',
+      updatedAt: now,
+    };
+    if (dto.payoutMethod === 'bank' && dto.bank) {
+      bankDetails.accountNumber = dto.bank.accountNumber;
+      bankDetails.ifsc = dto.bank.ifsc;
+      bankDetails.bankName = dto.bank.bankName;
+    }
+    if (dto.payoutMethod === 'upi' && dto.upi) {
+      bankDetails.upiId = dto.upi.upiId;
+    }
+
+    await userRepository.updateById(userId, {
+      vendorProfile: { ...user.vendorProfile, bankDetails } as NonNullable<typeof user.vendorProfile>,
+    });
+    return this.getPayoutAccount(userId);
+  }
+
+  async getPayoutAccount(userId: string): Promise<PayoutAccountDto> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+    const bank = user.vendorProfile?.bankDetails;
+    if (!bank || (!bank.accountNumber && !bank.upiId)) {
+      throw new NotFoundError('No payout account saved yet');
+    }
+    const digits = bank.accountNumber ?? '';
+    return {
+      payoutMethod: bank.payoutMethod ?? 'bank',
+      accountHolderName: bank.accountHolderName ?? user.fullName ?? '',
+      accountNumberMasked: digits ? `${'*'.repeat(Math.max(digits.length - 4, 0))}${digits.slice(-4)}` : undefined,
+      ifsc: bank.ifsc,
+      bankName: bank.bankName,
+      upiId: bank.upiId,
+      isVerified: Boolean(bank.isVerified),
+      verifiedAt: bank.verifiedAt?.toISOString(),
+      updatedAt: bank.updatedAt?.toISOString(),
+    };
+  }
+
+  async getEarningsHistory(userId: string): Promise<VendorEarningsDto> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+
+    const driverIds = (
+      await UserModel.find({ role: 'driver', 'driverProfile.vendorUserId': user._id })
+        .select('_id')
+        .lean()
+        .exec()
+    ).map((driver) => driver._id);
+
+    const vendorMatch = driverIds.length > 0
+      ? { $or: [{ vendorId: user._id }, { driverId: { $in: driverIds } }] }
+      : { vendorId: user._id };
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const sum = async (match: Record<string, unknown>): Promise<number> => {
+      const rows = await TransactionModel.aggregate([
+        { $match: { ...vendorMatch, type: 'PAYMENT', status: 'COMPLETED', ...match } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]);
+      return rows[0]?.total ?? 0;
+    };
+
+    const [today, week, month, allTime, payoutsRows, dailyRows] = await Promise.all([
+      sum({ createdAt: { $gte: startOfToday } }),
+      sum({ createdAt: { $gte: weekAgo } }),
+      sum({ createdAt: { $gte: monthAgo } }),
+      sum({}),
+      TransactionModel.find({ ...vendorMatch, type: 'VENDOR_PAYOUT' })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean()
+        .exec(),
+      TransactionModel.aggregate([
+        { $match: { ...vendorMatch, type: 'PAYMENT', status: 'COMPLETED', createdAt: { $gte: weekAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            amount: { $sum: '$amount' },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    return {
+      currency: 'INR',
+      totals: { today, week, month, allTime },
+      payouts: payoutsRows.map((row) => ({
+        id: row._id?.toString() ?? '',
+        amount: row.amount,
+        status: row.status,
+        paidAt: row.createdAt.toISOString(),
+        description: row.description,
+      })),
+      dailyEarnings: dailyRows.map((row) => ({ date: row._id, amount: row.amount })),
     };
   }
 }

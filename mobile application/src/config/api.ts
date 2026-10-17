@@ -33,6 +33,8 @@ export const API_ENDPOINTS = {
   vendorDashboard: '/api/v1/vendor/dashboard',
   vendorUploadDocument: '/api/v1/vendor/upload-document',
   vendorSelfie: '/api/v1/vendor/selfie',
+  vendorPayoutAccount: '/api/v1/vendor/payout-account',
+  vendorEarnings: '/api/v1/vendor/earnings',
   bookings: '/api/v1/bookings',
   towingBookings: '/api/v1/bookings/towing',
   towingBooking: (id: string) => `/api/v1/bookings/towing/${id}`,

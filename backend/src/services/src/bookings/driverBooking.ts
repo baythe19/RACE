@@ -12,7 +12,7 @@ import {
   getVehicleCategory,
   resolvePackageHours,
 } from './booking';
-import { canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
+import { assertActorMayTransition, canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
 import { driverBookingRepository } from '../driverBookingRepository';
 import type { IDriverBooking } from '../../../models/src/driverBooking';
 import type {
@@ -180,6 +180,9 @@ export class DriverBookingService {
       throw new ForbiddenError('You do not have access to this booking');
     }
 
+    // VOC P0.9: forbid customers from confirming/starting/completing jobs —
+    // only cancellation is theirs (via the dedicated cancel endpoint too).
+    assertActorMayTransition(actor.role, booking.status, newStatus);
     assertValidStatusTransition(booking.status, newStatus);
 
     const updated = await driverBookingRepository.updateStatus(

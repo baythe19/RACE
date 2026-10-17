@@ -128,7 +128,11 @@ export class DriverSelfService {
     }
     user.isVerified = true;
     user.isProfileCompleted = true;
-    user.isAvailable = true;
+    // VOC P0.5: a brand-new self-driver must NOT become dispatch-eligible with
+    // a placeholder Bhubaneswar coordinate. Availability stays false until the
+    // device sends its first real location fix; the placeholder is only a
+    // display default in non-production.
+    user.isAvailable = false;
     user.currentLocation = {
       latitude: 20.2961,
       longitude: 85.8245,
@@ -193,7 +197,7 @@ export class DriverSelfService {
       // register() (existing-driver branch) will keep it.
       const count = await driverRepository.count();
       user.driverProfile = {
-        driverCode: user.driverProfile?.driverCode ?? `DRV${String(count + 1).padStart(4, '0')}`,
+        driverCode: `DRV${String(count + 1).padStart(4, '0')}`,
         licenseNo: 'PENDING',
         driverType: 'Tow Driver',
         city: 'Bhubaneswar',

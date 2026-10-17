@@ -1,13 +1,123 @@
-import type { Server as HttpServer } from 'http';
-
 import { Server as SocketIOServer, type Socket } from 'socket.io';
 
 import { env } from '../../config/env';
 import { logger } from '../../utils/src/logger';
+import { verifyAccessToken } from '../../utils/src/jwt';
+import { DriverBookingModel } from '../../models/src/driverBooking';
+import { TowingBookingModel } from '../../models/src/towingBooking';
+import { UserModel } from '../../models/src/user';
 
 let io: SocketIOServer | null = null;
 
-export function initializeSocket(httpServer: HttpServer): void {
+interface SocketPrincipal {
+  userId: string;
+  role: string;
+  mobileNumber: string;
+}
+
+type SocketWithPrincipal = Socket & { data: { principal?: SocketPrincipal } };
+
+/**
+ * BUG-03 / VOC P0.3 fix — socket handshake now requires a valid user access
+ * token (the same JWT the REST API uses). Admin tokens are rejected because
+ * verifyAccessToken enforces the user token shape.
+ */
+function authenticateHandshake(socket: SocketWithPrincipal): boolean {
+  const header =
+    (socket.handshake.auth?.token as string | undefined) ??
+    (socket.handshake.headers?.authorization as string | undefined);
+  const token = header?.startsWith('Bearer ') ? header.slice(7) : header;
+
+  if (!token) {
+    logger.warn('Socket connection rejected: missing token', { socketId: socket.id });
+    return false;
+  }
+  try {
+    const payload = verifyAccessToken(token);
+    socket.data.principal = {
+      userId: payload.sub,
+      role: payload.role,
+      mobileNumber: payload.mobileNumber,
+    };
+    logger.info('Socket authenticated', {
+      socketId: socket.id,
+      userId: payload.sub,
+      role: payload.role,
+    });
+    return true;
+  } catch {
+    logger.warn('Socket connection rejected: invalid token', { socketId: socket.id });
+    return false;
+  }
+}
+
+/**
+ * Room membership is derived from the authenticated principal, never from
+ * client-supplied ids alone:
+ *  - drivers may join only their own driver room;
+ *  - admins may join any room;
+ *  - everyone else (customer/vendor) may join a booking room only if they are
+ *    the booking's customer or own the booking's vendor.
+ */
+async function authorizeBookingRoom(
+  principal: SocketPrincipal,
+  bookingId: string,
+): Promise<boolean> {
+  if (principal.role === 'admin') return true;
+  if (principal.role === 'driver') return false; // drivers use driver:join, not booking rooms
+
+  try {
+    const [driverBooking, towingBooking] = await Promise.all([
+      DriverBookingModel.findById(bookingId)
+        .select('customerId vendorId')
+        .lean()
+        .exec(),
+      TowingBookingModel.findById(bookingId).select('customerId vendorId').lean().exec(),
+    ]);
+    const booking = driverBooking ?? towingBooking;
+    if (!booking) return false;
+
+    const customerId = booking.customerId?.toString();
+    const vendorId = booking.vendorId?.toString();
+    if (customerId && customerId === principal.userId) return true;
+    if (vendorId && vendorId === principal.userId) return true;
+
+    // Vendors also see bookings routed through their fleet drivers.
+    if (principal.role === 'vendor') {
+      const linked = await (
+        driverBooking ? DriverBookingModel : TowingBookingModel
+      )
+        .countDocuments({ _id: bookingId, vendorId: principal.userId })
+        .exec();
+      return linked > 0;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+async function authorizeDriverRoom(
+  principal: SocketPrincipal,
+  driverId: string,
+): Promise<boolean> {
+  if (principal.role === 'admin') return true;
+  if (principal.userId !== driverId) {
+    // A vendor may watch the driver room of a driver in their fleet.
+    if (principal.role === 'vendor') {
+      const linked = await UserModel.countDocuments({
+        _id: driverId,
+        role: 'driver',
+        'driverProfile.vendorUserId': principal.userId,
+      }).exec();
+      return linked > 0;
+    }
+    return false;
+  }
+  return principal.role === 'driver';
+}
+
+export function initializeSocket(httpServer: import('http').Server): void {
   io = new SocketIOServer(httpServer, {
     cors: {
       origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(','),
@@ -15,22 +125,43 @@ export function initializeSocket(httpServer: HttpServer): void {
     },
   });
 
-  io.on('connection', (socket: Socket) => {
-    socket.on('driver:join', (data: { driverId: string }) => {
-      socket.join(`driver:${data.driverId}`);
-      logger.info(`Driver ${data.driverId} connected`, { socketId: socket.id });
+  io.use((socket, next) => {
+    if (authenticateHandshake(socket as SocketWithPrincipal)) {
+      next();
+    } else {
+      next(new Error('unauthorized'));
+    }
+  });
+
+  io.on('connection', (rawSocket: Socket) => {
+    const socket = rawSocket as SocketWithPrincipal;
+    const principal = socket.data.principal;
+    if (!principal) return;
+
+    socket.on('driver:join', async (data: { driverId: string }) => {
+      const driverId = String(data?.driverId ?? '');
+      if (!driverId) return;
+      const allowed = await authorizeDriverRoom(principal, driverId);
+      if (!allowed) {
+        logger.warn('driver:join denied', { socketId: socket.id, userId: principal.userId, driverId });
+        return;
+      }
+      socket.join(`driver:${driverId}`);
     });
 
-    socket.on('booking:track', (data: { bookingId: string; bookingType: string }) => {
-      socket.join(`booking:${data.bookingId}`);
-      logger.info(`Customer tracking booking ${data.bookingId}`, {
-        socketId: socket.id,
-        bookingType: data.bookingType,
-      });
-    });
-
-    socket.on('disconnect', () => {
-      logger.info(`Socket disconnected: ${socket.id}`);
+    socket.on('booking:track', async (data: { bookingId: string; bookingType: string }) => {
+      const bookingId = String(data?.bookingId ?? '');
+      if (!bookingId) return;
+      const allowed = await authorizeBookingRoom(principal, bookingId);
+      if (!allowed) {
+        logger.warn('booking:track denied', {
+          socketId: socket.id,
+          userId: principal.userId,
+          bookingId,
+        });
+        return;
+      }
+      socket.join(`booking:${bookingId}`);
     });
   });
 }
@@ -42,9 +173,14 @@ export function getIO(): SocketIOServer {
   return io;
 }
 
+export function emitToDriver(driverId: string, event: string, data: unknown): void {
+  if (!io) return;
+  getIO().to(`driver:${driverId}`).emit(event, data);
+}
+
 export function emitToBooking(bookingId: string, event: string, data: unknown): void {
   if (!io) return;
-  io.to(`booking:${bookingId}`).emit(event, data);
+  getIO().to(`booking:${bookingId}`).emit(event, data);
 }
 
 export function emitDriverLocation(

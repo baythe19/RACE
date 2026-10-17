@@ -11,7 +11,7 @@ import {
   createInitialStatusHistory,
   generatePrefixedBookingNumber,
 } from './booking';
-import { canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
+import { assertActorMayTransition, canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
 import { towingBookingRepository } from '../towingBookingRepository';
 import type { ITowingBooking } from '../../../models/src/towingBooking';
 import type {
@@ -173,6 +173,9 @@ export class TowingBookingService {
       throw new ForbiddenError('You do not have access to this booking');
     }
 
+    // VOC P0.9: forbid customers from confirming/starting/completing jobs —
+    // only cancellation is theirs (via the dedicated cancel endpoint too).
+    assertActorMayTransition(actor.role, booking.status, newStatus);
     assertValidStatusTransition(booking.status, newStatus);
 
     const updated = await towingBookingRepository.updateStatus(

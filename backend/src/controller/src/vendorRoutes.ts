@@ -12,6 +12,7 @@ import {
   resetVendorDriverPasswordSchema,
   uploadVendorDriverDocumentSchema,
 } from '../../services/src/vendorDriversValidator';
+import { savePayoutAccountSchema } from '../../services/src/vendorValidator';
 import {
   createVendorVehicleSchema,
   updateVendorVehicleSchema,
@@ -35,6 +36,17 @@ router.put('/update', validate(updateVendorSchema), vendorController.update);
 router.get('/profile', vendorController.getProfile);
 router.get('/status', vendorController.getStatus);
 router.get('/dashboard', requireRole('vendor'), vendorController.getDashboard);
+
+/** Payout account — real persistence on the vendor's user profile. */
+router.get('/payout-account', requireRole('vendor'), vendorController.getPayoutAccount);
+router.put(
+  '/payout-account',
+  requireRole('vendor'),
+  validate(savePayoutAccountSchema),
+  vendorController.savePayoutAccount,
+);
+/** Real earnings/payout history from the transactions collection. */
+router.get('/earnings', requireRole('vendor'), vendorController.getEarnings);
 
 router.post(
   '/upload-document',

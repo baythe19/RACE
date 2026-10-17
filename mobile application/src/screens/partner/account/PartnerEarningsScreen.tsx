@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
-import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   TrendingUp,
@@ -12,77 +12,112 @@ import {
   CheckCircle,
   Zap,
   ShieldCheck,
+  Clock,
+  AlertCircle,
 } from 'lucide-react-native';
 
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import { usePartnerPayoutStore } from '../../../store/partnerPayoutStore';
+import {
+  usePayoutAccountQuery,
+  useVendorEarningsQuery,
+} from '../../../services/vendor/useVendorMutations';
+import { colors } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerEarnings'>;
 
-const WEEK_DATA = [
-  { day: 'Mon', amount: 800, heightPct: 0.35 },
-  { day: 'Tue', amount: 1100, heightPct: 0.45 },
-  { day: 'Wed', amount: 950, heightPct: 0.4 },
-  { day: 'Thu', amount: 1400, heightPct: 0.58 },
-  { day: 'Fri', amount: 1250, heightPct: 0.52 },
-  { day: 'Sat', amount: 2400, heightPct: 1.0, isHighlight: true },
-  { day: 'Sun', amount: 1550, heightPct: 0.65 },
-];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-const RECENT_TRIPS = [
-  { id: '1', bookingNumber: '#TOW-10048', time: '12 Oct, 5:24 pm', fare: '₹1,650', status: 'Completed' },
-  { id: '2', bookingNumber: '#TOW-10047', time: '12 Oct, 1:10 pm', fare: '₹1,200', status: 'Completed' },
-  { id: '3', bookingNumber: '#TOW-10046', time: '11 Oct, 8:40 pm', fare: '₹1,850', status: 'Completed' },
-];
+function formatInr(amount: number) {
+  return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+}
 
-const RECENT_PAYOUTS = [
-  { id: 'p1', amount: '₹3,200', date: 'Paid to Bank • 12 Oct 2026', status: 'Completed' },
-  { id: 'p2', amount: '₹2,850', date: 'Paid to Bank • 5 Oct 2026', status: 'Completed' },
-  { id: 'p3', amount: '₹3,100', date: 'Paid to Bank • 28 Sep 2026', status: 'Completed' },
-];
+function shortDay(isoDate: string) {
+  const date = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(+date)) return isoDate;
+  return DAY_LABELS[date.getDay()];
+}
 
 export default function PartnerEarningsScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<'earnings' | 'payouts'>('earnings');
-  const payoutMethod = usePartnerPayoutStore(state => state.payoutMethod);
-  const bankDetails = usePartnerPayoutStore(state => state.bankDetails);
-  const upiDetails = usePartnerPayoutStore(state => state.upiDetails);
+  const earnings = useVendorEarningsQuery(true);
+  const payoutAccount = usePayoutAccountQuery(true);
+
+  /* Backend-driven chart; falls back to an empty chart when no payments yet. */
+  const daily = useMemo(() => earnings.data?.dailyEarnings ?? [], [earnings.data]);
+  const chart = useMemo(() => {
+    if (daily.length === 0) return [];
+    const max = Math.max(...daily.map(day => day.amount), 1);
+    return daily.map(entry => ({
+      key: entry.date,
+      label: shortDay(entry.date),
+      amount: entry.amount,
+      heightPct: Math.max(entry.amount / max, 0.08),
+      isHighlight: entry.amount === max,
+    }));
+  }, [daily]);
+
+  const weekTotal = earnings.data?.totals.week ?? 0;
+  const payouts = useMemo(() => earnings.data?.payouts ?? [], [earnings.data]);
+
+  const account = payoutAccount.data;
+  const accountLoading = payoutAccount.isLoading;
+  const verified = Boolean(account?.isVerified);
+  const isUpi = (account?.payoutMethod ?? usePartnerPayoutStore.getState().payoutMethod) === 'upi';
+
+  const recentPayouts = useMemo(
+    () =>
+      payouts.slice(0, 5).map(payout => ({
+        id: payout.id,
+        amount: formatInr(payout.amount),
+        date: `Paid ${new Date(payout.paidAt).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })}`,
+        status: payout.status === 'COMPLETED' ? 'Completed' : payout.status,
+      })),
+    [payouts],
+  );
 
   return (
-    <PartnerScreenLayout
-      title="Earnings"
-      onBack={() => navigation.goBack()}>
-      {/* Top Segmented Controls */}
+    <PartnerScreenLayout title="Earnings" onBack={() => navigation.goBack()}>
+      {/* Segment tabs */}
       <View style={styles.segmentContainer}>
         <Pressable
           style={[styles.segmentTab, activeTab === 'earnings' && styles.segmentTabActive]}
           onPress={() => setActiveTab('earnings')}>
-          <PartnerText
-            style={[
-              styles.segmentText,
-              activeTab === 'earnings' && styles.segmentTextActive,
-            ]}>
+          <PartnerText style={[styles.segmentText, activeTab === 'earnings' && styles.segmentTextActive]}>
             Earnings
           </PartnerText>
         </Pressable>
-
         <Pressable
           style={[styles.segmentTab, activeTab === 'payouts' && styles.segmentTabActive]}
           onPress={() => setActiveTab('payouts')}>
-          <PartnerText
-            style={[
-              styles.segmentText,
-              activeTab === 'payouts' && styles.segmentTextActive,
-            ]}>
+          <PartnerText style={[styles.segmentText, activeTab === 'payouts' && styles.segmentTextActive]}>
             Payouts
           </PartnerText>
         </Pressable>
       </View>
 
-      {activeTab === 'earnings' ? (
+      {activeTab === 'payouts' ? (
+        <PayoutsTabBody />
+      ) : earnings.isLoading ? (
+        <View style={styles.loaderWrap}>
+          <ActivityIndicator size="small" color={driverColors.amber} />
+        </View>
+      ) : earnings.isError ? (
+        <View style={styles.errorBox}>
+          <AlertCircle size={16} color="#DC2626" strokeWidth={2.2} />
+          <PartnerText style={styles.errorText}>
+            Could not load your earnings. Pull down to retry.
+          </PartnerText>
+        </View>
+      ) : (
         <>
-          {/* Total Earnings Card */}
+          {/* ── Weekly total (real transactions) ── */}
           <View style={styles.heroCard}>
             <View style={styles.heroTopRow}>
               <PartnerText style={styles.heroLabel}>Total Earnings (This Week)</PartnerText>
@@ -92,184 +127,116 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
               </View>
             </View>
 
-            <PartnerText style={styles.heroAmount}>₹8,450</PartnerText>
+            <PartnerText style={styles.heroAmount}>{formatInr(weekTotal)}</PartnerText>
 
-            <View style={styles.trendRow}>
-              <TrendingUp size={14} color={driverColors.green} strokeWidth={2.4} />
-              <PartnerText style={styles.trendText}>+12% from last week</PartnerText>
-            </View>
-
-            {/* Bar Chart */}
-            <View style={styles.chartContainer}>
-              <View style={styles.chartBarsRow}>
-                {WEEK_DATA.map(item => (
-                  <View key={item.day} style={styles.barCol}>
-                    {item.isHighlight ? (
-                      <View style={styles.tooltipPill}>
-                        <PartnerText style={styles.tooltipText}>₹{item.amount}</PartnerText>
-                      </View>
-                    ) : null}
-                    <View style={styles.barTrack}>
-                      <View
-                        style={[
-                          styles.barFill,
-                          { height: `${item.heightPct * 100}%` },
-                          item.isHighlight && styles.barFillHighlight,
-                        ]}
-                      />
-                    </View>
-                    <PartnerText
-                      style={[
-                        styles.barLabel,
-                        item.isHighlight && styles.barLabelHighlight,
-                      ]}>
-                      {item.day}
-                    </PartnerText>
-                  </View>
-                ))}
+            {daily.length === 0 ? (
+              <View style={styles.trendRow}>
+                <Clock size={14} color={driverColors.grey} strokeWidth={2.4} />
+                <PartnerText style={[styles.trendText, { color: driverColors.grey }]}>
+                  No completed jobs this week yet
+                </PartnerText>
               </View>
-            </View>
+            ) : (
+              <View style={styles.trendRow}>
+                <TrendingUp size={14} color={driverColors.green} strokeWidth={2.4} />
+                <PartnerText style={styles.trendText}>
+                  {daily.length} earning day{daily.length === 1 ? '' : 's'} in the last 7 days
+                </PartnerText>
+              </View>
+            )}
 
-            {/* Metrics Strip */}
+            {/* Bar chart from real daily payments */}
+            {chart.length > 0 ? (
+              <View style={styles.chartContainer}>
+                <View style={styles.chartBarsRow}>
+                  {chart.map(bar => (
+                    <View key={bar.key} style={styles.barCol}>
+                      {bar.isHighlight ? (
+                        <View style={styles.tooltipPill}>
+                          <PartnerText style={styles.tooltipText}>{formatInr(bar.amount)}</PartnerText>
+                        </View>
+                      ) : null}
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            { height: `${bar.heightPct * 100}%` },
+                            bar.isHighlight && styles.barFillHighlight,
+                          ]}
+                        />
+                      </View>
+                      <PartnerText
+                        style={[styles.barLabel, bar.isHighlight && styles.barLabelHighlight]}>
+                        {bar.label}
+                      </PartnerText>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {/* Metrics strip — real totals */}
             <View style={styles.metricsStrip}>
               <View style={styles.metricItem}>
-                <PartnerText style={styles.metricVal}>18</PartnerText>
-                <PartnerText style={styles.metricCap}>Trips Completed</PartnerText>
+                <PartnerText style={styles.metricVal}>{formatInr(earnings.data?.totals.today ?? 0)}</PartnerText>
+                <PartnerText style={styles.metricCap}>Today</PartnerText>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricItem}>
-                <PartnerText style={styles.metricVal}>32 h</PartnerText>
-                <PartnerText style={styles.metricCap}>Online Time</PartnerText>
+                <PartnerText style={styles.metricVal}>{formatInr(earnings.data?.totals.month ?? 0)}</PartnerText>
+                <PartnerText style={styles.metricCap}>This month</PartnerText>
               </View>
 
               <View style={styles.metricDivider} />
 
               <View style={styles.metricItem}>
-                <PartnerText style={styles.metricVal}>₹468</PartnerText>
-                <PartnerText style={styles.metricCap}>Avg. per trip</PartnerText>
+                <PartnerText style={styles.metricVal}>{formatInr(earnings.data?.totals.allTime ?? 0)}</PartnerText>
+                <PartnerText style={styles.metricCap}>All time</PartnerText>
               </View>
             </View>
           </View>
 
-          {/* Recent Trips Section */}
+          {/* ── Recent completed payments (real rows) ── */}
           <View style={styles.sectionHeaderRow}>
-            <PartnerText style={styles.sectionTitle}>Recent Trips</PartnerText>
-            <Pressable
-              hitSlop={8}
-              onPress={() => navigation.navigate('PartnerTripHistory')}>
-              <PartnerText style={styles.viewAllText}>View all</PartnerText>
-            </Pressable>
+            <PartnerText style={styles.sectionTitle}>Recent Payments</PartnerText>
           </View>
 
           <View style={styles.tripList}>
-            {RECENT_TRIPS.map(trip => (
-              <Pressable
-                key={trip.id}
-                style={({ pressed }) => [
-                  styles.tripRow,
-                  getPressableFeedback(pressed),
-                ]}
-                onPress={() => navigation.navigate('PartnerTripHistory')}>
-                <View style={styles.tripIconCircle}>
-                  <Truck size={18} color="#0284C7" strokeWidth={2.2} />
-                </View>
-
-                <View style={styles.tripMetaCol}>
-                  <PartnerText style={styles.tripNumber}>{trip.bookingNumber}</PartnerText>
-                  <PartnerText style={styles.tripTime}>{trip.time}</PartnerText>
-                </View>
-
-                <View style={styles.tripFareCol}>
-                  <PartnerText style={styles.tripFare}>{trip.fare}</PartnerText>
-                  <View style={styles.completedPill}>
-                    <PartnerText style={styles.completedText}>{trip.status}</PartnerText>
+            {(earnings.data?.dailyEarnings ?? []).length === 0 ? (
+              <View style={styles.emptyInline}>
+                <PartnerText style={styles.emptyText}>
+                  Payments appear here after your first completed job.
+                </PartnerText>
+              </View>
+            ) : (
+              (earnings.data?.dailyEarnings ?? [])
+                .slice()
+                .reverse()
+                .slice(0, 5)
+                .map(day => (
+                  <View key={day.date} style={styles.tripRow}>
+                    <View style={styles.tripIconCircle}>
+                      <Truck size={18} color="#0284C7" strokeWidth={2.2} />
+                    </View>
+                    <View style={styles.tripMetaCol}>
+                      <PartnerText style={styles.tripNumber}>{formatInr(day.amount)}</PartnerText>
+                      <PartnerText style={styles.tripTime}>
+                        {new Date(`${day.date}T00:00:00`).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })}
+                      </PartnerText>
+                    </View>
+                    <View style={styles.completedPill}>
+                      <PartnerText style={styles.completedText}>Paid</PartnerText>
+                    </View>
+                    <ChevronRight size={16} color="#C4C7D0" strokeWidth={2.2} />
                   </View>
-                </View>
-
-                <ChevronRight size={16} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
-            ))}
-          </View>
-        </>
-      ) : (
-        <>
-          {/* Payouts Tab View */}
-          <View style={styles.bankCard}>
-            <View style={styles.bankTopRow}>
-              <View
-                style={[
-                  styles.bankIconCircle,
-                  payoutMethod === 'upi' && { backgroundColor: '#FEF3C7' },
-                ]}>
-                {payoutMethod === 'upi' ? (
-                  <Zap size={20} color="#D97706" strokeWidth={2.4} />
-                ) : (
-                  <Building size={20} color={driverColors.amber} strokeWidth={2.2} />
-                )}
-              </View>
-              <View style={styles.bankTextCol}>
-                <PartnerText style={styles.bankName}>
-                  {payoutMethod === 'upi'
-                    ? `UPI ID: ${upiDetails.holderName}`
-                    : bankDetails.bankName || 'State Bank of India'}
-                </PartnerText>
-                <PartnerText style={styles.bankAcc}>
-                  {payoutMethod === 'upi'
-                    ? upiDetails.upiId
-                    : `•••• •••• ${bankDetails.accountNumber.slice(-4) || '7890'} • IFSC: ${bankDetails.ifsc}`}
-                </PartnerText>
-              </View>
-              <View style={styles.verifiedBadge}>
-                <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
-                <PartnerText style={styles.verifiedText}>
-                  {payoutMethod === 'upi' ? 'Linked' : 'Verified'}
-                </PartnerText>
-              </View>
-            </View>
-
-            <View style={styles.scheduleRow}>
-              <ShieldCheck size={14} color="#059669" strokeWidth={2.2} />
-              <PartnerText style={styles.scheduleText}>
-                Next automated payout: Monday, 6:00 AM (0 transfer fee)
-              </PartnerText>
-            </View>
-
-            <Pressable
-              style={({ pressed }) => [
-                styles.editBankBtn,
-                getPressableFeedback(pressed),
-              ]}
-              onPress={() => navigation.navigate('PartnerBankDetails')}>
-              <CreditCard size={14} color={driverColors.amber} strokeWidth={2.2} />
-              <PartnerText style={styles.editBankText}>
-                Manage {payoutMethod === 'upi' ? 'UPI & Bank Details' : 'Bank & UPI Details'}
-              </PartnerText>
-            </Pressable>
-          </View>
-
-          <PartnerText style={[styles.sectionTitle, { marginTop: 16, marginBottom: 12 }]}>
-            Recent Payouts
-          </PartnerText>
-
-          <View style={styles.tripList}>
-            {RECENT_PAYOUTS.map(p => (
-              <View key={p.id} style={styles.payoutRow}>
-                <View style={styles.payoutIconCircle}>
-                  <CreditCard size={18} color="#059669" strokeWidth={2.2} />
-                </View>
-
-                <View style={styles.tripMetaCol}>
-                  <PartnerText style={styles.payoutAmount}>{p.amount}</PartnerText>
-                  <PartnerText style={styles.tripTime}>{p.date}</PartnerText>
-                </View>
-
-                <View style={styles.completedPill}>
-                  <PartnerText style={styles.completedText}>{p.status}</PartnerText>
-                </View>
-              </View>
-            ))}
+                ))
+            )}
           </View>
         </>
       )}
@@ -277,37 +244,164 @@ export default function PartnerEarningsScreen({ navigation }: Props) {
   );
 }
 
+/** Payouts tab body — real payout account + history. */
+function PayoutsTabBody() {
+  const payoutAccount = usePayoutAccountQuery(true);
+  const earnings = useVendorEarningsQuery(true);
+  const account = payoutAccount.data;
+  const hiddenAccount = payoutAccount.isLoading;
+  const verified = Boolean(account?.isVerified);
+  const accountExists = Boolean(account);
+
+  const recentPayouts = useMemo(
+    () =>
+      (earnings.data?.payouts ?? []).slice(0, 5).map(payout => ({
+        id: payout.id,
+        amount: formatInr(payout.amount),
+        date: `Paid ${new Date(payout.paidAt).toLocaleDateString('en-IN', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        })}`,
+        status: payout.status === 'COMPLETED' ? 'Completed' : payout.status,
+      })),
+    [earnings.data],
+  );
+
+  if (hiddenAccount) {
+    return (
+      <View style={styles.loaderWrap}>
+        <ActivityIndicator size="small" color={driverColors.amber} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={{ paddingBottom: 24 }}>
+      {/* Payout account card — real data, masked */}
+      <View style={styles.bankCard}>
+        <View style={styles.bankTopRow}>
+          <View style={[styles.bankIconCircle, account?.payoutMethod === 'upi' && { backgroundColor: '#FEF3C7' }]}>
+            {account?.payoutMethod === 'upi' ? (
+              <Zap size={20} color="#D97706" strokeWidth={2.4} />
+            ) : (
+              <Building size={20} color={driverColors.amber} strokeWidth={2.2} />
+            )}
+          </View>
+          <View style={styles.bankTextCol}>
+            {accountExists && account ? (
+              <>
+                <PartnerText style={styles.bankName}>
+                  {account.payoutMethod === 'upi'
+                    ? `UPI · ${account.upiId ?? ''}`
+                    : account.bankName || 'Bank account'}
+                </PartnerText>
+                <PartnerText style={styles.bankAcc}>
+                  {account.payoutMethod === 'upi'
+                    ? account.accountHolderName
+                    : `${account.accountNumberMasked ?? ''} • IFSC: ${account.ifsc ?? ''}`}
+                </PartnerText>
+              </>
+            ) : (
+              <PartnerText style={styles.bankName}>No payout account yet</PartnerText>
+            )}
+          </View>
+          <View style={[styles.verifiedBadge, !verified && { backgroundColor: '#FEF3C7' }]}>
+            {verified ? (
+              <CheckCircle size={12} color={driverColors.green} strokeWidth={2.4} />
+            ) : (
+              <Clock size={12} color={colors.primaryDark} strokeWidth={2.4} />
+            )}
+            <PartnerText
+              style={[styles.verifiedText, !verified && { color: colors.primaryDark }]}>
+              {verified ? 'Verified' : 'Pending'}
+            </PartnerText>
+          </View>
+        </View>
+
+        {!verified ? (
+          <View style={styles.scheduleRow}>
+            <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
+            <PartnerText style={[styles.scheduleText, { color: colors.grey }]}>
+              Payouts begin after our team verifies this account.
+            </PartnerText>
+          </View>
+        ) : null}
+
+        <Pressable
+          style={({ pressed }) => [styles.editBankBtn, getPressableFeedback(pressed)]}
+          onPress={() => navigation.navigate('PartnerBankDetails')}>
+          <CreditCard size={14} color={driverColors.amber} strokeWidth={2.2} />
+          <PartnerText style={styles.editBankText}>
+            {account ? 'Manage payout account' : 'Add payout account'}
+          </PartnerText>
+        </Pressable>
+      </View>
+
+      <PartnerText style={[styles.sectionTitle, { marginTop: 16, marginBottom: 12 }]}>
+        Recent Payouts
+      </PartnerText>
+
+      <View style={styles.tripList}>
+        {recentPayouts.length === 0 ? (
+          <View style={styles.emptyInline}>
+            <PartnerText style={styles.emptyText}>
+              Payout history appears here once settlements start.
+            </PartnerText>
+          </View>
+        ) : (
+          recentPayouts.map(payout => (
+            <View key={payout.id} style={styles.payoutRow}>
+              <View style={styles.payoutIconCircle}>
+                <CreditCard size={18} color="#059669" strokeWidth={2.2} />
+              </View>
+              <View style={styles.tripMetaCol}>
+                <PartnerText style={styles.payoutAmount}>{payout.amount}</PartnerText>
+                <PartnerText style={styles.tripTime}>{payout.date}</PartnerText>
+              </View>
+              <View style={styles.completedPill}>
+                <PartnerText style={styles.completedText}>{payout.status}</PartnerText>
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
 const styles = StyleSheet.create({
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: driverColors.light,
-    borderRadius: driverRadius.pill,
-    padding: 4,
-    marginBottom: 16,
-  },
-  segmentTab: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: driverRadius.pill,
+  loaderWrap: {
+    paddingVertical: 60,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  segmentTabActive: {
-    backgroundColor: driverColors.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    padding: 12,
   },
-  segmentText: {
-    fontSize: 13,
+  errorText: {
+    flex: 1,
+    fontSize: 12.5,
     fontWeight: '600',
-    color: driverColors.grey,
+    color: '#DC2626',
   },
-  segmentTextActive: {
-    fontWeight: '800',
-    color: driverColors.ink,
+  emptyInline: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyText: {
+    fontSize: 12.5,
+    color: driverColors.grey,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   heroCard: {
     backgroundColor: '#FEF8E8',
@@ -363,89 +457,87 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     height: 120,
-    marginVertical: 10,
-    justifyContent: 'flex-end',
-  },
-  chartBarsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: '100%',
-  },
-  barCol: {
-    flex: 1,
-    alignItems: 'center',
-    height: '100%',
-    justifyContent: 'flex-end',
-    position: 'relative',
-  },
-  tooltipPill: {
-    position: 'absolute',
-    top: 0,
-    backgroundColor: driverColors.ink,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    zIndex: 10,
-  },
-  tooltipText: {
-    color: driverColors.white,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  barTrack: {
-    width: 14,
-    height: 80,
-    backgroundColor: '#F1EDE2',
-    borderRadius: 7,
-    justifyContent: 'flex-end',
-    overflow: 'hidden',
-  },
-  barFill: {
-    width: '100%',
-    backgroundColor: '#FECF66',
-    borderRadius: 7,
-  },
-  barFillHighlight: {
-    backgroundColor: driverColors.amber,
-  },
-  barLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: driverColors.grey,
-    marginTop: 6,
-  },
-  barLabelHighlight: {
-    color: driverColors.ink,
-    fontWeight: '800',
   },
   metricsStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: driverColors.white,
-    borderRadius: driverRadius.innerCard,
+    borderRadius: driverRadius.card,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     paddingVertical: 12,
-    paddingHorizontal: 10,
-    marginTop: 14,
+    paddingHorizontal: 8,
   },
   metricItem: {
     flex: 1,
     alignItems: 'center',
+    gap: 2,
   },
   metricVal: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '800',
     color: driverColors.ink,
   },
   metricCap: {
-    fontSize: 11,
+    fontSize: 10,
     color: driverColors.grey,
-    marginTop: 2,
   },
   metricDivider: {
     width: 1,
-    height: 24,
-    backgroundColor: driverColors.hairline,
+    height: 28,
+    backgroundColor: '#E5E7EB',
+  },
+  chartBarsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    flex: 1,
+    gap: 6,
+  },
+  barCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    height: '100%',
+    justifyContent: 'flex-end',
+  },
+  tooltipPill: {
+    position: 'absolute',
+    top: -26,
+    backgroundColor: driverColors.ink,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  tooltipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: driverColors.white,
+  },
+  barTrack: {
+    width: '100%',
+    maxWidth: 26,
+    height: 84,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  barFill: {
+    width: '100%',
+    backgroundColor: driverColors.amber,
+    borderRadius: 6,
+  },
+  barFillHighlight: {
+    backgroundColor: driverColors.ink,
+  },
+  barLabel: {
+    fontSize: 10,
+    color: driverColors.grey,
+  },
+  barLabelHighlight: {
+    color: driverColors.ink,
+    fontWeight: '700',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -454,35 +546,35 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: driverColors.ink,
   },
   viewAllText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: driverColors.amberText,
+    color: colors.primaryDark,
   },
   tripList: {
-    gap: 10,
+    gap: 8,
   },
   tripRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: driverColors.white,
     borderRadius: driverRadius.card,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: driverColors.hairline,
+    borderColor: '#F1F5F9',
+    gap: 10,
   },
   tripIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F0F9FF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0F2FE',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   tripMetaCol: {
     flex: 1,
@@ -493,13 +585,13 @@ const styles = StyleSheet.create({
     color: driverColors.ink,
   },
   tripTime: {
-    fontSize: 12,
+    fontSize: 11,
     color: driverColors.grey,
     marginTop: 2,
   },
   tripFareCol: {
     alignItems: 'flex-end',
-    marginRight: 8,
+    gap: 3,
   },
   tripFare: {
     fontSize: 14,
@@ -507,11 +599,10 @@ const styles = StyleSheet.create({
     color: driverColors.ink,
   },
   completedPill: {
-    backgroundColor: driverColors.greenPill,
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
-    marginTop: 2,
   },
   completedText: {
     fontSize: 10,
@@ -524,49 +615,26 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.02,
-    shadowRadius: 3,
-    elevation: 0.5,
   },
   bankTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  scheduleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: '#DCFCE7',
-  },
-  scheduleText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: '#15803D',
+    gap: 12,
   },
   bankIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: driverColors.amberTileSoft,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#FEF3C7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   bankTextCol: {
     flex: 1,
   },
   bankName: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: driverColors.ink,
   },
   bankAcc: {
@@ -578,52 +646,64 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: driverColors.greenPill,
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 10,
+    borderRadius: 8,
   },
   verifiedText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: driverColors.green,
+  },
+  scheduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+  },
+  scheduleText: {
+    fontSize: 11.5,
+    color: driverColors.grey,
+    flex: 1,
   },
   editBankBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#FFFDF5',
-    borderWidth: 1,
-    borderColor: driverColors.amberBorder,
-    borderRadius: driverRadius.button,
+    marginTop: 14,
     paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
   },
   editBankText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '700',
-    color: driverColors.amberText,
+    color: '#92400E',
   },
   payoutRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: driverColors.white,
     borderRadius: driverRadius.card,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
-    borderColor: driverColors.hairline,
+    borderColor: '#F1F5F9',
+    gap: 10,
   },
   payoutIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: driverColors.greenPill,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DCFCE7',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   payoutAmount: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '800',
     color: driverColors.ink,
   },

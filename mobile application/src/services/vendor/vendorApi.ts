@@ -96,6 +96,58 @@ export async function getVendorStatus(): Promise<VendorProfileResponse> {
   }
 }
 
+/* ── Payout account & earnings (real backend, no mock defaults) ── */
+
+export interface PayoutAccount {
+  payoutMethod: 'bank' | 'upi';
+  accountHolderName: string;
+  /** Masked by the backend — never a full account number. */
+  accountNumberMasked?: string;
+  ifsc?: string;
+  bankName?: string;
+  upiId?: string;
+  isVerified: boolean;
+  verifiedAt?: string;
+  updatedAt?: string;
+}
+
+export interface SavePayoutAccountRequest {
+  payoutMethod: 'bank' | 'upi';
+  accountHolderName: string;
+  bank?: { accountNumber: string; ifsc: string; bankName: string };
+  upi?: { upiId: string };
+}
+
+export interface VendorEarnings {
+  currency: 'INR';
+  totals: { today: number; week: number; month: number; allTime: number };
+  payouts: Array<{ id: string; amount: number; status: string; paidAt: string; description?: string }>;
+  dailyEarnings: Array<{ date: string; amount: number }>;
+}
+
+/** 404 from this endpoint = no payout saved yet — callers treat it as empty state. */
+export async function getPayoutAccount(): Promise<PayoutAccount> {
+  const { data } = await apiClient.get<ApiSuccessResponse<PayoutAccount>>(
+    API_ENDPOINTS.vendorPayoutAccount,
+  );
+  return data.data;
+}
+
+export async function savePayoutAccount(payload: SavePayoutAccountRequest): Promise<PayoutAccount> {
+  const { data } = await apiClient.put<ApiSuccessResponse<PayoutAccount>>(
+    API_ENDPOINTS.vendorPayoutAccount,
+    payload,
+  );
+  return data.data;
+}
+
+export async function getVendorEarnings(): Promise<VendorEarnings> {
+  const { data } = await apiClient.get<ApiSuccessResponse<VendorEarnings>>(
+    API_ENDPOINTS.vendorEarnings,
+  );
+  return data.data;
+}
+
 export interface VendorDashboardStats {
   jobsToday: number;
   earningsToday: number;

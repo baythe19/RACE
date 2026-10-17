@@ -39,6 +39,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { openPartnerNotifications } from '../../../navigation/partnerNavigationRef';
+import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
@@ -195,8 +196,8 @@ function RequestJobCard({
     <View
       style={{
         backgroundColor: C.card,
-        borderRadius: px(R.innerCard),
-        borderWidth: 1,
+        borderRadius: px(R.card),
+        borderWidth: 1.25,
         borderColor: C.amberBorder,
         padding: px(12),
         marginBottom: px(10),
@@ -204,14 +205,14 @@ function RequestJobCard({
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
           style={{
-            width: px(40),
-            height: px(40),
-            borderRadius: px(20),
+            width: px(M.jobTile),
+            height: px(M.jobTile),
+            borderRadius: px(R.tile),
             backgroundColor: C.amberTileSoft,
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          <JobGlyph job={job} px={px} size={24} />
+          <JobGlyph job={job} px={px} size={20} />
         </View>
 
         <View style={{ flex: 1, marginLeft: px(10) }}>
@@ -231,7 +232,7 @@ function RequestJobCard({
               </View>
               <PartnerText
                 numberOfLines={1}
-                style={[T.jobTitle, { fontSize: px(13.5), color: C.inkSoft }]}>
+                style={[T.jobTitle, { fontSize: px(11.5), lineHeight: px(15), color: C.inkSoft }]}>
                 #{job.bookingNumber}
               </PartnerText>
             </View>
@@ -241,7 +242,7 @@ function RequestJobCard({
                 <PartnerText
                   style={[
                     T.distance,
-                    { fontSize: px(12.5), lineHeight: px(16), color: C.green, marginLeft: px(3) },
+                    { fontSize: px(11.5), lineHeight: px(15), color: C.green, marginLeft: px(3) },
                   ]}>
                   {job.distanceKm} km away
                 </PartnerText>
@@ -255,26 +256,26 @@ function RequestJobCard({
         numberOfLines={1}
         style={[
           T.jobTitle,
-          { fontSize: px(14.5), lineHeight: px(19), color: C.ink, marginTop: px(8) },
+          { fontSize: px(14), lineHeight: px(18), color: C.ink, marginTop: px(6) },
         ]}>
         {serviceTitle(job)}
       </PartnerText>
 
       {pickup || drop ? (
-        <View style={{ flexDirection: 'row', marginTop: px(7) }}>
+        <View style={{ flexDirection: 'row', marginTop: px(6) }}>
           <RouteSpine px={px} />
           <View style={{ flex: 1, marginLeft: px(9) }}>
             {pickup ? (
               <PartnerText
                 numberOfLines={1}
-                style={[T.body, { fontSize: px(13), color: C.inkSoft }]}>
+                style={[T.body, { fontSize: px(12), lineHeight: px(16), color: C.inkSoft }]}>
                 {pickup}
               </PartnerText>
             ) : null}
             {drop ? (
               <PartnerText
                 numberOfLines={1}
-                style={[T.body, { fontSize: px(13), color: C.inkSoft, marginTop: px(6) }]}>
+                style={[T.body, { fontSize: px(12), lineHeight: px(16), color: C.inkSoft, marginTop: px(4) }]}>
                 {drop}
               </PartnerText>
             ) : null}
@@ -287,14 +288,14 @@ function RequestJobCard({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginTop: px(6),
+            marginTop: px(4),
             paddingLeft: px(24),
           }}>
           <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
           <PartnerText
             style={[
               T.meta,
-              { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginLeft: px(6) },
+              { fontSize: px(10.5), lineHeight: px(14), color: C.greySoft, marginLeft: px(6) },
             ]}>
             {formatWhen(job.createdAt)}
           </PartnerText>
@@ -302,14 +303,14 @@ function RequestJobCard({
       ) : null}
 
       {job.estimatedFare != null ? (
-        <View style={{ marginTop: px(8), paddingLeft: px(24) }}>
-          <PartnerText style={[T.metricValue, { fontSize: px(22), lineHeight: px(26), color: C.ink }]}>
+        <View style={{ marginTop: px(6), paddingLeft: px(24) }}>
+          <PartnerText style={[T.metricValue, { fontSize: px(18), lineHeight: px(22), color: C.ink }]}>
             {formatInr(job.estimatedFare)}
           </PartnerText>
           <PartnerText
             style={[
               T.small,
-              { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft, marginTop: px(1) },
+              { fontSize: px(10.5), lineHeight: px(14), color: C.greySoft, marginTop: px(1) },
             ]}>
             Estimated earnings
           </PartnerText>
@@ -317,7 +318,7 @@ function RequestJobCard({
       ) : null}
 
       {/* Action buttons in one line side-by-side */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(10) }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(8) }}>
         <Pressable
           onPress={onDecline}
           disabled={busy}
@@ -325,7 +326,7 @@ function RequestJobCard({
           accessibilityLabel={`Decline trip ${job.bookingNumber}`}
           style={({ pressed }) => ({
             flex: 1,
-            height: px(40),
+            height: px(48),
             borderRadius: px(R.button),
             backgroundColor: C.light,
             alignItems: 'center',
@@ -357,7 +358,7 @@ function RequestJobCard({
           }
           style={({ pressed }) => ({
             flex: 1.5,
-            height: px(40),
+            height: px(48),
             borderRadius: px(R.button),
             backgroundColor: hasActiveJob ? '#E2E8F0' : busy ? C.amberBorder : C.amber,
             alignItems: 'center',
@@ -1213,90 +1214,79 @@ export default function DriverJobsScreen({ navigation }: Props) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
-      {/* fixed header ------------------------------------------------- */}
+      {/* Brand, action and subtitle follow the vendor Jobs header rhythm. */}
       <View
         style={{
-          paddingTop: insets.top + px(6),
+          paddingTop: insets.top + px(4),
           paddingHorizontal: px(M.pagePadding),
           paddingBottom: px(6),
           backgroundColor: C.pageBg,
           borderBottomWidth: 1,
           borderBottomColor: C.hairline,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
           zIndex: 10,
         }}>
-        <View>
-          <PartnerText
-            style={[
-              T.greeting,
-              {
-                fontSize: px(22),
-                lineHeight: px(28),
-                color: C.ink,
-                letterSpacing: -0.3,
-              },
-            ]}>
-            Jobs
-          </PartnerText>
-          <PartnerText
-            style={[
-              T.subtitle,
-              { fontSize: px(12.5), lineHeight: px(16), color: C.grey, marginTop: px(1) },
-            ]}>
-            Trips approved for you
-          </PartnerText>
-        </View>
-
-        <Pressable
-          onPress={openPartnerNotifications}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={
-            badgeCount > 0 ? `Notifications, ${badgeCount} unread` : 'Notifications'
-          }
+        <View
           style={{
-            width: px(36),
-            height: px(36),
-            borderRadius: px(18),
-            backgroundColor: C.card,
-            borderWidth: 1,
-            borderColor: C.hairline,
+            minHeight: px(36),
+            flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'space-between',
           }}>
-          <Bell size={px(18)} color={C.ink} strokeWidth={2} />
-          {badgeCount > 0 ? (
-            <View
-              style={{
-                position: 'absolute',
-                top: -px(3),
-                right: -px(3),
-                minWidth: px(17),
-                height: px(17),
-                borderRadius: px(8.5),
-                backgroundColor: C.red,
-                borderWidth: 1.5,
-                borderColor: '#FFFFFF',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: px(2),
-              }}>
-              <PartnerText
+          <PartnerHeaderLogo width={px(76)} />
+          <Pressable
+            onPress={openPartnerNotifications}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={
+              badgeCount > 0 ? `Notifications, ${badgeCount} unread` : 'Notifications'
+            }
+            style={{
+              width: px(32),
+              height: px(32),
+              borderRadius: px(16),
+              backgroundColor: C.card,
+              borderWidth: 1,
+              borderColor: C.hairline,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Bell size={px(18)} color={C.ink} strokeWidth={2} />
+            {badgeCount > 0 ? (
+              <View
                 style={{
-                  fontSize: px(9),
-                  fontWeight: '800',
-                  color: '#FFFFFF',
-                  lineHeight: px(11),
-                  textAlign: 'center',
-                  includeFontPadding: false,
+                  position: 'absolute',
+                  top: -px(3),
+                  right: -px(3),
+                  minWidth: px(17),
+                  height: px(17),
+                  borderRadius: px(8.5),
+                  backgroundColor: C.red,
+                  borderWidth: 1.5,
+                  borderColor: '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: px(2),
                 }}>
-                {badgeCount > 9 ? '9+' : badgeCount}
-              </PartnerText>
-            </View>
-          ) : null}
-        </Pressable>
+                <PartnerText
+                  style={{
+                    fontSize: px(9),
+                    fontWeight: '800',
+                    color: '#FFFFFF',
+                    lineHeight: px(11),
+                    textAlign: 'center',
+                    includeFontPadding: false,
+                  }}>
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </PartnerText>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
+        <PartnerText
+          style={[T.subtitle, { fontSize: px(12.5), lineHeight: px(16), color: C.grey, marginTop: px(4) }]}
+          numberOfLines={1}>
+          Trips approved by your vendor appear here — accept to start.
+        </PartnerText>
       </View>
 
       <ScrollView
@@ -1306,32 +1296,43 @@ export default function DriverJobsScreen({ navigation }: Props) {
         <View
           style={{
             flexDirection: 'row',
-            alignItems: 'center',
+            gap: px(8),
             marginTop: px(8),
             marginHorizontal: px(M.pagePadding),
-            borderRadius: px(R.innerCard),
-            borderWidth: 1,
-            borderColor: C.hairline,
-            backgroundColor: C.card,
-            paddingVertical: px(4),
-            paddingHorizontal: px(6),
           }}>
-          <JobsCount label="ready to accept" count={offers.length} px={px} />
-          <View style={{ width: 1, height: px(20), backgroundColor: C.hairline }} />
-          <JobsCount label="active trip" count={activeJobs.length} px={px} />
+          <View
+            style={{
+              flex: 1,
+              borderRadius: px(14),
+              borderWidth: 1,
+              borderColor: C.hairline,
+              backgroundColor: C.card,
+              paddingVertical: px(4),
+              paddingHorizontal: px(2),
+            }}>
+            <JobsCount label="ready to accept" count={offers.length} px={px} />
+          </View>
+          <View
+            style={{
+              flex: 1,
+              borderRadius: px(14),
+              borderWidth: 1,
+              borderColor: C.hairline,
+              backgroundColor: C.card,
+              paddingVertical: px(4),
+              paddingHorizontal: px(2),
+            }}>
+            <JobsCount label="active trip" count={activeJobs.length} px={px} />
+          </View>
         </View>
 
         {/* segmented tabs ----------------------------------------------- */}
         <View
           style={{
             flexDirection: 'row',
+            gap: px(6),
             marginTop: px(12),
             marginHorizontal: px(M.pagePadding),
-            padding: px(4),
-            borderRadius: px(14),
-            backgroundColor: '#F1F5F9',
-            borderWidth: 1,
-            borderColor: '#E2E8F0',
           }}>
           {segments.map(item => {
             const selected = item.id === segment;
@@ -1343,47 +1344,40 @@ export default function DriverJobsScreen({ navigation }: Props) {
                 accessibilityState={{ selected }}
                 style={({ pressed }) => ({
                   flex: 1,
-                  height: px(36),
-                  paddingHorizontal: px(4),
-                  borderRadius: px(10),
-                  backgroundColor: selected ? C.card : 'transparent',
+                  minHeight: px(30),
+                  paddingHorizontal: px(6),
+                  borderRadius: px(8),
+                  backgroundColor: selected ? C.amber : C.light,
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderWidth: selected ? 1 : 0,
-                  borderColor: selected ? 'rgba(0,0,0,0.06)' : 'transparent',
-                  ...(selected
-                    ? {
-                        shadowColor: '#0F172A',
-                        shadowOpacity: 0.08,
-                        shadowRadius: 4,
-                        shadowOffset: { width: 0, height: 1.5 },
-                        elevation: 2,
-                      }
-                    : {}),
-                  opacity: pressed ? 0.9 : 1,
+                  borderWidth: 1,
+                  borderColor: selected ? C.amber : '#E5E7EB',
+                  opacity: pressed ? 0.86 : 1,
                 })}>
                 <PartnerText
                   style={{
-                    fontSize: px(13),
-                    lineHeight: px(17),
+                    fontSize: px(12),
+                    lineHeight: px(15),
                     fontWeight: selected ? '700' : '600',
-                    color: selected ? C.ink : '#64748B',
+                    color: selected ? C.ink : C.grey,
                   }}>
                   {item.label}
                 </PartnerText>
                 <View
                   style={{
-                    marginLeft: px(5),
-                    paddingHorizontal: px(6),
-                    paddingVertical: px(1.5),
-                    borderRadius: px(10),
+                    marginLeft: px(4),
+                    minWidth: px(17),
+                    paddingHorizontal: px(5),
+                    paddingVertical: px(1),
+                    borderRadius: px(R.pill),
+                    alignItems: 'center',
                     backgroundColor: selected ? C.amberTile : 'rgba(100, 116, 139, 0.12)',
                   }}>
                   <PartnerText
                     style={{
-                      fontSize: px(10.5),
-                      lineHeight: px(13),
+                      fontSize: px(10),
+                      lineHeight: px(12),
                       fontWeight: '700',
                       color: selected ? C.amberText : '#64748B',
                     }}>

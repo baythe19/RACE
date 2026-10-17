@@ -147,6 +147,73 @@ export type UploadDocumentDto = z.infer<typeof uploadDocumentSchema>;
 export type ReviewVendorDto = z.infer<typeof reviewVendorSchema>;
 export type ReviewDocumentDto = z.infer<typeof reviewDocumentSchema>;
 
+/** Vendor payout account — bank transfer or UPI VPA. Real validation, no mocks.
+ *  IFSC: 4 letters (bank) + 0 + 6 alphanumerics (branch). UPI: name@handle. */
+export const savePayoutAccountSchema = z
+  .object({
+    payoutMethod: z.enum(['bank', 'upi']),
+    accountHolderName: z.string().trim().min(3).max(80),
+    bank: z
+      .object({
+        accountNumber: z.string().trim().regex(/^\d{9,18}$/, 'Account number must be 9-18 digits'),
+        ifsc: z.string().trim().toUpperCase().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, 'Invalid IFSC code'),
+        bankName: z.string().trim().min(2).max(80),
+      })
+      .optional(),
+    upi: z
+      .object({
+        upiId: z
+          .string()
+          .trim()
+          .toLowerCase()
+          .regex(/^[\w.\-]{2,64}@[a-zA-Z]{2,32}$/, 'Invalid UPI ID (e.g. name@okhdfcbank)'),
+      })
+      .optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.payoutMethod === 'bank' && !value.bank) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['bank'], message: 'Bank details are required' });
+    }
+    if (value.payoutMethod === 'upi' && !value.upi) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['upi'], message: 'UPI details are required' });
+    }
+  });
+
+export type SavePayoutAccountDto = z.infer<typeof savePayoutAccountSchema>;
+
+export interface PayoutAccountDto {
+  payoutMethod: 'bank' | 'upi';
+  accountHolderName: string;
+  /** Masked for display — never return the full number to the client. */
+  accountNumberMasked?: string;
+  ifsc?: string;
+  bankName?: string;
+  upiId?: string;
+  isVerified: boolean;
+  verifiedAt?: string;
+  updatedAt?: string;
+}
+
+export interface VendorEarningsDto {
+  currency: 'INR';
+  totals: {
+    today: number;
+    week: number;
+    month: number;
+    allTime: number;
+  };
+  /** Payouts actually marked VENDOR_PAYOUT / COMPLETED. */
+  payouts: Array<{
+    id: string;
+    amount: number;
+    status: string;
+    paidAt: string;
+    description?: string;
+  }>;
+  /** Real completed job payments for the chart (last 7 days, per day). */
+  dailyEarnings: Array<{ date: string; amount: number }>;
+}
+
 export interface VendorDocumentDto {
   id: string;
   documentType: string;

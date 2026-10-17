@@ -7,7 +7,7 @@ import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { canTransition } from '../bookingStatusConstants';
 import { appendStatusHistory } from './booking';
-import { emitBookingStatusUpdate } from '../socket';
+import { emitBookingStatusUpdate, emitToDriver } from '../socket';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
 import { generateTripStartOtp } from './tripOtp';
 import type { ActiveBookingType } from '../../../models/src/user';
@@ -530,12 +530,20 @@ export async function claimOpenBookingOffer(
     activeBookingType: bookingType,
   }).exec();
 
+  // VOC P0.3: the trip-start OTP must reach ONLY the assigned driver — it is
+  // no longer broadcast to the shared booking room, where any authenticated
+  // socket (previously even unauthenticated) could hear it.
   emitBookingStatusUpdate(bookingId, 'DRIVER_EN_ROUTE', {
     internalStatus: 'DRIVER_EN_ROUTE',
     driverAccepted: true,
     message: 'Partner accepted your booking',
     assignedFleetVehicleLabel: fleetVehicleLabel,
+  });
+  emitToDriver(driverId, 'trip:otp', {
+    bookingId,
+    bookingType,
     tripStartOtp,
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
   });
 
   return {

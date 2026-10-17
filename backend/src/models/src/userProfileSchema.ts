@@ -25,6 +25,21 @@ export type VerificationStage =
 
 export type DriverStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 
+/** Vendor payout destination — bank transfer or UPI VPA.
+ *  `isVerified` is set only by a real verification step (penny-drop or admin review). */
+export interface VendorBankDetails {
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  bankName?: string;
+  payoutMethod?: 'bank' | 'upi';
+  upiId?: string;
+  isVerified?: boolean;
+  verifiedAt?: Date;
+  source?: 'vendor_app' | 'admin' | 'seed';
+  updatedAt?: Date;
+}
+
 export interface IVendorProfile {
   vendorType: VendorType;
   status: VendorStatus;
@@ -38,12 +53,7 @@ export interface IVendorProfile {
     capacity?: string;
     photos?: string[];
   };
-  bankDetails?: {
-    accountHolderName?: string;
-    accountNumber?: string;
-    ifsc?: string;
-    bankName?: string;
-  };
+  bankDetails?: VendorBankDetails;
   partnerDriverDetails?: {
     dateOfBirth?: string;
     emergencyContact?: {

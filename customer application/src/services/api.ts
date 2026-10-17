@@ -31,6 +31,11 @@ async function getAccessToken(): Promise<string | null> {
   return SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
 }
 
+/** socketService (and other non-axios callers) read the current user token. */
+export async function readAccessToken(): Promise<string | null> {
+  return getAccessToken();
+}
+
 async function getRefreshToken(): Promise<string | null> {
   return SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
 }
