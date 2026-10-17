@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import { getCache } from '../../config/cache';
 import { logger } from '../../utils/src/logger';
 
 export interface LatLng {
@@ -39,6 +40,23 @@ export async function getDistanceAndDuration(
 
   const url = `https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`;
 
+  // BUG-18: Distance Matrix is a billed API and /fare is public — identical
+  // origin/destination pairs are served from a 10-minute cache so a client
+  // cannot burn quota by replaying the same request. Rounding to 3 decimals
+  // makes the key stable across trivial GPS jitter.
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  const cacheKey = `dm:${round(origin.latitude)},${round(origin.longitude)}:${round(destination.latitude)},${round(destination.longitude)}`;
+  try {
+    const cache = getCache();
+    const hit = await cache.get(cacheKey);
+    if (hit) {
+      const parsed = JSON.parse(hit) as { distanceKm: number; durationMinutes: number };
+      return parsed;
+    }
+  } catch {
+    // cache unavailable — fall through to the live call
+  }
+
   try {
     const response = await fetch(url);
 
@@ -69,10 +87,17 @@ export async function getDistanceAndDuration(
       return null;
     }
 
-    return {
+    const result = {
       distanceKm: element.distance.value / 1000,
       durationMinutes: element.duration.value / 60,
     };
+
+    // Cache-aside write: 10 minutes (600 s). Best-effort; failures are ignored.
+    void getCache()
+      .set(cacheKey, JSON.stringify(result), 'EX', 600)
+      .catch(() => undefined);
+
+    return result;
   } catch (error) {
     logger.warn('Google Distance Matrix request threw', {
       error: error instanceof Error ? error.message : String(error),

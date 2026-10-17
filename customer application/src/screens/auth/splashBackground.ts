@@ -1,4 +1,4 @@
-/** Bundled `golden-sunrise-tow-truck-highway.png` pixel size */
+/** Bundled `golden-sunrise-tow-truck-highway.jpg` pixel size */
 export const SPLASH_BG_WIDTH = 854;
 export const SPLASH_BG_HEIGHT = 1842;
 

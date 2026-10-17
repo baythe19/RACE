@@ -73,7 +73,7 @@ export async function generateTokenPair(
   role: string,
   mobileNumber: string,
 ): Promise<TokenPair> {
-  const accessToken = signAccessToken({ sub: userId, role, mobileNumber });
+  const accessToken = signAccessToken({ sub: userId, role, mobileNumber, tokenType: 'user' });
   const { token: refreshToken, jti } = signRefreshToken(userId);
   await storeRefreshToken(userId, jti);
 

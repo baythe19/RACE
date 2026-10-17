@@ -25,3 +25,12 @@ export const otpRateLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'OTP rate limit exceeded' },
 });
+
+/** BUG-18: /fare calls the billed Google Distance Matrix — tight per-IP cap. */
+export const fareRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.NODE_ENV === 'production' ? 30 : 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Fare estimate limit reached. Please try again later.' },
+});
