@@ -31,6 +31,7 @@ export class DriverRepository {
       fullName: data.fullName,
       email: data.email,
       role: 'driver',
+      isAvailable: false,
       isVerified: data.isVerified ?? true,
       isProfileCompleted: false,
       driverProfile: {
@@ -67,36 +68,60 @@ export class DriverRepository {
   }
 
   async updateById(id: string, data: Partial<DriverRecord>): Promise<DriverRecord | null> {
-    const user = await UserModel.findOne({ _id: id, role: 'driver' });
-    if (!user?.driverProfile) return null;
+    const set: Record<string, unknown> = {};
+    const unset: Record<string, 1> = {};
 
-    if (data.name) user.fullName = data.name;
-    if (data.phone) user.mobileNumber = data.phone;
-    if (data.email !== undefined) user.email = data.email;
-
-    const profile = user.driverProfile;
-    if (data.driverCode) profile.driverCode = data.driverCode;
-    if (data.licenseNo) profile.licenseNo = data.licenseNo;
-    if (data.driverType) profile.driverType = data.driverType;
+    if (data.name) set.fullName = data.name;
+    if (data.phone) set.mobileNumber = data.phone;
+    if (data.email !== undefined) set.email = data.email;
+    if (data.driverCode) set['driverProfile.driverCode'] = data.driverCode;
+    if (data.licenseNo) set['driverProfile.licenseNo'] = data.licenseNo;
+    if (data.driverType) set['driverProfile.driverType'] = data.driverType;
     if (data.vendorId !== undefined) {
-      profile.vendorUserId = data.vendorId ? new Types.ObjectId(data.vendorId.toString()) : undefined;
+      if (data.vendorId) {
+        set['driverProfile.vendorUserId'] = new Types.ObjectId(data.vendorId.toString());
+      } else {
+        unset['driverProfile.vendorUserId'] = 1;
+      }
     }
-    if (data.city) profile.city = data.city;
-    if (data.state) profile.state = data.state;
-    if (data.vehicleRegistration !== undefined) profile.vehicleRegistration = data.vehicleRegistration;
-    if (data.status) profile.status = data.status;
-    if (data.rating != null) profile.rating = data.rating;
-    if (data.reviewCount != null) profile.reviewCount = data.reviewCount;
-    if (data.totalTrips != null) profile.totalTrips = data.totalTrips;
-    if (data.documents) profile.documents = data.documents;
-    if (data.statusHistory) profile.statusHistory = data.statusHistory;
+    if (data.city) set['driverProfile.city'] = data.city;
+    if (data.state) set['driverProfile.state'] = data.state;
+    if (data.vehicleRegistration !== undefined) {
+      if (data.vehicleRegistration) {
+        set['driverProfile.vehicleRegistration'] = data.vehicleRegistration;
+      } else {
+        unset['driverProfile.vehicleRegistration'] = 1;
+      }
+    }
+    if (data.status) {
+      set['driverProfile.status'] = data.status;
+      set.isAvailable = false;
+    }
+    if (data.rating != null) set['driverProfile.rating'] = data.rating;
+    if (data.reviewCount != null) set['driverProfile.reviewCount'] = data.reviewCount;
+    if (data.totalTrips != null) set['driverProfile.totalTrips'] = data.totalTrips;
+    if (data.documents) set['driverProfile.documents'] = data.documents;
+    if (data.statusHistory) set['driverProfile.statusHistory'] = data.statusHistory;
 
-    await user.save();
-    return toDriverRecord(user);
+    const update: Record<string, unknown> = {};
+    if (Object.keys(set).length) update.$set = set;
+    if (Object.keys(unset).length) update.$unset = unset;
+
+    const user = await UserModel.findOneAndUpdate(
+      { _id: id, role: 'driver', activeBookingId: null },
+      update,
+      { new: true, runValidators: true },
+    ).exec();
+
+    return user?.driverProfile ? toDriverRecord(user) : null;
   }
 
   async deleteById(id: string): Promise<DriverRecord | null> {
-    const user = await UserModel.findOneAndDelete({ _id: id, role: 'driver' });
+    const user = await UserModel.findOneAndDelete({
+      _id: id,
+      role: 'driver',
+      activeBookingId: null,
+    });
     return user?.driverProfile ? toDriverRecord(user) : null;
   }
 

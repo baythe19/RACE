@@ -1,12 +1,13 @@
 import { Types } from 'mongoose';
 
-import { BookingModel } from '../../../models/src/booking';
+import { BookingModel, type BookingStatus } from '../../../models/src/booking';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { UserModel } from '../../../models/src/user';
 import { VehicleModel } from '../../../models/src/vehicle';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import { releaseDriver } from '../bookings/driverAssignment';
+import { adminServiceBookingsService } from './adminServiceBookings';
 import { emitBookingStatusUpdate } from '../socket';
 import { TransactionModel } from '../../../models/src/transaction';
 import { escapeRegex } from './pagination';
@@ -15,7 +16,26 @@ import { createNotification } from './notificationService';
 import { mapLocationPoint } from './responseMappers';
 import { generateBookingFinancials, generateRefund } from './transactionEngine';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
-import { NotFoundError } from '../../../utils/src/errors';
+import { BadRequestError, NotFoundError } from '../../../utils/src/errors';
+import { canTransition, UNIFIED_BOOKING_STATUSES, type UnifiedBookingStatus } from '../bookingStatusConstants';
+
+const LEGACY_ADMIN_TRANSITIONS: Record<string, string[]> = {
+  CREATED: ['ASSIGNED', 'CANCELLED'],
+  ASSIGNED: ['ACCEPTED', 'CANCELLED'],
+  ACCEPTED: ['EN_ROUTE', 'CANCELLED'],
+  EN_ROUTE: ['ARRIVED', 'CANCELLED'],
+  ARRIVED: ['SERVICE_STARTED', 'CANCELLED'],
+  SERVICE_STARTED: ['SERVICE_COMPLETED', 'CANCELLED'],
+  SERVICE_COMPLETED: ['PAYMENT_PENDING', 'PAID', 'COMPLETED'],
+  PAYMENT_PENDING: ['PAID', 'REFUNDED', 'CANCELLED'],
+  PAID: ['REFUNDED'],
+  CANCELLED: ['REFUNDED'],
+  REFUNDED: [],
+};
+
+function canAdminTransitionLegacy(current: BookingStatus, next: string): boolean {
+  return LEGACY_ADMIN_TRANSITIONS[current]?.includes(next) ?? false;
+}
 
 const COMPLETED_STATUSES = ['SERVICE_COMPLETED', 'PAID'];
 
@@ -639,6 +659,17 @@ export const adminBookingsService = {
     actor: { id: string; name: string },
     options?: { reason?: string; amount?: number; bookingType?: AdminBookingType },
   ) {
+    if (
+      status === 'CANCELLED' &&
+      (options?.bookingType === 'towing' || options?.bookingType === 'driver')
+    ) {
+      return adminServiceBookingsService.cancelBooking(id, {
+        bookingType: options.bookingType,
+        reason: options.reason?.trim() || 'Cancelled by admin',
+        refundAmount: options.amount,
+      }, actor);
+    }
+
     if (options?.bookingType === 'towing' || options?.bookingType === 'driver') {
       const booking =
         options.bookingType === 'towing'
@@ -646,7 +677,19 @@ export const adminBookingsService = {
           : await DriverBookingModel.findById(id);
       if (!booking) throw new NotFoundError('Booking not found');
 
-      booking.status = status as never;
+      const nextStatus = UNIFIED_BOOKING_STATUSES.find((candidate) => candidate === status) as
+        | UnifiedBookingStatus
+        | undefined;
+      if (!nextStatus || !canTransition(booking.status, nextStatus)) {
+        throw new BadRequestError('Invalid booking status transition');
+      }
+      if (nextStatus !== 'CONFIRMED') {
+        throw new BadRequestError(
+          'Use driver assignment and trip actions to advance an active service booking',
+        );
+      }
+
+      booking.status = nextStatus;
       booking.statusHistory.push({
         status: status as never,
         timestamp: new Date(),
@@ -655,7 +698,7 @@ export const adminBookingsService = {
       await booking.save();
 
       if (['COMPLETED', 'CANCELLED'].includes(status) && booking.driverId) {
-        await releaseDriver(booking.driverId.toString());
+        await releaseDriver(booking.driverId.toString(), booking._id.toString());
       }
 
       emitBookingStatusUpdate(booking._id.toString(), status, {
@@ -686,6 +729,16 @@ export const adminBookingsService = {
 
     const booking = await BookingModel.findById(id);
     if (!booking) throw new NotFoundError('Booking not found');
+    if (!canAdminTransitionLegacy(booking.status, status)) {
+      throw new BadRequestError('Invalid booking status transition');
+    }
+    if (status === 'REFUNDED') {
+      const refundAmount = options?.amount ?? booking.invoice?.total ?? 0;
+      const maximumRefund = booking.invoice?.total ?? 0;
+      if (!Number.isFinite(refundAmount) || refundAmount <= 0 || refundAmount > maximumRefund) {
+        throw new BadRequestError('Refund amount must be positive and cannot exceed the booking total');
+      }
+    }
 
     await pushStatus(booking, status);
 

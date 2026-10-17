@@ -42,12 +42,15 @@ export function useBookings() {
     queryKey: ['bookings', filters],
     queryFn: () => getBookings(filters),
     placeholderData: (prev) => prev,
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 
   const countsQuery = useQuery({
     queryKey: ['booking-status-counts'],
     queryFn: getBookingStatusCountsApi,
-  });
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
 
   const serviceTypes = useMemo(() => getBookingServiceTypes(), []);
 

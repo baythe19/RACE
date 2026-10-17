@@ -1,9 +1,13 @@
+import { Types } from 'mongoose';
 import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../utils/src/errors';
 import { notificationService } from './eventNotification';
 import { storageService } from '../../storage/src/index';
 import { BookingModel } from '../../models/src/booking';
 import { TransactionModel } from '../../models/src/transaction';
 import { UserModel } from '../../models/src/user';
+import { DriverBookingModel } from '../../models/src/driverBooking';
+import { TowingBookingModel } from '../../models/src/towingBooking';
+import { PaymentTransactionModel } from '../../models/src/paymentTransaction';
 import type { VendorBankDetails } from '../../models/src/userProfileSchema';
 import { userRepository } from './userRepository';
 import { vendorRepository } from './vendorRepository';
@@ -58,6 +62,43 @@ async function mapVendor(vendor: IVendor): Promise<VendorResponseDto> {
     createdAt: vendor.createdAt.toISOString(),
     updatedAt: vendor.updatedAt.toISOString(),
   };
+}
+
+async function getServicePaymentTransactions(
+  vendorId: Types.ObjectId,
+  driverIds: Types.ObjectId[],
+) {
+  const bookingQuery =
+    driverIds.length > 0
+      ? { $or: [{ vendorId }, { driverId: { $in: driverIds } }] }
+      : { vendorId };
+  const [towingBookingIds, driverBookingIds] = await Promise.all([
+    TowingBookingModel.find(bookingQuery).distinct('_id').exec(),
+    DriverBookingModel.find(bookingQuery).distinct('_id').exec(),
+  ]);
+  const [towingTransactions, driverTransactions] = await Promise.all([
+    PaymentTransactionModel.find({
+      bookingType: 'towing',
+      bookingId: { $in: towingBookingIds },
+      status: 'success',
+    }).lean().exec(),
+    PaymentTransactionModel.find({
+      bookingType: 'driver',
+      bookingId: { $in: driverBookingIds },
+      status: 'success',
+    }).lean().exec(),
+  ]);
+  return [...towingTransactions, ...driverTransactions];
+}
+
+function netServicePayments(
+  transactions: Array<{ paymentType: string; amount: number; updatedAt: Date }>,
+  from?: Date,
+): number {
+  return transactions.reduce((total, transaction) => {
+    if (from && transaction.updatedAt < from) return total;
+    return total + (transaction.paymentType === 'refund' ? -transaction.amount : transaction.amount);
+  }, 0);
 }
 
 function assertEditable(vendor: IVendor): void {
@@ -435,17 +476,26 @@ export class VendorService {
       .select('_id')
       .lean();
     const driverIds = driverUsers.map((driver) => driver._id.toString());
+    const driverObjectIds = driverUsers.map((driver) => driver._id);
 
     const bookingQuery =
       driverIds.length > 0
         ? { $or: [{ vendorId: user._id }, { 'driver.id': { $in: driverIds } }] }
         : { vendorId: user._id };
+    const serviceBookingQuery =
+      driverObjectIds.length > 0
+        ? { $or: [{ vendorId: user._id }, { driverId: { $in: driverObjectIds } }] }
+        : { vendorId: user._id };
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const [jobsToday, earningsTodayAgg, earningsTotalAgg] = await Promise.all([
+    const [jobsToday, serviceJobsToday, earningsTodayAgg, earningsTotalAgg, serviceTransactions] = await Promise.all([
       BookingModel.countDocuments({ ...bookingQuery, createdAt: { $gte: startOfDay } }),
+      Promise.all([
+        TowingBookingModel.countDocuments({ ...serviceBookingQuery, createdAt: { $gte: startOfDay } }),
+        DriverBookingModel.countDocuments({ ...serviceBookingQuery, createdAt: { $gte: startOfDay } }),
+      ]).then((counts) => counts.reduce((sum, count) => sum + count, 0)),
       TransactionModel.aggregate([
         {
           $match: {
@@ -467,12 +517,13 @@ export class VendorService {
         },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
+      getServicePaymentTransactions(user._id, driverObjectIds),
     ]);
 
     return {
-      jobsToday,
-      earningsToday: earningsTodayAgg[0]?.total ?? 0,
-      earningsTotal: earningsTotalAgg[0]?.total ?? 0,
+      jobsToday: jobsToday + serviceJobsToday,
+      earningsToday: (earningsTodayAgg[0]?.total ?? 0) + netServicePayments(serviceTransactions, startOfDay),
+      earningsTotal: (earningsTotalAgg[0]?.total ?? 0) + netServicePayments(serviceTransactions),
     };
   }
 
@@ -580,7 +631,7 @@ export class VendorService {
       return rows[0]?.total ?? 0;
     };
 
-    const [today, week, month, allTime, payoutsRows, dailyRows] = await Promise.all([
+    const [today, week, month, allTime, payoutsRows, dailyRows, serviceTransactions] = await Promise.all([
       sum({ createdAt: { $gte: startOfToday } }),
       sum({ createdAt: { $gte: weekAgo } }),
       sum({ createdAt: { $gte: monthAgo } }),
@@ -600,11 +651,27 @@ export class VendorService {
         },
         { $sort: { _id: 1 } },
       ]),
+      getServicePaymentTransactions(user._id, driverIds),
     ]);
+
+    const dailyTotals = new Map<string, number>(
+      dailyRows.map((row) => [row._id, row.amount]),
+    );
+    for (const transaction of serviceTransactions) {
+      if (transaction.updatedAt < weekAgo) continue;
+      const date = transaction.updatedAt.toISOString().slice(0, 10);
+      const amount = transaction.paymentType === 'refund' ? -transaction.amount : transaction.amount;
+      dailyTotals.set(date, (dailyTotals.get(date) ?? 0) + amount);
+    }
 
     return {
       currency: 'INR',
-      totals: { today, week, month, allTime },
+      totals: {
+        today: today + netServicePayments(serviceTransactions, startOfToday),
+        week: week + netServicePayments(serviceTransactions, weekAgo),
+        month: month + netServicePayments(serviceTransactions, monthAgo),
+        allTime: allTime + netServicePayments(serviceTransactions),
+      },
       payouts: payoutsRows.map((row) => ({
         id: row._id?.toString() ?? '',
         amount: row.amount,
@@ -612,7 +679,9 @@ export class VendorService {
         paidAt: row.createdAt.toISOString(),
         description: row.description,
       })),
-      dailyEarnings: dailyRows.map((row) => ({ date: row._id, amount: row.amount })),
+      dailyEarnings: [...dailyTotals]
+        .sort(([first], [second]) => first.localeCompare(second))
+        .map(([date, amount]) => ({ date, amount })),
     };
   }
 }

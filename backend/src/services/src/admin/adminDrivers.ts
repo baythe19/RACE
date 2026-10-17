@@ -176,6 +176,27 @@ export const adminDriversService = {
     const existing = await driverRepository.findById(id);
     if (!existing) throw new NotFoundError('Driver not found');
 
+    if (input.status === 'APPROVED' && existing.status !== 'APPROVED') {
+      const user = await UserModel.findOne({ _id: id, role: 'driver' })
+        .select('driverProfile.documents')
+        .exec();
+      const documents = user?.driverProfile?.documents ?? [];
+      const hasVerifiedRequiredDocument = (labels: string[]) =>
+        documents.some((document) =>
+          labels.some((label) => document.type.toLowerCase().includes(label)) &&
+          document.status === 'VERIFIED',
+        );
+
+      if (
+        !hasVerifiedRequiredDocument(['driving license']) ||
+        !hasVerifiedRequiredDocument(['government id', 'aadhaar', 'pan'])
+      ) {
+        throw new BadRequestError(
+          'Verify the driver license and government ID before approving this driver',
+        );
+      }
+    }
+
     const driver = await driverRepository.updateById(id, {
       name: input.name ?? existing.name,
       phone: input.phone ?? existing.phone,
@@ -185,9 +206,17 @@ export const adminDriversService = {
       city: input.city ?? existing.city,
       vehicleRegistration: input.vehicleRegistration ?? existing.vehicleRegistration,
       vendorId: input.vendorId ? new Types.ObjectId(input.vendorId) : existing.vendorId,
-      status: (input.status ?? existing.status) as never,
+      status: input.status && input.status !== existing.status ? (input.status as never) : undefined,
     });
-    if (!driver) throw new NotFoundError('Driver not found');
+    if (!driver) {
+      const current = await UserModel.findOne({ _id: id, role: 'driver' })
+        .select('activeBookingId')
+        .exec();
+      if (current?.activeBookingId) {
+        throw new BadRequestError('Cannot update a driver during an active booking');
+      }
+      throw new NotFoundError('Driver not found');
+    }
 
     await logActivity({
       actorId: actor.id,
@@ -203,7 +232,15 @@ export const adminDriversService = {
 
   async remove(id: string, actor: { id: string; name: string }) {
     const driver = await driverRepository.deleteById(id);
-    if (!driver) throw new NotFoundError('Driver not found');
+    if (!driver) {
+      const current = await UserModel.findOne({ _id: id, role: 'driver' })
+        .select('activeBookingId')
+        .exec();
+      if (current?.activeBookingId) {
+        throw new BadRequestError('Cannot remove a driver during an active booking');
+      }
+      throw new NotFoundError('Driver not found');
+    }
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
@@ -262,7 +299,25 @@ export const adminDriversService = {
 
     if (!user.driverProfile.documents[docIndex]) throw new NotFoundError('Document not found');
 
-    user.driverProfile.documents[docIndex].status = status;
+    const reviewedDocument = user.driverProfile.documents[docIndex];
+    reviewedDocument.status = status;
+
+    const requiredDocumentRejected =
+      status === 'REJECTED' &&
+      ['driving license', 'government id', 'aadhaar', 'pan'].some((label) =>
+        reviewedDocument.type.toLowerCase().includes(label),
+      );
+    if (requiredDocumentRejected) {
+      user.driverProfile.status = 'REJECTED';
+      user.isAvailable = false;
+      user.driverProfile.statusHistory.push({
+        status: 'REJECTED',
+        note: 'Required document rejected: ' + reviewedDocument.type,
+        changedAt: new Date(),
+        changedBy: actor.id,
+      });
+    }
+
     await user.save();
 
     await logActivity({

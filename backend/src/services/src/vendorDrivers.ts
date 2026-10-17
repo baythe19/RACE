@@ -28,7 +28,7 @@ function mapVendorDriver(user: IUser) {
     city: profile?.city ?? '',
     vehicleRegistration: profile?.vehicleRegistration,
     status: profile?.status ?? 'PENDING',
-    isAvailable: Boolean(user.isAvailable),
+    isAvailable: profile?.status === 'APPROVED' && Boolean(user.isAvailable) && !user.activeBookingId,
     isBusy: Boolean(user.activeBookingId),
     rating: profile?.rating ?? 0,
     vendorId: profile?.vendorUserId?.toString() ?? '',
@@ -89,6 +89,9 @@ export class VendorDriversService {
       if (existing.role !== 'driver' || !existing.driverProfile) {
         throw new ConflictError('This mobile number is already registered as a non-driver account');
       }
+      if (existing.activeBookingId) {
+        throw new BadRequestError('Cannot add a driver with an active booking to a vendor fleet');
+      }
       const currentVendor = existing.driverProfile.vendorUserId?.toString();
       if (currentVendor && currentVendor !== vendorUserId) {
         throw new ConflictError('Driver already belongs to another vendor');
@@ -96,24 +99,44 @@ export class VendorDriversService {
 
       await assertLoginIdAvailable(loginId, existing.id);
 
-      existing.driverProfile.vendorUserId = new Types.ObjectId(vendorUserId);
-      existing.driverProfile.fleetSource = 'vendor';
-      existing.driverProfile.loginId = loginId;
-      existing.driverProfile.passwordHash = passwordHash;
-      if (dto.licenseNo) existing.driverProfile.licenseNo = dto.licenseNo;
-      if (dto.driverType) existing.driverProfile.driverType = dto.driverType;
-      if (dto.city) existing.driverProfile.city = dto.city;
+      const set: Record<string, unknown> = {
+        'driverProfile.vendorUserId': new Types.ObjectId(vendorUserId),
+        'driverProfile.fleetSource': 'vendor',
+        'driverProfile.loginId': loginId,
+        'driverProfile.passwordHash': passwordHash,
+        isAvailable: false,
+      };
+      if (dto.licenseNo) set['driverProfile.licenseNo'] = dto.licenseNo;
+      if (dto.driverType) set['driverProfile.driverType'] = dto.driverType;
+      if (dto.city) set['driverProfile.city'] = dto.city;
       if (dto.vehicleRegistration) {
-        existing.driverProfile.vehicleRegistration = dto.vehicleRegistration;
+        set['driverProfile.vehicleRegistration'] = dto.vehicleRegistration;
       }
-      if (dto.name) existing.fullName = dto.name;
+      if (dto.name) set.fullName = dto.name;
       if (process.env.NODE_ENV !== 'production') {
-        existing.driverProfile.status = 'APPROVED';
-        existing.isVerified = true;
-        existing.isProfileCompleted = true;
+        set['driverProfile.status'] = 'APPROVED';
+        set.isVerified = true;
+        set.isProfileCompleted = true;
       }
-      await existing.save();
-      return mapVendorDriver(existing);
+
+      const expectedVendorId = currentVendor
+        ? new Types.ObjectId(currentVendor)
+        : null;
+      const linked = await UserModel.findOneAndUpdate(
+        {
+          _id: existing._id,
+          role: 'driver',
+          activeBookingId: null,
+          'driverProfile.vendorUserId': expectedVendorId,
+        },
+        { $set: set },
+        { new: true, runValidators: true },
+      ).exec();
+
+      if (!linked) {
+        throw new ConflictError('Driver or booking state changed; refresh and try again');
+      }
+      return mapVendorDriver(linked);
     }
 
     const count = await driverRepository.count();
@@ -139,12 +162,7 @@ export class VendorDriversService {
 
     await UserModel.findByIdAndUpdate(created.id, {
       isProfileCompleted: true,
-      isAvailable: true,
-      currentLocation: {
-        latitude: 20.2961,
-        longitude: 85.8245,
-        updatedAt: new Date(),
-      },
+      isAvailable: false,
     }).exec();
 
     const user = await UserModel.findById(created.id).exec();
@@ -159,14 +177,37 @@ export class VendorDriversService {
     if (!driver?.driverProfile) {
       throw new NotFoundError('No driver found with this mobile number');
     }
+    if (driver.activeBookingId) {
+      throw new BadRequestError('Cannot add a driver with an active booking to a vendor fleet');
+    }
     const currentVendor = driver.driverProfile.vendorUserId?.toString();
     if (currentVendor && currentVendor !== vendorUserId) {
       throw new ConflictError('Driver already belongs to another vendor');
     }
-    driver.driverProfile.vendorUserId = new Types.ObjectId(vendorUserId);
-    driver.driverProfile.fleetSource = 'vendor';
-    await driver.save();
-    return mapVendorDriver(driver);
+    const expectedVendorId = currentVendor
+      ? new Types.ObjectId(currentVendor)
+      : null;
+    const linked = await UserModel.findOneAndUpdate(
+      {
+        _id: driver._id,
+        role: 'driver',
+        activeBookingId: null,
+        'driverProfile.vendorUserId': expectedVendorId,
+      },
+      {
+        $set: {
+          'driverProfile.vendorUserId': new Types.ObjectId(vendorUserId),
+          'driverProfile.fleetSource': 'vendor',
+          isAvailable: false,
+        },
+      },
+      { new: true, runValidators: true },
+    ).exec();
+
+    if (!linked) {
+      throw new ConflictError('Driver or booking state changed; refresh and try again');
+    }
+    return mapVendorDriver(linked);
   }
 
   async remove(vendorUserId: string, driverId: string) {
@@ -230,6 +271,9 @@ export class VendorDriversService {
     if (driver.driverProfile.vendorUserId?.toString() !== vendorUserId) {
       throw new ForbiddenError('Driver is not on your vendor team');
     }
+    if (driver.activeBookingId) {
+      throw new BadRequestError('Cannot change a driver vehicle during an active booking');
+    }
 
     const registrationRaw = (dto.vehicleRegistration ?? '').trim().toUpperCase();
     if (registrationRaw) {
@@ -264,6 +308,9 @@ export class VendorDriversService {
     if (!driver?.driverProfile) throw new NotFoundError('Driver not found');
     if (driver.driverProfile.vendorUserId?.toString() !== vendorUserId) {
       throw new ForbiddenError('Driver is not on your vendor team');
+    }
+    if (driver.activeBookingId) {
+      throw new BadRequestError('Cannot update driver documents during an active booking');
     }
 
     const upload = await storageService.uploadDriverDocument({
@@ -301,8 +348,9 @@ export class VendorDriversService {
       });
     }
 
-    // Keep driver pending until admin approves.
+    // Keep the driver offline until admin approves the updated documents.
     driver.driverProfile.status = 'PENDING';
+    driver.isAvailable = false;
     await driver.save();
 
     return mapVendorDriver(driver);

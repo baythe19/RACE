@@ -70,15 +70,43 @@ export class DriverService {
       throw new NotFoundError('Driver not found');
     }
 
-    if (!dto.isAvailable && driver.activeBookingId) {
-      throw new BadRequestError('Cannot go offline with active booking');
+    if (driver.activeBookingId) {
+      throw new BadRequestError('Availability cannot change while you have an active booking');
+    }
+    if (dto.isAvailable && driver.driverProfile?.status !== 'APPROVED') {
+      throw new ForbiddenError('Driver account pending admin approval');
     }
 
-    await userRepository.updateById(driverId, { isAvailable: dto.isAvailable });
+    const availabilityFilter = {
+      _id: driverId,
+      role: 'driver',
+      activeBookingId: null,
+      ...(dto.isAvailable ? { 'driverProfile.status': 'APPROVED' } : {}),
+    };
+    const updated = await UserModel.findOneAndUpdate(
+      availabilityFilter,
+      { $set: { isAvailable: dto.isAvailable } },
+      { new: true },
+    ).exec();
 
+    if (!updated) {
+      const current = await userRepository.findById(driverId);
+      if (!current) {
+        throw new NotFoundError('Driver not found');
+      }
+      if (current.activeBookingId) {
+        throw new BadRequestError('Availability cannot change while you have an active booking');
+      }
+      if (dto.isAvailable && current.driverProfile?.status !== 'APPROVED') {
+        throw new ForbiddenError('Driver account pending admin approval');
+      }
+      throw new BadRequestError('Availability changed; refresh and try again');
+    }
+
+    const isAvailable = updated.isAvailable === true;
     return {
-      isAvailable: dto.isAvailable,
-      message: dto.isAvailable ? 'You are now available' : 'You are now offline',
+      isAvailable,
+      message: isAvailable ? 'You are now available' : 'You are now offline',
     };
   }
 
@@ -291,7 +319,7 @@ export class DriverService {
     }
 
     if (dto.status === 'COMPLETED') {
-      await releaseDriver(driverId);
+      await releaseDriver(driverId, bookingId);
     }
 
     emitBookingStatusUpdate(bookingId, dto.status, {

@@ -57,6 +57,9 @@ export class DriverSelfService {
     }));
 
     if (user.role === 'driver' && user.driverProfile) {
+      if (user.activeBookingId) {
+        throw new BadRequestError('Cannot update driver registration during an active booking');
+      }
       user.fullName = dto.fullName;
       if (dto.email) user.email = dto.email;
       if (parsedDob && !isNaN(parsedDob.getTime())) user.dateOfBirth = parsedDob;
@@ -89,15 +92,9 @@ export class DriverSelfService {
         user.driverProfile.documents = formattedDocs;
       }
       user.driverProfile.status = status as 'PENDING' | 'APPROVED';
+      user.isAvailable = false;
       user.isProfileCompleted = true;
       user.isVerified = true;
-      if (!user.currentLocation) {
-        user.currentLocation = {
-          latitude: 20.2961,
-          longitude: 85.8245,
-          updatedAt: new Date(),
-        };
-      }
       await user.save();
       return {
         id: user.id,
@@ -128,16 +125,9 @@ export class DriverSelfService {
     }
     user.isVerified = true;
     user.isProfileCompleted = true;
-    // VOC P0.5: a brand-new self-driver must NOT become dispatch-eligible with
-    // a placeholder Bhubaneswar coordinate. Availability stays false until the
-    // device sends its first real location fix; the placeholder is only a
-    // display default in non-production.
+    // A new driver stays offline until approved and explicitly available.
+    // Do not persist a fabricated coordinate; dispatch may rank real GPS only.
     user.isAvailable = false;
-    user.currentLocation = {
-      latitude: 20.2961,
-      longitude: 85.8245,
-      updatedAt: new Date(),
-    };
     user.driverProfile = {
       driverCode,
       licenseNo: dto.licenseNo,
@@ -182,6 +172,9 @@ export class DriverSelfService {
     if (!user) throw new NotFoundError('User not found');
     if (user.role === 'vendor') {
       throw new BadRequestError('Vendor accounts use the vendor document upload path');
+    }
+    if (user.role === 'driver' && user.activeBookingId) {
+      throw new BadRequestError('Cannot update driver documents during an active booking');
     }
 
     const upload = await storageService.uploadDriverDocument({
@@ -228,6 +221,9 @@ export class DriverSelfService {
     }
 
     // A fresh upload always returns the application to admin review.
+    if (user.role === 'driver') {
+      user.isAvailable = false;
+    }
     if (user.role === 'driver' && user.driverProfile.status === 'APPROVED') {
       user.driverProfile.status = 'PENDING';
       user.driverProfile.statusHistory?.push({ status: 'PENDING', changedAt: new Date() });

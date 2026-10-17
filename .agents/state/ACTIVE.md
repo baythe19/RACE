@@ -429,3 +429,13 @@ Self-review corrections (see `02-§6`): backend is **171 route registrations / 1
 - Verified Admin web and Backend TypeScript checks, Admin production build, and repo git diff --check. Admin bundle builds successfully with a 1.12 MB main JS chunk warning.
 
 - Admin booking tabs now group legacy and service booking statuses consistently: CREATED joins Pending; assigned/en-route/service/payment states are counted as Active exactly as the filter displays them. Backend returns a typed active count. Backend typecheck and Admin production build pass (with existing large-main-chunk warning).
+
+- Backend assignment safety recheck: open-offer claims and admin/auto assignment now atomically reserve an approved, available driver before the booking compare-and-set. Failed claims release only the matching booking reservation, and completion/cancellation release is booking-scoped so an old event cannot clear a newer active job. Backend TypeScript check and git diff --check pass; no live DB concurrency run was performed.
+
+## Cross-app logic audit - 2026-10-17
+
+- Started the requested customer/driver/vendor/admin action-to-state-to-view audit; working ledger: .unlazy/cross-app-logic-audit/GATES.md and findings: docs/audit/LOGIC_CONSISTENCY_AUDIT.md.
+- Prevented concurrent double assignment by atomically reserving approved/online driver capacity before claiming a booking; failed claims and later releases are scoped to that booking.
+- Aligned availability state: drivers cannot toggle availability during active bookings; new driver records start offline; unapproved/busy drivers no longer appear online in profile/vendor mappings; admin available-driver search excludes active bookings.
+- Removed newly generated placeholder Bhubaneswar coordinates from self/vendor driver registration. Vendor fleet mutation, driver registration/KYC update, and admin driver record edits/removal now guard active-booking state.
+- Verified backend npm run lint, gate-lint, and git diff --check. No live DB/device run; destructive seed:fresh was not run against an unverified database. Partner source writes remain stopped under the active Cursor lock.

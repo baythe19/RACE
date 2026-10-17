@@ -4,8 +4,11 @@ import { UserModel } from '../../../models/src/user';
 import { driverRepository } from '../driverRepository';
 import { vendorRepository } from '../vendorRepository';
 import { BookingModel } from '../../../models/src/booking';
+import { DriverBookingModel } from '../../../models/src/driverBooking';
+import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { TransactionModel } from '../../../models/src/transaction';
 import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
+import { VendorDocumentModel } from '../../../models/src/vendorDocument';
 import { escapeRegex, paginate } from './pagination';
 import { logActivity } from './activityLogger';
 import { createNotification } from './notificationService';
@@ -28,6 +31,7 @@ import type { CreateVendorDriverDto } from '../vendorDriversValidator';
 import { notificationService } from '../eventNotification';
 import { BadRequestError, ConflictError, NotFoundError } from '../../../utils/src/errors';
 import type { IUser } from '../../../models/src/user';
+import { REQUIRED_DOCUMENTS } from '../vendorValidator';
 
 function mapAdminVendorStatus(status?: string): string {
   switch (String(status ?? 'PENDING').toUpperCase()) {
@@ -71,6 +75,55 @@ function mapVendorStatus(status: string): string {
   if (status === 'rejected') return 'REJECTED';
   if (status === 'suspended') return 'SUSPENDED';
   return 'PENDING';
+}
+
+const VENDOR_DOCUMENT_LABELS: Record<string, string> = {
+  aadhaar: 'Aadhaar Card',
+  pan: 'PAN Card',
+  gst: 'GST Certificate',
+  shop_license: 'Shop License',
+  msme: 'MSME Certificate',
+  cancelled_cheque: 'Cancelled Cheque',
+  commercial_licence: 'Commercial Licence',
+  driving_license: 'Driving License',
+  police_verification: 'Police Verification',
+  medical_certificate: 'Medical Fitness Certificate',
+  vehicle_insurance: 'Vehicle Insurance',
+  fitness_certificate: 'Fitness Certificate',
+  puc: 'PUC Certificate',
+  commercial_permit: 'Commercial Permit',
+  selfie: 'Selfie',
+  vehicle_photo: 'Vehicle Photo',
+  other: 'Other Document',
+};
+
+const VENDOR_DOCUMENT_ALIASES: Record<string, string> = {
+  'business-reg': 'shop_license',
+  bank: 'cancelled_cheque',
+  insurance: 'vehicle_insurance',
+  dl: 'driving_license',
+};
+
+function mapStoredVendorDocument(document: {
+  _id: { toString(): string };
+  documentType: string;
+  verificationStatus: string;
+  uploadedAt: Date;
+}, vendorId: string) {
+  const status =
+    document.verificationStatus === 'approved'
+      ? 'VERIFIED'
+      : document.verificationStatus === 'rejected'
+        ? 'REJECTED'
+        : 'PENDING';
+  return {
+    id: document._id.toString(),
+    key: document.documentType,
+    name: VENDOR_DOCUMENT_LABELS[document.documentType] ?? document.documentType.replace(/_/g, ' '),
+    status,
+    url: '/admin/documents/vendor/' + vendorId + '/' + document.documentType,
+    uploadedAt: document.uploadedAt.toISOString(),
+  };
 }
 
 function mapVendorFromUser(user: IUser) {
@@ -144,6 +197,23 @@ export const adminVendorsService = {
         { $group: { _id: '$vendorId', total: { $sum: '$amount' } } },
       ]),
     ]);
+    const storedDocuments = await VendorDocumentModel.find({ vendorId: { $in: vendorIds } })
+      .select('vendorId verificationStatus')
+      .lean()
+      .exec();
+    const documentStatuses = new Map<string, string[]>();
+    for (const document of storedDocuments) {
+      const key = document.vendorId.toString();
+      const statuses = documentStatuses.get(key) ?? [];
+      statuses.push(
+        document.verificationStatus === 'approved'
+          ? 'VERIFIED'
+          : document.verificationStatus === 'rejected'
+            ? 'REJECTED'
+            : 'PENDING',
+      );
+      documentStatuses.set(key, statuses);
+    }
     const driverMap = new Map(driverCounts.map((d) => [d._id.toString(), d.count]));
     const vehicleMap = new Map(vehicleCounts.map((d) => [d._id.toString(), d.count]));
     const revenueMap = new Map(revenueAgg.map((d) => [d._id.toString(), d.total]));
@@ -155,6 +225,9 @@ export const adminVendorsService = {
         driverCount: driverMap.get(v.id) ?? 0,
         vehicleCount: vehicleMap.get(v.id) ?? (v.vehicleCount || 0),
         totalRevenue: revenueMap.get(v.id) ?? 0,
+        documentsStatus: deriveDocumentsStatus(
+          (documentStatuses.get(v.id) ?? []).map((status) => ({ status })),
+        ),
       })),
     };
   },
@@ -166,29 +239,83 @@ export const adminVendorsService = {
     const base = mapVendorFromUser(user);
     const driverUsers = await UserModel.find({ role: 'driver', 'driverProfile.vendorUserId': user._id }).lean();
     const driverIds = driverUsers.map((d) => d._id.toString());
+    const driverObjectIds = driverUsers.map((d) => d._id);
 
     const bookingQuery =
       driverIds.length > 0
         ? { $or: [{ vendorId: user._id }, { 'driver.id': { $in: driverIds } }] }
         : { vendorId: user._id };
+    const serviceBookingQuery =
+      driverObjectIds.length > 0
+        ? { $or: [{ vendorId: user._id }, { driverId: { $in: driverObjectIds } }] }
+        : { vendorId: user._id };
 
-    const [vehicles, bookings, activities, revenueAgg, bookingCount] = await Promise.all([
+    const [
+      vehicles,
+      bookings,
+      towingBookings,
+      driverBookings,
+      activities,
+      revenueAgg,
+      bookingCount,
+      towingBookingCount,
+      driverBookingCount,
+      towingRevenueAgg,
+      driverRevenueAgg,
+      storedDocuments,
+    ] = await Promise.all([
       VendorVehicleModel.find({ vendorId: user._id }).lean(),
       BookingModel.find(bookingQuery).sort({ createdAt: -1 }).limit(10).lean(),
+      TowingBookingModel.find(serviceBookingQuery).sort({ createdAt: -1 }).limit(10).lean(),
+      DriverBookingModel.find(serviceBookingQuery).sort({ createdAt: -1 }).limit(10).lean(),
       getEntityActivities('vendor', id),
       TransactionModel.aggregate([
         { $match: { vendorId: user._id, type: 'PAYMENT', status: 'COMPLETED' } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       BookingModel.countDocuments(bookingQuery),
+      TowingBookingModel.countDocuments(serviceBookingQuery),
+      DriverBookingModel.countDocuments(serviceBookingQuery),
+      TowingBookingModel.aggregate([
+        {
+          $match: {
+            ...serviceBookingQuery,
+            status: { $in: ['COMPLETED', 'RATED'] },
+            paymentStatus: 'FULLY_PAID',
+          },
+        },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$finalFare', '$estimatedFare'] } } } },
+      ]),
+      DriverBookingModel.aggregate([
+        {
+          $match: {
+            ...serviceBookingQuery,
+            status: { $in: ['COMPLETED', 'RATED'] },
+            paymentStatus: 'FULLY_PAID',
+          },
+        },
+        { $group: { _id: null, total: { $sum: { $ifNull: ['$finalFare', '$estimatedFare'] } } } },
+      ]),
+      vendorRepository.findDocuments(id),
     ]);
 
-    const customerIds = [...new Set(bookings.map((b) => b.customerId.toString()))];
+    const customerIds = [
+      ...new Set([
+        ...bookings.map((b) => b.customerId.toString()),
+        ...towingBookings.map((b) => b.customerId.toString()),
+        ...driverBookings.map((b) => b.customerId.toString()),
+      ]),
+    ];
     const customers = await UserModel.find({ _id: { $in: customerIds } }).lean();
     const customerMap = new Map(customers.map((c) => [c._id.toString(), c.fullName ?? 'Customer']));
+    const driverMap = new Map(driverUsers.map((driver) => [driver._id.toString(), driver.fullName ?? 'Driver']));
 
-    const totalRevenue = revenueAgg[0]?.total ?? 0;
-    const documents = buildVendorDocuments(vendor);
+    const totalBookings = bookingCount + towingBookingCount + driverBookingCount;
+    const totalRevenue =
+      (revenueAgg[0]?.total ?? 0) +
+      (towingRevenueAgg[0]?.total ?? 0) +
+      (driverRevenueAgg[0]?.total ?? 0);
+    const documents = storedDocuments.map((document) => mapStoredVendorDocument(document, id));
 
     return {
       ...base,
@@ -204,7 +331,7 @@ export const adminVendorsService = {
       ifscCode: vendor.bankDetails?.ifsc ?? '—',
       serviceAreas: ['Bhubaneswar, Odisha'],
       workingHours: '24/7',
-      totalBookings: bookingCount,
+      totalBookings,
       totalRevenue,
       verificationStage: vendor.verificationStage,
       verificationStageLabel: mapVerificationStageLabel(vendor.verificationStage),
@@ -221,19 +348,43 @@ export const adminVendorsService = {
         year: v.year,
         status: v.status,
       })),
-      recentBookings: bookings.map((b) => ({
-        id: b._id.toString(),
-        bookingNumber: b.bookingNumber,
-        customerName: customerMap.get(b.customerId.toString()) ?? 'Customer',
-        service: b.serviceLabel,
-        driverName: b.driver?.name ?? '—',
-        status: b.status,
-        amount: b.invoice?.total ?? 0,
-        date: b.createdAt.toISOString(),
-      })),
+      recentBookings: [
+        ...bookings.map((b) => ({
+          id: b._id.toString(),
+          bookingNumber: b.bookingNumber,
+          customerName: customerMap.get(b.customerId.toString()) ?? 'Customer',
+          service: b.serviceLabel,
+          driverName: b.driver?.name ?? '—',
+          status: b.status,
+          amount: b.invoice?.total ?? 0,
+          date: b.createdAt.toISOString(),
+        })),
+        ...towingBookings.map((b) => ({
+          id: b._id.toString(),
+          bookingNumber: b.bookingNumber,
+          customerName: customerMap.get(b.customerId.toString()) ?? 'Customer',
+          service: 'Towing',
+          driverName: b.driverId ? driverMap.get(b.driverId.toString()) ?? '—' : '—',
+          status: b.status,
+          amount: b.finalFare ?? b.estimatedFare,
+          date: b.createdAt.toISOString(),
+        })),
+        ...driverBookings.map((b) => ({
+          id: b._id.toString(),
+          bookingNumber: b.bookingNumber,
+          customerName: customerMap.get(b.customerId.toString()) ?? 'Customer',
+          service: 'Driver Service',
+          driverName: b.driverId ? driverMap.get(b.driverId.toString()) ?? '—' : '—',
+          status: b.status,
+          amount: b.finalFare ?? b.estimatedFare,
+          date: b.createdAt.toISOString(),
+        })),
+      ]
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 10),
       activities,
       quickStats: [
-        { id: 'bookings', label: 'Total Bookings', value: String(bookingCount), icon: 'ClipboardList' },
+        { id: 'bookings', label: 'Total Bookings', value: String(totalBookings), icon: 'ClipboardList' },
         { id: 'revenue', label: 'Total Revenue', value: formatInr(totalRevenue), icon: 'IndianRupee' },
         { id: 'rating', label: 'Average Rating', value: base.rating > 0 ? String(base.rating) : '—', icon: 'Star' },
       ],
@@ -385,6 +536,21 @@ export const adminVendorsService = {
   async approve(id: string, actor: { id: string; name: string }) {
     const user = await UserModel.findOne({ _id: id, role: 'vendor' });
     if (!user?.vendorProfile) throw new NotFoundError('Vendor not found');
+    const requiredDocumentTypes = REQUIRED_DOCUMENTS[user.vendorProfile.vendorType] ?? [];
+    const uploadedDocuments = await vendorRepository.findDocuments(id);
+    const missingDocuments = requiredDocumentTypes.filter(
+      (documentType) =>
+        !uploadedDocuments.some(
+          (document) =>
+            document.documentType === documentType &&
+            document.verificationStatus === 'approved',
+        ),
+    );
+    if (missingDocuments.length > 0) {
+      throw new BadRequestError(
+        'Verify required vendor documents before approval: ' + missingDocuments.join(', '),
+      );
+    }
     user.vendorProfile.status = 'approved';
     user.vendorProfile.verificationStage = 'approved';
     user.vendorProfile.approvedAt = new Date();
@@ -473,13 +639,37 @@ export const adminVendorsService = {
     const user = await UserModel.findOne({ _id: id, role: 'vendor' });
     if (!user?.vendorProfile) throw new NotFoundError('Vendor not found');
 
+    const normalizedDocKey = VENDOR_DOCUMENT_ALIASES[docKey] ?? docKey;
+    const allowedDocumentTypes = Object.keys(VENDOR_DOCUMENT_LABELS);
+    if (!allowedDocumentTypes.includes(normalizedDocKey)) {
+      throw new NotFoundError('Document not found');
+    }
+
+    const storedDocument = await vendorRepository.updateDocumentStatus(
+      id,
+      normalizedDocKey,
+      status === 'VERIFIED' ? 'approved' : 'rejected',
+    );
+    if (!storedDocument) throw new NotFoundError('Uploaded vendor document not found');
+
     const reviews = [...(user.vendorProfile.documentReviews ?? [])];
-    const idx = reviews.findIndex((review) => review.key === docKey);
-    const entry = { key: docKey, status, reviewedAt: new Date() };
+    const idx = reviews.findIndex((review) => review.key === normalizedDocKey);
+    const entry = { key: normalizedDocKey, status, reviewedAt: new Date() };
     if (idx >= 0) reviews[idx] = entry;
     else reviews.push(entry);
     user.vendorProfile.documentReviews = reviews;
-    user.vendorProfile.verificationStage = 'document_review';
+    if (status === 'REJECTED') {
+      user.vendorProfile.status = 'changes_requested';
+      user.vendorProfile.verificationStage = 'document_review';
+      user.vendorProfile.reviewNotes = 'Required document rejected: ' + normalizedDocKey;
+      user.vendorProfile.statusHistory.push({
+        status: 'changes_requested',
+        changedAt: new Date(),
+        note: user.vendorProfile.reviewNotes,
+      });
+    } else if (user.vendorProfile.status !== 'approved') {
+      user.vendorProfile.verificationStage = 'document_review';
+    }
     await user.save();
 
     await logActivity({

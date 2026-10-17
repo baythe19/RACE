@@ -49,7 +49,8 @@ export function TopNavigation() {
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notification-count'],
     queryFn: getUnreadNotificationCount,
-    refetchInterval: 60_000,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   const { data: notifications } = useQuery({

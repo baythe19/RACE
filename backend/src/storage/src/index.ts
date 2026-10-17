@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -213,9 +213,56 @@ export class StorageService {
     return uploadToLocal(input, storagePath, fileName);
   }
 
+  async readUploadedFile(fileUrl: string): Promise<Buffer> {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(fileUrl);
+    } catch {
+      throw new AppError('Stored document URL is invalid', 404);
+    }
+
+    if (parsedUrl.hostname === 'storage.googleapis.com') {
+      const [bucketName, ...objectSegments] = decodeURIComponent(parsedUrl.pathname)
+        .split('/')
+        .filter(Boolean);
+      if (!bucketName || bucketName !== gcsConfig.bucketName || !objectSegments.length) {
+        throw new AppError('Stored document was not found', 404);
+      }
+      try {
+        const { Storage } = await import('@google-cloud/storage');
+        const storage = new Storage({
+          projectId: gcsConfig.projectId,
+          keyFilename: gcsConfig.keyFile || undefined,
+        });
+        const [buffer] = await storage
+          .bucket(bucketName)
+          .file(objectSegments.join('/'))
+          .download();
+        return buffer;
+      } catch (error) {
+        logger.warn('Could not read uploaded GCS document', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new AppError('Stored document could not be read', 503);
+      }
+    }
+
+    const marker = '/uploads/';
+    const markerIndex = parsedUrl.pathname.indexOf(marker);
+    if (markerIndex < 0) throw new AppError('Stored document source is unsupported', 404);
+    const relativePath = decodeURIComponent(parsedUrl.pathname.slice(markerIndex + marker.length));
+    const uploadsRoot = path.resolve(getLocalUploadsRoot());
+    const absolutePath = path.resolve(uploadsRoot, relativePath);
+    if (!absolutePath.startsWith(uploadsRoot + path.sep) || !existsSync(absolutePath)) {
+      throw new AppError('Stored document was not found', 404);
+    }
+    return readFileSync(absolutePath);
+  }
+
   getLocalFileStream(relativePath: string) {
-    const absolutePath = path.join(getLocalUploadsRoot(), relativePath);
-    if (!existsSync(absolutePath)) {
+    const uploadsRoot = path.resolve(getLocalUploadsRoot());
+    const absolutePath = path.resolve(uploadsRoot, relativePath);
+    if (!absolutePath.startsWith(uploadsRoot + path.sep) || !existsSync(absolutePath)) {
       throw new AppError('File not found', 404);
     }
     return createReadStream(absolutePath);

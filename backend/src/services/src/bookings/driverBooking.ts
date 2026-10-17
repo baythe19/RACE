@@ -199,7 +199,7 @@ export class DriverBookingService {
       (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') &&
       booking.driverId
     ) {
-      await releaseDriver(booking.driverId.toString());
+      await releaseDriver(booking.driverId.toString(), bookingId);
     }
 
     emitBookingStatusUpdate(bookingId, newStatus, {
@@ -331,7 +331,7 @@ export class DriverBookingService {
     await booking.save();
 
     if (booking.driverId) {
-      await releaseDriver(booking.driverId.toString());
+      await releaseDriver(booking.driverId.toString(), booking._id.toString());
     }
 
     if (policy.refundAmount > 0) {

@@ -60,7 +60,7 @@ function mapProfile(user: IUser): ProfileResponseDto {
     isVerified: user.isVerified,
     isProfileCompleted: user.isProfileCompleted,
     role: user.role,
-    ...(user.role === 'driver' ? { isAvailable: user.isAvailable ?? true } : {}),
+    ...(user.role === 'driver' ? { isAvailable: user.driverProfile?.status === 'APPROVED' && user.isAvailable === true && !user.activeBookingId } : {}),
     ...(user.role === 'driver' ? { driverProfile: mapDriverProfile(user) } : {}),
   };
 }

@@ -23,6 +23,32 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useBookingDetail } from '@/hooks/use-booking-detail';
 import { useAuthStore } from '@/stores/auth.store';
 
+const SERVICE_STATUS_OPTIONS: Record<string, string[]> = {
+  PENDING: ['CONFIRMED', 'CANCELLED'],
+  CONFIRMED: ['DRIVER_ASSIGNED', 'CANCELLED'],
+  DRIVER_ASSIGNED: ['CANCELLED'],
+  DRIVER_EN_ROUTE: ['CANCELLED'],
+  DRIVER_ARRIVED: ['CANCELLED'],
+  IN_PROGRESS: ['CANCELLED'],
+  COMPLETED: [],
+  RATED: [],
+  CANCELLED: [],
+};
+
+const LEGACY_STATUS_OPTIONS: Record<string, string[]> = {
+  CREATED: ['ASSIGNED', 'CANCELLED'],
+  ASSIGNED: ['ACCEPTED', 'CANCELLED'],
+  ACCEPTED: ['EN_ROUTE', 'CANCELLED'],
+  EN_ROUTE: ['ARRIVED', 'CANCELLED'],
+  ARRIVED: ['SERVICE_STARTED', 'CANCELLED'],
+  SERVICE_STARTED: ['SERVICE_COMPLETED', 'CANCELLED'],
+  SERVICE_COMPLETED: ['PAYMENT_PENDING', 'PAID', 'COMPLETED'],
+  PAYMENT_PENDING: ['PAID', 'REFUNDED', 'CANCELLED'],
+  PAID: ['REFUNDED'],
+  CANCELLED: ['REFUNDED'],
+  REFUNDED: [],
+};
+
 function SummaryCard({ booking }: { booking: BookingDetail }) {
   return (
     <Card>
@@ -147,33 +173,56 @@ export function BookingDetailContent({
   const qc = useQueryClient();
   const [selectedDriverId, setSelectedDriverId] = useState('');
   const [nextStatus, setNextStatus] = useState('');
+  const resolvedBookingType = booking?.bookingType ?? bookingType ?? 'legacy';
+  const currentStatus = booking?.internalStatus ?? booking?.status ?? '';
+  const statusOptions =
+    resolvedBookingType === 'legacy'
+      ? LEGACY_STATUS_OPTIONS[currentStatus] ?? []
+      : SERVICE_STATUS_OPTIONS[currentStatus] ?? [];
 
   const availableDriversQuery = useQuery({
-    queryKey: ['available-drivers', bookingType],
+    queryKey: ['available-drivers', resolvedBookingType],
     queryFn: () =>
       getAvailableDrivers(
-        bookingType === 'towing' || bookingType === 'driver' ? { bookingType } : undefined,
+        resolvedBookingType === 'towing' || resolvedBookingType === 'driver'
+          ? { bookingType: resolvedBookingType }
+          : undefined,
       ),
-    enabled: bookingType === 'towing' || bookingType === 'driver',
+    enabled: resolvedBookingType === 'towing' || resolvedBookingType === 'driver',
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   });
 
   const assignDriverMutation = useMutation({
-    mutationFn: (driverId: string) =>
-      assignServiceBookingDriver(bookingId, { driverId, bookingType: bookingType as 'towing' | 'driver' }),
+    mutationFn: (driverId: string) => {
+      if (resolvedBookingType !== 'towing' && resolvedBookingType !== 'driver') {
+        throw new Error('Driver assignment is only available for service bookings');
+      }
+      return assignServiceBookingDriver(bookingId, {
+        driverId,
+        bookingType: resolvedBookingType,
+      });
+    },
     onSuccess: async () => {
+      setSelectedDriverId('');
       await qc.invalidateQueries({ queryKey: ['booking', bookingId] });
       await qc.invalidateQueries({ queryKey: ['bookings'] });
+      await qc.invalidateQueries({ queryKey: ['booking-status-counts'] });
+      await qc.invalidateQueries({ queryKey: ['available-drivers'] });
     },
   });
 
   const updateStatusMutation = useMutation({
     mutationFn: (status: string) =>
       updateBookingStatus(bookingId, status, {
-        bookingType: bookingType as 'towing' | 'driver' | 'legacy' | undefined,
+        bookingType: resolvedBookingType,
       }),
     onSuccess: async () => {
+      setNextStatus('');
       await qc.invalidateQueries({ queryKey: ['booking', bookingId] });
       await qc.invalidateQueries({ queryKey: ['bookings'] });
+      await qc.invalidateQueries({ queryKey: ['booking-status-counts'] });
+      await qc.invalidateQueries({ queryKey: ['available-drivers'] });
     },
   });
 
@@ -263,7 +312,9 @@ export function BookingDetailContent({
           </Card>
         ) : null}
 
-        {bookingType === 'towing' || bookingType === 'driver' ? (
+        {(resolvedBookingType === 'towing' || resolvedBookingType === 'driver') &&
+        currentStatus === 'CONFIRMED' &&
+        !booking.driverId ? (
           <Card>
             <CardHeader>
               <CardTitle>Driver Assignment</CardTitle>
@@ -307,16 +358,7 @@ export function BookingDetailContent({
                 onChange={(e) => setNextStatus(e.target.value)}
               >
                 <option value="">Select status</option>
-                {[
-                  'PENDING',
-                  'CONFIRMED',
-                  'DRIVER_ASSIGNED',
-                  'DRIVER_EN_ROUTE',
-                  'DRIVER_ARRIVED',
-                  'IN_PROGRESS',
-                  'COMPLETED',
-                  'CANCELLED',
-                ].map((status) => (
+                {statusOptions.map((status) => (
                   <option key={status} value={status}>
                     {status}
                   </option>
@@ -331,6 +373,20 @@ export function BookingDetailContent({
                 {updateStatusMutation.isPending ? 'Updating...' : 'Update Status'}
               </button>
             </div>
+            {updateStatusMutation.isError ? (
+              <p className="mt-3 text-sm text-red-600" role="alert">
+                {updateStatusMutation.error instanceof Error
+                  ? updateStatusMutation.error.message
+                  : 'Unable to update booking status.'}
+              </p>
+            ) : null}
+            {assignDriverMutation.isError ? (
+              <p className="mt-3 text-sm text-red-600" role="alert">
+                {assignDriverMutation.error instanceof Error
+                  ? assignDriverMutation.error.message
+                  : 'Unable to assign the driver.'}
+              </p>
+            ) : null}
           </CardContent>
         </Card>
 

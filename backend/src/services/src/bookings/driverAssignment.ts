@@ -46,6 +46,66 @@ function driverTypesForBooking(bookingType: ActiveBookingType): readonly string[
   return bookingType === 'towing' ? TOWING_DRIVER_TYPES : DRIVER_SERVICE_TYPES;
 }
 
+async function reserveDriverForBooking(
+  driverObjectId: Types.ObjectId,
+  bookingObjectId: Types.ObjectId,
+  bookingType: ActiveBookingType,
+  expectedVendorId?: string | null,
+): Promise<void> {
+  const filter: Record<string, unknown> = {
+    _id: driverObjectId,
+    role: 'driver',
+    isAvailable: true,
+    'driverProfile.status': 'APPROVED',
+    activeBookingId: null,
+  };
+  if (expectedVendorId === null) {
+    filter['driverProfile.vendorUserId'] = null;
+  } else if (expectedVendorId !== undefined) {
+    filter['driverProfile.vendorUserId'] = new Types.ObjectId(expectedVendorId);
+  }
+
+  const reserved = await UserModel.findOneAndUpdate(
+    filter,
+    {
+      $set: {
+        isAvailable: false,
+        activeBookingId: bookingObjectId,
+        activeBookingType: bookingType,
+      },
+    },
+    { new: true },
+  ).exec();
+
+  if (!reserved) {
+    throw new ConflictError('Driver is no longer available or already has an active booking');
+  }
+}
+
+async function releaseDriverReservationIfBookingUnclaimed(
+  driverId: string,
+  bookingId: string,
+  bookingType: ActiveBookingType,
+): Promise<void> {
+  try {
+    const bookingModel =
+      bookingType === 'towing' ? TowingBookingModel : DriverBookingModel;
+    const assignmentPersisted = await bookingModel
+      .exists({ _id: bookingId, driverId: new Types.ObjectId(driverId) })
+      .exec();
+
+    if (!assignmentPersisted) {
+      await releaseDriver(driverId, bookingId);
+    }
+  } catch (error) {
+    logger.error('Failed to roll back a driver booking reservation', {
+      driverId,
+      bookingId,
+      error: error instanceof Error ? error.message : 'Unknown rollback error',
+    });
+  }
+}
+
 export function isDriverEligibleForBooking(
   driver: IUser,
   bookingType: ActiveBookingType,
@@ -481,6 +541,7 @@ export async function claimOpenBookingOffer(
       : undefined) ?? options?.fleetVehicleLabel;
 
   const driverObjectId = new Types.ObjectId(driverId);
+  const bookingObjectId = new Types.ObjectId(bookingId);
   const tripStartOtp = generateTripStartOtp();
   const $set: Record<string, unknown> = {
     driverId: driverObjectId,
@@ -515,20 +576,23 @@ export async function claimOpenBookingOffer(
     $or: [{ driverId: null }, { driverId: { $exists: false } }],
   };
 
-  const claimed =
-    bookingType === 'towing'
-      ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: true }).exec()
-      : await DriverBookingModel.findOneAndUpdate(filter, update, { new: true }).exec();
+  await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, vendorId ?? null);
 
-  if (!claimed) {
-    throw new ConflictError('This job was just taken by another partner');
+  let claimed;
+  try {
+    claimed =
+      bookingType === 'towing'
+        ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: true }).exec()
+        : await DriverBookingModel.findOneAndUpdate(filter, update, { new: true }).exec();
+  } catch (error) {
+    await releaseDriverReservationIfBookingUnclaimed(driverId, bookingId, bookingType);
+    throw error;
   }
 
-  await UserModel.findByIdAndUpdate(driverId, {
-    isAvailable: false,
-    activeBookingId: new Types.ObjectId(bookingId),
-    activeBookingType: bookingType,
-  }).exec();
+  if (!claimed) {
+    await releaseDriver(driverId, bookingId);
+    throw new ConflictError('This job was just taken by another partner');
+  }
 
   // VOC P0.3: the trip-start OTP must reach ONLY the assigned driver — it is
   // no longer broadcast to the shared booking room, where any authenticated
@@ -593,72 +657,88 @@ export async function assignDriverToBooking(
   if (!driver) {
     throw new NotFoundError('Driver not found');
   }
+  if (driver.driverProfile?.status !== 'APPROVED') {
+    throw new BadRequestError('Driver account pending admin approval');
+  }
 
   if (!isDriverEligibleForBooking(driver, bookingType)) {
     const expected =
       bookingType === 'towing' ? 'tow driver' : 'driver service (Full-Time / Part-Time)';
     throw new BadRequestError(
-      `Driver ${driver.fullName ?? driverId} is not eligible for ${bookingType} bookings (${expected} required)`,
+      'Driver ' + (driver.fullName ?? driverId) + ' is not eligible for ' +
+        bookingType + ' bookings (' + expected + ' required)',
+    );
+  }
+
+  const booking =
+    bookingType === 'towing'
+      ? await TowingBookingModel.findById(bookingId).exec()
+      : await DriverBookingModel.findById(bookingId).exec();
+  if (!booking) {
+    throw new NotFoundError('Booking not found');
+  }
+
+  if (!canTransition(booking.status, 'DRIVER_ASSIGNED')) {
+    throw new BadRequestError(
+      'Cannot assign driver: invalid status transition from ' + booking.status +
+        ' to DRIVER_ASSIGNED',
     );
   }
 
   const driverObjectId = new Types.ObjectId(driverId);
-
-  if (bookingType === 'towing') {
-    const booking = await TowingBookingModel.findById(bookingId).exec();
-    if (!booking) {
-      throw new NotFoundError('Booking not found');
-    }
-
-    if (!canTransition(booking.status, 'DRIVER_ASSIGNED')) {
-      throw new BadRequestError(
-        `Cannot assign driver: invalid status transition from ${booking.status} to DRIVER_ASSIGNED`,
-      );
-    }
-
-    await TowingBookingModel.findByIdAndUpdate(bookingId, {
+  const bookingObjectId = new Types.ObjectId(bookingId);
+  const filter = {
+    _id: bookingObjectId,
+    status: booking.status,
+    $or: [{ driverId: null }, { driverId: { $exists: false } }],
+  };
+  const update = {
+    $set: {
       driverId: driverObjectId,
       status: 'DRIVER_ASSIGNED',
-      statusHistory: appendStatusHistory(booking.statusHistory, 'DRIVER_ASSIGNED'),
-    }).exec();
-  } else {
-    const booking = await DriverBookingModel.findById(bookingId).exec();
-    if (!booking) {
-      throw new NotFoundError('Booking not found');
-    }
+    },
+    $push: {
+      statusHistory: { status: 'DRIVER_ASSIGNED', timestamp: new Date() },
+    },
+  };
 
-    if (!canTransition(booking.status, 'DRIVER_ASSIGNED')) {
-      throw new BadRequestError(
-        `Cannot assign driver: invalid status transition from ${booking.status} to DRIVER_ASSIGNED`,
-      );
-    }
+  await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType);
+  try {
+    const assigned =
+      bookingType === 'towing'
+        ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: true }).exec()
+        : await DriverBookingModel.findOneAndUpdate(filter, update, { new: true }).exec();
 
-    await DriverBookingModel.findByIdAndUpdate(bookingId, {
-      driverId: driverObjectId,
-      status: 'DRIVER_ASSIGNED',
-      statusHistory: appendStatusHistory(booking.statusHistory, 'DRIVER_ASSIGNED'),
-    }).exec();
+    if (!assigned) {
+      await releaseDriver(driverId, bookingId);
+      throw new ConflictError('Booking changed before the driver could be assigned');
+    }
+  } catch (error) {
+    await releaseDriverReservationIfBookingUnclaimed(driverId, bookingId, bookingType);
+    throw error;
   }
-
-  await UserModel.findByIdAndUpdate(driverId, {
-    isAvailable: false,
-    activeBookingId: new Types.ObjectId(bookingId),
-    activeBookingType: bookingType,
-  }).exec();
 
   emitBookingStatusUpdate(bookingId, mapPublicBookingStatus('DRIVER_ASSIGNED'), {
     internalStatus: 'DRIVER_ASSIGNED',
     driverAccepted: false,
-    message: 'Driver allotted — awaiting acceptance',
+    message: 'Driver allotted � awaiting acceptance',
   });
 }
 
-export async function releaseDriver(driverId: string): Promise<void> {
-  await UserModel.findByIdAndUpdate(driverId, {
-    isAvailable: true,
-    activeBookingId: null,
-    activeBookingType: null,
-  }).exec();
+export async function releaseDriver(driverId: string, bookingId: string): Promise<void> {
+  await UserModel.findOneAndUpdate(
+    {
+      _id: driverId,
+      activeBookingId: new Types.ObjectId(bookingId),
+    },
+    {
+      $set: {
+        isAvailable: true,
+        activeBookingId: null,
+        activeBookingType: null,
+      },
+    },
+  ).exec();
 }
 
 /** Driver rejects an assigned job — frees driver and returns booking to CONFIRMED for reassignment. */
@@ -691,7 +771,7 @@ export async function unassignDriverFromBooking(
     }).exec();
   }
 
-  await releaseDriver(driverId);
+  await releaseDriver(driverId, bookingId);
 }
 
 export async function autoAssignDriver(
@@ -741,6 +821,7 @@ export async function listAvailableDrivers(options?: {
     role: 'driver',
     isAvailable: true,
     'driverProfile.status': 'APPROVED',
+    $or: [{ activeBookingId: null }, { activeBookingId: { $exists: false } }],
   };
 
   if (options?.bookingType) {
