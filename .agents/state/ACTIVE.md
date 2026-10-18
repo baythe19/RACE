@@ -5,6 +5,13 @@
 
 ---
 
+## Latest session — Partner v6 source re-review and documentation (2026-10-18)
+
+- v6 is a branch in the existing teamwebstarts-cmyk/RACE repository, not a new repository. The published branch is changes-v6-partner-role-dispatch. Keep the dirty v5 checkout at /workspaces/RACE untouched; open the separate /workspaces/RACE-v6-partner-role-dispatch worktree to review the v6 branch in Cursor.
+- Re-reviewed current source with three read-only audits and direct file inspection. Updated the product report and plan with exact API/mobile/customer/Admin/database files, UI effects, and validation gates.
+- Read the client product documents. Their older v2/release4Aug2026 vendor-owned-driver flow is superseded by the new consent-based Driver model. Their payment docs confirm gateway payments are stubs and bank capture is missing; they do not select a gateway.
+- Current verdict: not ready for live customer-facing MVP. Vendor dispatch starts trips before Driver acknowledgement; location is written globally before booking validation; legacy links can still authorize dispatch; reservation races and migration are unproven; Customer typed tracking/history and Admin/payout projections have gaps.
+- This review changed documentation only; no app/backend source, server, Metro, or simulator was modified or restarted. Existing lint/audit results are from the prior v6 implementation pass; no new code tests were needed for this documentation re-review.
 ## Latest session — Partner v6 role and dispatch scaffold (2026-10-18, branch changes-v6-partner-role-dispatch)
 
 - Added the first v6 capability, Driver–Vendor membership, service-aware dispatch, Driver onboarding, tracking, and typed customer booking-route changes. The product report, implementation map, and remaining-work ledger are in `docs/product/` and `docs/plans/`.

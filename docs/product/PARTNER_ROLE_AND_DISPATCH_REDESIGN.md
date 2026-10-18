@@ -13,6 +13,10 @@ A Towing Vendor owns its fleet, invites already registered drivers, and dispatch
 
 This is a domain and dispatch change, not just a screen refresh. Account roles, membership consent, service-specific offers, assignment races, location access, notifications, and migration all need to agree.
 
+
+## MVP readiness verdict
+
+**Not ready for a customer-facing MVP launch yet.** The published v6 branch is an implementation scaffold that is ready for code review and limited UI inspection. It is not yet safe to dispatch live work: the active Vendor assignment path starts trips before Driver acknowledgment, location writes global user coordinates before validating the booking, a legacy vendor link can authorize dispatch, and fleet/Driver reservations are not proven race-safe. Customer booking identity/history and Admin/payout projections also have gaps. Close the P0 gates below and run database-backed and device-level end-to-end tests before calling the flow MVP-ready.
 ## Requirements captured
 
 1. Partner role selection says **Towing Vendor** and **Driver**.
@@ -69,7 +73,7 @@ Customer confirms towing → only approved Towing Vendors receive the offer → 
 
 ### Driver Hire
 
-Customer confirms driver hire → eligible independent Drivers and, if enabled, Towing Vendors receive the request → an independent Driver accepts directly, or vendor selects an eligible member driver → the backend commits exactly one path → driver acknowledges and performs service → customer/vendor see milestones.
+Customer confirms driver hire → eligible independent Drivers and Towing Vendors receive the request → an independent Driver accepts directly, or a Towing Vendor selects an eligible linked Driver → the backend commits exactly one path → the Driver acknowledges and performs service → customer/vendor see milestones.
 
 If a vendor assignment is pending driver acceptance, suppress other claims for that booking. If the driver declines/times out, release reservations and reopen according to the dispatch policy. A vendor-assigned driver sees the assignment in **My Vendor**; a direct independent offer is not a towing lead.
 
@@ -202,7 +206,7 @@ The original product recommendation follows the requested model. This follow-up 
 
 ### Additional product decisions to resolve or record as MVP defaults
 
-1. Driver lookup: use exact phone invitation with a generic response and no account enumeration; do not build a public name/number directory without a privacy design.
+1. Driver discovery: Drivers control an explicit discoverability opt-in. Vendors may search opted-in, verified Drivers by name or normalized phone using minimal masked fields, rate limits and audit logging. Non-discoverable exact-phone invitations return a generic response and reveal no account existence, documents, or location.
 2. Service matrix: classify every catalog service/roadside category as Vendor-only, Driver-Hire, or unavailable before emitting offers.
 3. Driver-Hire vehicle semantics: customer's service vehicle is not the vendor's tow truck; never require a fleet vehicle for Driver-Hire.
 4. Offer expiry, direct-vs-vendor timer, requeue, no-show, cancellation and driver/vendor responsibility need explicit rules.
@@ -254,7 +258,7 @@ The file-level customer/admin implementation map and collision, legacy-history, 
 
 ## Implementation snapshot and remaining gates (18 October 2026)
 
-This snapshot reflects the isolated worktree, not a deployed release. The original v5 checkout was left unchanged, and no commit or push was made.
+This snapshot reflects the isolated v6 worktree, not a deployed release. The original v5 checkout at /workspaces/RACE was left unchanged. The v6 implementation is published on origin/changes-v6-partner-role-dispatch; its source changes are in 88be358, and the active-state documentation update is in 0dca0c0. The branch may advance as this review is published.
 
 ### Implemented and statically verified
 
@@ -264,8 +268,8 @@ This snapshot reflects the isolated worktree, not a deployed release. The origin
 - Driver registration now requests Driver type and driving licence without requiring a personal vehicle or vendor fleet documents. The visible stepper now says “Driver Details”. The active flow now uploads real files through the authenticated storage endpoint and submits the returned durable URL; service credentials and full end-to-end storage behavior still need integration validation.
 - Independent Driver offer selection is restricted to Driver-Hire. Vendor dispatch validates an accepted membership or a legacy embedded vendor link; the legacy path still bypasses the new Driver-consent rule and must be removed for new dispatch. Towing also needs an active vehicle owned by that vendor, while Driver-Hire does not.
 - Driver has a My Vendor screen for invitations, membership, and vendor-assigned work. Vendor has a membership roster and service-aware assignment screen. Vendor job cards now have a Track action for assigned/active work; verify it in the live preview for both booking kinds.
-- Driver location is copied into a booking only for the matching assigned Driver and active booking. Vendor has a separate authorized booking-tracking endpoint and screen with stale-location handling; that screen does not report the vendor phone's GPS.
-- Foreground authenticated socket invalidation and REST refresh fallbacks are wired. This is not background push delivery. Vehicle fleet UI no longer exposes the old broken permanent Driver↔vehicle action; the availability count is based on active booking assignment records.
+- A booking-scoped location field and authorized vendor tracking endpoint/screen exist, but the current write path first updates global User.currentLocation, and treats DRIVER_ASSIGNED as active before the Driver accepts the job. Therefore the implementation does not yet meet the target privacy rule; do not describe pre-accept location as booking-authorized. Vendor tracking must start only after explicit per-job Driver acceptance and stop at terminal state.
+- Foreground authenticated socket invalidation and REST refresh fallbacks are wired for booking, driver, vehicle and notification data; membership/invitation cache keys are not invalidated by those socket handlers, and membership screens rely on polling/manual refresh. This is not background push delivery. Vehicle fleet UI no longer exposes the old broken permanent Driver↔vehicle action; the availability count is based on active booking assignment records.
 - Backend TypeScript lint, the focused partner-v6 role/dispatch audit, Partner mobile TypeScript lint, Customer app TypeScript lint, and git diff whitespace checks passed. The duplicate Mongoose index warning was removed.
 - Admin web lint remains unverified because npm ci reports a workspace lockfile mismatch (missing @types/node@22.20.5 and undici-types@6.21.0); the lockfile was not modified.
 - Customer npm ci reported 37 dependency advisories (12 moderate, 24 high, 1 critical). Review the affected packages and reachable paths before production; no automated audit fix was applied.
@@ -278,15 +282,35 @@ This snapshot reflects the isolated worktree, not a deployed release. The origin
 4. Legacy `driverProfile.vendorUserId` still authorizes new vendor dispatch/claim in some paths despite the consent-based membership model. Keep it only for history/continuation.
 5. The controller's duplicate location emission has been removed. DriverService still writes global User.currentLocation before confirming that activeBookingId/type resolves to the matching owned booking in an operational state. Move validation ahead of any globally visible write; make booking-scoped location the canonical source and test stale pointers, terminal jobs, and wrong type/owner.
 6. Partner AuthUser now carries server capabilities, but PartnerNavigator's app-area and screen guards still key off the scalar role. Customer+Driver coexistence is not yet usable through explicit app-area switching; derive access from capabilities and preserve the selected surface.
-7. Customer list/detail routes and the primary REST query/cache paths now carry booking kind. Remaining collision risk is typed socket room/event identity and older untyped callers; same-ID database integration tests are still needed. Admin service-booking projections still need a regression check for vendor identity, assignment source, assigned fleet truck (separate from the customer's vehicle), and legacy history.
+7. Customer list/detail routes and the primary typed REST query/cache paths now carry booking kind, but Redux, tracking and socket state still use bare IDs. The combined customer endpoint does not include records from the legacy Booking collection, so old customer trips are not yet guaranteed to appear. Admin typed links exist, but bare row keys, untyped legacy fallback, projections, and same-ID cases still need regression work.
 
+
+
+### Client-document cross-check
+
+The repository’s client baseline is in docs/client/CLIENT_OVERVIEW.md and docs/client/CLIENT_FEATURES.md; the detailed intended flow is docs/client/CLIENT_USER_FLOWS.md, and the gap snapshot is docs/client/CLIENT_DOC_VS_BUILD.md. These files describe an earlier v2/release4Aug2026 contract, so use them as background requirements and reconcile them with the new product decisions in this report rather than treating their old build scores or role model as current code facts.
+
+- The client baseline confirms a two-app, one-admin, one-backend product; Driver-Hire and towing are separate customer services; service booking payments are advance plus final; and real gateway wiring is explicitly pending/stubbed. It names Razorpay/Stripe as candidates, but does not select one. Product must choose gateway, settlement ownership, commission, refund policy, and manual-pilot rules before payout implementation.
+- Vendor banking is an explicit hole in the client gap report: bank holder/account/IFSC collection and submission are marked stub/missing. The existing earnings or bank screen should not be treated as verified payout setup. Add an approved bank-detail capture/verification and change/audit flow only after the settlement contract is chosen; never show customer receipts as money already paid to a vendor or Driver.
+- The older client flow says a vendor creates/owns fleet drivers and a Driver may register their own vehicle. That conflicts with the newer user-approved design: Drivers are independently verified accounts, do not need a vehicle, and join a Vendor only with consent. The new role and consent rules in this report supersede those earlier flow assumptions.
+- The client docs list roadside categories but also say some service types are “coming soon” or incomplete. Before opening offers, explicitly map each catalog item to Vendor towing, Driver-Hire, roadside provider, or unavailable. Do not route an unsupported roadside request as towing by default.
+### Cross-surface and UI findings from the published-source recheck
+
+- Driver discovery is narrower than the requirement. Invitation currently starts from an exact phone number and returns a generic result. There is no persisted Driver-controlled discoverability preference or opt-in name-search endpoint. Add consent settings, minimal masked search results, rate limits, and an audit trail before claiming “search by name or phone” is implemented.
+- Connected Driver work mode is unresolved in code. Membership acceptance clears the legacy vendor pointer, while direct Driver-Hire feed classification still relies on that pointer. A linked Driver can consequently look independent and receive direct work. Decide whether a connected Driver can take independent jobs off shift, then enforce the same policy in offer selection and claim/reservation.
+- Assignment status and the mounted Driver UI disagree with the target flow. Vendor assignment can mark a booking en route without a per-job Driver acknowledgement. The mounted DriverJobsScreen treats DRIVER_ASSIGNED as active and opens DriverActiveJobScreen; the separate PartnerJobsScreen acceptance controls are not the Driver route. Add an Awaiting response screen/state, Accept/Decline, deadline, notification, release/reopen, and distinct UI status before showing travel actions.
+- Vendor Jobs does not clearly expose assigned work. The screen counts assigned work as in progress, but its filters do not have a matching Assigned state. Add an explicit assigned/awaiting-driver filter and align filter counts with row predicates so a new dispatch is findable.
+- Realtime and first-load UI remain uneven. Membership queries poll, but the membership/invitation cache keys are not invalidated by the foreground socket handlers. My Vendor, membership roster, vendor assignment, and tracking initial-load paths use spinners. Add membership event invalidation and consistent skeleton/loading/error/retry states; do not call polling a push guarantee.
+- Booking identity is only partly typed end to end. Customer list/detail REST paths carry the booking kind, but Redux active-booking state and tracking/socket maps still use bare IDs, and backend socket authorization does not bind the kind. Two collections may contain the same ID. Use (bookingType, bookingId) for reducer state, query/cache, socket room/event, and authorization.
+- Customer, Admin, and payout projections need their own contract pass. The combined Customer endpoint reads towing and Driver-Hire collections, not the legacy Booking collection, so old Customer history is absent unless separately migrated or exposed. Customer details do not reliably show the customer-owned vehicle alongside the vendor fleet truck. Admin list keys use bare IDs and service-booking projections omit some vendor/assignment/fleet fields. Service payouts still read legacy Booking transactions and do not establish v6 settlement; Vendor earnings also combine service receipts without proving net payable or payout. These are data/UI compatibility gates, not completed dispatch behavior.
+- Membership lifecycle and database safeguards are incomplete. EXPIRED exists without an expiry timestamp/worker; invitation/revocation races, suspended Vendor acceptance, reservation crash recovery, and additive migration are not covered by the focused static audit. Add retry-safe expiry/lock release, verify Vendor account state, and test against a disposable Mongo replica set before enabling new dispatch broadly.
 ### Still open before calling this production-ready
 
-1. Vendor dispatch currently assigns a booking directly. A separate per-job Driver accept/decline/timeout flow and safe release path are not complete. The Driver's acceptance of a vendor membership is implemented; it should not be confused with acceptance of each dispatched job.
+1. Vendor dispatch currently assigns a booking directly. A separate per-job Driver accept/decline/timeout flow and safe release path are not complete. The Driver's acceptance of a vendor membership is implemented; it should not be confused with acceptance of each dispatched job. The mounted Driver Jobs route must show this pending state before any arrived/en route action.
 2. Pending vendor invitations currently have no expiry timestamp or cleanup path. The EXPIRED enum is present, but a stale invitation can retain the one-vendor Driver lock. Define lifetime, expiry, lock release, and resend behavior.
 3. Driver reservation uses a conditional write with compensating release, but crash recovery is not proven; fleet vehicles have no server-side active reservation. Concurrent-claim, crash-recovery, and rollback behavior still need database-backed tests and stronger reservation invariants.
 4. There is no additive dry-run migration and rollback runbook for existing scalar roles, embedded vendor links, and old credential-based Driver records. The old destructive one-time user migration must remain untouched.
-5. Customer list/detail routes now carry booking kind and typed reads no longer probe towing then Driver-Hire by ID. Typed socket room/event identity, older callers, and same-ID database tests remain open. Admin and customer projections need a regression pass that preserves the customer-owned vehicle separately from the vendor's fleet truck and retains legacy history.
+5. Customer list/detail routes now carry booking kind and typed reads no longer probe towing then Driver-Hire by ID. Redux active state, tracking maps, socket room/event identity, older callers, and same-ID database tests remain open. The combined Customer endpoint also omits the legacy Booking collection, so legacy trips are not guaranteed to appear. Admin and customer projections need a regression pass that preserves the customer-owned vehicle separately from the vendor's fleet truck; the Admin list currently keys by bare ID.
 6. Expo/FCM push delivery, background location, and foreground/background/terminated-device behavior have not been validated on Android or iOS. They need native configuration and physical-device tests.
 7. Maps/navigation, real payment/refunds, account/security operations, and location retention remain separate product/operations gates. Current payment stubs are not a settlement implementation.
 
