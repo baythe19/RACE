@@ -21,6 +21,9 @@ export interface IVendorVehicle extends Document {
   insuranceExpiry?: Date;
   maintenanceNote?: string;
   documents?: IVendorVehicleDocument[];
+  /** P0-2: booking this truck is atomically pinned to (null when free). */
+  activeBookingId?: Types.ObjectId | null;
+  activeBookingType?: 'towing' | 'driver' | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -40,6 +43,17 @@ const VendorVehicleSchema = new Schema<IVendorVehicle>(
     },
     insuranceExpiry: { type: Date },
     maintenanceNote: { type: String },
+    activeBookingId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    activeBookingType: {
+      type: String,
+      enum: ['towing', 'driver', null],
+      default: null,
+    },
     documents: {
       type: [{
         type: { type: String, required: true },

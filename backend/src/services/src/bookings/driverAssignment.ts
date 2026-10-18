@@ -85,6 +85,72 @@ async function reserveDriverForBooking(
   }
 }
 
+/**
+ * P0-2 (v6 audit): atomically pin one ACTIVE fleet vehicle to this booking.
+ * The conditional update fails when the vehicle is already pinned to a
+ * different open job, so two vendors (or two dispatches racing) cannot bind
+ * the same truck. The vehicle document gains `activeBookingId` mirrors of the
+ * driver reservation so release/cancel can always free it.
+ */
+export async function reserveFleetVehicleForBooking(
+  vehicleId: string,
+  vendorId: string,
+  bookingObjectId: Types.ObjectId,
+  bookingType: ActiveBookingType,
+): Promise<void> {
+  const openJobFilter = {
+    _id: { $ne: bookingObjectId },
+    assignedFleetVehicleId: new Types.ObjectId(vehicleId),
+    status: { $in: ['CONFIRMED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'] },
+  };
+  const [towingClash, driverClash] = await Promise.all([
+    TowingBookingModel.exists(openJobFilter).exec(),
+    DriverBookingModel.exists(openJobFilter).exec(),
+  ]);
+  if (towingClash || driverClash) {
+    throw new ConflictError(
+      'This fleet vehicle is already on another open job. Assign a different vehicle.',
+    );
+  }
+
+  const reserved = await VendorVehicleModel.findOneAndUpdate(
+    {
+      _id: new Types.ObjectId(vehicleId),
+      vendorId: new Types.ObjectId(vendorId),
+      status: 'ACTIVE',
+      $or: [
+        { activeBookingId: null },
+        { activeBookingId: { $exists: false } },
+      ],
+    },
+    {
+      $set: {
+        activeBookingId: bookingObjectId,
+        activeBookingType: bookingType,
+      },
+    },
+    { new: true },
+  ).exec();
+
+  if (!reserved) {
+    throw new ConflictError(
+      'Fleet vehicle is not available — it may be inactive or already on another job. Assign a different vehicle.',
+    );
+  }
+}
+
+/** Free a fleet vehicle that was pinned to a booking (accept, cancel, unassign). */
+export async function releaseFleetVehicleFromBooking(bookingId: string): Promise<void> {
+  try {
+    await VendorVehicleModel.updateMany(
+      { activeBookingId: new Types.ObjectId(bookingId) },
+      { $set: { activeBookingId: null, activeBookingType: null } },
+    ).exec();
+  } catch (error) {
+    logger.error('Failed to release fleet vehicle reservation', { bookingId, error });
+  }
+}
+
 async function releaseDriverReservationIfBookingUnclaimed(
   driverId: string,
   bookingId: string,
@@ -96,7 +162,6 @@ async function releaseDriverReservationIfBookingUnclaimed(
     const assignmentPersisted = await bookingModel
       .exists({ _id: bookingId, driverId: new Types.ObjectId(driverId) })
       .exec();
-
     if (!assignmentPersisted) {
       await releaseDriver(driverId, bookingId);
     }
@@ -654,6 +719,17 @@ export async function claimOpenBookingOffer(
 
   await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, vendorId ? undefined : null);
 
+  // P0-2: vendor dispatch with a fleet vehicle must atomically pin the truck
+  // before the booking update; else two dispatches could bind one vehicle.
+  if (vendorId && fleetVehicleId) {
+    try {
+      await reserveFleetVehicleForBooking(fleetVehicleId, vendorId, bookingObjectId, bookingType);
+    } catch (error) {
+      await releaseDriver(driverId, bookingId);
+      throw error;
+    }
+  }
+
   let claimed;
   try {
     claimed =
@@ -662,11 +738,17 @@ export async function claimOpenBookingOffer(
         : await DriverBookingModel.findOneAndUpdate(filter, update, { new: true }).exec();
   } catch (error) {
     await releaseDriverReservationIfBookingUnclaimed(driverId, bookingId, bookingType);
+    if (vendorId && fleetVehicleId) {
+      await releaseFleetVehicleFromBooking(bookingId);
+    }
     throw error;
   }
 
   if (!claimed) {
     await releaseDriver(driverId, bookingId);
+    if (vendorId && fleetVehicleId) {
+      await releaseFleetVehicleFromBooking(bookingId);
+    }
     throw new ConflictError('This job was just taken by another partner');
   }
 
@@ -841,6 +923,8 @@ export async function assignDriverToBooking(
 }
 
 export async function releaseDriver(driverId: string, bookingId: string): Promise<void> {
+  // P0-2: freeing the driver also frees the fleet truck pinned to this booking.
+  await releaseFleetVehicleFromBooking(bookingId);
   await UserModel.findOneAndUpdate(
     {
       _id: driverId,
