@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { MapPin, Phone, Truck, UserRound } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,12 +16,23 @@ const AMBER = '#F9A602';
 const INK = '#191919';
 const MUTED = '#6B7280';
 
+/** Ticks every second so the "updated N sec ago" line never looks frozen. */
+function useNow() {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
 function labelStatus(status: string) {
   return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
-export default function VendorBookingTrackingScreen({ route }: Props) {
+export default function VendorBookingTrackingScreen({ route, navigation }: Props) {
   const px = useScreenPx();
+  const now = useNow();
   const bookingId = route.params?.bookingId ?? '';
   const bookingType = route.params?.bookingType ?? 'towing';
   const { data, isLoading, isError, refetch } = useVendorBookingTrackingQuery(bookingId, bookingType);
@@ -118,9 +129,20 @@ export default function VendorBookingTrackingScreen({ route }: Props) {
               borderRadius={px(17)}
             />
           </View>
-          <PartnerText style={{ color: data.isLocationFresh ? '#13834C' : MUTED, fontSize: px(11), marginBottom: px(15) }}>
+          <PartnerText
+            style={{
+              color: data.isLocationFresh
+                ? (data.driverLocation?.updatedAt && now - new Date(data.driverLocation.updatedAt).getTime() > 45_000
+                  ? '#B45309'
+                  : '#13834C')
+                : MUTED,
+              fontSize: px(11),
+              marginBottom: px(15),
+            }}>
             {data.isLocationFresh && data.driverLocation?.updatedAt
-              ? 'Driver location updated ' + Math.max(0, Math.round((Date.now() - new Date(data.driverLocation.updatedAt).getTime()) / 1000)) + ' sec ago'
+              ? now - new Date(data.driverLocation.updatedAt).getTime() > 45_000
+                ? 'Location is ' + Math.max(1, Math.round((now - new Date(data.driverLocation.updatedAt).getTime()) / 1000)) + ' sec old — checking for a newer fix…'
+                : 'Driver location updated ' + Math.max(0, Math.round((now - new Date(data.driverLocation.updatedAt).getTime()) / 1000)) + ' sec ago'
               : 'Waiting for a fresh Driver location. The map hides old locations.'}
           </PartnerText>
 

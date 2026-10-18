@@ -48,15 +48,71 @@ export type VendorBookingTracking = {
   statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
 };
 
+/* Location-101 preview fixture: a live EN_ROUTE trip with a fresh driver fix
+ * between pickup and drop. Mirrors GET /vendor/bookings/:id/tracking so the
+ * tracking screen can be exercised without a backend session. Real API wins. */
+const MOCK_TRACKING_LAT = 20.2961;
+const buildMockTracking = (bookingId: string, bookingType: 'towing' | 'driver'): VendorBookingTracking => ({
+  bookingType,
+  id: bookingId,
+  bookingNumber: bookingType === 'towing' ? 'TOW-10048' : 'DRV-10048',
+  status: 'DRIVER_EN_ROUTE',
+  serviceLabel: bookingType === 'towing' ? 'Emergency Towing' : 'Full-Time Driver',
+  pickup: {
+    address: 'Janpath Road, Saheed Nagar, Bhubaneswar',
+    latitude: 20.2891,
+    longitude: 85.8412,
+  },
+  dropoff: {
+    address: 'Sector B, Mancheswar Industrial Workshop, Bhubaneswar',
+    latitude: 20.3204,
+    longitude: 85.8678,
+  },
+  assignedFleetVehicleLabel: 'Tata 407 (OD-02-TOW-1001)',
+  driver: { id: 'mock-driver-1', name: 'Rakesh Sahoo', phone: '+919876123401' },
+  driverLocation: {
+    latitude: MOCK_TRACKING_LAT,
+    longitude: 85.852,
+    updatedAt: new Date().toISOString(),
+  },
+  isLocationFresh: true,
+  statusHistory: [
+    {
+      status: 'CONFIRMED',
+      timestamp: new Date(Date.now() - 32 * 60 * 1000).toISOString(),
+      note: 'Advance payment verified',
+    },
+    {
+      status: 'DRIVER_ASSIGNED',
+      timestamp: new Date(Date.now() - 26 * 60 * 1000).toISOString(),
+      note: 'Rakesh Sahoo assigned with Tata 407',
+    },
+    {
+      status: 'DRIVER_EN_ROUTE',
+      timestamp: new Date(Date.now() - 21 * 60 * 1000).toISOString(),
+      note: 'Driver accepted the job',
+    },
+  ],
+});
+
 export async function getVendorBookingTracking(input: {
   bookingId: string;
   bookingType: 'towing' | 'driver';
 }): Promise<VendorBookingTracking> {
-  const { data } = await api.get<ApiSuccessResponse<VendorBookingTracking>>(
-    API_ENDPOINTS.vendorBookingTracking(input.bookingId),
-    { params: { bookingType: input.bookingType } },
-  );
-  return data.data;
+  try {
+    const { data } = await api.get<ApiSuccessResponse<VendorBookingTracking>>(
+      API_ENDPOINTS.vendorBookingTracking(input.bookingId),
+      { params: { bookingType: input.bookingType } },
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      // Location-101 preview: serve the live-trip fixture so the tracking
+      // screen (map, fresh driver marker, progress timeline) is testable.
+      return buildMockTracking(input.bookingId, input.bookingType);
+    }
+    throw error;
+  }
 }
 
 export async function listVendorBookings(): Promise<VendorBookingItem[]> {
