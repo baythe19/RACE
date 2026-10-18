@@ -43,7 +43,9 @@ import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 const SUCCESS_GREEN = '#22C55E';
 
 const ACTIVE_STATUSES = new Set(['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS']);
-const TRACKABLE_STATUSES = new Set(['DRIVER_ASSIGNED', ...ACTIVE_STATUSES]);
+// P0-1 companion: a vendor-assigned job that the driver has not accepted yet
+// is visible as ASSIGNED, but live tracking starts only post-accept.
+const TRACKABLE_STATUSES = new Set([...ACTIVE_STATUSES]);
 
 type JobTab = 'all' | 'new' | 'nearby' | 'assigned' | 'in_progress' | 'completed';
 
