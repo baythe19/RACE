@@ -21,6 +21,7 @@ interface DriverRegistrationLayoutProps {
   showFooter?: boolean;
   footerOverride?: ReactNode;
   scrollEnabled?: boolean;
+  stepLabels?: readonly string[];
 }
 
 const REF_W = 390;
@@ -38,6 +39,7 @@ export default function DriverRegistrationLayout({
   showFooter = true,
   footerOverride,
   scrollEnabled,
+  stepLabels,
 }: DriverRegistrationLayoutProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -80,6 +82,7 @@ export default function DriverRegistrationLayout({
   const scale = Math.min(1.22, Math.max(0.88, width / REF_W));
   const px = (val: number) => Math.max(1, Math.round(val * scale));
 
+  const steps = stepLabels ?? DRIVER_REGISTRATION_STEPS;
   const resolvedTitle = title ?? 'Driver registration';
   const resolvedSubtitle =
     subtitle ??
@@ -140,7 +143,7 @@ export default function DriverRegistrationLayout({
           },
         ]}>
         <View style={styles.stepperRow}>
-          {DRIVER_REGISTRATION_STEPS.map((label, idx) => {
+          {steps.map((label, idx) => {
             const stepNum = idx + 1;
             const isCompleted = stepNum < step;
             const isActive = stepNum === step;
@@ -166,7 +169,7 @@ export default function DriverRegistrationLayout({
                 )}
 
                 {/* Connecting Line Right (from this step center to next step center) */}
-                {idx < DRIVER_REGISTRATION_STEPS.length - 1 && (
+                {idx < steps.length - 1 && (
                   <View
                     style={[
                       styles.connectorHalfLine,
@@ -182,7 +185,7 @@ export default function DriverRegistrationLayout({
                 )}
 
                 {/* Centered Arrow / Directional Chevron between columns */}
-                {idx < DRIVER_REGISTRATION_STEPS.length - 1 && (
+                {idx < steps.length - 1 && (
                   <View
                     style={[
                       styles.arrowContainer,

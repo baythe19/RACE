@@ -346,11 +346,11 @@ const styles = StyleSheet.create({
   cardList: {
     gap: spacing.sm,
   },
-  compactCardRow: { gap: 8, paddingHorizontal: 8, paddingVertical: 8, minHeight: 62, borderRadius: 10 },
-  compactIconWrap: { width: 32, height: 32, borderRadius: 8 },
+  compactCardRow: { gap: 7, paddingHorizontal: 8, paddingVertical: 6, minHeight: 58, borderRadius: 10 },
+  compactIconWrap: { width: 30, height: 30, borderRadius: 8 },
   compactCardTitle: { fontSize: 11, lineHeight: 14 },
   compactDocStatus: { fontSize: 9, color: colors.grey, marginTop: 3 },
-  compactUploadPill: { paddingHorizontal: 8, paddingVertical: 6, borderRadius: 8 },
+  compactUploadPill: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',

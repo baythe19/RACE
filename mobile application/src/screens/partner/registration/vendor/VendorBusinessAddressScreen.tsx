@@ -1,66 +1,34 @@
-import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  MapPin,
-  ShieldCheck,
-} from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { ChevronDown, ChevronRight, MapPin, ShieldCheck } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { images } from '../../../../assets';
+import DriverRegistrationLayout from '../../../../components/partner/DriverRegistrationLayout';
+import PartnerRegistrationStepCard from '../../../../components/partner/PartnerRegistrationStepCard';
+import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import LocationPickerModal from '../../../../components/common/LocationPickerModal';
-import PartnerRegistrationStepper from '../../../../components/partner/PartnerRegistrationStepper';
-import {
-  INDIAN_STATE_OPTIONS,
-  VENDOR_REGISTRATION_STEPS,
-} from '../../../../constants/partnerRegistration';
+import { INDIAN_STATE_OPTIONS, VENDOR_REGISTRATION_STEPS } from '../../../../constants/partnerRegistration';
 import { usePartnerRegistrationStore } from '../../../../store/partnerRegistrationStore';
 import type { LocationResult } from '../../../../types/location';
 import type { PartnerRegistrationStackParamList } from '../../../../types/partnerNavigation';
 import { toAddressFormValues } from '../../../../utils/googlePlaces';
-import {
-  isValidIndianPin,
-  partnerRegistrationGoBack,
-  showSelectOptions,
-} from '../../../../utils/partnerRegistration';
-import { colors, layout, radius, shadows, spacing, typography } from '../../../../theme';
+import { isValidIndianPin, partnerRegistrationGoBack, showSelectOptions } from '../../../../utils/partnerRegistration';
+import { colors } from '../../../../theme';
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, 'VendorBusinessAddress'>;
 
-const REF_W = 390;
-const PAGE_BG = '#F7F7F5';
-const SUCCESS_GREEN = '#22C55E';
-
-function ValidCheck({ visible }: { visible: boolean }) {
-  if (!visible) return null;
-  return (
-    <View style={styles.validCheck}>
-      <Check size={14} color={SUCCESS_GREEN} strokeWidth={3} />
-    </View>
-  );
-}
+const INDIAN_IFSC_PATTERN = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 
 export default function VendorBusinessAddressScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const scale = width / REF_W;
-  const px = (value: number) => Math.max(1, Math.round(value * scale));
-
   const vendorAddress = usePartnerRegistrationStore((s) => s.vendorAddress);
   const setVendorAddress = usePartnerRegistrationStore((s) => s.setVendorAddress);
   const vendorBusiness = usePartnerRegistrationStore((s) => s.vendorBusiness);
   const setVendorBusiness = usePartnerRegistrationStore((s) => s.setVendorBusiness);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [bankDetailsExpanded, setBankDetailsExpanded] = useState(false);
 
-  const handleBack = () =>
-    partnerRegistrationGoBack(navigation, 'VendorBusinessAddress', route.params);
+  const handleBack = () => partnerRegistrationGoBack(navigation, 'VendorBusinessAddress', route.params);
 
   const searchDisplayValue = [
     vendorAddress.addressLine1,
@@ -68,21 +36,14 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
     vendorAddress.city,
     vendorAddress.state,
     vendorAddress.pinCode,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  ].filter(Boolean).join(', ');
 
-  const fieldValid = useMemo(
-    () => ({
-      addressLine1: vendorAddress.addressLine1.trim().length >= 3,
-      addressLine2: vendorAddress.addressLine2.trim().length >= 2,
-      city: vendorAddress.city.trim().length >= 2,
-      state: Boolean(vendorAddress.state),
-      pinCode: isValidIndianPin(vendorAddress.pinCode),
-      landmark: vendorAddress.landmark.trim().length >= 2,
-    }),
-    [vendorAddress],
-  );
+  const fieldValid = useMemo(() => ({
+    addressLine1: vendorAddress.addressLine1.trim().length >= 3,
+    city: vendorAddress.city.trim().length >= 2,
+    state: Boolean(vendorAddress.state),
+    pinCode: isValidIndianPin(vendorAddress.pinCode),
+  }), [vendorAddress]);
 
   const handleLocationSelect = (location: LocationResult) => {
     const mapped = toAddressFormValues(location);
@@ -102,308 +63,205 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
 
   const validate = () => {
     const next: Record<string, string> = {};
-    if (!vendorAddress.addressLine1.trim()) next.addressLine1 = 'Address line 1 is required';
-    if (!vendorAddress.city.trim()) next.city = 'City is required';
-    if (!vendorAddress.state) next.state = 'Select state';
+    if (vendorAddress.addressLine1.trim().length < 3) next.addressLine1 = 'Enter your street address';
+    if (vendorAddress.city.trim().length < 2) next.city = 'Enter your city';
+    if (!vendorAddress.state) next.state = 'Select a state';
     if (!isValidIndianPin(vendorAddress.pinCode)) next.pinCode = 'Enter a valid 6-digit PIN code';
+
+    const accountNumber = (vendorBusiness.accountNumber ?? '').replace(/\D/g, '');
+    const ifsc = (vendorBusiness.ifsc ?? '').trim().toUpperCase();
+    if (accountNumber || ifsc) {
+      if (accountNumber.length < 9 || accountNumber.length > 18) {
+        next.accountNumber = 'Enter a valid bank account number';
+      }
+      if (!INDIAN_IFSC_PATTERN.test(ifsc)) next.ifsc = 'Enter a valid IFSC code';
+    }
+
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const onContinue = () => {
-    // Populate sensible defaults if fields are empty so user is never blocked
+    if (!validate()) {
+      if (vendorBusiness.accountNumber || vendorBusiness.ifsc) {
+        setBankDetailsExpanded(true);
+      }
+      return;
+    }
     setVendorAddress({
-      addressLine1: vendorAddress.addressLine1.trim() || 'Unit 4, Master Canteen Square',
-      addressLine2: vendorAddress.addressLine2.trim() || 'Near Railway Station Road',
-      city: vendorAddress.city.trim() || 'Bhubaneswar',
-      state: vendorAddress.state || 'Odisha',
-      pinCode: vendorAddress.pinCode.trim() || '751001',
-      landmark: vendorAddress.landmark || 'Opposite State Bank Bhavan',
+      addressLine1: vendorAddress.addressLine1.trim(),
+      addressLine2: vendorAddress.addressLine2.trim(),
+      city: vendorAddress.city.trim(),
+      pinCode: vendorAddress.pinCode.trim(),
+      landmark: vendorAddress.landmark.trim(),
     });
-    setErrors({});
+    setVendorBusiness({
+      accountHolderName: vendorBusiness.accountHolderName?.trim(),
+      accountNumber: vendorBusiness.accountNumber?.replace(/\D/g, ''),
+      ifsc: vendorBusiness.ifsc?.trim().toUpperCase(),
+    });
     navigation.navigate('VendorDocuments', route.params);
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor={PAGE_BG} />
-
-      <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
-        <Pressable
-          onPress={handleBack}
-          hitSlop={12}
-          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Go back">
-          <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
-        </Pressable>
-
-        <View style={styles.brandBlock}>
-          <PartnerText style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</PartnerText>
-          <PartnerText style={[styles.brandPartner, { fontSize: px(11), lineHeight: px(14) }]}>
-            PARTNER
-          </PartnerText>
-        </View>
-
-        <View style={styles.backButton} />
-      </View>
-
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView
-          style={styles.scroll}
-          bounces={false}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[
-            styles.scrollContent,
-            {
-              paddingHorizontal: px(layout.screenPadding),
-              paddingBottom: insets.bottom + px(spacing.xl),
-            },
-          ]}>
-          <PartnerText style={[styles.heroTitle, { fontSize: px(24), lineHeight: px(30) }]}>
-            Almost there!
-          </PartnerText>
-          <PartnerText
-            style={[
-              styles.heroSubtitle,
-              { fontSize: px(14), lineHeight: px(21), marginTop: px(6) },
-            ]}>
-            Add your business address so customers and RACE can reach you easily.
-          </PartnerText>
-
-          <Image
-            source={images.homeHeroTruck}
-            style={[styles.heroImage, { height: px(100), marginTop: px(spacing.sm) }]}
-            resizeMode="contain"
-            accessibilityLabel="RACE Partner tow truck"
-          />
-
-          <View
-            style={[
-              styles.card,
-              {
-                marginTop: px(spacing.md),
-                paddingHorizontal: px(spacing.lg),
-                paddingTop: px(spacing.lg),
-                paddingBottom: px(spacing.xl),
-                borderRadius: px(18),
-              },
-            ]}>
-            <PartnerRegistrationStepper
-              steps={VENDOR_REGISTRATION_STEPS}
-              activeStep={2}
-            />
-
-            <PartnerText style={[styles.formTitle, { fontSize: px(20), marginTop: px(spacing.lg) }]}>
-              Where customers can find your business
+    <>
+      <DriverRegistrationLayout
+        step={2}
+        stepLabels={VENDOR_REGISTRATION_STEPS}
+        title="Vendor registration"
+        subtitle="Add your business service address."
+        onBack={handleBack}
+        onContinue={onContinue}
+        continueLabel="Continue">
+        <PartnerRegistrationStepCard
+          title="Business address"
+          subtitle="Add the location customers and RACE can use to reach you."
+          Icon={MapPin}>
+          <Pressable
+            onPress={() => setShowLocationPicker(true)}
+            style={({ pressed }) => [styles.mapPicker, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Search or select address on map">
+            <MapPin size={17} color="#F59E0B" strokeWidth={2.2} />
+            <PartnerText style={[styles.mapPickerText, Boolean(searchDisplayValue) && styles.mapPickerFilled]} numberOfLines={2}>
+              {searchDisplayValue || 'Search or select address on map'}
             </PartnerText>
-            <PartnerText
-              style={[
-                styles.formSubtitle,
-                { fontSize: px(13), lineHeight: px(19), marginTop: px(4) },
-              ]}>
-              We'll use this address for service and booking.
-            </PartnerText>
+            <ChevronRight size={17} color="#6B7280" />
+          </Pressable>
 
+          <View style={styles.fieldGroup}>
+            <PartnerText style={styles.fieldLabel}>Address line 1 <PartnerText style={styles.required}>*</PartnerText></PartnerText>
+            <View style={[styles.inputWrap, errors.addressLine1 ? styles.inputError : null, fieldValid.addressLine1 && !errors.addressLine1 ? styles.inputValid : null]}>
+              <PartnerTextInput
+                value={vendorAddress.addressLine1}
+                onChangeText={(addressLine1) => { setVendorAddress({ addressLine1 }); clearError('addressLine1'); }}
+                placeholder="House, building, street or locality"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+                returnKeyType="next"
+                style={styles.input}
+              />
+            </View>
+            {errors.addressLine1 ? <PartnerText style={styles.error}>{errors.addressLine1}</PartnerText> : null}
+
+            <PartnerText style={styles.fieldLabelSpaced}>Address line 2 <PartnerText style={styles.optional}>(optional)</PartnerText></PartnerText>
+            <View style={styles.inputWrap}>
+              <PartnerTextInput
+                value={vendorAddress.addressLine2}
+                onChangeText={(addressLine2) => setVendorAddress({ addressLine2 })}
+                placeholder="Apartment, area or nearby location"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+                returnKeyType="next"
+                style={styles.input}
+              />
+            </View>
+
+            <View style={styles.cityStateRow}>
+              <View style={styles.cityColumn}>
+                <PartnerText style={styles.fieldLabel}>City <PartnerText style={styles.required}>*</PartnerText></PartnerText>
+                <View style={[styles.inputWrap, errors.city ? styles.inputError : null, fieldValid.city && !errors.city ? styles.inputValid : null]}>
+                  <PartnerTextInput
+                    value={vendorAddress.city}
+                    onChangeText={(city) => { setVendorAddress({ city }); clearError('city'); }}
+                    placeholder="City"
+                    placeholderTextColor={colors.textMuted}
+                    autoCapitalize="words"
+                    returnKeyType="next"
+                    style={styles.input}
+                  />
+                </View>
+                {errors.city ? <PartnerText style={styles.error}>{errors.city}</PartnerText> : null}
+              </View>
+              <View style={styles.pinColumn}>
+                <PartnerText style={styles.fieldLabel}>PIN code <PartnerText style={styles.required}>*</PartnerText></PartnerText>
+                <View style={[styles.inputWrap, errors.pinCode ? styles.inputError : null, fieldValid.pinCode && !errors.pinCode ? styles.inputValid : null]}>
+                  <PartnerTextInput
+                    value={vendorAddress.pinCode}
+                    onChangeText={(pinCode) => { setVendorAddress({ pinCode: pinCode.replace(/\D/g, '').slice(0, 6) }); clearError('pinCode'); }}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    placeholder="751001"
+                    placeholderTextColor={colors.textMuted}
+                    returnKeyType="done"
+                    style={styles.input}
+                  />
+                </View>
+                {errors.pinCode ? <PartnerText style={styles.error}>{errors.pinCode}</PartnerText> : null}
+              </View>
+            </View>
+
+            <PartnerText style={styles.fieldLabelSpaced}>State <PartnerText style={styles.required}>*</PartnerText></PartnerText>
             <Pressable
-              onPress={() => setShowLocationPicker(true)}
-              style={({ pressed }) => [
-                styles.mapPicker,
-                { marginTop: px(spacing.lg) },
-                pressed && styles.pressed,
-              ]}>
-              <MapPin size={18} color={colors.primary} strokeWidth={2.2} />
-              <PartnerText
-                style={[styles.mapPickerText, searchDisplayValue ? styles.mapPickerFilled : null]}
-                numberOfLines={2}>
-                {searchDisplayValue || 'Search / select address on map'}
+              onPress={() => showSelectOptions('State', INDIAN_STATE_OPTIONS, (state) => { setVendorAddress({ state }); clearError('state'); }, vendorAddress.state)}
+              style={[styles.inputWrap, errors.state ? styles.inputError : null, fieldValid.state && !errors.state ? styles.inputValid : null]}
+              accessibilityRole="button">
+              <PartnerText style={[styles.input, !vendorAddress.state && styles.placeholder]} numberOfLines={1}>
+                {vendorAddress.state || 'Select state'}
               </PartnerText>
-              <ChevronRight size={18} color={colors.grey} strokeWidth={2.4} />
+              {fieldValid.state ? <View style={styles.validDot}><ShieldCheck size={14} color="#16A34A" /></View> : <ChevronDown size={17} color="#6B7280" />}
             </Pressable>
+            {errors.state ? <PartnerText style={styles.error}>{errors.state}</PartnerText> : null}
 
-            <View style={{ marginTop: px(spacing.lg) }}>
-              <PartnerText style={styles.fieldLabel}>
-                Address line 1 <PartnerText style={styles.required}>*</PartnerText>
-              </PartnerText>
-              <View
-                style={[
-                  styles.inputWrap,
-                  errors.addressLine1 ? styles.inputError : null,
-                  fieldValid.addressLine1 ? styles.inputValid : null,
-                ]}>
-                <PartnerTextInput
-                  value={vendorAddress.addressLine1}
-                  onChangeText={(addressLine1) => {
-                    setVendorAddress({ addressLine1 });
-                    clearError('addressLine1');
-                  }}
-                  placeholder="Plot No. 92, Aerodrome Area"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
-                <ValidCheck visible={fieldValid.addressLine1 && !errors.addressLine1} />
-              </View>
-              {errors.addressLine1 ? <PartnerText style={styles.error}>{errors.addressLine1}</PartnerText> : null}
+            <PartnerText style={styles.fieldLabelSpaced}>Landmark <PartnerText style={styles.optional}>(optional)</PartnerText></PartnerText>
+            <View style={styles.inputWrap}>
+              <PartnerTextInput
+                value={vendorAddress.landmark}
+                onChangeText={(landmark) => setVendorAddress({ landmark })}
+                placeholder="Nearby landmark"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="words"
+                returnKeyType="done"
+                style={styles.input}
+              />
+            </View>
+          </View>
+        </PartnerRegistrationStepCard>
 
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>Address line 2</PartnerText>
-              <View
-                style={[
-                  styles.inputWrap,
-                  fieldValid.addressLine2 ? styles.inputValid : null,
-                ]}>
-                <PartnerTextInput
-                  value={vendorAddress.addressLine2}
-                  onChangeText={(addressLine2) => setVendorAddress({ addressLine2 })}
-                  placeholder="Near Khandagiri Square"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
-                <ValidCheck visible={fieldValid.addressLine2} />
-              </View>
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                City <PartnerText style={styles.required}>*</PartnerText>
-              </PartnerText>
-              <View
-                style={[
-                  styles.inputWrap,
-                  errors.city ? styles.inputError : null,
-                  fieldValid.city ? styles.inputValid : null,
-                ]}>
-                <PartnerTextInput
-                  value={vendorAddress.city}
-                  onChangeText={(city) => {
-                    setVendorAddress({ city });
-                    clearError('city');
-                  }}
-                  placeholder="Bhubaneswar"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
-                <ValidCheck visible={fieldValid.city && !errors.city} />
-              </View>
-              {errors.city ? <PartnerText style={styles.error}>{errors.city}</PartnerText> : null}
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                State <PartnerText style={styles.required}>*</PartnerText>
-              </PartnerText>
-              <Pressable
-                onPress={() =>
-                  showSelectOptions(
-                    'State',
-                    INDIAN_STATE_OPTIONS,
-                    (state) => {
-                      setVendorAddress({ state });
-                      clearError('state');
-                    },
-                    vendorAddress.state,
-                  )
-                }
-                style={[
-                  styles.inputWrap,
-                  errors.state ? styles.inputError : null,
-                  fieldValid.state ? styles.inputValid : null,
-                ]}>
-                <PartnerText
-                  style={[styles.input, !vendorAddress.state && styles.placeholder]}
-                  numberOfLines={1}>
-                  {vendorAddress.state || 'Select state'}
-                </PartnerText>
-                {fieldValid.state && !errors.state ? (
-                  <ValidCheck visible />
-                ) : (
-                  <ChevronDown size={18} color={colors.grey} strokeWidth={2.4} />
-                )}
-              </Pressable>
-              {errors.state ? <PartnerText style={styles.error}>{errors.state}</PartnerText> : null}
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                PIN code <PartnerText style={styles.required}>*</PartnerText>
-              </PartnerText>
-              <View
-                style={[
-                  styles.inputWrap,
-                  errors.pinCode ? styles.inputError : null,
-                  fieldValid.pinCode ? styles.inputValid : null,
-                ]}>
-                <PartnerTextInput
-                  value={vendorAddress.pinCode}
-                  onChangeText={(pinCode) => {
-                    setVendorAddress({ pinCode: pinCode.replace(/\D/g, '').slice(0, 6) });
-                    clearError('pinCode');
-                  }}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  placeholder="751020"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
-                <ValidCheck visible={fieldValid.pinCode && !errors.pinCode} />
-              </View>
-              {errors.pinCode ? <PartnerText style={styles.error}>{errors.pinCode}</PartnerText> : null}
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Landmark <PartnerText style={styles.optional}>(optional)</PartnerText>
-              </PartnerText>
-              <View
-                style={[
-                  styles.inputWrap,
-                  fieldValid.landmark ? styles.inputValid : null,
-                ]}>
-                <PartnerTextInput
-                  value={vendorAddress.landmark}
-                  onChangeText={(landmark) => setVendorAddress({ landmark })}
-                  placeholder="Opp. Airport Fire Station"
-                  placeholderTextColor={colors.textMuted}
-                  style={styles.input}
-                />
-                <ValidCheck visible={fieldValid.landmark} />
-              </View>
-
-              <View style={{ marginTop: px(spacing.xl) }}>
-                <PartnerText style={[styles.formTitle, { fontSize: px(17) }]}>Bank details for payouts</PartnerText>
-                <PartnerText style={[styles.formSubtitle, { fontSize: px(13), marginTop: px(2) }]}>
-                  Direct deposit for completed service jobs
-                </PartnerText>
-              </View>
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Account holder name <PartnerText style={styles.optional}>(optional)</PartnerText>
-              </PartnerText>
+        <View style={styles.bankCard}>
+          <Pressable
+            onPress={() => setBankDetailsExpanded((value) => !value)}
+            style={({ pressed }) => [styles.bankHeader, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: bankDetailsExpanded }}>
+            <View style={styles.bankIcon}><ShieldCheck size={16} color="#D97706" /></View>
+            <View style={styles.bankHeaderCopy}>
+              <PartnerText style={styles.bankTitle}>Bank details for payouts</PartnerText>
+              <PartnerText style={styles.bankSubtitle}>Optional now; add before your first payout.</PartnerText>
+            </View>
+            <ChevronDown size={17} color="#6B7280" style={{ transform: [{ rotate: bankDetailsExpanded ? '180deg' : '0deg' }] }} />
+          </Pressable>
+          {bankDetailsExpanded ? (
+            <View style={styles.bankFields}>
+              <PartnerText style={styles.fieldLabel}>Account holder name <PartnerText style={styles.optional}>(optional)</PartnerText></PartnerText>
               <View style={styles.inputWrap}>
                 <PartnerTextInput
                   value={vendorBusiness.accountHolderName ?? ''}
                   onChangeText={(accountHolderName) => setVendorBusiness({ accountHolderName })}
-                  placeholder="e.g. Ramesh Kumar Sahoo"
+                  placeholder="Name on the bank account"
                   placeholderTextColor={colors.textMuted}
+                  autoCapitalize="words"
+                  returnKeyType="next"
                   style={styles.input}
                 />
               </View>
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                Bank account number <PartnerText style={styles.optional}>(optional)</PartnerText>
-              </PartnerText>
-              <View style={styles.inputWrap}>
+              <PartnerText style={styles.fieldLabelSpaced}>Bank account number <PartnerText style={styles.optional}>(optional)</PartnerText></PartnerText>
+              <View style={[styles.inputWrap, errors.accountNumber ? styles.inputError : null]}>
                 <PartnerTextInput
                   value={vendorBusiness.accountNumber ?? ''}
-                  onChangeText={(accountNumber) => setVendorBusiness({ accountNumber: accountNumber.replace(/\D/g, '') })}
+                  onChangeText={(accountNumber) => { setVendorBusiness({ accountNumber: accountNumber.replace(/\D/g, '') }); if (errors.accountNumber) setErrors((e) => ({ ...e, accountNumber: '' })); }}
                   keyboardType="number-pad"
                   placeholder="Enter bank account number"
                   placeholderTextColor={colors.textMuted}
                   style={styles.input}
                 />
               </View>
-
-              <PartnerText style={[styles.fieldLabel, { marginTop: spacing.lg }]}>
-                IFSC code <PartnerText style={styles.optional}>(optional)</PartnerText>
-              </PartnerText>
-              <View style={styles.inputWrap}>
+              {errors.accountNumber ? <PartnerText style={styles.error}>{errors.accountNumber}</PartnerText> : null}
+              <PartnerText style={styles.fieldLabelSpaced}>IFSC code <PartnerText style={styles.optional}>(optional)</PartnerText></PartnerText>
+              <View style={[styles.inputWrap, errors.ifsc ? styles.inputError : null]}>
                 <PartnerTextInput
                   value={vendorBusiness.ifsc ?? ''}
-                  onChangeText={(ifsc) => setVendorBusiness({ ifsc: ifsc.toUpperCase() })}
+                  onChangeText={(ifsc) => { setVendorBusiness({ ifsc: ifsc.toUpperCase() }); if (errors.ifsc) setErrors((e) => ({ ...e, ifsc: '' })); }}
                   autoCapitalize="characters"
                   maxLength={11}
                   placeholder="e.g. SBIN0001234"
@@ -411,191 +269,76 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                   style={styles.input}
                 />
               </View>
+              {errors.ifsc ? <PartnerText style={styles.error}>{errors.ifsc}</PartnerText> : null}
             </View>
-
-            <Pressable
-              onPress={onContinue}
-              style={({ pressed }) => [
-                styles.continueButton,
-                { marginTop: px(spacing.xl), minHeight: px(54), borderRadius: px(14) },
-                pressed && styles.pressed,
-              ]}>
-              <PartnerText style={[styles.continueLabel, { fontSize: px(16) }]}>Continue</PartnerText>
-              <ArrowRight size={px(18)} color={colors.dark} strokeWidth={2.5} />
-            </Pressable>
-          </View>
-
-          <View style={[styles.secureCard, { marginTop: px(spacing.lg), borderRadius: px(14) }]}>
-            <ShieldCheck size={16} color={colors.primary} strokeWidth={2.2} />
-            <PartnerText style={styles.secureText}>
-              Your information is safe. We use enterprise-grade security to protect your data.
-            </PartnerText>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          ) : null}
+        </View>
+      </DriverRegistrationLayout>
 
       <LocationPickerModal
         visible={showLocationPicker}
-        title="Select your address"
-        confirmLabel="Confirm address"
+        title="Select your business address"
+        confirmLabel="Use this address"
         openSearchOnShow
         onClose={() => setShowLocationPicker(false)}
         onLocationSelected={handleLocationSelect}
       />
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: PAGE_BG,
-  },
-  flex: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandBlock: { alignItems: 'center' },
-  brandRace: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 0.5,
-  },
-  brandPartner: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.6,
-  },
-  scroll: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  heroTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    marginTop: spacing.sm,
-  },
-  heroSubtitle: {
-    color: colors.grey,
-  },
-  heroImage: {
-    width: '100%',
-    maxWidth: 240,
-    alignSelf: 'center',
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  formTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-  },
-  formSubtitle: {
-    color: colors.grey,
-  },
   mapPicker: {
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    minHeight: 52,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.input,
-    backgroundColor: colors.goldLight,
-    paddingHorizontal: spacing.md,
-  },
-  mapPickerText: {
-    flex: 1,
-    color: colors.grey,
-    fontSize: typography.sizes.md,
-  },
-  mapPickerFilled: {
-    color: colors.dark,
-    fontWeight: typography.weights.semibold,
-  },
-  fieldLabel: {
-    color: colors.dark,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.bold,
-    marginBottom: spacing.sm,
-  },
-  required: { color: colors.error },
-  optional: {
-    color: colors.grey,
-    fontWeight: typography.weights.medium,
-  },
-  inputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 52,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: radius.input,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.md,
-  },
-  inputValid: {
-    borderColor: colors.primary,
-  },
-  inputError: {
-    borderColor: colors.error,
-  },
-  input: {
-    flex: 1,
-    color: colors.dark,
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.medium,
-    paddingVertical: spacing.md,
-  },
-  placeholder: {
-    color: colors.textMuted,
-    fontWeight: typography.weights.regular,
-  },
-  validCheck: {
-    marginLeft: spacing.xs,
-  },
-  error: {
-    marginTop: spacing.xs,
-    color: colors.error,
-    fontSize: typography.sizes.sm,
-  },
-  continueButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-  },
-  continueLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  secureCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: colors.background,
+    gap: 8,
+    marginBottom: 12,
+    paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    ...shadows.card,
+    borderColor: '#FDE68A',
+    borderRadius: 10,
+    backgroundColor: '#FFFBEB',
   },
-  secureText: {
-    flex: 1,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 20,
+  mapPickerText: { flex: 1, color: '#6B7280', fontSize: 12, lineHeight: 17 },
+  mapPickerFilled: { color: '#111827', fontWeight: '600' },
+  fieldGroup: { width: '100%' },
+  fieldLabel: { color: '#374151', fontSize: 12, fontWeight: '600', marginBottom: 5 },
+  fieldLabelSpaced: { color: '#374151', fontSize: 12, fontWeight: '600', marginTop: 11, marginBottom: 5 },
+  required: { color: '#DC2626', fontWeight: '700' },
+  optional: { color: '#9CA3AF', fontWeight: '400' },
+  inputWrap: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
   },
-  pressed: { opacity: 0.9 },
+  inputValid: { borderColor: '#F59E0B' },
+  inputError: { borderColor: '#DC2626' },
+  input: { flex: 1, minHeight: 40, paddingVertical: 6, color: '#111827', fontSize: 13, fontWeight: '500' },
+  placeholder: { color: '#9CA3AF' },
+  error: { marginTop: 3, color: '#DC2626', fontSize: 10.5 },
+  cityStateRow: { flexDirection: 'row', gap: 8, marginTop: 11 },
+  cityColumn: { flex: 1.3 },
+  pinColumn: { flex: 0.9 },
+  validDot: { marginLeft: 4 },
+  bankCard: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  bankHeader: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bankIcon: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#FEF3C7' },
+  bankHeaderCopy: { flex: 1 },
+  bankTitle: { color: '#111827', fontSize: 12.5, fontWeight: '700' },
+  bankSubtitle: { marginTop: 2, color: '#6B7280', fontSize: 10.5 },
+  bankFields: { paddingBottom: 12 },
+  pressed: { opacity: 0.85 },
 });
