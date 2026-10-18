@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL, TOKEN_KEYS } from '../../config/env';
 import { notificationQueryKeys } from '../useNotificationQueries';
 import { driverQueryKeys } from './useDriverQueries';
+import { vendorMembershipKeys } from '../vendor/useVendorMembershipQueries';
 
 /** Authenticated driver-room sync; short polling remains the recovery fallback. */
 export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
@@ -25,6 +26,15 @@ export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
         queryClient.invalidateQueries({ queryKey: driverQueryKeys.offers, refetchType: 'active' }),
         queryClient.invalidateQueries({ queryKey: driverQueryKeys.active, refetchType: 'active' }),
         queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list, refetchType: 'active' }),
+        // P1 (v6 audit): My Vendor membership + invitation state refreshes live.
+        queryClient.invalidateQueries({
+          queryKey: vendorMembershipKeys.driver,
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: vendorMembershipKeys.invitations,
+          refetchType: 'active',
+        }),
       ]);
     };
 

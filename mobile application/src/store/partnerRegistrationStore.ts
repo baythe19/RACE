@@ -77,20 +77,24 @@ interface PartnerRegistrationState {
   reset: () => void;
 }
 
-export const defaultMockDriverPersonal: DriverPersonalInfo = {
-  fullName: 'Rajesh Kumar',
-  mobileNumber: '9876543210',
-  email: 'rajesh.driver@gmail.com',
-  dateOfBirth: '1992-05-15',
-  address: 'Plot 42, Saheed Nagar, Janpath Road',
-  city: 'Bhubaneswar',
-  emergencyContactName: 'Sunita Kumar',
-  emergencyContactNumber: '9876543211',
-  yearsOfExperience: '6',
-  languages: 'Odia, Hindi, English',
+// P1 (v6 audit): registration forms start EMPTY. The old pre-filled mock PII
+// ("Rajesh Kumar", 9876543210, fabricated bank details, Unsplash document
+// URIs) could reach the real register APIs when a user skipped a field.
+// Permissive QA prefill lives in the UI QA navigator, not in production state.
+export const defaultDriverPersonal: DriverPersonalInfo = {
+  fullName: '',
+  mobileNumber: '',
+  email: '',
+  dateOfBirth: '',
+  address: '',
+  city: '',
+  emergencyContactName: '',
+  emergencyContactNumber: '',
+  yearsOfExperience: '',
+  languages: '',
 };
 
-export const defaultMockDriverVehicle: DriverVehicleInfo = {
+export const defaultDriverVehicle: DriverVehicleInfo = {
   vehicleType: 'Tow Driver',
   vehicleNumber: '',
   rcNumber: '',
@@ -100,61 +104,39 @@ export const defaultMockDriverVehicle: DriverVehicleInfo = {
   vehicleModel: '',
 };
 
-export const defaultMockDriverDocuments: PartnerUploadedDocument[] = [];
+export const defaultDriverDocuments: PartnerUploadedDocument[] = [];
 
-export const defaultMockVendorBusiness: VendorBusinessInfo = {
-  businessName: 'Kalinga Towing & Roadside Services',
-  ownerName: 'Amit Pattnaik',
-  mobileNumber: '9988776655',
-  email: 'kalinga.towing@gmail.com',
+export const defaultVendorBusiness: VendorBusinessInfo = {
+  businessName: '',
+  ownerName: '',
+  mobileNumber: '',
+  email: '',
   businessType: 'Towing Company',
-  accountHolderName: 'Kalinga Towing Services',
-  accountNumber: '50200012345678',
-  ifsc: 'HDFC0001234',
-  acceptTerms: true,
+  accountHolderName: '',
+  accountNumber: '',
+  ifsc: '',
+  acceptTerms: false,
 };
 
-export const defaultMockVendorAddress: VendorBusinessAddress = {
-  addressLine1: 'Unit 4, Master Canteen Square',
-  addressLine2: 'Near Railway Station Road',
-  city: 'Bhubaneswar',
-  state: 'Odisha',
-  pinCode: '751001',
-  landmark: 'Opposite State Bank Bhavan',
+export const defaultVendorAddress: VendorBusinessAddress = {
+  addressLine1: '',
+  addressLine2: '',
+  city: '',
+  state: '',
+  pinCode: '',
+  landmark: '',
 };
 
-export const defaultMockVendorDocuments: PartnerUploadedDocument[] = [
-  {
-    id: 'business_registration',
-    label: 'Business Registration / MSME',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'msme_certificate.pdf',
-    mimeType: 'application/pdf',
-  },
-  {
-    id: 'gst_certificate',
-    label: 'GST Certificate',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'gst_reg_0419.pdf',
-    mimeType: 'application/pdf',
-  },
-  {
-    id: 'pan_card',
-    label: 'Owner PAN Card',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'pan_card_amit.jpg',
-    mimeType: 'image/jpeg',
-  },
-];
+export const defaultVendorDocuments: PartnerUploadedDocument[] = [];
 
 export const usePartnerRegistrationStore = create<PartnerRegistrationState>((set) => ({
   role: null,
-  driverPersonal: defaultMockDriverPersonal,
-  driverVehicle: defaultMockDriverVehicle,
-  driverDocuments: defaultMockDriverDocuments,
-  vendorBusiness: defaultMockVendorBusiness,
-  vendorAddress: defaultMockVendorAddress,
-  vendorDocuments: defaultMockVendorDocuments,
+  driverPersonal: defaultDriverPersonal,
+  driverVehicle: defaultDriverVehicle,
+  driverDocuments: defaultDriverDocuments,
+  vendorBusiness: defaultVendorBusiness,
+  vendorAddress: defaultVendorAddress,
+  vendorDocuments: defaultVendorDocuments,
   setRole: (role) => set({ role }),
   setDriverPersonal: (data) =>
     set((state) => ({ driverPersonal: { ...state.driverPersonal, ...data } })),
@@ -189,11 +171,11 @@ export const usePartnerRegistrationStore = create<PartnerRegistrationState>((set
   reset: () =>
     set({
       role: null,
-      driverPersonal: defaultMockDriverPersonal,
-      driverVehicle: defaultMockDriverVehicle,
-      driverDocuments: defaultMockDriverDocuments,
-      vendorBusiness: defaultMockVendorBusiness,
-      vendorAddress: defaultMockVendorAddress,
-      vendorDocuments: defaultMockVendorDocuments,
+      driverPersonal: defaultDriverPersonal,
+      driverVehicle: defaultDriverVehicle,
+      driverDocuments: defaultDriverDocuments,
+      vendorBusiness: defaultVendorBusiness,
+      vendorAddress: defaultVendorAddress,
+      vendorDocuments: defaultVendorDocuments,
     }),
 }));

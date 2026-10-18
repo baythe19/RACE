@@ -13,6 +13,10 @@ const GENERIC_INVITE_RESULT = {
   message: 'If a verified Driver account matches that number, an invitation has been sent.',
 };
 
+/** P1 (v6 audit): pending invitations expire after 7 days (configurable). */
+const INVITATION_TTL_MS =
+  Math.max(1, Number(process.env.VENDOR_INVITATION_TTL_DAYS ?? 7)) * 24 * 60 * 60 * 1000;
+
 export class DriverVendorMembershipService {
   private async approvedVendor(userId: string) {
     const vendor = await UserModel.findById(userId).exec();
@@ -46,6 +50,18 @@ export class DriverVendorMembershipService {
     }
 
     const driverId = driver.id;
+    // P1: an expired stale invite must not block a fresh invitation.
+    await DriverVendorMembershipModel.updateMany(
+      {
+        driverLockKey: driverId,
+        status: 'PENDING',
+        expiresAt: { $ne: null, $lte: new Date() },
+      },
+      {
+        $set: { status: 'EXPIRED' },
+        $unset: { driverLockKey: 1 },
+      },
+    ).exec();
     if (await DriverVendorMembershipModel.exists({ driverLockKey: driverId })) {
       return GENERIC_INVITE_RESULT;
     }
@@ -57,6 +73,9 @@ export class DriverVendorMembershipService {
         status: 'PENDING',
         invitedBy: vendor._id,
         invitedAt: new Date(),
+        // P1 (v6 audit): pending invitations must not hold the one-vendor
+        // driver lock forever.
+        expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
         driverLockKey: driverId,
       });
       try {
@@ -119,6 +138,18 @@ export class DriverVendorMembershipService {
   }
 
   async listDriverInvitations(driverUserId: string) {
+    // P1: hide + lazily expire invitations past their TTL.
+    await DriverVendorMembershipModel.updateMany(
+      {
+        driverUserId: new Types.ObjectId(driverUserId),
+        status: 'PENDING',
+        expiresAt: { $ne: null, $lte: new Date() },
+      },
+      {
+        $set: { status: 'EXPIRED' },
+        $unset: { driverLockKey: 1 },
+      },
+    ).exec();
     const memberships = await DriverVendorMembershipModel.find({
       driverUserId: new Types.ObjectId(driverUserId),
       status: 'PENDING',
@@ -167,6 +198,19 @@ export class DriverVendorMembershipService {
   }
 
   async respond(driverUserId: string, membershipId: string, decision: 'accept' | 'decline') {
+    // P1 (v6 audit): lazily expire stale pending invitations so a dead invite
+    // cannot keep holding the one-vendor driver lock.
+    await DriverVendorMembershipModel.updateMany(
+      {
+        status: 'PENDING',
+        expiresAt: { $ne: null, $lte: new Date() },
+      },
+      {
+        $set: { status: 'EXPIRED' },
+        $unset: { driverLockKey: 1 },
+      },
+    ).exec();
+
     const membership = await DriverVendorMembershipModel.findOne({
       _id: membershipId,
       driverUserId: new Types.ObjectId(driverUserId),

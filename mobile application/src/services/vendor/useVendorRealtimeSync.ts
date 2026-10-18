@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { API_BASE_URL, TOKEN_KEYS } from '../../config/env';
 import { notificationQueryKeys } from '../useNotificationQueries';
 import { vendorBookingQueryKeys } from './useVendorBookingsQueries';
+import { vendorMembershipKeys } from './useVendorMembershipQueries';
 
 /** Refresh vendor data on authenticated socket signals; polling remains the recovery path. */
 export function useVendorRealtimeSync(enabled: boolean, vendorId?: string) {
@@ -35,6 +36,16 @@ export function useVendorRealtimeSync(enabled: boolean, vendorId?: string) {
         }),
         queryClient.invalidateQueries({
           queryKey: vendorBookingQueryKeys.vehicles,
+          refetchType: 'active',
+        }),
+        // P1 (v6 audit): membership/invitation state must refresh on live
+        // signals too, not only on its 20s poll.
+        queryClient.invalidateQueries({
+          queryKey: vendorMembershipKeys.vendor,
+          refetchType: 'active',
+        }),
+        queryClient.invalidateQueries({
+          queryKey: vendorMembershipKeys.invitations,
           refetchType: 'active',
         }),
         queryClient.invalidateQueries({

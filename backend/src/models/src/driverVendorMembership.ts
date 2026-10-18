@@ -13,6 +13,8 @@ export interface IDriverVendorMembership extends Document {
   status: DriverVendorMembershipStatus;
   invitedBy: Types.ObjectId;
   invitedAt: Date;
+  /** P1 (v6 audit): PENDING invitations die after this instant. */
+  expiresAt?: Date;
   decidedBy?: Types.ObjectId;
   decidedAt?: Date;
   revokedBy?: Types.ObjectId;
@@ -36,6 +38,7 @@ const DriverVendorMembershipSchema = new Schema<IDriverVendorMembership>(
     },
     invitedBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     invitedAt: { type: Date, required: true, default: Date.now },
+    expiresAt: { type: Date },
     decidedBy: { type: Schema.Types.ObjectId, ref: 'User' },
     decidedAt: Date,
     revokedBy: { type: Schema.Types.ObjectId, ref: 'User' },

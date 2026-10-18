@@ -116,29 +116,25 @@ export class DriverService {
 
     await assertDriverApproved(driverId);
     const updatedAt = new Date();
-    const updated = await UserModel.findOneAndUpdate(
-      { _id: driverId, role: 'driver' },
-      {
-        $set: {
-          currentLocation: {
-            latitude: dto.latitude,
-            longitude: dto.longitude,
-            updatedAt,
-          },
-        },
-      },
-      { new: true },
-    )
-      .select('activeBookingId activeBookingType')
-      .exec();
-    if (!updated) throw new NotFoundError('Driver not found');
 
-    const activeBookingId = updated.activeBookingId?.toString();
-    if (activeBookingId) {
-      const activeStatus = {
-        $in: ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'],
+    // P1 (v6 audit / GPS privacy): the booking-scoped write is resolved FIRST.
+    // User.currentLocation (globally visible) is only written when the active
+    // pointer did NOT match an owned, operationally-active booking — so stale
+    // pointers, terminal jobs, or wrong type/owner never pre-expose location,
+    // and a DRIVER_ASSIGNED (not yet accepted) booking never receives it.
+    const activePointer = (
+      await UserModel.findById(driverId).select('activeBookingId activeBookingType').exec()
+    )?.toObject();
+    const activeBookingId = activePointer?.activeBookingId?.toString();
+    const activeBookingType = activePointer?.activeBookingType as 'towing' | 'driver' | undefined;
+
+    let bookingScoped = false;
+    if (activeBookingId && (activeBookingType === 'towing' || activeBookingType === 'driver')) {
+      const filter = {
+        _id: activeBookingId,
+        driverId,
+        status: { $in: ['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'] },
       };
-      const filter = { _id: activeBookingId, driverId, status: activeStatus };
       const update = {
         $set: {
           driverLatitude: dto.latitude,
@@ -146,14 +142,29 @@ export class DriverService {
           driverLocationUpdatedAt: updatedAt,
         },
       };
-      const updatedBooking = updated.activeBookingType === 'towing'
-        ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: false }).select('_id').lean().exec()
-        : updated.activeBookingType === 'driver'
-          ? await DriverBookingModel.findOneAndUpdate(filter, update, { new: false }).select('_id').lean().exec()
-          : null;
+      const updatedBooking =
+        activeBookingType === 'towing'
+          ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: false }).select('_id').lean().exec()
+          : await DriverBookingModel.findOneAndUpdate(filter, update, { new: false }).select('_id').lean().exec();
       if (updatedBooking) {
+        bookingScoped = true;
         emitDriverLocation(activeBookingId, driverId, dto.latitude, dto.longitude);
       }
+    }
+
+    if (!bookingScoped) {
+      await UserModel.findOneAndUpdate(
+        { _id: driverId, role: 'driver' },
+        {
+          $set: {
+            currentLocation: {
+              latitude: dto.latitude,
+              longitude: dto.longitude,
+              updatedAt,
+            },
+          },
+        },
+      ).exec();
     }
 
     return {
