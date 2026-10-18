@@ -98,7 +98,10 @@ export class VendorBookingsService {
     const driver = booking.driverId
       ? await UserModel.findById(booking.driverId).select('fullName mobileNumber').lean().exec()
       : null;
-    const activeStatuses = ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
+    // P0-1 (v6 audit): live driver location is a post-accept signal only. A
+    // vendor-dispatched booking waiting at DRIVER_ASSIGNED has not been
+    // acknowledged, so it must not expose driver location yet.
+    const activeStatuses = ['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
     const updatedAt = booking.driverLocationUpdatedAt;
     const ageMs = updatedAt ? Date.now() - updatedAt.getTime() : undefined;
     const isLocationFresh = activeStatuses.includes(booking.status) &&
@@ -319,7 +322,10 @@ export class VendorBookingsService {
       ...result,
       driver: assignedDriver,
       assignedFleetVehicleLabel: fleetVehicleLabel,
-      message: dto.bookingType === 'towing' ? 'Driver and fleet vehicle assigned' : 'Driver assigned',
+      message:
+        dto.bookingType === 'towing'
+          ? 'Driver and fleet vehicle assigned — waiting for the driver to accept'
+          : 'Driver assigned — waiting for the driver to accept',
     };
   }
 

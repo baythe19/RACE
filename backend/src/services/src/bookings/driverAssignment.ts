@@ -523,6 +523,8 @@ export async function claimOpenBookingOffer(
   driverId: string;
   vendorId?: string;
   assignedFleetVehicleLabel?: string;
+  /** True when the vendor dispatched this job and it now waits for the driver's own accept. */
+  awaitingDriverAccept?: boolean;
 }> {
   const driver = await UserModel.findOne({ _id: driverId, role: 'driver' }).exec();
   if (!driver) throw new NotFoundError('Driver not found');
@@ -610,9 +612,14 @@ export async function claimOpenBookingOffer(
   const driverObjectId = new Types.ObjectId(driverId);
   const bookingObjectId = new Types.ObjectId(bookingId);
   const tripStartOtp = generateTripStartOtp();
+  // P0-1 (v6 audit): vendor dispatch must NOT start the trip. The booking waits
+  // at DRIVER_ASSIGNED until the allotted driver taps Accept; only the driver's
+  // own claim (no vendorId in options) starts the trip immediately, exactly as
+  // the open-marketplace flow always did.
+  const vendorDispatched = Boolean(vendorId);
   const $set: Record<string, unknown> = {
     driverId: driverObjectId,
-    status: 'DRIVER_EN_ROUTE',
+    status: vendorDispatched ? 'DRIVER_ASSIGNED' : 'DRIVER_EN_ROUTE',
     tripStartOtp,
     tripStartOtpVerified: false,
   };
@@ -632,7 +639,9 @@ export async function claimOpenBookingOffer(
       statusHistory: {
         $each: [
           { status: 'DRIVER_ASSIGNED', timestamp: new Date() },
-          { status: 'DRIVER_EN_ROUTE', timestamp: new Date() },
+          ...(vendorDispatched
+            ? []
+            : [{ status: 'DRIVER_EN_ROUTE', timestamp: new Date() }]),
         ],
       },
     },
@@ -659,6 +668,33 @@ export async function claimOpenBookingOffer(
   if (!claimed) {
     await releaseDriver(driverId, bookingId);
     throw new ConflictError('This job was just taken by another partner');
+  }
+
+  if (vendorDispatched) {
+    // Vendor-routed assignment waits for the driver's own acknowledgement. The
+    // trip-start OTP is intentionally NOT emitted here — it goes out when the
+    // driver accepts (updateBookingStatus → DRIVER_EN_ROUTE).
+    emitBookingStatusUpdate(bookingId, 'DRIVER_ASSIGNED', {
+      internalStatus: 'DRIVER_ASSIGNED',
+      driverAccepted: false,
+      message: 'New job assigned by your vendor — accept to start',
+      assignedFleetVehicleLabel: fleetVehicleLabel,
+    });
+    emitToDriver(driverId, 'job:offer', {
+      bookingId,
+      bookingType,
+      status: 'DRIVER_ASSIGNED',
+      message: 'New job assigned by your vendor',
+    });
+    return {
+      id: claimed.id,
+      status: claimed.status,
+      bookingNumber: claimed.bookingNumber,
+      driverId,
+      vendorId,
+      assignedFleetVehicleLabel: fleetVehicleLabel,
+      awaitingDriverAccept: true,
+    };
   }
 
   // VOC P0.3: the trip-start OTP must reach ONLY the assigned driver — it is

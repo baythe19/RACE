@@ -10,8 +10,11 @@ import type { DriverJobBooking } from '../services/driver/driverApi';
 
 const COMPLETED_STATUSES = ['COMPLETED', 'RATED', 'PAID'];
 const CANCELLED_STATUSES = ['CANCELLED', 'CANCELLED_BY_CUSTOMER'];
+// P0-1 (v6 audit): DRIVER_ASSIGNED is a vendor dispatch awaiting the driver's
+// own acknowledgement — it is NOT an active trip. Travel UI unlocks only at
+// DRIVER_EN_ROUTE, after the driver taps Accept.
+const PENDING_ACCEPT_STATUSES = ['DRIVER_ASSIGNED'];
 const ACTIVE_STATUSES = [
-  'DRIVER_ASSIGNED',
   'DRIVER_EN_ROUTE',
   'DRIVER_ARRIVED',
   'IN_PROGRESS',
@@ -32,6 +35,11 @@ export function isClosedBookingStatus(status: string): boolean {
 
 export function isActiveBookingStatus(status: string): boolean {
   return ACTIVE_STATUSES.includes(status);
+}
+
+/** Vendor-assigned job waiting for this driver's Accept/Decline. */
+export function isPendingAcceptStatus(status: string): boolean {
+  return PENDING_ACCEPT_STATUSES.includes(status);
 }
 
 /**

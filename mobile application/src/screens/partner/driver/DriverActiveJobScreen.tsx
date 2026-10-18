@@ -839,6 +839,60 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     );
   }
 
+  // P0-1 (v6 audit): a vendor-dispatched booking waits at DRIVER_ASSIGNED for
+  // the driver's own acknowledgement — the travel/OTP UI must not open here.
+  // The Jobs tab owns the Accept/Decline action.
+  if (job && job.status === 'DRIVER_ASSIGNED') {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+        {header}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: px(24) }}>
+          <View
+            style={{
+              width: px(64),
+              height: px(64),
+              borderRadius: px(32),
+              backgroundColor: C.cream,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <TriangleAlert size={px(28)} color={C.amberText} strokeWidth={2.2} />
+          </View>
+          <PartnerText
+            style={[
+              T.sectionTitle,
+              { fontSize: px(19), lineHeight: px(24), color: C.ink, marginTop: px(16), textAlign: 'center' },
+            ]}>
+            New job assigned
+          </PartnerText>
+          <PartnerText
+            style={[
+              T.cardSubtitle,
+              { fontSize: px(13.5), lineHeight: px(19), color: C.grey, marginTop: px(8), textAlign: 'center' },
+            ]}>
+            Your vendor assigned this job. Accept it from the Jobs tab to start the trip.
+          </PartnerText>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            style={{
+              marginTop: px(20),
+              height: px(M.ctaHeight),
+              paddingHorizontal: px(24),
+              borderRadius: px(R.button),
+              backgroundColor: C.amber,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <PartnerText style={[T.button, { fontSize: px(14), color: C.ink }]}>
+              Go to Jobs
+            </PartnerText>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   if (isError && !job) {
     return (
       <View style={{ flex: 1, backgroundColor: C.pageBg }}>

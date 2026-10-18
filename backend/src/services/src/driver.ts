@@ -1,11 +1,11 @@
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
-import { emitBookingStatusUpdate, emitDriverLocation } from './socket';
+import { emitBookingStatusUpdate, emitDriverLocation, emitToDriver } from './socket';
 import { userRepository } from './userRepository';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
-import { assertTripStartOtp } from './bookings/tripOtp';
+import { assertTripStartOtp, generateTripStartOtp } from './bookings/tripOtp';
 import { UserModel } from '../../models/src/user';
 import { TowingBookingModel } from '../../models/src/towingBooking';
 import { DriverBookingModel } from '../../models/src/driverBooking';
@@ -355,6 +355,24 @@ export class DriverService {
 
     if (!updated) {
       throw new ConflictError('Booking changed before the status update was saved');
+    }
+
+    // P0-1 (v6 audit): a vendor-dispatched booking sits at DRIVER_ASSIGNED until
+    // the driver accepts. Accepting (→ DRIVER_EN_ROUTE) is the trip-start gate,
+    // so the driver-only trip OTP is delivered exactly here.
+    if (dto.status === 'DRIVER_EN_ROUTE' && booking.status === 'DRIVER_ASSIGNED') {
+      const tripStartOtp = booking.tripStartOtp ?? generateTripStartOtp();
+      if (!booking.tripStartOtp) {
+        await Model.updateStatus(bookingId, 'DRIVER_EN_ROUTE', 'DRIVER_EN_ROUTE', {
+          tripStartOtp,
+        });
+      }
+      emitToDriver(driverId, 'trip:otp', {
+        bookingId,
+        bookingType: dto.bookingType,
+        tripStartOtp,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      });
     }
 
     if (dto.status === 'COMPLETED') {

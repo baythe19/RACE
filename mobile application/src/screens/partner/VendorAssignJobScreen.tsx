@@ -101,7 +101,8 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       });
       Alert.alert(
         'Job assigned',
-        result.message || 'The connected Driver has been assigned to #' + bookingNumber + '.',
+        result.message ||
+          `Driver assigned to #${bookingNumber}. The trip starts once the driver accepts the job.`,
         [{ text: 'OK', onPress: () => navigation.navigate('PartnerJobsList') }],
       );
     } catch (error) {

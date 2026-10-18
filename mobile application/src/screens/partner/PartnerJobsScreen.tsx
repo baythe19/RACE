@@ -510,13 +510,13 @@ export default function PartnerJobsScreen() {
               disabled={busy}
               onPress={() => void onAccept(job)}
               style={[styles.acceptBtn, busy && styles.disabled]}>
-              <PartnerText style={styles.acceptLabel}>{busy ? '…' : 'Start trip'}</PartnerText>
+              <PartnerText style={styles.acceptLabel}>{busy ? '…' : 'Accept trip'}</PartnerText>
             </Pressable>
             <Pressable
               disabled={busy}
               onPress={() => onReject(job)}
               style={[styles.rejectBtn, busy && styles.disabled]}>
-              <PartnerText style={styles.rejectLabel}>Reject</PartnerText>
+              <PartnerText style={styles.rejectLabel}>Decline</PartnerText>
             </Pressable>
           </View>
         ) : null}
