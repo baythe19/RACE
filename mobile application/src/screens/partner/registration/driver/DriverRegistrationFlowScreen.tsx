@@ -38,20 +38,22 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import DriverRegistrationLayout from '../../../../components/partner/DriverRegistrationLayout';
-import VehicleTypeArtwork from '../../../../components/partner/VehicleTypeArtwork';
 import {
   CONDITIONAL_DOCUMENTS,
   CORE_REVIEW_DOCUMENTS,
   type DriverDocumentConfig,
   LATER_DOCUMENTS,
 } from '../../../../constants/driverRegistrationDocuments';
-import { DRIVER_VEHICLE_TYPE_CARDS } from '../../../../constants/driverVehicleTypes';
 import { usePartnerRegistrationStore } from '../../../../store/partnerRegistrationStore';
 import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
 import { completeOnboarding } from '../../../../redux/auth/authSlice';
 import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlice';
 import { API_ENDPOINTS } from '../../../../config/api';
-import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../../../constants/preview';
+import {
+  isUiTestPermissiveMode,
+  UI_PREVIEW_MODE,
+  UI_PREVIEW_MUTATIONS_ENABLED,
+} from '../../../../constants/preview';
 import { api, saveTokens } from '../../../../services/api';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import type {
@@ -143,11 +145,6 @@ function getFirstDayOfWeek(year: number, month1Indexed: number): number {
   return new Date(year, month1Indexed - 1, 1).getDay();
 }
 
-function mapVehicleToDriverType(vehicleType: string): 'Tow Driver' | 'Full-Time' | 'Part-Time' {
-  const lower = (vehicleType || '').toLowerCase();
-  if (lower.includes('car') && !lower.includes('tow')) return 'Part-Time';
-  return 'Tow Driver';
-}
 
 export default function DriverRegistrationFlowScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
@@ -158,7 +155,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const fromReviewParam = Boolean(route.params?.fromReview);
   const isResubmitParam = Boolean((route.params as any)?.isResubmit);
 
-  // Flow Step State (1: Personal, 2: Vehicle, 3: Documents, 4: Review)
+  // Flow Step State (1: Personal, 2: Driver details, 3: Documents, 4: Review)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(
     initialStepParam >= 1 && initialStepParam <= 4 ? (initialStepParam as any) : 1,
   );
@@ -268,21 +265,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     setCalendarModalVisible(false);
   };
 
-  // -------------------------------------------------------------
-  // Step 2: Vehicle Info States
-  // -------------------------------------------------------------
-  const [modelModalVisible, setModelModalVisible] = useState(false);
-  const [customModelInput, setCustomModelInput] = useState(driverVehicle.vehicleModel || '');
-
-  const selectedVehicleCardId =
-    DRIVER_VEHICLE_TYPE_CARDS.find(
-      (c) =>
-        c.label.toLowerCase() === (driverVehicle.vehicleType || '').toLowerCase() ||
-        c.id.toLowerCase() === (driverVehicle.vehicleType || '').toLowerCase() ||
-        (driverVehicle.vehicleType || '').toLowerCase().includes(c.id),
-    )?.id || 'flatbed';
-
-  const registeredTo = driverVehicle.registeredTo || 'me';
+  // Step 2 stores the Driver's work type and personal driving licence only.
+  const DRIVER_SERVICE_TYPES = ['Tow Driver', 'Full-Time', 'Part-Time'] as const;
 
   // -------------------------------------------------------------
   // Step 3: Document Verification States
@@ -308,7 +292,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const isDocUploaded = (docId: string) => driverDocuments.some((d) => d.id === docId);
   const getUploadedDoc = (docId: string) => driverDocuments.find((d) => d.id === docId);
 
-  const startAnimatedUpload = (
+  const startAnimatedUpload = async (
     doc: DriverDocumentConfig,
     sourceLabel: string,
     realFile?: { uri: string; name: string; mimeType: string },
@@ -317,41 +301,70 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     setUploadProgressState({
       doc,
       sourceLabel,
-      progress: 20,
-      statusText: 'Connecting securely...',
+      progress: 8,
+      statusText: 'Preparing secure upload...',
       isComplete: false,
     });
 
-    setTimeout(() => {
-      setUploadProgressState((prev) =>
-        prev ? { ...prev, progress: 55, statusText: `Uploading from ${sourceLabel}...` } : null,
-      );
-    }, 320);
+    try {
+      if (!realFile) throw new Error('Choose a document before uploading.');
+      const isPreviewSample =
+        sourceLabel === 'Sample' && UI_PREVIEW_MODE && isUiTestPermissiveMode();
+      let remoteUrl = '';
 
-    setTimeout(() => {
-      setUploadProgressState((prev) =>
-        prev ? { ...prev, progress: 88, statusText: 'Verifying resolution & readability...' } : null,
-      );
-    }, 700);
+      if (isPreviewSample) {
+        remoteUrl = realFile.uri;
+      } else {
+        if (/^https?:\/\//i.test(realFile.uri)) {
+          throw new Error('Sample files are available only in preview mode. Select a real document.');
+        }
+        const formData = new FormData();
+        formData.append('documentType', doc.id);
+        formData.append('file', {
+          uri: realFile.uri,
+          name: realFile.name,
+          type: realFile.mimeType,
+        } as unknown as Blob);
+        setUploadProgressState(prev =>
+          prev ? { ...prev, progress: 12, statusText: 'Uploading document securely...' } : null,
+        );
+        const { data } = await api.post<ApiSuccessResponse<{ fileUrl: string }>>(
+          API_ENDPOINTS.driverUploadDocument,
+          formData,
+          {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            onUploadProgress: event => {
+              const ratio = event.total ? event.loaded / event.total : 0;
+              const progress = Math.min(90, Math.max(12, Math.round(ratio * 90)));
+              setUploadProgressState(prev =>
+                prev ? { ...prev, progress, statusText: 'Uploading document securely...' } : null,
+              );
+            },
+          },
+        );
+        remoteUrl = data.data.fileUrl;
+        if (!remoteUrl) throw new Error('The server did not return a stored document URL.');
+      }
 
-    setTimeout(() => {
-      setUploadProgressState((prev) =>
-        prev ? { ...prev, progress: 100, statusText: 'Verified & uploaded successfully! ✓', isComplete: true } : null,
-      );
-    }, 1050);
-
-    setTimeout(() => {
       addDriverDocument({
         id: doc.id,
         label: doc.title,
-        uri:
-          realFile?.uri ||
-          `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&q=80&sig=${doc.id}`,
-        name: realFile?.name || `${doc.id}_verified.jpg`,
-        mimeType: realFile?.mimeType || 'image/jpeg',
+        uri: realFile.uri,
+        remoteUrl,
+        name: realFile.name,
+        mimeType: realFile.mimeType,
       });
+      setUploadProgressState(prev =>
+        prev ? { ...prev, progress: 100, statusText: 'Uploaded and saved securely.', isComplete: true } : null,
+      );
+      setTimeout(() => setUploadProgressState(null), 700);
+    } catch (error) {
       setUploadProgressState(null);
-    }, 1500);
+      Alert.alert(
+        'Document upload failed',
+        getApiErrorMessage(error, 'The document was not saved. Check your connection and try again.'),
+      );
+    }
   };
 
   // -------------------------------------------------------------
@@ -624,12 +637,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   };
 
   const validateVehicleStep = () => {
-    if (!driverVehicle.vehicleType.trim()) {
-      Alert.alert('Vehicle type required', 'Select the vehicle type you operate.');
-      return false;
-    }
-    if (driverVehicle.vehicleNumber.trim().length < 4) {
-      Alert.alert('Registration number required', 'Enter a valid vehicle registration number.');
+    if (!DRIVER_SERVICE_TYPES.includes(driverVehicle.vehicleType as (typeof DRIVER_SERVICE_TYPES)[number])) {
+      Alert.alert('Driver type required', 'Choose Tow Driver, Full-Time or Part-Time.');
       return false;
     }
     if (driverVehicle.licenseNumber.trim().length < 4) {
@@ -674,21 +683,17 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
       animateToStep(2, 'forward');
     } else if (currentStep === 2) {
-      const chosenCard =
-        DRIVER_VEHICLE_TYPE_CARDS.find((c) => c.id === selectedVehicleCardId) ||
-        DRIVER_VEHICLE_TYPE_CARDS[0];
-
       setDriverVehicle({
-        vehicleType: driverVehicle.vehicleType.trim() || (permissivePreview ? chosenCard.label : ''),
-        vehicleNumber:
-          driverVehicle.vehicleNumber.trim() || (permissivePreview ? 'OD 02 AB 1234' : ''),
-        licenseNumber:
-          driverVehicle.licenseNumber.trim() || (permissivePreview ? 'OD-0220190012345' : ''),
-        rcNumber:
-          driverVehicle.rcNumber.trim() || (permissivePreview ? 'RC-OD02-2022-987654' : ''),
-        vehicleModel:
-          driverVehicle.vehicleModel.trim() || (permissivePreview ? 'Tata 407 Recovery Spec' : ''),
-        registeredTo: driverVehicle.registeredTo || (permissivePreview ? 'me' : undefined),
+        vehicleType: DRIVER_SERVICE_TYPES.includes(driverVehicle.vehicleType as (typeof DRIVER_SERVICE_TYPES)[number])
+          ? driverVehicle.vehicleType
+          : permissivePreview ? 'Tow Driver' : '',
+        licenseNumber: driverVehicle.licenseNumber.trim() || (permissivePreview ? 'OD-0220190012345' : ''),
+        vehicleNumber: '',
+        rcNumber: '',
+        vehicleModel: '',
+        insuranceProvider: '',
+        insurancePolicyNumber: '',
+        registeredTo: undefined,
       });
       animateToStep(3, 'forward');
     } else if (currentStep === 3) {
@@ -720,13 +725,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           }
         : undefined;
 
-      const documentsPayload = driverDocuments.map((doc) => ({
-        type: doc.id,
-        url: doc.uri,
-        status: 'PENDING' as const,
-      }));
+      const documentsPayload = driverDocuments.map((doc) => {
+        const url = doc.remoteUrl || (UI_PREVIEW_MODE && /^https?:\/\//i.test(doc.uri) ? doc.uri : '');
+        if (!url) throw new Error(`${doc.label} has not finished uploading. Upload it again before submitting.`);
+        return { type: doc.id, url, status: 'PENDING' as const };
+      });
 
-      const driverType = mapVehicleToDriverType(driverVehicle.vehicleType || 'Flatbed');
 
       const payload = {
         fullName: driverPersonal.fullName.trim(),
@@ -736,9 +740,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         dateOfBirth: normalizeDobForApi(driverPersonal.dateOfBirth),
         emergencyContact,
         licenseNo: driverVehicle.licenseNumber.trim(),
-        driverType,
-        vehicleRegistration: driverVehicle.vehicleNumber.trim() || undefined,
-        vehicleType: driverVehicle.vehicleType.trim() || undefined,
+        driverType: driverVehicle.vehicleType.trim() as 'Tow Driver' | 'Full-Time' | 'Part-Time',
         documents: documentsPayload,
         experienceYears: driverPersonal.yearsOfExperience
           ? Number(driverPersonal.yearsOfExperience)
@@ -768,7 +770,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           registeredName = data.data.fullName;
         }
       } catch (err) {
-        if (!UI_PREVIEW_MODE) throw err;
+        if (!UI_PREVIEW_MUTATIONS_ENABLED) throw err;
         console.warn('Driver self registration API fallback:', err);
       }
 
@@ -808,7 +810,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     } catch (error) {
       Alert.alert(
         'Submission notice',
-        getApiErrorMessage(error, 'Application submitted with local confirmation'),
+        getApiErrorMessage(error, 'Please check your connection and submit again.'),
       );
     } finally {
       setSubmitting(false);
@@ -1014,95 +1016,56 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // -------------------------------------------------------------
   const renderStep2VehicleInfo = () => (
     <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
-      {/* Card Header Row */}
       <View style={styles.cardHeaderRow}>
         <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
-          <Truck size={px(17)} color="#D97706" strokeWidth={2.4} />
+          <User size={px(17)} color="#D97706" strokeWidth={2.4} />
         </View>
         <View style={styles.headerTextWrap}>
-          <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>Vehicle information</PartnerText>
+          <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>Driver details</PartnerText>
           <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
-            Tell us about your vehicle.
+            Choose the work you want to accept and add your driving licence.
           </PartnerText>
         </View>
       </View>
 
       <View style={styles.cardDivider} />
 
-      {/* Vehicle Type * (Single Row of 4 Compact Cards) */}
       <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(6) }]}>
-          Vehicle type <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(7) }]}>
+          Driver type <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
         </PartnerText>
-
-        <View style={styles.vehicleRow}>
-          {DRIVER_VEHICLE_TYPE_CARDS.map((item) => {
-            const isSelected = selectedVehicleCardId === item.id;
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(7) }}>
+          {DRIVER_SERVICE_TYPES.map(type => {
+            const selected = driverVehicle.vehicleType === type;
             return (
               <Pressable
-                key={item.id}
-                onPress={() => setDriverVehicle({ vehicleType: item.label })}
+                key={type}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                onPress={() => setDriverVehicle({ vehicleType: type })}
                 style={({ pressed }) => [
                   styles.vehicleCard,
-                  { paddingVertical: px(8), paddingHorizontal: px(4), borderRadius: px(8) },
-                  isSelected ? styles.vehicleCardSelected : styles.vehicleCardIdle,
+                  { minWidth: px(88), paddingHorizontal: px(11), paddingVertical: px(10), borderRadius: px(10) },
+                  selected ? styles.vehicleCardSelected : styles.vehicleCardIdle,
                   pressed && styles.pressed,
                 ]}>
-                <View style={styles.artworkContainer}>
-                  <VehicleTypeArtwork
-                    type={item.illustrationType}
-                    size={px(34)}
-                    selected={isSelected}
-                  />
-                </View>
-                <PartnerText
-                  numberOfLines={1}
-                  style={[
-                    styles.vehicleCardLabel,
-                    { fontSize: px(10.5), marginTop: px(4) },
-                    isSelected ? styles.vehicleCardLabelSelected : styles.vehicleCardLabelIdle,
-                  ]}>
-                  {item.label}
+                <PartnerText style={[
+                  styles.vehicleCardLabel,
+                  { fontSize: px(12) },
+                  selected ? styles.vehicleCardLabelSelected : styles.vehicleCardLabelIdle,
+                ]}>
+                  {type}
                 </PartnerText>
               </Pressable>
             );
           })}
         </View>
+        <PartnerText style={{ color: '#6B7280', fontSize: px(11), lineHeight: px(16), marginTop: px(7) }}>
+          Tow Driver gets towing assignments from a connected Towing Vendor. Full-Time and Part-Time Drivers can receive driver-hire requests.
+        </PartnerText>
       </View>
 
-      {/* Vehicle Registration Number */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <View style={styles.inputLabelRow}>
-          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-            Vehicle registration number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-          </PartnerText>
-          {driverVehicle.vehicleNumber.length >= 8 ? (
-            <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
-              {driverVehicle.vehicleNumber.length}/14
-            </PartnerText>
-          ) : null}
-        </View>
-        <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-          <CreditCard size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerTextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
-            placeholder="e.g. OD 02 AB 1234"
-            placeholderTextColor="#9CA3AF"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={14}
-            value={driverVehicle.vehicleNumber}
-            onChangeText={(text) =>
-              setDriverVehicle({
-                vehicleNumber: text.replace(/[^A-Za-z0-9\s]/g, '').toUpperCase(),
-              })
-            }
-          />
-        </View>
-      </View>
-
-      {/* Driving Licence Number */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+      <View style={[styles.inputGroup, { marginBottom: px(8) }]}>
         <View style={styles.inputLabelRow}>
           <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
             Driving licence number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
@@ -1113,133 +1076,34 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </PartnerText>
           ) : null}
         </View>
-        <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+        <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(10) }]}>
           <FileText size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
           <PartnerTextInput
             style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
-            placeholder="Enter Driving License (DL) number"
+            placeholder="Enter your DL number"
             placeholderTextColor="#9CA3AF"
             autoCapitalize="characters"
             autoCorrect={false}
             maxLength={18}
             value={driverVehicle.licenseNumber}
-            onChangeText={(text) =>
-              setDriverVehicle({
-                licenseNumber: text.replace(/[^A-Za-z0-9\-]/g, '').toUpperCase(),
-              })
-            }
+            onChangeText={text => setDriverVehicle({
+              licenseNumber: text.replace(/[^A-Za-z0-9-]/g, '').toUpperCase(),
+            })}
           />
         </View>
       </View>
 
-      {/* Vehicle Registered To (Clean Radio Buttons) */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(6) }]}>
-          Vehicle registered to <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-        </PartnerText>
-
-        <View style={styles.radioGroup}>
-          <Pressable
-            onPress={() => setDriverVehicle({ registeredTo: 'me' })}
-            style={({ pressed }) => [styles.radioRow, pressed && styles.pressed]}>
-            <View
-              style={[
-                styles.radioCircle,
-                registeredTo === 'me' && styles.radioCircleActive,
-              ]}>
-              {registeredTo === 'me' ? <View style={styles.radioDot} /> : null}
-            </View>
-            <PartnerText style={[styles.radioLabel, { fontSize: px(12.5) }]}>
-              Me / I own this vehicle
-            </PartnerText>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setDriverVehicle({ registeredTo: 'someone_else' })}
-            style={({ pressed }) => [
-              styles.radioRow,
-              { marginTop: px(6), alignItems: 'flex-start' },
-              pressed && styles.pressed,
-            ]}>
-            <View
-              style={[
-                styles.radioCircle,
-                { marginTop: px(2) },
-                registeredTo === 'someone_else' && styles.radioCircleActive,
-              ]}>
-              {registeredTo === 'someone_else' ? <View style={styles.radioDot} /> : null}
-            </View>
-            <View style={styles.radioTextWrap}>
-              <PartnerText style={[styles.radioLabel, { fontSize: px(12.5) }]}>
-                Someone else
-              </PartnerText>
-              <PartnerText style={[styles.radioSubLabel, { fontSize: px(10.5) }]}>
-                Owner authorisation may be needed
-              </PartnerText>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Vehicle Model (Custom Input or Dropdown) */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <View style={styles.labelWithActionRow}>
-          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-            Vehicle model <PartnerText style={styles.optionalText}>(Optional)</PartnerText>
+      <View style={[styles.blueNoticeBanner, { paddingVertical: px(9), paddingHorizontal: px(10), borderRadius: px(8) }]}>
+        <View style={styles.noticeBannerRow}>
+          <Info size={px(15)} color="#2563EB" />
+          <PartnerText style={[styles.noticeBannerText, { fontSize: px(11), flex: 1 }]}>
+            You do not need to own a vehicle. Towing Vendors register their fleet vehicles separately and assign one to a towing job.
           </PartnerText>
-          <Pressable
-            hitSlop={8}
-            onPress={() => {
-              setCustomModelInput(driverVehicle.vehicleModel || '');
-              setModelModalVisible(true);
-            }}>
-            <PartnerText style={[styles.browseDropdownLink, { fontSize: px(11.5) }]}>
-              Choose from list ▾
-            </PartnerText>
-          </Pressable>
         </View>
-
-        <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-          <Car size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerTextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
-            placeholder="Type custom model or choose from list"
-            placeholderTextColor="#9CA3AF"
-            maxLength={35}
-            value={driverVehicle.vehicleModel}
-            onChangeText={(text) =>
-              setDriverVehicle({
-                vehicleModel: text.replace(/[^A-Za-z0-9\s\-.]/g, ''),
-              })
-            }
-          />
-          <Pressable
-            hitSlop={10}
-            onPress={() => {
-              setCustomModelInput(driverVehicle.vehicleModel || '');
-              setModelModalVisible(true);
-            }}
-            style={styles.dropdownChevronBtn}>
-            <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Bottom Notice Box */}
-      <View style={[styles.noticeBox, { padding: px(10), borderRadius: px(8) }]}>
-        <View style={[styles.noticeIconCircle, { width: px(20), height: px(20), borderRadius: px(10) }]}>
-          <Info size={px(12)} color="#FFFFFF" strokeWidth={2.4} />
-        </View>
-        <PartnerText style={[styles.noticeText, { fontSize: px(11) }]}>
-          RC and insurance details will be checked from uploaded documents.
-        </PartnerText>
       </View>
     </View>
   );
 
-  // -------------------------------------------------------------
-  // Render Step 3: Documents
-  // -------------------------------------------------------------
   const renderDocRow = (doc: DriverDocumentConfig, isConditional: boolean = false) => {
     const uploaded = isDocUploaded(doc.id);
     const uploadedData = getUploadedDoc(doc.id);
@@ -1401,14 +1265,27 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           {CORE_REVIEW_DOCUMENTS.map((doc) => renderDocRow(doc, false))}
         </View>
 
-        {/* Section 2: Only when applicable */}
-        <View style={[styles.sectionContainer, { marginBottom: px(8) }]}>
-          <PartnerText style={[styles.sectionTitle, { fontSize: px(13), marginBottom: px(6) }]}>
-            Only when applicable
-          </PartnerText>
-
-          {CONDITIONAL_DOCUMENTS.map((doc) => renderDocRow(doc, true))}
-        </View>
+        {CONDITIONAL_DOCUMENTS.length > 0 ? (
+          <View style={[styles.sectionContainer, { marginBottom: px(8) }]}>
+            <PartnerText style={[styles.sectionTitle, { fontSize: px(13), marginBottom: px(6) }]}>
+              Only when applicable
+            </PartnerText>
+            {CONDITIONAL_DOCUMENTS.map((doc) => renderDocRow(doc, true))}
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.blueNoticeBanner,
+              { marginBottom: px(8), paddingVertical: px(9), paddingHorizontal: px(10), borderRadius: px(8) },
+            ]}>
+            <View style={styles.noticeBannerRow}>
+              <Info size={px(15)} color="#2563EB" />
+              <PartnerText style={[styles.noticeBannerText, { fontSize: px(11) }]}>
+                A Driver account does not need vehicle registration papers. Towing Vendors add and verify fleet vehicles separately.
+              </PartnerText>
+            </View>
+          </View>
+        )}
 
         {/* Collapsible 1: Payout details */}
         <Pressable
@@ -1634,7 +1511,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
         <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
 
-        {/* Section 2: Vehicle Details */}
+        {/* Section 2: Driver Details */}
         <View style={styles.summarySectionCol}>
           <View style={styles.summarySectionHeader}>
             <Pressable
@@ -1645,10 +1522,10 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 <Check size={px(11)} color="#15803D" strokeWidth={3} />
               </View>
               <View style={[styles.sectionIconWrap, { width: px(28), height: px(28), borderRadius: px(6) }]}>
-                <Truck size={px(15)} color="#D97706" />
+                <User size={px(15)} color="#D97706" />
               </View>
               <View style={styles.summaryTitleRow}>
-                <PartnerText style={[styles.summaryTitle, { fontSize: px(13) }]}>Vehicle details</PartnerText>
+                <PartnerText style={[styles.summaryTitle, { fontSize: px(13) }]}>Driver details</PartnerText>
                 <View style={[styles.checkedPill, { paddingHorizontal: px(5), paddingVertical: px(1), borderRadius: px(4) }]}>
                   <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                 </View>
@@ -1679,30 +1556,23 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </View>
           </View>
 
-          {/* Key Vehicle Information Points — expands stacked below */}
           {reviewExpanded.vehicle && (
             <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  Type: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Flatbed Tow Truck'}</PartnerText>
-                  {'  •  '}{driverVehicle.vehicleModel || 'Tata 407 Recovery Spec'}
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]}>
+                  Work type: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Select a Driver type'}</PartnerText>
                 </PartnerText>
               </View>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  Plate: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleNumber || 'OD 02 AB 1234'}</PartnerText>
-                  {'  •  '}RC: <PartnerText style={styles.reviewPointBold}>{driverVehicle.rcNumber || 'RC-OD02-2022-987654'}</PartnerText>
+                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]}>
+                  Driving licence: <PartnerText style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'Not entered'}</PartnerText>
                 </PartnerText>
               </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  DL: <PartnerText style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'OD-0220190012345'}</PartnerText>
-                  {'  •  '}Ownership: <PartnerText style={styles.reviewPointBold}>{driverVehicle.registeredTo === 'someone_else' ? 'NOC / Authorized' : 'Owner (Me)'}</PartnerText>
-                </PartnerText>
-              </View>
+              <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5), marginLeft: px(9) }]}>
+                No personal vehicle is required for a Driver account.
+              </PartnerText>
             </View>
           )}
         </View>
@@ -1779,19 +1649,17 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           {reviewExpanded.documents && (
             <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
               <View style={styles.reviewDocTagsRow}>
-                {['RC Book', 'Driving licence', 'Vehicle insurance', 'Fitness cert', 'Vehicle photos'].map(
-                  (docTag) => (
-                    <View
-                      key={docTag}
-                      style={[
-                        styles.docReviewTag,
-                        { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
-                      ]}>
-                      <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
-                      <PartnerText style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{docTag}</PartnerText>
-                    </View>
-                  ),
-                )}
+                {CORE_REVIEW_DOCUMENTS.map((doc) => (
+                  <View
+                    key={doc.id}
+                    style={[
+                      styles.docReviewTag,
+                      { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
+                    ]}>
+                    <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
+                    <PartnerText style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{doc.title}</PartnerText>
+                  </View>
+                ))}
               </View>
               <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
@@ -2153,87 +2021,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         </Pressable>
       </Modal>
 
-      {/* Vehicle Model Modal (Popular list + Custom typing) */}
-      <Modal visible={modelModalVisible} transparent animationType="slide">
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setModelModalVisible(false)} />
-          <Pressable
-            style={[styles.modalSheet, { maxHeight: px(520), borderTopLeftRadius: px(16), borderTopRightRadius: px(16) }]}
-            onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHeader}>
-              <View>
-                <PartnerText style={[styles.sheetTitle, { fontSize: px(15) }]}>Vehicle Model</PartnerText>
-                <PartnerText style={[styles.sheetSubtitle, { fontSize: px(11) }]}>
-                  Type custom model or choose from popular models
-                </PartnerText>
-              </View>
-              <Pressable hitSlop={12} onPress={() => setModelModalVisible(false)}>
-                <X size={px(18)} color="#4B5563" />
-              </Pressable>
-            </View>
 
-            {/* Custom Input Box inside modal */}
-            <View style={[styles.modalSearchContainer, { height: px(42), marginHorizontal: px(14), marginBottom: px(10) }]}>
-              <Car size={px(16)} color="#9CA3AF" style={{ marginRight: px(8) }} />
-              <PartnerTextInput
-                style={[styles.modalSearchInput, { fontSize: px(13), flex: 1 }]}
-                placeholder="Enter custom vehicle model..."
-                placeholderTextColor="#9CA3AF"
-                maxLength={35}
-                value={customModelInput}
-                onChangeText={(text) => setCustomModelInput(text.replace(/[^A-Za-z0-9\s\-.]/g, ''))}
-              />
-              {customModelInput.trim().length > 0 ? (
-                <Pressable
-                  hitSlop={8}
-                  onPress={() => {
-                    setDriverVehicle({ vehicleModel: customModelInput.trim() });
-                    setModelModalVisible(false);
-                  }}
-                  style={styles.modalApplyBtn}>
-                  <PartnerText style={[styles.modalApplyText, { fontSize: px(12) }]}>Apply</PartnerText>
-                </Pressable>
-              ) : null}
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: px(340) }}>
-              {POPULAR_VEHICLE_MODELS.map((model) => {
-                const isSelected = driverVehicle.vehicleModel === model;
-                return (
-                  <Pressable
-                    key={model}
-                    onPress={() => {
-                      if (model === 'Other / Custom Vehicle Model') {
-                        setCustomModelInput(driverVehicle.vehicleModel || '');
-                      } else {
-                        setDriverVehicle({ vehicleModel: model });
-                        setModelModalVisible(false);
-                      }
-                    }}
-                    style={({ pressed }) => [
-                      styles.cityRow,
-                      { paddingVertical: px(10), paddingHorizontal: px(14) },
-                      isSelected && styles.cityRowSelected,
-                      pressed && styles.pressed,
-                    ]}>
-                    <PartnerText
-                      style={[
-                        styles.cityText,
-                        { fontSize: px(13) },
-                        isSelected && styles.cityTextSelected,
-                      ]}>
-                      {model}
-                    </PartnerText>
-                    {isSelected ? <Check size={px(16)} color="#D97706" strokeWidth={2.5} /> : null}
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {/* Upload Action Sheet Modal (Step 3) */}
       <Modal visible={!!activeDocForUpload} transparent animationType="slide">
@@ -2311,28 +2099,29 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               <ChevronRight size={px(16)} color="#9CA3AF" />
             </Pressable>
 
-            {/* Option 4: Instant Sample Document for QA */}
-            <Pressable
-              onPress={() => activeDocForUpload && handlePickSample(activeDocForUpload)}
-              style={({ pressed }) => [
-                styles.uploadOptionRow,
-                styles.sampleOptionRow,
-                { paddingVertical: px(10), marginTop: px(8), borderRadius: px(8) },
-                pressed && styles.pressed,
-              ]}>
-              <View style={[styles.uploadOptionIconBox, { backgroundColor: '#DCFCE7' }]}>
-                <Sparkles size={px(18)} color="#15803D" />
-              </View>
-              <View style={styles.uploadOptionTextWrap}>
-                <PartnerText style={[styles.uploadOptionTitle, { color: '#166534', fontSize: px(13) }]}>
-                  Use verified sample document
-                </PartnerText>
-                <PartnerText style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11) }]}>
-                  Fast testing & QA preview
-                </PartnerText>
-              </View>
-              <Check size={px(16)} color="#15803D" strokeWidth={2.5} />
-            </Pressable>
+            {UI_PREVIEW_MODE && isUiTestPermissiveMode() ? (
+              <Pressable
+                onPress={() => activeDocForUpload && handlePickSample(activeDocForUpload)}
+                style={({ pressed }) => [
+                  styles.uploadOptionRow,
+                  styles.sampleOptionRow,
+                  { paddingVertical: px(10), marginTop: px(8), borderRadius: px(8) },
+                  pressed && styles.pressed,
+                ]}>
+                <View style={[styles.uploadOptionIconBox, { backgroundColor: '#DCFCE7' }]}>
+                  <Sparkles size={px(18)} color="#15803D" />
+                </View>
+                <View style={styles.uploadOptionTextWrap}>
+                  <PartnerText style={[styles.uploadOptionTitle, { color: '#166534', fontSize: px(13) }]}>
+                    Use verified sample document
+                  </PartnerText>
+                  <PartnerText style={[styles.uploadOptionSubtitle, { color: '#15803D', fontSize: px(11) }]}>
+                    Fast testing & QA preview
+                  </PartnerText>
+                </View>
+                <Check size={px(16)} color="#15803D" strokeWidth={2.5} />
+              </Pressable>
+            ) : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -2480,9 +2269,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   <Truck size={px(18)} color="#D97706" />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Vehicle details</PartnerText>
+                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Driver details</PartnerText>
                   <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
-                    Vehicle type, Plate number, Driving licence, Vehicle model
+                    Driver type and driving licence
                   </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />
@@ -2502,7 +2291,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 <View style={styles.pickerTextWrap}>
                   <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>3. Uploaded documents</PartnerText>
                   <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
-                    RC, Driving licence, Insurance, Fitness, Vehicle photos
+                    Driving licence, government photo ID, profile photo
                   </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />

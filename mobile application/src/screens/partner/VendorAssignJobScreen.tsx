@@ -1,19 +1,20 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native';
-import { Check, Info, MapPin, Truck } from 'lucide-react-native';
+import { Check, Info, MapPin, Truck, UserRound } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PartnerScreenLayout from '../../components/partner/PartnerScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { images } from '../../assets';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import {
   useApproveVendorBookingMutation,
   useVendorBookingOffersQuery,
   useVendorBookingsQuery,
-  useVendorFleetDriversQuery,
   useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
+import { useVendorMembershipsQuery } from '../../services/vendor/useVendorMembershipQueries';
 import { formatReadableAddress } from '../../utils/readableAddress';
 import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
@@ -40,7 +41,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     isLoading: vehiclesLoading,
     refetch: refetchVehicles,
   } = useVendorFleetVehiclesQuery(true);
-  const { data: drivers = [] } = useVendorFleetDriversQuery(true);
+  const { data: memberships = [], isLoading: driversLoading, refetch: refetchDrivers } = useVendorMembershipsQuery(true);
   const { refetch: refetchOffers } = useVendorBookingOffersQuery(true);
   const { data: activeBookings = [] } = useVendorBookingsQuery(true);
   const approveMutation = useApproveVendorBookingMutation();
@@ -61,47 +62,59 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         .map(vehicle => vehicle.id)),
   );
 
-  // Driver↔vehicle association lives on the driver profile (vehicleRegistration).
-  const driverByReg = new Map<string, { name: string; status: string }>();
-  for (const driver of drivers) {
-    const key = (driver.vehicleRegistration ?? '').replace(/\s+/g, '').toUpperCase();
-    if (key) driverByReg.set(key, { name: driver.name, status: driver.status });
-  }
+  const eligibleDrivers = memberships.filter(member =>
+    member.status === 'ACTIVE' &&
+    Boolean(member.driver) &&
+    member.driver?.driverStatus === 'APPROVED' &&
+    (bookingType === 'towing'
+      ? member.driver?.driverType === 'Tow Driver'
+      : member.driver?.driverType === 'Full-Time' || member.driver?.driverType === 'Part-Time'),
+  );
 
+  const [driverId, setDriverId] = useState<string | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
   const selectedVehicleIsAvailable =
-    Boolean(vehicleId) &&
-    vehicles.some(vehicle => vehicle.id === vehicleId) &&
-    !reservedVehicleIds.has(vehicleId ?? '');
+    bookingType === 'driver' ||
+    (Boolean(vehicleId) &&
+      vehicles.some(vehicle => vehicle.id === vehicleId) &&
+      !reservedVehicleIds.has(vehicleId ?? ''));
+  const selectedDriver = eligibleDrivers.find(member => member.driver?.id === driverId)?.driver;
+  const selectedDriverIsAvailable = Boolean(selectedDriver?.isAvailable && !selectedDriver.isBusy);
+  const canAssign = Boolean(driverId) && selectedDriverIsAvailable && selectedVehicleIsAvailable;
 
   const onApprove = async () => {
-    if (!vehicleId || !selectedVehicleIsAvailable || approveMutation.isPending) {
-      Alert.alert('Select a vehicle', 'Choose a fleet vehicle for this job.');
+    if (!driverId || !selectedDriverIsAvailable) {
+      Alert.alert('Select an available Driver', 'Choose a connected Driver who is approved and currently available.');
       return;
     }
+    if (bookingType === 'towing' && (!vehicleId || !selectedVehicleIsAvailable)) {
+      Alert.alert('Select an available vehicle', 'Towing work requires an active fleet vehicle.');
+      return;
+    }
+    if (approveMutation.isPending) return;
     try {
       const result = await approveMutation.mutateAsync({
         bookingId,
         bookingType,
-        vehicleId,
+        driverId,
+        ...(bookingType === 'towing' && vehicleId ? { vehicleId } : {}),
       });
       Alert.alert(
-        'Job Approved & Assigned',
-        result.message ||
-          `Vehicle assigned successfully. Your drivers can now accept #${bookingNumber} from their jobs list.`,
+        'Job assigned',
+        result.message || 'The connected Driver has been assigned to #' + bookingNumber + '.',
         [{ text: 'OK', onPress: () => navigation.navigate('PartnerJobsList') }],
       );
     } catch (error) {
-      Alert.alert('Approval failed', getApiErrorMessage(error, 'Could not approve job'));
-      // The lead may already be gone (taken/expired) — refresh to show reality.
+      Alert.alert('Assignment failed', getApiErrorMessage(error, 'Could not assign this job'));
       void refetchOffers();
       void refetchVehicles();
+      void refetchDrivers();
     }
   };
 
   return (
     <PartnerScreenLayout
-      title="Assign vehicle"
+      title={bookingType === 'towing' ? 'Assign driver & vehicle' : 'Assign driver'}
       onBack={() => navigation.goBack()}
       contentTopSpacing={spacing.sm}
       footer={
@@ -109,11 +122,11 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           style={({ pressed }) => [
             styles.primaryButton,
             getPressableFeedback(pressed),
-            (approveMutation.isPending || !selectedVehicleIsAvailable) && styles.disabledButton,
+            (!canAssign || approveMutation.isPending) && styles.disabledButton,
           ]}
           onPress={() => void onApprove()}
           testID="vendorConfirmAssignment"
-          disabled={approveMutation.isPending || !selectedVehicleIsAvailable}>
+          disabled={approveMutation.isPending || !canAssign}>
           {approveMutation.isPending ? (
             <ActivityIndicator size="small" color={driverColors.white} />
           ) : (
@@ -125,7 +138,9 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       <View style={styles.summaryCard}>
         <View style={styles.bookingBanner}>
           <View style={styles.bookingArtworkWrap}>
-            <Image source={images.icons.truck} style={styles.bookingArtwork} resizeMode="contain" />
+            {bookingType === 'towing'
+              ? <Image source={images.icons.truck} style={styles.bookingArtwork} resizeMode="contain" />
+              : <UserRound size={34} color={driverColors.amberText} /> }
           </View>
           <View style={styles.summaryCopy}>
             <PartnerText style={styles.bookingNumber}>#{bookingNumber}</PartnerText>
@@ -156,93 +171,70 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         ) : null}
       </View>
 
-      {/* Info notice */}
+      {/* Dispatch explanation */}
       <View style={styles.infoBanner}>
         <Info size={16} color="#0284C7" strokeWidth={2.2} />
         <PartnerText style={styles.infoText}>
-          Confirming assigns this lead to the selected fleet vehicle. You can change the assignment before confirming.
+          {bookingType === 'towing'
+            ? 'Assign this towing request to an available connected Driver and one active fleet vehicle.'
+            : 'Assign this Driver-hire request to an available connected Driver. No fleet vehicle is needed.'}
         </PartnerText>
       </View>
 
-      {/* Vehicle Selection Header */}
       <View style={styles.sectionHeader}>
-        <PartnerText style={styles.sectionTitle}>Available fleet vehicles</PartnerText>
+        <PartnerText style={styles.sectionTitle}>Available connected Drivers</PartnerText>
       </View>
-
-      {/* Vehicle List */}
-      {vehiclesLoading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="small" color={driverColors.amber} />
-        </View>
-      ) : vehicles.length === 0 ? (
+      {driversLoading ? (
+        <View style={styles.emptyCard}><ActivityIndicator color={driverColors.amber} /></View>
+      ) : eligibleDrivers.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Truck size={32} color={driverColors.greySoft} strokeWidth={1.8} />
-          <PartnerText style={styles.emptyTitle}>No active fleet vehicles</PartnerText>
+          <UserRound size={30} color={driverColors.greySoft} />
+          <PartnerText style={styles.emptyTitle}>No eligible connected Drivers</PartnerText>
           <PartnerText style={styles.emptySub}>
-            You must add and activate at least one vehicle before assigning jobs.
+            Invite an approved Driver with the matching service type before assigning this job.
           </PartnerText>
-          <Pressable
-            style={styles.addVehicleBtn}
-            onPress={() => navigation.navigate('VendorVehicles')}>
-            <PartnerText style={styles.addVehicleBtnText}>Add Vehicle to Fleet</PartnerText>
+          <Pressable style={styles.addVehicleBtn} onPress={() => navigation.navigate('VendorDrivers')}>
+            <PartnerText style={styles.addVehicleBtnText}>Manage Drivers</PartnerText>
           </Pressable>
         </View>
       ) : (
         <View style={styles.vehiclesList}>
-          {vehicles.map(vehicle => {
-            const selected = vehicleId === vehicle.id;
-            const isAvailable = !reservedVehicleIds.has(vehicle.id);
-            const linkedDriver = driverByReg.get(
-              vehicle.registrationNo.replace(/\s+/g, '').toUpperCase(),
-            );
+          {eligibleDrivers.map(member => {
+            const driver = member.driver!;
+            const selected = driverId === driver.id;
+            const available = driver.isAvailable && !driver.isBusy;
             return (
               <Pressable
-                key={vehicle.id}
-                testID={`vendorFleetVehicle-${vehicle.id}`}
+                key={member.id}
                 accessibilityRole="radio"
-                accessibilityLabel={`${vehicle.registrationNo}, ${isAvailable ? 'Available' : 'In service'}`}
-                accessibilityState={{ selected, disabled: !isAvailable }}
-                onPress={() => isAvailable && setVehicleId(vehicle.id)}
-                disabled={!isAvailable}
+                accessibilityLabel={driver.name + (available ? ', Available' : ', Busy')}
+                accessibilityState={{ selected, disabled: !available }}
+                onPress={() => available && setDriverId(driver.id)}
+                disabled={!available}
                 style={({ pressed }) => [
                   styles.optionCard,
+                  { minHeight: 82 },
                   selected && styles.optionCardSelected,
-                  !isAvailable && styles.optionCardUnavailable,
+                  !available && styles.optionCardUnavailable,
                   getPressableFeedback(pressed),
                 ]}>
                 <View style={styles.artworkCircle}>
-                  <Image source={images.icons.truck} style={styles.vehicleArtwork} resizeMode="contain" />
+                  <UserRound size={25} color={driverColors.amberText} />
                 </View>
-
                 <View style={styles.optionCopy}>
-                  <PartnerText style={styles.optionPlate}>{vehicle.registrationNo}</PartnerText>
-                  <PartnerText style={styles.vehicleTypePill} numberOfLines={1}>
-                    {vehicle.type}
-                  </PartnerText>
-                  <PartnerText style={styles.optionMeta} numberOfLines={1}>
-                    {vehicle.model}
-                  </PartnerText>
-                  <PartnerText style={styles.optionDriver} numberOfLines={1}>
-                    {linkedDriver
-                      ? `Assigned driver: ${linkedDriver.name}`
-                      : 'No driver linked yet'}
+                  <PartnerText style={styles.optionPlate}>{driver.name}</PartnerText>
+                  <PartnerText style={styles.optionMeta}>{driver.phone}</PartnerText>
+                  <PartnerText style={styles.optionMeta}>
+                    {driver.driverType + (driver.city ? ' · ' + driver.city : '')}
                   </PartnerText>
                   <View style={styles.availabilityRow}>
-                    <View
-                      style={[styles.availableDot, !isAvailable && styles.unavailableDot]}
-                    />
-                    <PartnerText
-                      style={[styles.availableLabel, !isAvailable && styles.unavailableLabel]}>
-                      {isAvailable ? 'Available' : 'In service'}
+                    <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                    <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                      {available ? 'Available' : driver.isBusy ? 'On an active job' : 'Offline'}
                     </PartnerText>
                   </View>
                 </View>
-
-                <View
-                  style={[
-                    styles.radioOuter,
-                    selected && styles.radioOuterSelected,
-                  ]}>
+                <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
                   {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
                 </View>
               </Pressable>
@@ -250,6 +242,69 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           })}
         </View>
       )}
+
+      {bookingType === 'towing' ? (
+        <>
+          <View style={[styles.sectionHeader, { marginTop: 18 }]}>
+            <PartnerText style={styles.sectionTitle}>Available fleet vehicles</PartnerText>
+          </View>
+          {vehiclesLoading ? (
+            <DriverDataSkeleton variant="vehicles" />
+          ) : vehicles.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Truck size={32} color={driverColors.greySoft} strokeWidth={1.8} />
+              <PartnerText style={styles.emptyTitle}>No active fleet vehicles</PartnerText>
+              <PartnerText style={styles.emptySub}>
+                Add and activate a towing vehicle before assigning this job.
+              </PartnerText>
+              <Pressable style={styles.addVehicleBtn} onPress={() => navigation.navigate('VendorVehicles')}>
+                <PartnerText style={styles.addVehicleBtnText}>Add Vehicle to Fleet</PartnerText>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={styles.vehiclesList}>
+              {vehicles.map(vehicle => {
+                const selected = vehicleId === vehicle.id;
+                const available = !reservedVehicleIds.has(vehicle.id);
+                return (
+                  <Pressable
+                    key={vehicle.id}
+                    testID={'vendorFleetVehicle-' + vehicle.id}
+                    accessibilityRole="radio"
+                    accessibilityLabel={vehicle.registrationNo + (available ? ', Available' : ', In service')}
+                    accessibilityState={{ selected, disabled: !available }}
+                    onPress={() => available && setVehicleId(vehicle.id)}
+                    disabled={!available}
+                    style={({ pressed }) => [
+                      styles.optionCard,
+                      selected && styles.optionCardSelected,
+                      !available && styles.optionCardUnavailable,
+                      getPressableFeedback(pressed),
+                    ]}>
+                    <View style={styles.artworkCircle}>
+                      <Image source={images.icons.truck} style={styles.vehicleArtwork} resizeMode="contain" />
+                    </View>
+                    <View style={styles.optionCopy}>
+                      <PartnerText style={styles.optionPlate}>{vehicle.registrationNo}</PartnerText>
+                      <PartnerText style={styles.vehicleTypePill} numberOfLines={1}>{vehicle.type}</PartnerText>
+                      <PartnerText style={styles.optionMeta} numberOfLines={1}>{vehicle.model}</PartnerText>
+                      <View style={styles.availabilityRow}>
+                        <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                        <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                          {available ? 'Available' : 'In service'}
+                        </PartnerText>
+                      </View>
+                    </View>
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </>
+      ) : null}
     </PartnerScreenLayout>
   );
 }
@@ -353,10 +408,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: driverColors.ink,
-  },
-  loaderWrap: {
-    paddingVertical: 30,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: driverColors.white,

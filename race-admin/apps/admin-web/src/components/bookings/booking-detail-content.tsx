@@ -24,8 +24,9 @@ import { useBookingDetail } from '@/hooks/use-booking-detail';
 import { useAuthStore } from '@/stores/auth.store';
 
 const SERVICE_STATUS_OPTIONS: Record<string, string[]> = {
-  PENDING: ['CONFIRMED', 'CANCELLED'],
-  CONFIRMED: ['DRIVER_ASSIGNED', 'CANCELLED'],
+  // Confirmation comes from verified payment; assignment has its own action.
+  PENDING: ['CANCELLED'],
+  CONFIRMED: ['CANCELLED'],
   DRIVER_ASSIGNED: ['CANCELLED'],
   DRIVER_EN_ROUTE: ['CANCELLED'],
   DRIVER_ARRIVED: ['CANCELLED'],

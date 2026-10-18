@@ -4,6 +4,7 @@ import { userRepository } from '../userRepository';
 import { towingBookingRepository } from '../towingBookingRepository';
 import { driverBookingRepository } from '../driverBookingRepository';
 import { assignDriverToBooking } from '../bookings/driverAssignment';
+import { getCancellationPolicy } from '../bookings/cancellation';
 import { releaseDriver } from '../bookings/driverAssignment';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
@@ -87,7 +88,13 @@ export class AdminServiceBookingsService {
     const paidAmount =
       (booking.advancePaid ? booking.advanceAmount : 0) +
       (booking.remainingPaid ? booking.remainingAmount : 0);
-    const refundAmount = dto.refundAmount ?? paidAmount;
+    const cancellationPolicy = getCancellationPolicy(
+      booking.status,
+      booking.advancePaid,
+      booking.advanceAmount,
+    );
+    const policyRefund = cancellationPolicy.canCancel ? cancellationPolicy.refundAmount : 0;
+    const refundAmount = dto.refundAmount ?? Math.min(policyRefund, paidAmount);
     if (!Number.isFinite(refundAmount) || refundAmount < 0 || refundAmount > paidAmount) {
       throw new BadRequestError('Refund amount must be between 0 and the amount paid');
     }

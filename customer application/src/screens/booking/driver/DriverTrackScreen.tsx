@@ -45,7 +45,7 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const bookingId = route.params?.bookingId;
   const fromBookings = route.params?.fromBookings;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'driver');
   const { etaLabel, status, driverLocation, driverName, driverRating, tripStartOtp: trackedOtp } =
     useBookingTracking(bookingId, 'driver');
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;

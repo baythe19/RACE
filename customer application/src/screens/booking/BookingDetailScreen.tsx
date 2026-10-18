@@ -16,7 +16,7 @@ import { colors, spacing, typography } from '../../theme';
 type Props = NativeStackScreenProps<BookingsStackParamList, 'BookingDetail'>;
 
 export default function BookingDetailScreen({ navigation, route }: Props) {
-  const booking = useBookingQuery(route.params.bookingId);
+  const booking = useBookingQuery(route.params.bookingId, route.params.bookingType);
   const { payRemaining, isPaying } = useFinalPayment();
 
   if (!booking) {
@@ -122,7 +122,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
             {isTrackable ? (
               <PrimaryButton
                 label="Track Live"
-                onPress={() => navigation.navigate('LiveTracking', { bookingId: booking.id })}
+                onPress={() => navigation.navigate('LiveTracking', { bookingId: booking.id, bookingType: booking.bookingType ?? 'towing' })}
               />
             ) : null}
             {canRate && !booking.rating ? (

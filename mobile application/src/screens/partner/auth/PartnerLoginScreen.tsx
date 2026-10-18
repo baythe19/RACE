@@ -32,12 +32,8 @@ import type {
   PartnerRole,
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
-import {
-  isVendorDriverLoginError,
-  VENDOR_DRIVER_LOGIN_HINT,
-} from '../../../utils/vendorDriverLoginError';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
-import { isUiTestPermissiveMode } from '../../../constants/preview';
+import { isUiTestPermissiveMode, UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 import { Sparkles } from 'lucide-react-native';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerLogin'>;
@@ -67,7 +63,6 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
   const [mobileNumber, setMobileNumber] = useState('');
   const [error, setError] = useState('');
-  const [vendorDriverCta, setVendorDriverCta] = useState(false);
   const [focused, setFocused] = useState(false);
 
   const sendOtpMutation = useSendOtpMutation();
@@ -101,7 +96,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
   };
 
   const isDriver = partnerRole === 'driver';
-  const roleDisplayTitle = isDriver ? 'Driver account' : 'Vendor / Fleet account';
+  const roleDisplayTitle = isDriver ? 'Driver account' : 'Towing Vendor account';
   const roleChangeLabel = isDriver ? 'Change type' : 'Change role';
 
   const goToPartnerMain = () => {
@@ -135,7 +130,6 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
   const handleSendOtp = async () => {
     setError('');
-    setVendorDriverCta(false);
 
     let phoneToUse = mobileNumber;
     if (isUiTestPermissiveMode() && !phoneToUse) {
@@ -161,7 +155,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
       // --- OTP auth bypass (when SKIP_OTP_AUTH is active) ---
       if (SKIP_OTP_AUTH) {
-        const otp = result.devOtp ?? extractOtpFromMessage(result.message) ?? (UI_PREVIEW_MODE ? '123456' : null);
+        const otp = result.devOtp ?? extractOtpFromMessage(result.message) ?? (UI_PREVIEW_MUTATIONS_ENABLED ? '123456' : null);
         if (!otp) {
           setError('Dev OTP unavailable. Turn off SKIP_OTP_AUTH or use a non-production API.');
           return;
@@ -213,12 +207,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         );
         return;
       }
-      if (isVendorDriverLoginError(err)) {
-        setError(VENDOR_DRIVER_LOGIN_HINT);
-        setVendorDriverCta(true);
-        return;
-      }
-      if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode()) {
+      if (UI_PREVIEW_MUTATIONS_ENABLED) {
         navigation.navigate('PartnerOtpVerification', {
           mobileNumber: phoneToUse || '9876543210',
           role: partnerRole,
@@ -377,7 +366,6 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                     onChangeText={(text) => {
                     setMobileNumber(text.replace(/\D/g, '').slice(0, 10));
                     if (error) setError('');
-                    if (vendorDriverCta) setVendorDriverCta(false);
                   }}
                     onFocus={() => setFocused(true)}
                     onBlur={() => setFocused(false)}
@@ -393,32 +381,6 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
             {/* Error Message Toast */}
             <AuthToast message={error} type="error" position="inline" onDismiss={() => setError('')} />
-
-            {/* Vendor-driver 409: jump to Login ID / password screen */}
-            {vendorDriverCta ? (
-              <Pressable
-                onPress={() => navigation.navigate('PartnerVendorDriverLogin')}
-                style={({ pressed }) => [
-                  {
-                    minHeight: px(46),
-                    borderRadius: px(12),
-                    borderWidth: 1.5,
-                    borderColor: '#F59E0B',
-                    backgroundColor: '#FFFDF5',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginTop: px(12),
-                    paddingHorizontal: px(16),
-                  },
-                  pressed && { opacity: 0.85 },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel="Login with ID and password">
-                <PartnerText style={{ fontSize: px(14.5), fontWeight: '700', color: '#B45309' }}>
-                  Login with ID &amp; password →
-                </PartnerText>
-              </Pressable>
-            ) : null}
 
             {/* Primary CTA: Send OTP */}
             <Pressable
@@ -450,14 +412,14 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             {/* Quick Test Mode Buttons */}
             {UI_PREVIEW_MODE ? (
               <View style={{ marginTop: px(12), gap: px(8) }}>
-                <Pressable
+                {UI_PREVIEW_MUTATIONS_ENABLED ? <Pressable
                   style={styles.devBtn}
                   onPress={() => void handleQuickMockLogin(isDriver ? 'driver' : 'vendor')}>
                   <Zap size={14} color="#D97706" />
                   <PartnerText style={styles.devBtnText}>
                     ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Dashboard (Mock)
                   </PartnerText>
-                </Pressable>
+                </Pressable> : null}
                 <Pressable
                   style={styles.devBtn}
                   onPress={() => goToRegistration(isDriver ? 'driver' : 'vendor')}>
@@ -484,8 +446,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                   <Zap size={px(16)} color="#D97706" strokeWidth={2.4} />
                 </View>
                 <View style={styles.trustTextCol}>
-                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>Instant Roadside Requests</PartnerText>
-                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>Receive customer breakdowns in real-time</PartnerText>
+                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>{isDriver ? 'Driver-Hire requests' : 'Towing & Driver-Hire leads'}</PartnerText>
+                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>{isDriver ? 'Receive requests from customers who need a driver' : 'Review service requests for your fleet'}</PartnerText>
                 </View>
               </View>
 
@@ -496,8 +458,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                   <Wallet size={px(16)} color="#059669" strokeWidth={2.4} />
                 </View>
                 <View style={styles.trustTextCol}>
-                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>Guaranteed Fast Settlements</PartnerText>
-                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>Direct deposits straight to your account</PartnerText>
+                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>{isDriver ? 'Vendor job details' : 'Connected Drivers'}</PartnerText>
+                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>{isDriver ? 'See assigned vehicles and job updates in your account' : 'Connect verified Drivers and assign fleet vehicles per job'}</PartnerText>
                 </View>
               </View>
             </View>
@@ -516,7 +478,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             </View>
 
             {/* Discreet Dev Demo Mode (for offline QA testing) */}
-            {(__DEV__ || UI_PREVIEW_MODE) && (
+            {UI_PREVIEW_MUTATIONS_ENABLED && (
               <View style={[styles.demoRow, { marginTop: px(14) }]}>
                 <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Quick Preview:</PartnerText>
                 <Pressable

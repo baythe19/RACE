@@ -46,6 +46,8 @@ export interface IUser extends Document {
   isVerified: boolean;
   isProfileCompleted: boolean;
   role: UserRole;
+  /** Additive app capabilities. Legacy rows derive their initial capability from role. */
+  capabilities?: UserRole[];
   customerCode?: string;
   accountStatus?: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
   vendorProfile?: IVendorProfile;
@@ -105,6 +107,7 @@ const UserSchema = new Schema<IUser>(
     isVerified: { type: Boolean, default: false },
     isProfileCompleted: { type: Boolean, default: false },
     role: { type: String, enum: USER_ROLES, default: 'customer', index: true },
+    capabilities: { type: [{ type: String, enum: USER_ROLES }], default: undefined },
     customerCode: { type: String, unique: true, sparse: true, index: true },
     accountStatus: {
       type: String,

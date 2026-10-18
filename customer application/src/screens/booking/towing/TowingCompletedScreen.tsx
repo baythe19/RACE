@@ -16,7 +16,7 @@ export default function TowingCompletedScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const { resetBooking } = useTowingBooking();
   const bookingId = route.params?.bookingId;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'towing');
   const { payRemaining, isPaying } = useFinalPayment();
   const [finalPaid, setFinalPaid] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;

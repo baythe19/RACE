@@ -1404,7 +1404,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
               <EmptyState
                 type="available"
                 title="No open requests"
-                subtitle="New towing and roadside requests will appear here."
+                subtitle="New Driver-Hire requests will appear here."
                 px={px}
                 onRefresh={retryQueries}
               />

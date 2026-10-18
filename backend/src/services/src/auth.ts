@@ -1,4 +1,5 @@
 import { AppError, ConflictError, ForbiddenError, UnauthorizedError } from '../../utils/src/errors';
+import { canAddUserCapability, getUserCapabilities, hasUserCapability } from '../../auth/src/roles';
 import {
   generateTokenPair,
   isRefreshTokenValid,
@@ -30,6 +31,7 @@ export interface AuthTokensResponse {
     id: string;
     mobileNumber: string;
     role: string;
+    capabilities: UserRole[];
     isVerified: boolean;
     isProfileCompleted: boolean;
     fullName?: string;
@@ -57,9 +59,9 @@ function roleMismatchMessage(existingRole: UserRole, requestedRole: UserRole): s
   return `This number is registered as a ${ROLE_LABEL[existingRole]}. You cannot access the ${ROLE_LABEL[requestedRole]} app with it. Use the correct app or a different number.`;
 }
 
-/** Locked once verified — one mobile number maps to exactly one role. */
+/** Customer and Driver can coexist; Vendor remains a separate account mode. */
 function assertRoleAccess(user: IUser, requestedRole: UserRole): void {
-  if (user.role === requestedRole) {
+  if (hasUserCapability(user, requestedRole) || canAddUserCapability(user, requestedRole)) {
     return;
   }
 
@@ -102,19 +104,16 @@ async function createUnverifiedUser(mobileNumber: string, role: UserRole): Promi
 }
 
 /**
- * Ensure DB role matches the login intent.
- * Unverified abandoned signups may switch role; verified accounts cannot.
+ * Preserve a verified user's canonical role. New active capabilities are granted only
+ * after OTP verification; abandoned unverified signups can still switch their intent.
  */
 async function ensureUserRole(user: IUser, requestedRole: UserRole): Promise<IUser> {
-  if (user.role === requestedRole) {
+  if (user.role === requestedRole || user.isVerified) {
     return user;
   }
 
-  if (user.isVerified) {
-    throw new ConflictError(roleMismatchMessage(user.role, requestedRole));
-  }
-
   user.role = requestedRole;
+  user.capabilities = [requestedRole];
   await user.save();
   return user;
 }
@@ -129,25 +128,20 @@ export class AuthService {
       user = await ensureUserRole(user, role);
       assertAccountActive(user.accountStatus);
 
-      if (
-        role === 'driver' &&
-        user.role === 'driver' &&
-        user.driverProfile?.loginId &&
-        user.driverProfile?.vendorUserId
-      ) {
-        throw new ConflictError(
-          'This number belongs to a vendor driver. Sign in with the Login ID and password provided by your vendor.',
-        );
-      }
-
       const otpResult = await otpService.sendOtp(mobileNumber, role);
 
       return {
         ...otpResult,
         isExistingUser: user.isVerified,
-        isProfileCompleted: user.isVerified ? computeProfileCompleted(user) : false,
-        onboardingRequired: !user.isVerified || !computeProfileCompleted(user),
-        role: user.role,
+        isProfileCompleted: user.isVerified
+          ? role === 'driver'
+            ? Boolean(user.driverProfile?.licenseNo)
+            : computeProfileCompleted(user)
+          : false,
+        onboardingRequired:
+          !user.isVerified ||
+          (role === 'driver' ? !user.driverProfile?.licenseNo : !computeProfileCompleted(user)),
+        role,
       };
     }
 
@@ -178,34 +172,27 @@ export class AuthService {
     user = await ensureUserRole(user, role);
     assertAccountActive(user.accountStatus);
 
-    if (
-      role === 'driver' &&
-      user.driverProfile?.loginId &&
-      user.driverProfile?.vendorUserId
-    ) {
-      throw new ConflictError(
-        'This number belongs to a vendor driver. Sign in with the Login ID and password provided by your vendor.',
-      );
-    }
-
+    user.capabilities = getUserCapabilities(user);
+    if (!user.capabilities.includes(role)) user.capabilities.push(role);
     user.isVerified = true;
     user.isProfileCompleted = computeProfileCompleted(user);
     await user.save();
 
-    const tokens = await generateTokenPair(user.id, user.role, user.mobileNumber);
+    const tokens = await generateTokenPair(user.id, role, user.mobileNumber);
 
     return {
       ...tokens,
       user: {
         id: user.id,
         mobileNumber: user.mobileNumber,
-        role: user.role,
+        role,
+        capabilities: getUserCapabilities(user),
         isVerified: user.isVerified,
         isProfileCompleted: user.isProfileCompleted,
         fullName: user.fullName,
         email: user.email,
       },
-      onboardingRequired: !user.isProfileCompleted,
+      onboardingRequired: role === 'driver' ? !user.driverProfile?.licenseNo : !user.isProfileCompleted,
     };
   }
 
@@ -247,7 +234,8 @@ export class AuthService {
       user: {
         id: user.id,
         mobileNumber: user.mobileNumber,
-        role: user.role,
+        role: 'driver',
+        capabilities: getUserCapabilities(user),
         isVerified: user.isVerified,
         isProfileCompleted: user.isProfileCompleted,
         fullName: user.fullName,
@@ -277,21 +265,25 @@ export class AuthService {
 
     assertAccountActive(user.accountStatus);
 
+    const activeRole =
+      payload.role && hasUserCapability(user, payload.role) ? payload.role : user.role;
     await revokeRefreshToken(payload.sub, payload.jti);
-    const tokens = await generateTokenPair(user.id, user.role, user.mobileNumber);
+    const tokens = await generateTokenPair(user.id, activeRole, user.mobileNumber);
 
     return {
       ...tokens,
       user: {
         id: user.id,
         mobileNumber: user.mobileNumber,
-        role: user.role,
+        role: activeRole,
+        capabilities: getUserCapabilities(user),
         isVerified: user.isVerified,
         isProfileCompleted: user.isProfileCompleted,
         fullName: user.fullName,
         email: user.email,
       },
-      onboardingRequired: !computeProfileCompleted(user),
+      onboardingRequired:
+        activeRole === 'driver' ? !user.driverProfile?.licenseNo : !computeProfileCompleted(user),
     };
   }
 }

@@ -9,6 +9,7 @@ import { UserModel } from '../../models/src/user';
 
 let io: SocketIOServer | null = null;
 const DRIVER_OFFER_ROOM = 'drivers:open-offers';
+const VENDOR_OFFER_ROOM = 'vendors:open-offers';
 
 interface SocketPrincipal {
   userId: string;
@@ -148,6 +149,7 @@ export function initializeSocket(httpServer: import('http').Server): void {
 
     socket.join(`user:${principal.userId}`);
     if (principal.role === 'driver') socket.join(DRIVER_OFFER_ROOM);
+    if (principal.role === 'vendor') socket.join(VENDOR_OFFER_ROOM);
 
     socket.on('driver:join', async (data: { driverId: string }) => {
       const driverId = String(data?.driverId ?? '');
@@ -195,29 +197,37 @@ export function emitDriverOffersUpdated(): void {
   io.to(DRIVER_OFFER_ROOM).emit('job:offer', { updatedAt: new Date().toISOString() });
 }
 
+/** Broadcast a data-free invalidation signal to authenticated vendor sessions. */
+export function emitVendorOffersUpdated(): void {
+  if (!io) return;
+  io.to(VENDOR_OFFER_ROOM).emit('vendor:jobs-updated', {
+    updatedAt: new Date().toISOString(),
+  });
+}
+
 /** Deliver a data-free notification refresh signal to one authenticated user. */
 export function emitToUser(userId: string, event: string, data: unknown): void {
   if (!io) return;
   io.to(`user:${userId}`).emit(event, data);
 }
 
-async function emitAssignedDriverBookingUpdate(
+async function emitAssignedBookingUpdate(
   bookingId: string,
   status: string,
 ): Promise<void> {
   try {
     const [driverBooking, towingBooking] = await Promise.all([
-      DriverBookingModel.findById(bookingId).select('driverId').lean().exec(),
-      TowingBookingModel.findById(bookingId).select('driverId').lean().exec(),
+      DriverBookingModel.findById(bookingId).select('driverId vendorId').lean().exec(),
+      TowingBookingModel.findById(bookingId).select('driverId vendorId').lean().exec(),
     ]);
-    const driverId = (driverBooking ?? towingBooking)?.driverId?.toString();
-    if (!driverId) return;
+    const booking = driverBooking ?? towingBooking;
+    const driverId = booking?.driverId?.toString();
+    const vendorId = booking?.vendorId?.toString();
+    if (!driverId && !vendorId) return;
 
-    emitToDriver(driverId, 'booking:status', {
-      bookingId,
-      status,
-      updatedAt: new Date().toISOString(),
-    });
+    const update = { bookingId, status, updatedAt: new Date().toISOString() };
+    if (driverId) emitToDriver(driverId, 'booking:status', update);
+    if (vendorId) emitToUser(vendorId, 'vendor:jobs-updated', update);
   } catch (error) {
     logger.warn('Could not emit booking update to assigned driver', {
       bookingId,
@@ -259,6 +269,9 @@ export function emitBookingStatusUpdate(
     updatedAt: new Date().toISOString(),
     ...(data ?? {}),
   });
-  if (status === 'CONFIRMED') emitDriverOffersUpdated();
-  void emitAssignedDriverBookingUpdate(bookingId, status);
+  if (status === 'CONFIRMED') {
+    emitDriverOffersUpdated();
+    emitVendorOffersUpdated();
+  }
+  void emitAssignedBookingUpdate(bookingId, status);
 }

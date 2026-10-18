@@ -16,7 +16,7 @@ const TAGS = ['Professional', 'On Time', 'Helpful', 'Friendly', 'Clean Vehicle',
 const RATING_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'];
 
 export default function RatingReviewScreen({ navigation, route }: Props) {
-  const booking = useBookingQuery(route.params.bookingId);
+  const booking = useBookingQuery(route.params.bookingId, route.params.bookingType);
   const submitRating = useSubmitRatingMutation();
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
@@ -35,7 +35,7 @@ export default function RatingReviewScreen({ navigation, route }: Props) {
       bookingType,
       payload: { rating, review: review.trim() || undefined, tags: selectedTags },
     });
-    navigation.navigate('BookingDetail', { bookingId: route.params.bookingId });
+    navigation.navigate('BookingDetail', { bookingId: route.params.bookingId, bookingType });
   };
 
   return (

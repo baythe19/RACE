@@ -2,6 +2,8 @@ export interface AuthUser {
   id: string;
   mobileNumber: string;
   role: 'customer' | 'vendor' | 'driver';
+  /** Server-owned capabilities can include Customer and Driver on one identity. */
+  capabilities?: Array<'customer' | 'vendor' | 'driver'>;
   isVerified: boolean;
   isProfileCompleted: boolean;
   fullName?: string;

@@ -3,7 +3,7 @@ import type { ApiSuccessResponse } from '../../types/auth';
 import type { VendorProfileResponse, VendorRegistrationRequest } from '../../types/vendor';
 import { apiClient } from '../api/apiClient';
 import axios from 'axios';
-import { UI_PREVIEW_MODE } from '../../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 import {
   MOCK_VENDOR_DASHBOARD,
   MOCK_VENDOR_STATUS,
@@ -28,7 +28,7 @@ export async function saveVendorDraft(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return MOCK_VENDOR_STATUS;
     }
     throw error;
@@ -45,7 +45,7 @@ export async function registerVendor(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return MOCK_VENDOR_STATUS;
     }
     throw error;
@@ -62,7 +62,7 @@ export async function updateVendor(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return MOCK_VENDOR_STATUS;
     }
     throw error;
@@ -168,7 +168,7 @@ export async function savePayoutAccount(payload: SavePayoutAccountRequest): Prom
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE && axios.isAxiosError(error)) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED && axios.isAxiosError(error)) {
       const status = error.response?.status;
       // Same preview contract as getPayoutAccount (401/404/403 → demo echo).
       if (status === 404 || status === 401 || status === 403) {
@@ -275,7 +275,7 @@ export async function uploadVendorDocument(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       onProgress?.(100);
       return MOCK_VENDOR_STATUS;
     }
@@ -313,7 +313,7 @@ export async function uploadVendorSelfie(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       onProgress?.(100);
       return MOCK_VENDOR_STATUS;
     }

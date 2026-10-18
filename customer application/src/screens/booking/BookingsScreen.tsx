@@ -102,7 +102,7 @@ export default function BookingsScreen({ navigation }: Props) {
                   key={booking.id}
                   booking={booking}
                   compact
-                  onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
+                  onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id, bookingType: booking.bookingType })}
                 />
               ))
             )}

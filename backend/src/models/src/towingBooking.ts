@@ -63,6 +63,7 @@ export interface ITowingBooking extends Document {
   refundStatus: 'NOT_APPLICABLE' | 'PENDING' | 'PROCESSED';
   driverLatitude?: number;
   driverLongitude?: number;
+  driverLocationUpdatedAt?: Date;
   rating?: {
     score: number;
     review?: string;
@@ -146,6 +147,7 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     },
     driverLatitude: { type: Number },
     driverLongitude: { type: Number },
+    driverLocationUpdatedAt: { type: Date },
     rating: { type: ServiceBookingRatingSchema },
   },
   { timestamps: true },

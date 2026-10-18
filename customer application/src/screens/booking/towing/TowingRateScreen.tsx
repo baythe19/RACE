@@ -15,7 +15,7 @@ export default function TowingRateScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const bookingId = route.params?.bookingId;
   const bookingType = route.params?.bookingType ?? 'towing';
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'towing');
   const submitRating = useSubmitRatingMutation();
   const [rating, setRating] = useState(0);
   const [feedback, setFeedback] = useState('');

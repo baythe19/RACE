@@ -20,7 +20,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const trackParams = route.params;
   const bookingId = route.params?.bookingId;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'towing');
   const {
     etaLabel,
     etaMinutes,

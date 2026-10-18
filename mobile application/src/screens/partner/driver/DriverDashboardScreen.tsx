@@ -512,10 +512,10 @@ function RequestCard({
       style={{
         marginTop: px(10),
         backgroundColor: '#FFFFFF',
-        borderRadius: px(16),
+        borderRadius: px(14),
         borderWidth: 1,
         borderColor: '#FDE68A',
-        padding: px(14),
+        padding: px(12),
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.02,
@@ -526,9 +526,9 @@ function RequestCard({
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         <View
           style={{
-            width: px(44),
-            height: px(44),
-            borderRadius: px(12),
+            width: px(38),
+            height: px(38),
+            borderRadius: px(10),
             backgroundColor: '#FEF3C7',
             alignItems: 'center',
             justifyContent: 'center',
@@ -538,7 +538,7 @@ function RequestCard({
           {offer.bookingType === 'towing' ? (
             <Image
               source={images.icons.towing}
-              style={{ width: px(24), height: px(20) }}
+              style={{ width: px(21), height: px(17) }}
               resizeMode="contain"
             />
           ) : (
@@ -546,14 +546,14 @@ function RequestCard({
           )}
         </View>
 
-        <View style={{ flex: 1, marginLeft: px(12) }}>
+        <View style={{ flex: 1, marginLeft: px(10) }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <PartnerText
               numberOfLines={1}
               style={{
                 flex: 1,
-                fontSize: px(15.5),
-                lineHeight: px(20),
+                fontSize: px(14),
+                lineHeight: px(18),
                 fontWeight: '800',
                 color: '#111827',
                 marginRight: px(8),
@@ -564,33 +564,33 @@ function RequestCard({
               style={{
                 backgroundColor: '#EFF6FF',
                 borderRadius: px(R.pill),
-                paddingHorizontal: px(8),
-                paddingVertical: px(2.5),
+                paddingHorizontal: px(7),
+                paddingVertical: px(2),
                 borderWidth: 1,
                 borderColor: '#BFDBFE',
               }}>
-              <PartnerText style={{ fontSize: px(10.5), fontWeight: '700', color: '#1D4ED8' }}>
+              <PartnerText style={{ fontSize: px(9.5), fontWeight: '700', color: '#1D4ED8' }}>
                 NEW
               </PartnerText>
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(3) }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
             {offer.bookingNumber ? (
-              <PartnerText style={{ fontSize: px(12), fontWeight: '600', color: '#6B7280' }}>
+              <PartnerText style={{ fontSize: px(11), fontWeight: '600', color: '#6B7280' }}>
                 #{offer.bookingNumber}
               </PartnerText>
             ) : null}
             {offer.bookingNumber && offer.distanceKm != null ? (
-              <PartnerText style={{ fontSize: px(12), color: '#9CA3AF', marginHorizontal: px(6) }}>•</PartnerText>
+              <PartnerText style={{ fontSize: px(11), color: '#9CA3AF', marginHorizontal: px(5) }}>•</PartnerText>
             ) : null}
             {offer.distanceKm != null ? (
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MapPin size={px(12)} color="#059669" strokeWidth={2.4} />
+                <MapPin size={px(11)} color="#059669" strokeWidth={2.4} />
                 <PartnerText
                   style={{
                     marginLeft: px(3),
-                    fontSize: px(12.5),
+                    fontSize: px(11.5),
                     fontWeight: '700',
                     color: '#059669',
                   }}>
@@ -606,22 +606,22 @@ function RequestCard({
       {showRoute ? (
         <View
           style={{
-            marginTop: px(12),
+            marginTop: px(10),
             backgroundColor: '#F9FAFB',
-            borderRadius: px(12),
-            paddingVertical: px(10),
-            paddingHorizontal: px(12),
+            borderRadius: px(10),
+            paddingVertical: px(8),
+            paddingHorizontal: px(10),
             borderWidth: 1,
             borderColor: '#F3F4F6',
           }}>
           {pickup ? (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-              <View style={{ alignItems: 'center', width: px(16), paddingTop: px(2) }}>
+              <View style={{ alignItems: 'center', width: px(14), paddingTop: px(2) }}>
                 <View
                   style={{
-                    width: px(9),
-                    height: px(9),
-                    borderRadius: px(4.5),
+                    width: px(8),
+                    height: px(8),
+                    borderRadius: px(4),
                     backgroundColor: '#10B981',
                   }}
                 />
@@ -629,20 +629,20 @@ function RequestCard({
                   <View
                     style={{
                       width: px(1.5),
-                      height: px(18),
+                      height: px(16),
                       backgroundColor: '#D1D5DB',
                       marginVertical: px(2),
                     }}
                   />
                 ) : null}
               </View>
-              <View style={{ flex: 1, marginLeft: px(8) }}>
-                <PartnerText style={{ fontSize: px(10), fontWeight: '700', color: '#059669', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+              <View style={{ flex: 1, marginLeft: px(7) }}>
+                <PartnerText style={{ fontSize: px(9.5), fontWeight: '700', color: '#059669', letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Pickup
                 </PartnerText>
                 <PartnerText
                   numberOfLines={1}
-                  style={{ fontSize: px(13), lineHeight: px(17), fontWeight: '600', color: '#1F2937', marginTop: px(1) }}>
+                  style={{ fontSize: px(11.5), lineHeight: px(15), fontWeight: '600', color: '#1F2937', marginTop: px(1) }}>
                   {pickup}
                 </PartnerText>
               </View>
@@ -651,23 +651,23 @@ function RequestCard({
 
           {drop ? (
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: pickup ? px(2) : 0 }}>
-              <View style={{ alignItems: 'center', width: px(16), paddingTop: px(3) }}>
+              <View style={{ alignItems: 'center', width: px(14), paddingTop: px(3) }}>
                 <View
                   style={{
-                    width: px(9),
-                    height: px(9),
-                    borderRadius: px(4.5),
+                    width: px(8),
+                    height: px(8),
+                    borderRadius: px(4),
                     backgroundColor: '#F59E0B',
                   }}
                 />
               </View>
-              <View style={{ flex: 1, marginLeft: px(8) }}>
-                <PartnerText style={{ fontSize: px(10), fontWeight: '700', color: '#D97706', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+              <View style={{ flex: 1, marginLeft: px(7) }}>
+                <PartnerText style={{ fontSize: px(9.5), fontWeight: '700', color: '#D97706', letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Dropoff
                 </PartnerText>
                 <PartnerText
                   numberOfLines={1}
-                  style={{ fontSize: px(13), lineHeight: px(17), fontWeight: '600', color: '#1F2937', marginTop: px(1) }}>
+                  style={{ fontSize: px(11.5), lineHeight: px(15), fontWeight: '600', color: '#1F2937', marginTop: px(1) }}>
                   {drop}
                 </PartnerText>
               </View>
@@ -679,13 +679,13 @@ function RequestCard({
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                marginTop: px(8),
-                paddingTop: px(8),
+                marginTop: px(7),
+                paddingTop: px(7),
                 borderTopWidth: 1,
                 borderTopColor: '#E5E7EB',
               }}>
-              <CalendarDays size={px(12)} color="#6B7280" strokeWidth={2.2} />
-              <PartnerText style={{ fontSize: px(11.5), color: '#6B7280', marginLeft: px(6) }}>
+              <CalendarDays size={px(11)} color="#6B7280" strokeWidth={2.2} />
+              <PartnerText style={{ fontSize: px(10.5), color: '#6B7280', marginLeft: px(5) }}>
                 {formatWhen(offer.createdAt)}
               </PartnerText>
             </View>
@@ -699,16 +699,16 @@ function RequestCard({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginTop: px(12),
-          paddingTop: px(12),
+          marginTop: px(10),
+          paddingTop: px(10),
           borderTopWidth: 1,
           borderTopColor: '#F3F4F6',
         }}>
         <View style={{ flex: 1 }}>
           <PartnerText
             style={{
-              fontSize: px(11),
-              lineHeight: px(14),
+              fontSize: px(10),
+              lineHeight: px(13),
               fontWeight: '700',
               color: '#6B7280',
               letterSpacing: 0.3,
@@ -718,8 +718,8 @@ function RequestCard({
           </PartnerText>
           <PartnerText
             style={{
-              fontSize: px(24),
-              lineHeight: px(28),
+              fontSize: px(20),
+              lineHeight: px(24),
               fontWeight: '800',
               color: '#000000',
               marginTop: px(2),
@@ -733,8 +733,8 @@ function RequestCard({
           accessibilityRole="button"
           accessibilityLabel="View request details"
           style={({ pressed }) => ({
-            height: px(40),
-            paddingHorizontal: px(20),
+            height: px(36),
+            paddingHorizontal: px(16),
             borderRadius: px(R.pill),
             backgroundColor: '#FEA701',
             flexDirection: 'row',
@@ -742,10 +742,10 @@ function RequestCard({
             justifyContent: 'center',
             opacity: pressed ? 0.9 : 1,
           })}>
-          <PartnerText style={{ fontSize: px(14), fontWeight: '700', color: '#000000' }}>
+          <PartnerText style={{ fontSize: px(12.5), fontWeight: '700', color: '#000000' }}>
             View details
           </PartnerText>
-          <ArrowRight size={px(16)} color="#000000" strokeWidth={2.6} style={{ marginLeft: px(6) }} />
+          <ArrowRight size={px(14)} color="#000000" strokeWidth={2.6} style={{ marginLeft: px(5) }} />
         </Pressable>
       </View>
     </View>
@@ -782,9 +782,9 @@ function RecentJobRow({
       })}>
       <View
         style={{
-          width: px(34),
-          height: px(34),
-          borderRadius: px(17),
+          width: px(30),
+          height: px(30),
+          borderRadius: px(15),
           backgroundColor: C.creamRow,
           alignItems: 'center',
           justifyContent: 'center',
@@ -792,18 +792,18 @@ function RecentJobRow({
         {job.bookingType === 'towing' ? (
           <Image
             source={images.icons.towing}
-            style={{ width: px(22), height: px(18) }}
+            style={{ width: px(19), height: px(15) }}
             resizeMode="contain"
           />
         ) : (
-          <Car size={px(22)} color={C.ink} strokeWidth={2} />
+          <Car size={px(19)} color={C.ink} strokeWidth={2} />
         )}
       </View>
 
-      <View style={{ flex: 1, marginLeft: px(12) }}>
+      <View style={{ flex: 1, marginLeft: px(10) }}>
         <PartnerText
           numberOfLines={1}
-          style={[T.jobTitle, { fontSize: px(14.5), lineHeight: px(18), color: C.ink }]}>
+          style={[T.jobTitle, { fontSize: px(13.5), lineHeight: px(17), color: C.ink }]}>
           #{job.bookingNumber}
         </PartnerText>
         {pickup || drop ? (
@@ -811,24 +811,24 @@ function RecentJobRow({
             {pickup ? (
               <PartnerText
                 numberOfLines={1}
-                style={[T.meta, { flexShrink: 1, fontSize: px(12), lineHeight: px(15), color: C.greySoft }]}>
+                style={[T.meta, { flexShrink: 1, fontSize: px(11), lineHeight: px(14), color: C.greySoft }]}>
                 {pickup}
               </PartnerText>
             ) : null}
             {pickup && drop ? (
-              <PartnerText style={[T.meta, { fontSize: px(12), lineHeight: px(15), marginHorizontal: px(5), color: C.greySoft }]}>→</PartnerText>
+              <PartnerText style={[T.meta, { fontSize: px(11), lineHeight: px(14), marginHorizontal: px(4), color: C.greySoft }]}>→</PartnerText>
             ) : null}
             {drop ? (
               <PartnerText
                 numberOfLines={1}
-                style={[T.meta, { flexShrink: 1, fontSize: px(12), lineHeight: px(15), color: C.greySoft }]}>
+                style={[T.meta, { flexShrink: 1, fontSize: px(11), lineHeight: px(14), color: C.greySoft }]}>
                 {drop}
               </PartnerText>
             ) : null}
           </View>
         ) : null}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(1) }}>
-          <PartnerText style={[T.meta, { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft }]}>
+          <PartnerText style={[T.meta, { fontSize: px(10.5), lineHeight: px(13), color: C.greySoft }]}>
             {formatShortWhen(job.createdAt)}
           </PartnerText>
           {jobEarnings(job) != null ? (
@@ -836,11 +836,11 @@ function RecentJobRow({
               <PartnerText
                 style={[
                   T.meta,
-                  { fontSize: px(11.5), lineHeight: px(15), marginHorizontal: px(5), color: C.greySoft },
+                  { fontSize: px(10.5), lineHeight: px(13), marginHorizontal: px(4), color: C.greySoft },
                 ]}>
                 •
               </PartnerText>
-              <PartnerText style={[T.meta, { fontSize: px(11.5), lineHeight: px(15), color: C.greySoft }]}>
+              <PartnerText style={[T.meta, { fontSize: px(10.5), lineHeight: px(13), color: C.greySoft }]}>
                 {formatInr(jobEarnings(job) as number)}
               </PartnerText>
             </>
@@ -852,20 +852,20 @@ function RecentJobRow({
         style={{
           backgroundColor: pill.bg,
           borderRadius: px(R.pill),
-          height: px(M.rowPillHeight),
+          height: px(M.rowPillHeight - 2),
           justifyContent: 'center',
-          paddingHorizontal: px(8),
-          marginLeft: px(6),
+          paddingHorizontal: px(7),
+          marginLeft: px(5),
         }}>
-        <PartnerText style={[T.pill, { fontSize: px(10.5), lineHeight: px(14), color: pill.fg }]}>
+        <PartnerText style={[T.pill, { fontSize: px(9.5), lineHeight: px(12), color: pill.fg }]}>
           {pill.label}
         </PartnerText>
       </View>
       <ChevronRight
-        size={px(14)}
+        size={px(13)}
         color={C.greySoft}
         strokeWidth={2.4}
-        style={{ marginLeft: px(6) }}
+        style={{ marginLeft: px(5) }}
       />
     </Pressable>
   );
@@ -1202,8 +1202,8 @@ export default function DriverDashboardScreen() {
         style={[
           T.greeting,
           {
-            fontSize: px(22),
-            lineHeight: px(28),
+            fontSize: px(20),
+            lineHeight: px(25),
             color: C.ink,
             marginTop: px(5),
             letterSpacing: -0.3,
@@ -1214,7 +1214,7 @@ export default function DriverDashboardScreen() {
       <PartnerText
         style={[
           T.subtitle,
-          { fontSize: px(13.5), lineHeight: px(18), color: C.grey, marginTop: px(1) },
+          { fontSize: px(12.5), lineHeight: px(16), color: C.grey, marginTop: px(1) },
         ]}>
         {hasActiveJob ? 'You have an active trip in progress' : 'Ready for your next job?'}
       </PartnerText>
@@ -1245,9 +1245,9 @@ export default function DriverDashboardScreen() {
         {/* Live Radar Beacon Badge */}
         <View
           style={{
-            width: px(38),
-            height: px(38),
-            borderRadius: px(19),
+            width: px(34),
+            height: px(34),
+            borderRadius: px(17),
             backgroundColor: !isApproved
               ? '#FEF3C7'
               : isOnline
@@ -1263,7 +1263,7 @@ export default function DriverDashboardScreen() {
             justifyContent: 'center',
           }}>
           {!isApproved ? (
-            <ShieldCheck size={px(18)} color="#D97706" strokeWidth={2.4} />
+            <ShieldCheck size={px(16)} color="#D97706" strokeWidth={2.4} />
           ) : isOnline ? (
             <View
               style={{
@@ -1299,8 +1299,8 @@ export default function DriverDashboardScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <PartnerText
               style={{
-                fontSize: px(15.5),
-                lineHeight: px(20),
+                fontSize: px(14),
+                lineHeight: px(18),
                 fontWeight: '700',
                 color: C.ink,
                 letterSpacing: -0.2,
@@ -1315,16 +1315,16 @@ export default function DriverDashboardScreen() {
               <View
                 style={{
                   backgroundColor: '#ECFDF5',
-                  paddingHorizontal: px(7),
-                  paddingVertical: px(2),
-                  borderRadius: px(10),
-                  marginLeft: px(8),
+                  paddingHorizontal: px(6),
+                  paddingVertical: px(1.5),
+                  borderRadius: px(9),
+                  marginLeft: px(7),
                   borderWidth: 1,
                   borderColor: '#A7F3D0',
                 }}>
                 <PartnerText
                   style={{
-                    fontSize: px(10.5),
+                    fontSize: px(9.5),
                     fontWeight: '800',
                     color: '#059669',
                     letterSpacing: 0.5,
@@ -1336,8 +1336,8 @@ export default function DriverDashboardScreen() {
           </View>
           <PartnerText
             style={{
-              fontSize: px(12.5),
-              lineHeight: px(17),
+              fontSize: px(11.5),
+              lineHeight: px(15),
               color: C.grey,
               marginTop: px(2),
             }}>
@@ -1478,10 +1478,10 @@ export default function DriverDashboardScreen() {
           elevation: 0.5,
         }}>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <PartnerText style={[T.metricLabel, { fontSize: px(14), lineHeight: px(19), color: C.ink }]}>
+          <PartnerText style={[T.metricLabel, { fontSize: px(12.5), lineHeight: px(17), color: C.ink }]}>
             Today's earnings
           </PartnerText>
-          <Info size={px(14)} color={C.greySoft} strokeWidth={2.2} style={{ marginLeft: px(6) }} />
+          <Info size={px(13)} color={C.greySoft} strokeWidth={2.2} style={{ marginLeft: px(5) }} />
           <View style={{ flex: 1 }} />
           <Pressable
             onPress={() => setPeriodOpen(true)}
@@ -1500,11 +1500,11 @@ export default function DriverDashboardScreen() {
               backgroundColor: C.white,
               opacity: pressed ? 0.9 : 1,
             })}>
-            <PartnerText style={[T.chip, { fontSize: px(12), lineHeight: px(16), color: C.grey }]}>
+            <PartnerText style={[T.chip, { fontSize: px(11), lineHeight: px(15), color: C.grey }]}>
               {PERIOD_OPTIONS.find(option => option.id === period)?.chartLabel ?? 'This week'}
             </PartnerText>
             <ChevronDown
-              size={px(13)}
+              size={px(12)}
               color={C.grey}
               strokeWidth={2.6}
               style={{ marginLeft: px(4) }}
@@ -1517,14 +1517,14 @@ export default function DriverDashboardScreen() {
             <PartnerText
               style={[
                 T.metricValue,
-                { fontSize: px(34), lineHeight: px(38), color: C.ink },
+                { fontSize: px(28), lineHeight: px(32), color: C.ink },
               ]}>
               {formatInr(earningsToday)}
             </PartnerText>
             <PartnerText
               style={[
                 T.metricCaption,
-                { fontSize: px(13), lineHeight: px(18), color: C.grey, marginTop: px(2) },
+                { fontSize: px(11.5), lineHeight: px(15), color: C.grey, marginTop: px(2) },
               ]}>
               <PartnerText style={{ fontWeight: '700', color: C.ink }}>
                 {todayCompleted.length}
@@ -1608,7 +1608,7 @@ export default function DriverDashboardScreen() {
                 />
                 <PartnerText
                   style={{
-                    fontSize: px(10.5),
+                    fontSize: px(9.5),
                     fontWeight: '800',
                     color: '#059669',
                     letterSpacing: 0.4,
@@ -1619,7 +1619,7 @@ export default function DriverDashboardScreen() {
 
               <PartnerText
                 style={{
-                  fontSize: px(13),
+                  fontSize: px(12),
                   fontWeight: '700',
                   color: '#475569',
                   marginLeft: px(8),
@@ -1632,8 +1632,8 @@ export default function DriverDashboardScreen() {
               <View style={{ alignItems: 'flex-end' }}>
                 <PartnerText
                   style={{
-                    fontSize: px(17),
-                    lineHeight: px(21),
+                    fontSize: px(15),
+                    lineHeight: px(19),
                     fontWeight: '800',
                     color: '#0F172A',
                   }}>
@@ -1641,7 +1641,7 @@ export default function DriverDashboardScreen() {
                 </PartnerText>
                 <PartnerText
                   style={{
-                    fontSize: px(10),
+                    fontSize: px(9.5),
                     color: '#64748B',
                     fontWeight: '600',
                   }}>
@@ -1670,7 +1670,7 @@ export default function DriverDashboardScreen() {
               <PartnerText
                 numberOfLines={1}
                 style={{
-                  fontSize: px(14.5),
+                  fontSize: px(13.5),
                   fontWeight: '800',
                   color: '#0F172A',
                 }}>
@@ -1678,10 +1678,10 @@ export default function DriverDashboardScreen() {
               </PartnerText>
               {activeJob.distanceKm != null ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
-                  <MapPin size={px(11)} color="#059669" strokeWidth={2.4} />
+                  <MapPin size={px(10)} color="#059669" strokeWidth={2.4} />
                   <PartnerText
                     style={{
-                      fontSize: px(11.5),
+                      fontSize: px(10.5),
                       fontWeight: '600',
                       color: '#059669',
                       marginLeft: px(3),
@@ -1689,7 +1689,7 @@ export default function DriverDashboardScreen() {
                     {activeJob.distanceKm} km trip
                   </PartnerText>
                   {activeJob.assignedFleetVehicleLabel ? (
-                    <PartnerText style={{ fontSize: px(11.5), color: '#94A3B8', marginLeft: px(4) }}>
+                    <PartnerText style={{ fontSize: px(10.5), color: '#94A3B8', marginLeft: px(4) }}>
                       • {activeJob.assignedFleetVehicleLabel}
                     </PartnerText>
                   ) : null}
@@ -1794,7 +1794,7 @@ export default function DriverDashboardScreen() {
                   <View style={{ flex: 1 }}>
                     <PartnerText
                       style={{
-                        fontSize: px(10),
+                        fontSize: px(9.5),
                         fontWeight: '700',
                         color: '#B45309',
                         textTransform: 'uppercase',
@@ -1805,7 +1805,7 @@ export default function DriverDashboardScreen() {
                     <PartnerText
                       numberOfLines={1}
                       style={{
-                        fontSize: px(12.5),
+                        fontSize: px(11.5),
                         fontWeight: '600',
                         color: '#1E293B',
                         marginTop: px(1),
@@ -1841,11 +1841,11 @@ export default function DriverDashboardScreen() {
                   <User size={px(14)} color="#475569" strokeWidth={2.2} />
                 </View>
                 <View style={{ marginLeft: px(8) }}>
-                  <PartnerText style={{ fontSize: px(12), fontWeight: '700', color: '#1E293B' }}>
+                  <PartnerText style={{ fontSize: px(11.5), fontWeight: '700', color: '#1E293B' }}>
                     {activeJob.customer?.name || 'Customer'}
                   </PartnerText>
                   {activeJob.customer?.mobileNumber ? (
-                    <PartnerText style={{ fontSize: px(11), color: '#64748B' }}>
+                    <PartnerText style={{ fontSize: px(10.5), color: '#64748B' }}>
                       {activeJob.customer.mobileNumber}
                     </PartnerText>
                   ) : null}
@@ -1869,8 +1869,8 @@ export default function DriverDashboardScreen() {
                     paddingVertical: px(4.5),
                     borderRadius: px(14),
                   })}>
-                  <Phone size={px(12)} color="#15803D" strokeWidth={2.4} />
-                  <PartnerText style={{ fontSize: px(11.5), fontWeight: '700', color: '#15803D', marginLeft: px(4) }}>
+                  <Phone size={px(11)} color="#15803D" strokeWidth={2.4} />
+                  <PartnerText style={{ fontSize: px(10.5), fontWeight: '700', color: '#15803D', marginLeft: px(4) }}>
                     Call
                   </PartnerText>
                 </Pressable>
@@ -1884,9 +1884,9 @@ export default function DriverDashboardScreen() {
             accessibilityRole="button"
             accessibilityLabel={`Open active job #${activeJob.bookingNumber}`}
             style={({ pressed }) => ({
-              marginTop: px(12),
-              height: px(42),
-              borderRadius: px(12),
+              marginTop: px(10),
+              height: px(38),
+              borderRadius: px(11),
               backgroundColor: pressed ? '#047857' : '#059669',
               flexDirection: 'row',
               alignItems: 'center',
@@ -1897,17 +1897,17 @@ export default function DriverDashboardScreen() {
               shadowRadius: 4,
               elevation: 2,
             })}>
-            <Navigation size={px(15)} color="#FFFFFF" strokeWidth={2.6} style={{ marginRight: px(7) }} />
+            <Navigation size={px(14)} color="#FFFFFF" strokeWidth={2.6} style={{ marginRight: px(6) }} />
             <PartnerText
               style={{
-                fontSize: px(14),
+                fontSize: px(12.5),
                 fontWeight: '800',
                 color: '#FFFFFF',
                 letterSpacing: 0.3,
               }}>
               Continue Active Trip
             </PartnerText>
-            <ArrowRight size={px(15)} color="#FFFFFF" strokeWidth={2.6} style={{ marginLeft: px(6) }} />
+            <ArrowRight size={px(14)} color="#FFFFFF" strokeWidth={2.6} style={{ marginLeft: px(5) }} />
           </Pressable>
         </Pressable>
       ) : null}
@@ -1940,7 +1940,7 @@ export default function DriverDashboardScreen() {
             </View>
             <View style={{ flex: 1, marginLeft: px(10) }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <PartnerText style={{ fontSize: px(15.5), lineHeight: px(20), fontWeight: '800', color: C.ink }}>
+                <PartnerText style={{ fontSize: px(14), lineHeight: px(18), fontWeight: '800', color: C.ink }}>
                   {pendingRequests} new {pendingRequests === 1 ? 'request' : 'requests'}
                 </PartnerText>
                 <View
@@ -1955,7 +1955,7 @@ export default function DriverDashboardScreen() {
               </View>
               <PartnerText
                 numberOfLines={1}
-                style={{ fontSize: px(12), lineHeight: px(16), color: C.grey, marginTop: px(1) }}>
+                style={{ fontSize: px(11), lineHeight: px(14), color: C.grey, marginTop: px(1) }}>
                 Nearby customer requests waiting for you
               </PartnerText>
             </View>
@@ -1971,11 +1971,11 @@ export default function DriverDashboardScreen() {
                 paddingHorizontal: px(6),
                 opacity: pressed ? 0.8 : 1,
               })}>
-              <PartnerText style={{ fontSize: px(13), fontWeight: '700', color: '#D97706' }}>
+              <PartnerText style={{ fontSize: px(12), fontWeight: '700', color: '#D97706' }}>
                 View all
               </PartnerText>
               <ChevronRight
-                size={px(15)}
+                size={px(14)}
                 color="#D97706"
                 strokeWidth={2.8}
                 style={{ marginLeft: px(2) }}
@@ -2010,7 +2010,7 @@ export default function DriverDashboardScreen() {
               justifyContent: 'space-between',
               marginBottom: px(8),
             }}>
-            <PartnerText style={[T.sectionTitle, { fontSize: px(16), lineHeight: px(21), color: C.ink }]}>
+            <PartnerText style={[T.sectionTitle, { fontSize: px(14.5), lineHeight: px(19), color: C.ink }]}>
               Recent jobs
             </PartnerText>
             <Pressable

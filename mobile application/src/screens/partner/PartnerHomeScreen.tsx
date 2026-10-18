@@ -25,6 +25,7 @@ import { openPartnerNotifications, partnerAccountParams } from '../../navigation
 import VehicleTypeArtwork from '../../components/partner/VehicleTypeArtwork';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
 import { useAppSelector } from '../../redux/hooks';
 import {
@@ -395,10 +396,14 @@ export default function PartnerHomeScreen() {
     isRefetching: vendorRefetching,
     refetch: refetchVendor,
   } = useVendorStatusQuery(isVendor);
-  const { data: vendorDashboard, refetch: refetchDashboard } = useVendorDashboardQuery(isVendor);
-  const { data: offers = [], refetch: refetchOffers } = useVendorBookingOffersQuery(isVendor);
-  const { data: drivers = [], refetch: refetchDrivers } = useVendorFleetDriversQuery(isVendor);
-  const { data: vehicles = [], refetch: refetchVehicles } = useVendorFleetVehiclesQuery(isVendor);
+  const { data: vendorDashboard, isLoading: dashboardLoading, refetch: refetchDashboard } =
+    useVendorDashboardQuery(isVendor);
+  const { data: offers = [], isLoading: offersLoading, refetch: refetchOffers } =
+    useVendorBookingOffersQuery(isVendor);
+  const { data: drivers = [], isLoading: driversLoading, refetch: refetchDrivers } =
+    useVendorFleetDriversQuery(isVendor);
+  const { data: vehicles = [], isLoading: vehiclesLoading, refetch: refetchVehicles } =
+    useVendorFleetVehiclesQuery(isVendor);
   const { data: notifData } = useNotificationsQuery(isVendor);
   const unreadNotifCount = notifData?.unreadCount ?? 0;
 
@@ -422,7 +427,10 @@ export default function PartnerHomeScreen() {
   const displayEarnings = earningsRange === 'this_week' ? earningsToday : lastWeekEarnings;
   const displaySeries = earningsRange === 'this_week' ? weeklySeries : lastWeekSeries;
 
-  const openJobs = offers.filter(offer => !offer.vendorApproved).length;
+  const homeLoading =
+    vendorLoading || dashboardLoading || offersLoading || driversLoading || vehiclesLoading;
+  const openOffers = useMemo(() => offers.filter(offer => !offer.vendorApproved), [offers]);
+  const openJobs = openOffers.length;
   const awaitingClaimJobs = offers.length - openJobs;
   const onJobDrivers = drivers.filter(d => d.isBusy).length;
   const availableDrivers = drivers.filter(d => d.isAvailable && !d.isBusy).length;
@@ -432,7 +440,7 @@ export default function PartnerHomeScreen() {
   const verification = verificationCopy(vendorLoading ? null : vendor);
   const activity = useMemo(
     () => buildActivity({ vendor, drivers, offers }),
-    [vendor, drivers],
+    [vendor, drivers, offers],
   );
 
   const name = firstName(user?.fullName);
@@ -486,7 +494,7 @@ export default function PartnerHomeScreen() {
                       {unreadNotifCount > 9 ? '9+' : String(unreadNotifCount)}
                     </PartnerText>
                   </View>
-                ) : offers.length > 0 ? (
+                ) : openOffers.length > 0 ? (
                   <View style={styles.bellBadge} />
                 ) : null}
               </Pressable>
@@ -510,7 +518,11 @@ export default function PartnerHomeScreen() {
           <PartnerText style={styles.subtitle}>Here's what's happening with your fleet today.</PartnerText>
         </View>
       }>
-      {offers.length > 0 ? (
+      {homeLoading ? (
+        <DriverDataSkeleton variant="vendor-dashboard" />
+      ) : (
+        <>
+          {openOffers.length > 0 ? (
         <View style={styles.leadsBanner}>
           <View style={styles.leadsHeaderRow}>
             <View style={styles.leadsTitleGroup}>
@@ -518,7 +530,7 @@ export default function PartnerHomeScreen() {
                 <Truck size={13} color="#FFFFFF" strokeWidth={2.4} />
               </View>
               <PartnerText style={styles.leadsTitle}>
-                {offers.length} new lead{offers.length === 1 ? '' : 's'}
+                {openOffers.length} new lead{openOffers.length === 1 ? '' : 's'}
               </PartnerText>
             </View>
             <Pressable
@@ -529,7 +541,7 @@ export default function PartnerHomeScreen() {
               <ChevronRight size={13} color={colors.primaryDark} strokeWidth={2.6} />
             </Pressable>
           </View>
-          {offers.slice(0, 2).map(lead => (
+          {openOffers.slice(0, 2).map(lead => (
             <View key={lead.id} style={styles.leadCard}>
               <View style={styles.leadArtwork}>
                 {lead.bookingType === 'towing' ? (
@@ -850,6 +862,8 @@ export default function PartnerHomeScreen() {
           })
         )}
       </View>
+        </>
+      )}
     </AppScreenLayout>
   );
 }

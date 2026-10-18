@@ -102,8 +102,8 @@ export default function BookingsScreen() {
     navigation.navigate('TowingTrack', { bookingId, bookingType, fromBookings: true });
   };
 
-  const openDetail = (bookingId: string) => {
-    navigation.navigate('BookingDetail', { bookingId });
+  const openDetail = (bookingId: string, bookingType: 'towing' | 'driver') => {
+    navigation.navigate('BookingDetail', { bookingId, bookingType });
   };
 
   const isEmpty =
@@ -268,7 +268,7 @@ export default function BookingsScreen() {
                 booking={booking}
                 px={px}
                 onTrack={() => openTrack(booking.id, booking.bookingType)}
-                onPress={() => openDetail(booking.id)}
+                onPress={() => openDetail(booking.id, booking.bookingType)}
               />
             ))
           )}
@@ -297,7 +297,7 @@ export default function BookingsScreen() {
                 key={item.id}
                 item={item}
                 px={px}
-                onPress={() => openDetail(item.id)}
+                onPress={() => openDetail(item.id, item.bookingType)}
               />
             ))
           )}

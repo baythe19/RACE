@@ -5,6 +5,8 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '.
 import { UserModel, type IUser } from '../../../models/src/user';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
+import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
+import { DriverVendorMembershipModel } from '../../../models/src/driverVendorMembership';
 import { canTransition } from '../bookingStatusConstants';
 import { emitBookingStatusUpdate, emitToDriver } from '../socket';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
@@ -273,6 +275,30 @@ function mapOffer(
   };
 }
 
+/**
+ * Selects which booking collections may contribute to an open-offer feed.
+ *
+ * Independent drivers receive driver-hire jobs only, even when a caller asks
+ * for all offers or explicitly requests towing. Vendor-linked drivers retain
+ * the existing vendor-routed towing compatibility; vendors can browse both
+ * booking types. The internal audience preserves the legacy unscoped behavior.
+ */
+export function selectOpenOfferBookingTypes(options: {
+  audience: 'driver' | 'vendor' | 'internal';
+  bookingType?: ActiveBookingType;
+  vendorLinkedDriver?: boolean;
+}): ActiveBookingType[] {
+  const requestedTypes: ActiveBookingType[] = options.bookingType
+    ? [options.bookingType]
+    : ['towing', 'driver'];
+
+  if (options.audience === 'driver' && !options.vendorLinkedDriver) {
+    return requestedTypes.filter((bookingType) => bookingType === 'driver');
+  }
+
+  return requestedTypes;
+}
+
 /** Confirmed bookings with no driver â€” marketplace feed. */
 export async function listOpenBookingOffers(options?: {
   bookingType?: ActiveBookingType;
@@ -283,8 +309,13 @@ export async function listOpenBookingOffers(options?: {
   /** Vendor portal: open jobs + jobs this vendor already approved (awaiting driver). */
   forVendorId?: string;
 }): Promise<OpenBookingOffer[]> {
-  const includeTowing = !options?.bookingType || options.bookingType === 'towing';
-  const includeDriver = !options?.bookingType || options.bookingType === 'driver';
+  const selectedBookingTypes = selectOpenOfferBookingTypes({
+    audience: options?.forVendorId ? 'vendor' : options?.forDriver ? 'driver' : 'internal',
+    bookingType: options?.bookingType,
+    vendorLinkedDriver: Boolean(options?.forDriver?.driverProfile?.vendorUserId),
+  });
+  const includeTowing = selectedBookingTypes.includes('towing');
+  const includeDriver = selectedBookingTypes.includes('driver');
   const radiusKm = options?.radiusKm ?? DEFAULT_OFFER_RADIUS_KM;
 
   const noDriverClause = { $or: [{ driverId: null }, { driverId: { $exists: false } }] };
@@ -502,23 +533,11 @@ export async function claimOpenBookingOffer(
     throw new BadRequestError('You already have an active booking or are offline');
   }
   if (!isDriverEligibleForBooking(driver, bookingType)) {
-    const existingForEligibility =
+    throw new BadRequestError(
       bookingType === 'towing'
-        ? await TowingBookingModel.findById(bookingId).select('vendorId').exec()
-        : await DriverBookingModel.findById(bookingId).select('vendorId').exec();
-    const bookingVendorForEligibility = existingForEligibility?.vendorId?.toString();
-    const driverVendorForEligibility = driver.driverProfile?.vendorUserId?.toString();
-    if (
-      !bookingVendorForEligibility ||
-      !driverVendorForEligibility ||
-      bookingVendorForEligibility !== driverVendorForEligibility
-    ) {
-      throw new BadRequestError(
-        bookingType === 'towing'
-          ? 'Only tow drivers can accept towing jobs'
-          : 'Only Full-Time / Part-Time drivers can accept driver-hire jobs',
-      );
-    }
+        ? 'Only tow drivers can accept towing jobs'
+        : 'Only Full-Time / Part-Time drivers can accept driver-hire jobs',
+    );
   }
 
   const existing =
@@ -536,24 +555,53 @@ export async function claimOpenBookingOffer(
   const bookingVendorId =
     'vendorId' in existing && existing.vendorId ? existing.vendorId.toString() : undefined;
 
-  if (bookingVendorId) {
-    if (!driverVendorId || driverVendorId !== bookingVendorId) {
-      throw new ForbiddenError('This job is reserved for your vendor fleet drivers');
+  const routedVendorId = bookingVendorId ?? options?.vendorId;
+  const legacyVendorMatches = Boolean(driverVendorId && routedVendorId === driverVendorId);
+  const hasMembership = routedVendorId
+    ? Boolean(await DriverVendorMembershipModel.exists({
+        vendorUserId: new Types.ObjectId(routedVendorId),
+        driverUserId: new Types.ObjectId(driverId),
+        status: 'ACTIVE',
+      }).exec())
+    : false;
+
+  if (routedVendorId && !legacyVendorMatches && !hasMembership) {
+    throw new ForbiddenError('This job is reserved for connected Towing Vendor Drivers');
+  }
+  if (!routedVendorId && driverVendorId) {
+    throw new ForbiddenError('Your Towing Vendor must assign this job to you');
+  }
+  if (bookingType === 'towing' && !routedVendorId) {
+    throw new ForbiddenError('Towing work must be assigned by a Towing Vendor');
+  }
+
+  const assignedFleetVehicleId =
+    'assignedFleetVehicleId' in existing
+      ? existing.assignedFleetVehicleId?.toString()
+      : undefined;
+  if (bookingVendorId && assignedFleetVehicleId) {
+    const activeFleetVehicle = await VendorVehicleModel.findOne({
+      _id: assignedFleetVehicleId,
+      vendorId: bookingVendorId,
+      status: 'ACTIVE',
+    })
+      .select('_id')
+      .exec();
+    if (!activeFleetVehicle) {
+      throw new ConflictError(
+        'The fleet vehicle assigned to this job is no longer active. Ask your vendor to review the assignment.',
+      );
     }
-  } else if (driverVendorId) {
-    throw new ForbiddenError('Your vendor must approve this job before you can accept it');
   }
 
   // Open marketplace offers run on the backend decision clock. Vendor-routed
   // jobs are exempt, since their approval can legitimately land later.
-  if (!bookingVendorId && isOfferExpired(existing.createdAt)) {
+  if (!routedVendorId && isOfferExpired(existing.createdAt)) {
     throw new ConflictError('This request expired. Please wait for the next request.');
   }
 
   const vendorId = bookingVendorId ?? options?.vendorId;
-  const fleetVehicleId =
-    ('assignedFleetVehicleId' in existing && existing.assignedFleetVehicleId?.toString()) ??
-    options?.fleetVehicleId;
+  const fleetVehicleId = assignedFleetVehicleId ?? options?.fleetVehicleId;
   const fleetVehicleLabel =
     ('assignedFleetVehicleLabel' in existing
       ? existing.assignedFleetVehicleLabel
@@ -595,7 +643,7 @@ export async function claimOpenBookingOffer(
     $or: [{ driverId: null }, { driverId: { $exists: false } }],
   };
 
-  await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, vendorId ?? null);
+  await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, vendorId ? undefined : null);
 
   let claimed;
   try {
@@ -752,7 +800,7 @@ export async function assignDriverToBooking(
   emitBookingStatusUpdate(bookingId, mapPublicBookingStatus('DRIVER_ASSIGNED'), {
     internalStatus: 'DRIVER_ASSIGNED',
     driverAccepted: false,
-    message: 'Driver allotted — awaiting acceptance',
+    message: 'Driver allotted - awaiting acceptance',
   });
 }
 

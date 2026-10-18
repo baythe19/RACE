@@ -15,6 +15,8 @@ export interface AccessTokenPayload {
 export interface RefreshTokenPayload {
   sub: string;
   jti: string;
+  /** Selected app surface; optional for backwards compatibility with v5 tokens. */
+  role?: string;
 }
 
 export interface TokenPair {
@@ -30,10 +32,10 @@ export function signAccessToken(payload: AccessTokenPayload): string {
   return jwt.sign({ ...payload, tokenType: 'user' }, env.JWT_ACCESS_SECRET, options);
 }
 
-export function signRefreshToken(userId: string): { token: string; jti: string } {
+export function signRefreshToken(userId: string, role?: string): { token: string; jti: string } {
   const jti = uuidv4();
   const options: SignOptions = { expiresIn: env.JWT_REFRESH_EXPIRES_IN as SignOptions['expiresIn'] };
-  const token = jwt.sign({ sub: userId, jti } satisfies RefreshTokenPayload, env.JWT_REFRESH_SECRET, options);
+  const token = jwt.sign({ sub: userId, jti, role } satisfies RefreshTokenPayload, env.JWT_REFRESH_SECRET, options);
   return { token, jti };
 }
 
@@ -74,7 +76,7 @@ export async function generateTokenPair(
   mobileNumber: string,
 ): Promise<TokenPair> {
   const accessToken = signAccessToken({ sub: userId, role, mobileNumber, tokenType: 'user' });
-  const { token: refreshToken, jti } = signRefreshToken(userId);
+  const { token: refreshToken, jti } = signRefreshToken(userId, role);
   await storeRefreshToken(userId, jti);
 
   return {

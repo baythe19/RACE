@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   approveVendorBooking,
   assignVendorBooking,
+  getVendorBookingTracking,
   listVendorBookings,
   listVendorBookingOffers,
   type VendorBookingItem,
@@ -41,6 +42,21 @@ export function useVendorBookingsQuery(enabled = true) {
     queryFn: listVendorBookings,
     enabled,
     refetchInterval: 15_000,
+  });
+}
+
+export function useVendorBookingTrackingQuery(
+  bookingId: string,
+  bookingType: 'towing' | 'driver',
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: ['vendor', 'booking-tracking', bookingType, bookingId] as const,
+    queryFn: () => getVendorBookingTracking({ bookingId, bookingType }),
+    enabled: enabled && Boolean(bookingId),
+    refetchInterval: query => query.state.status === 'error' ? 15_000 : 5_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
   });
 }
 
@@ -149,6 +165,8 @@ export function useApproveVendorBookingMutation() {
       void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.offers });
       void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.bookings });
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.offers });
+      void queryClient.invalidateQueries({ queryKey: driverQueryKeys.jobs });
+      void queryClient.invalidateQueries({ queryKey: vendorDriverKeys.list });
     },
   });
 }

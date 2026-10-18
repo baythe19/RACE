@@ -14,7 +14,8 @@ import {
   type PartnerRole,
 } from '../../../store/partnerOnboardingStore';
 import type { PartnerAuthStackParamList } from '../../../types/partnerNavigation';
-import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { loginAsMockDriver, loginAsMockVendor } from '../../../config/uiPreviewMode';
+import { UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 import { typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerWelcome'>;
@@ -46,8 +47,8 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
     dispatch(setSignupPath({ accountType: selectedRole, vendorType: null }));
 
     if (selectedRole === 'driver') {
-      // Driver flow routes to Driver Type selection (Self vs Vendor Driver)
-      navigation.navigate('PartnerDriverAuthMode');
+      // Drivers sign in with their own verified mobile number.
+      navigation.navigate('PartnerLogin', { role: 'driver' });
     } else {
       // Vendor flow routes directly to Mobile OTP login
       navigation.navigate('PartnerLogin', { role: 'vendor' });
@@ -133,7 +134,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               ]}
               accessibilityRole="radio"
               accessibilityState={{ selected: isDriver }}
-              accessibilityLabel="Driver: Accept jobs and manage your trips">
+              accessibilityLabel="Driver: Accept Driver-Hire requests and vendor-assigned towing jobs">
               {/* Premium Tow Truck Icon Badge */}
               <View
                 style={[
@@ -156,7 +157,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               <View style={styles.roleTextContainer}>
                 <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Driver</PartnerText>
                 <PartnerText style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
-                  Accept jobs and manage your trips
+                  Accept Driver-Hire requests and vendor-assigned towing jobs
                 </PartnerText>
               </View>
 
@@ -178,7 +179,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               </View>
             </Pressable>
 
-            {/* Option 2: Vendor / Fleet */}
+            {/* Option 2: Towing Vendor */}
             <Pressable
               onPress={() => handleSelectRole('vendor')}
               style={({ pressed }) => [
@@ -189,7 +190,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               ]}
               accessibilityRole="radio"
               accessibilityState={{ selected: isVendor }}
-              accessibilityLabel="Vendor / Fleet: Manage vehicles, drivers and bookings">
+              accessibilityLabel="Towing Vendor: Manage towing vehicles, jobs and connected Drivers">
               {/* Premium Fleet Headquarters Building Badge */}
               <View
                 style={[
@@ -205,9 +206,9 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               </View>
 
               <View style={styles.roleTextContainer}>
-                <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Vendor / Fleet</PartnerText>
+                <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Towing Vendor</PartnerText>
                 <PartnerText style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
-                  Manage vehicles, drivers and bookings
+                  Manage towing vehicles, jobs and connected Drivers
                 </PartnerText>
               </View>
 
@@ -239,9 +240,9 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
               pressed && styles.pressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel={`Continue as ${isVendor ? 'Vendor' : 'Driver'}`}>
+            accessibilityLabel={`Continue as ${isVendor ? 'Towing Vendor' : 'Driver'}`}>
             <PartnerText style={[styles.primaryButtonText, { fontSize: px(16.5) }]}>
-              {isVendor ? 'Continue as Vendor' : 'Continue as Driver'}
+              {isVendor ? 'Continue as Towing Vendor' : 'Continue as Driver'}
             </PartnerText>
             <ArrowRight size={px(20)} color="#111827" strokeWidth={2.6} style={{ marginLeft: px(8) }} />
           </Pressable>
@@ -255,7 +256,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
           </View>
 
           {/* Discreet Dev Demo Mode (for offline QA testing) */}
-          {(__DEV__ || UI_PREVIEW_MODE) && (
+          {UI_PREVIEW_MUTATIONS_ENABLED && (
             <View style={[styles.demoRow, { marginTop: px(12) }]}>
               <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Demo View:</PartnerText>
               <Pressable

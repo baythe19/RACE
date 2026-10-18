@@ -11,11 +11,12 @@ import PartnerHomeScreen from '../screens/partner/PartnerHomeScreen';
 import DriverDashboardScreen from '../screens/partner/driver/DriverDashboardScreen';
 import DriverJobsScreen from '../screens/partner/driver/DriverJobsScreen';
 import DriverActiveJobScreen from '../screens/partner/driver/DriverActiveJobScreen';
+import DriverMyVendorScreen from '../screens/partner/driver/DriverMyVendorScreen';
 import PartnerJobsScreen from '../screens/partner/PartnerJobsScreen';
-import PartnerActiveJobScreen from '../screens/partner/PartnerActiveJobScreen';
+import VendorBookingTrackingScreen from '../screens/partner/VendorBookingTrackingScreen';
 import PartnerAccountScreen from '../screens/partner/PartnerAccountScreen';
 import PartnerVerificationStatusScreen from '../screens/partner/PartnerVerificationStatusScreen';
-import VendorDriversScreen from '../screens/partner/VendorDriversScreen';
+import VendorDriverMembershipsScreen from '../screens/partner/VendorDriverMembershipsScreen';
 import VendorVehiclesScreen from '../screens/partner/VendorVehiclesScreen';
 import VendorVehicleRegistrationScreen from '../screens/partner/registration/vehicle/VendorVehicleRegistrationScreen';
 import VendorAssignJobScreen from '../screens/partner/VendorAssignJobScreen';
@@ -81,7 +82,7 @@ function PartnerJobsStackNavigator() {
       />
       <JobsStack.Screen
         name="PartnerActiveJob"
-        component={isDriver ? DriverActiveJobScreen : PartnerActiveJobScreen}
+        component={isDriver ? DriverActiveJobScreen : VendorBookingTrackingScreen}
         options={isDriver ? { headerShown: false } : { headerTitle: 'Active job' }}
       />
       <JobsStack.Screen
@@ -96,7 +97,7 @@ function PartnerJobsStackNavigator() {
       />
       <JobsStack.Screen
         name="VendorDrivers"
-        component={VendorDriversScreen}
+        component={VendorDriverMembershipsScreen}
         options={{ headerTitle: 'Vendor drivers' }}
       />
       <JobsStack.Screen
@@ -130,7 +131,7 @@ function PartnerDriversStackNavigator() {
     <DriversStack.Navigator initialRouteName="VendorDriversList" screenOptions={stackScreenOptions}>
       <DriversStack.Screen
         name="VendorDriversList"
-        component={VendorDriversScreen}
+        component={VendorDriverMembershipsScreen}
         options={{ headerShown: false }}
       />
       <DriversStack.Screen
@@ -202,7 +203,7 @@ function PartnerAccountStackNavigator() {
       />
       <AccountStack.Screen
         name="VendorDrivers"
-        component={VendorDriversScreen}
+        component={VendorDriverMembershipsScreen}
         options={{ headerShown: false }}
       />
       <AccountStack.Screen
@@ -254,6 +255,13 @@ export default function PartnerNavigator() {
           name="PartnerDrivers"
           component={PartnerDriversStackNavigator}
           options={{ title: 'Drivers' }}
+        />
+      ) : null}
+      {isDriver ? (
+        <Tab.Screen
+          name="PartnerVendor"
+          component={DriverMyVendorScreen}
+          options={{ title: 'My Vendor' }}
         />
       ) : null}
       {!isDriver ? (

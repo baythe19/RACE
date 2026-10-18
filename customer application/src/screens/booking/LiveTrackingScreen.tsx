@@ -20,7 +20,7 @@ type Props = NativeStackScreenProps<BookingsStackParamList, 'LiveTracking'>;
 
 export default function LiveTrackingScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
-  const booking = useBookingQuery(route.params.bookingId);
+  const booking = useBookingQuery(route.params.bookingId, route.params.bookingType);
   const [eta, setEta] = useState<number | null>(booking?.etaMinutes ?? null);
   const [driverLocation, setDriverLocation] = useState<
     { latitude: number; longitude: number } | undefined
@@ -147,7 +147,7 @@ export default function LiveTrackingScreen({ navigation, route }: Props) {
               />
               <PrimaryButton
                 label="View Details"
-                onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id })}
+                onPress={() => navigation.navigate('BookingDetail', { bookingId: booking.id, bookingType: booking.bookingType ?? route.params.bookingType })}
                 variant="outline"
               />
             </View>

@@ -1,4 +1,5 @@
-import { BadRequestError, NotFoundError } from '../../utils/src/errors';
+import { BadRequestError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
+import { getUserCapabilities, hasUserCapability } from '../../auth/src/roles';
 import { UserModel } from '../../models/src/user';
 import { driverRepository } from './driverRepository';
 import { storageService } from '../../storage/src/index';
@@ -42,9 +43,11 @@ export class DriverSelfService {
     const user = await UserModel.findById(userId).exec();
     if (!user) throw new NotFoundError('User not found');
 
-    if (user.role === 'vendor') {
+    if (hasUserCapability(user, 'vendor')) {
       throw new BadRequestError('Vendor accounts cannot register as drivers on this path');
     }
+    user.capabilities = getUserCapabilities(user);
+    if (!user.capabilities.includes('driver')) user.capabilities.push('driver');
 
     const status = process.env.NODE_ENV === 'production' ? 'PENDING' : 'APPROVED';
 
@@ -56,10 +59,12 @@ export class DriverSelfService {
       uploadedAt: new Date(),
     }));
 
-    if (user.role === 'driver' && user.driverProfile) {
+    const existingDriverCode = user.driverProfile?.driverCode;
+    if (user.driverProfile) {
       if (user.activeBookingId) {
         throw new BadRequestError('Cannot update driver registration during an active booking');
       }
+      user.role = 'driver';
       user.fullName = dto.fullName;
       if (dto.email) user.email = dto.email;
       if (parsedDob && !isNaN(parsedDob.getTime())) user.dateOfBirth = parsedDob;
@@ -98,7 +103,7 @@ export class DriverSelfService {
       await user.save();
       return {
         id: user.id,
-        role: user.role,
+        role: 'driver',
         fullName: user.fullName,
         status: user.driverProfile.status,
         isProfileCompleted: user.isProfileCompleted,
@@ -107,8 +112,10 @@ export class DriverSelfService {
 
     // Promote customer → driver
     const count = await driverRepository.count();
-    const driverCode = user.driverProfile?.driverCode ?? `DRV${String(count + 1).padStart(4, '0')}`;
+    const driverCode = existingDriverCode ?? `DRV${String(count + 1).padStart(4, '0')}`;
 
+    user.capabilities = getUserCapabilities(user);
+    if (!user.capabilities.includes('driver')) user.capabilities.push('driver');
     user.role = 'driver';
     user.fullName = dto.fullName;
     if (dto.email) user.email = dto.email;
@@ -149,7 +156,7 @@ export class DriverSelfService {
 
     return {
       id: user.id,
-      role: user.role,
+      role: 'driver',
       fullName: user.fullName,
       status,
       isProfileCompleted: true,
@@ -170,10 +177,13 @@ export class DriverSelfService {
   ) {
     const user = await UserModel.findById(userId).exec();
     if (!user) throw new NotFoundError('User not found');
-    if (user.role === 'vendor') {
+    if (hasUserCapability(user, 'vendor')) {
       throw new BadRequestError('Vendor accounts use the vendor document upload path');
     }
-    if (user.role === 'driver' && user.activeBookingId) {
+    if (!hasUserCapability(user, 'driver')) {
+      throw new ForbiddenError('Verify your phone in Driver mode before uploading driver documents');
+    }
+    if (hasUserCapability(user, 'driver') && user.activeBookingId) {
       throw new BadRequestError('Cannot update driver documents during an active booking');
     }
 
@@ -186,6 +196,7 @@ export class DriverSelfService {
     });
 
     if (!user.driverProfile) {
+      user.role = 'driver';
       // Pre-registration upload: park the document on a minimal profile so
       // register() (existing-driver branch) will keep it.
       const count = await driverRepository.count();
@@ -221,10 +232,10 @@ export class DriverSelfService {
     }
 
     // A fresh upload always returns the application to admin review.
-    if (user.role === 'driver') {
+    if (hasUserCapability(user, 'driver')) {
       user.isAvailable = false;
     }
-    if (user.role === 'driver' && user.driverProfile.status === 'APPROVED') {
+    if (hasUserCapability(user, 'driver') && user.driverProfile.status === 'APPROVED') {
       user.driverProfile.status = 'PENDING';
       user.driverProfile.statusHistory?.push({ status: 'PENDING', changedAt: new Date() });
     }

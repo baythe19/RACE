@@ -66,7 +66,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LiveTripMap from '../../../components/booking/LiveTripMap';
 import { images } from '../../../assets';
-import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../../constants/preview';
+import {
+  isUiTestPermissiveMode,
+  UI_PREVIEW_MUTATIONS_ENABLED,
+} from '../../../constants/preview';
 import { updateMockActiveJobStatus } from '../../../data/mockPartnerData';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
@@ -515,7 +518,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         setOtpError('');
         setTripOtp('');
       } catch (error) {
-        if (isUiTestPermissiveMode() || UI_PREVIEW_MODE) {
+        if (UI_PREVIEW_MUTATIONS_ENABLED) {
           updateMockActiveJobStatus(status);
           if (status === 'COMPLETED') {
             const fallbackHistory = [
@@ -557,7 +560,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     }
     if (step === 'verify_otp') {
       const code = tripOtp.trim();
-      const isPermissive = isUiTestPermissiveMode() || UI_PREVIEW_MODE;
+      const isPermissive = isUiTestPermissiveMode() || UI_PREVIEW_MUTATIONS_ENABLED;
       if (!isPermissive && !/^\d{4}$/.test(code)) {
         setOtpError('Enter the 4-digit code shown in the customer app.');
         return;

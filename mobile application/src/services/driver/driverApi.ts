@@ -1,7 +1,11 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
-import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../constants/preview';
+import {
+  isUiTestPermissiveMode,
+  UI_PREVIEW_MODE,
+  UI_PREVIEW_MUTATIONS_ENABLED,
+} from '../../constants/preview';
 import {
   acceptMockDriverJob,
   getMockDriverJobOffers,
@@ -72,7 +76,7 @@ export async function setDriverAvailability(isAvailable: boolean): Promise<{
     >(API_ENDPOINTS.driverAvailability, { isAvailable });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return { isAvailable, message: `Status updated to ${isAvailable ? 'Online' : 'Offline'}` };
     }
     throw error;
@@ -156,7 +160,7 @@ export async function updateDriverLocation(
     >(API_ENDPOINTS.driverLocation, { latitude, longitude });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return { location: { latitude, longitude }, updatedAt: new Date().toISOString() };
     }
     throw error;
@@ -177,7 +181,7 @@ export async function updateDriverBookingStatus(
     });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE || isUiTestPermissiveMode()) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       if (status === 'IN_PROGRESS' && !isUiTestPermissiveMode() && tripOtp && tripOtp !== '1234' && tripOtp.length !== 4) {
         throw new Error('Incorrect trip OTP. Check the customer app and try again.');
       }
@@ -205,7 +209,7 @@ export async function acceptDriverJob(
     const { data } = await api.post(API_ENDPOINTS.driverBookingAccept(bookingId), { bookingType });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       if (
         mockActiveJobState &&
         !['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)
@@ -229,7 +233,7 @@ export async function rejectDriverJob(
     const { data } = await api.post(API_ENDPOINTS.driverBookingReject(bookingId), { bookingType });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       rejectMockDriverJob(bookingId);
       return { success: true, message: 'Job rejected' };
     }

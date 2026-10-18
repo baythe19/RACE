@@ -84,7 +84,7 @@ class TrackingService {
 
     if (!this.intervals.has(bookingId)) {
       const poll = async () => {
-        const legacy = await getBookingTracking(bookingId);
+        const legacy = await getBookingTracking(bookingId, bookingType);
         if (legacy) {
           const update: TrackingUpdate = {
             bookingId,

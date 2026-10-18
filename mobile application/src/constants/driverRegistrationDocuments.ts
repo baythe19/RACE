@@ -51,39 +51,6 @@ export const CORE_REVIEW_DOCUMENTS: DriverDocumentConfig[] = [
     backendDocType: 'driving_license',
   },
   {
-    id: 'vehicle_rc',
-    title: 'Vehicle RC',
-    subtitle: 'Front side',
-    requirement: 'required',
-    badgeLabel: 'Required',
-    Icon: FileText,
-    iconBg: '#FEF3C7',
-    iconColor: '#D97706',
-    backendDocType: 'vehicle_rc',
-  },
-  {
-    id: 'vehicle_insurance',
-    title: 'Vehicle insurance',
-    subtitle: 'Policy document',
-    requirement: 'required',
-    badgeLabel: 'Required',
-    Icon: Shield,
-    iconBg: '#FEF3C7',
-    iconColor: '#D97706',
-    backendDocType: 'vehicle_insurance',
-  },
-  {
-    id: 'vehicle_photo',
-    title: 'Vehicle photo (tow/service vehicle)',
-    subtitle: 'Clear photo',
-    requirement: 'required',
-    badgeLabel: 'Required',
-    Icon: Truck,
-    iconBg: '#FEF3C7',
-    iconColor: '#D97706',
-    backendDocType: 'vehicle_photo',
-  },
-  {
     id: 'profile_photo',
     title: 'Profile photo',
     subtitle: 'Clear face photo',
@@ -110,52 +77,7 @@ export const CORE_REVIEW_DOCUMENTS: DriverDocumentConfig[] = [
 /**
  * Conditional documents requested based on vehicle category & ownership.
  */
-export const CONDITIONAL_DOCUMENTS: DriverDocumentConfig[] = [
-  {
-    id: 'transport_permit',
-    title: 'Transport permit',
-    subtitle: 'For commercial vehicles',
-    requirement: 'conditional',
-    badgeLabel: 'Conditional',
-    Icon: FileSpreadsheet,
-    iconBg: '#F3F4F6',
-    iconColor: '#4B5563',
-    backendDocType: 'transport_permit',
-  },
-  {
-    id: 'fitness_certificate',
-    title: 'Fitness certificate',
-    subtitle: 'Required for certain vehicles',
-    requirement: 'conditional',
-    badgeLabel: 'Conditional',
-    Icon: ShieldCheck,
-    iconBg: '#F3F4F6',
-    iconColor: '#4B5563',
-    backendDocType: 'fitness_certificate',
-  },
-  {
-    id: 'puc_certificate',
-    title: 'PUC certificate',
-    subtitle: 'Required for certain vehicles',
-    requirement: 'conditional',
-    badgeLabel: 'Conditional',
-    Icon: FileCheck,
-    iconBg: '#F3F4F6',
-    iconColor: '#4B5563',
-    backendDocType: 'puc_certificate',
-  },
-  {
-    id: 'owner_noc',
-    title: 'Owner authorisation / NOC',
-    subtitle: 'Only when vehicle is registered to someone else',
-    requirement: 'conditional',
-    badgeLabel: 'Conditional',
-    Icon: FileText,
-    iconBg: '#F3F4F6',
-    iconColor: '#4B5563',
-    backendDocType: 'owner_noc',
-  },
-];
+export const CONDITIONAL_DOCUMENTS: DriverDocumentConfig[] = [];
 
 /**
  * Deferred documents that can be completed before first payout or when requested.

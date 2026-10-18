@@ -8,8 +8,8 @@ import { UserModel } from '../../models/src/user';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
 import { TowingBookingModel } from '../../models/src/towingBooking';
 import { DriverBookingModel } from '../../models/src/driverBooking';
+import { DriverVendorMembershipModel } from '../../models/src/driverVendorMembership';
 import {
-  approveVendorBookingOffer,
   claimOpenBookingOffer,
   isDriverEligibleForBooking,
   listOpenBookingOffers,
@@ -72,37 +72,69 @@ export class VendorBookingsService {
     return listOpenBookingOffers({ forVendorId: vendorUserId });
   }
 
-  /**
-   * Vendor approves a customer request and assigns a fleet vehicle.
-   * Job stays CONFIRMED until a vendor driver self-claims it.
-   */
+  /** Assign a connected Driver and, for towing, one active fleet vehicle. */
   async approveBooking(
     vendorUserId: string,
     bookingId: string,
     dto: VendorApproveBookingDto,
   ) {
+    return this.assignBooking(vendorUserId, bookingId, dto);
+  }
+
+  /** Read live Driver progress only for a booking owned by this Towing Vendor. */
+  async getBookingTracking(
+    vendorUserId: string,
+    bookingId: string,
+    bookingType: 'towing' | 'driver',
+  ) {
     await this.assertVendorApproved(vendorUserId);
+    const booking = bookingType === 'towing'
+      ? await TowingBookingModel.findOne({ _id: bookingId, vendorId: vendorUserId }).exec()
+      : await DriverBookingModel.findOne({ _id: bookingId, vendorId: vendorUserId }).exec();
+    if (!booking) throw new NotFoundError('Vendor booking not found');
 
-    const vehicle = await VendorVehicleModel.findById(dto.vehicleId).exec();
-    if (!vehicle) throw new NotFoundError('Fleet vehicle not found');
-    if (vehicle.vendorId.toString() !== vendorUserId) {
-      throw new ForbiddenError('Vehicle is not in your fleet');
-    }
-    if (vehicle.status !== 'ACTIVE') {
-      throw new BadRequestError('Only ACTIVE fleet vehicles can be assigned');
-    }
-
-    const fleetVehicleLabel = `${vehicle.registrationNo} · ${vehicle.type} · ${vehicle.vehicleModel}`;
-
-    const result = await approveVendorBookingOffer(bookingId, dto.bookingType, vendorUserId, {
-      fleetVehicleId: vehicle.id,
-      fleetVehicleLabel,
-    });
+    const towingMode = (booking as { towingMode?: string }).towingMode;
+    const driverServiceType = (booking as { driverServiceType?: string }).driverServiceType;
+    const driver = booking.driverId
+      ? await UserModel.findById(booking.driverId).select('fullName mobileNumber').lean().exec()
+      : null;
+    const activeStatuses = ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'];
+    const updatedAt = booking.driverLocationUpdatedAt;
+    const ageMs = updatedAt ? Date.now() - updatedAt.getTime() : undefined;
+    const isLocationFresh = activeStatuses.includes(booking.status) &&
+      typeof ageMs === 'number' && ageMs >= -30_000 && ageMs <= 90_000 &&
+      typeof booking.driverLatitude === 'number' &&
+      typeof booking.driverLongitude === 'number';
 
     return {
-      ...result,
-      assignedFleetVehicleLabel: fleetVehicleLabel,
-      message: 'Job approved — your drivers can now accept it',
+      bookingType,
+      id: booking.id,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      serviceLabel: bookingType === 'towing'
+        ? towingMode === 'emergency' ? 'Emergency Towing'
+          : towingMode === 'scheduled' ? 'Scheduled Towing' : 'Towing'
+        : driverServiceType === 'full_time' ? 'Full-Time Driver'
+          : driverServiceType === 'part_time' ? 'Part-Time Driver' : 'Driver hire',
+      pickup: booking.pickup,
+      dropoff: booking.dropoff ?? null,
+      assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
+      driver: driver ? {
+        id: driver._id.toString(),
+        name: driver.fullName ?? 'Driver',
+        phone: driver.mobileNumber,
+      } : undefined,
+      driverLocation: isLocationFresh ? {
+        latitude: booking.driverLatitude,
+        longitude: booking.driverLongitude,
+        updatedAt: updatedAt?.toISOString(),
+      } : null,
+      isLocationFresh,
+      statusHistory: (booking.statusHistory ?? []).map((entry) => ({
+        status: entry.status,
+        timestamp: entry.timestamp.toISOString(),
+        note: entry.note,
+      })),
     };
   }
 
@@ -115,14 +147,20 @@ export class VendorBookingsService {
   async listBookings(vendorUserId: string): Promise<VendorBookingListItem[]> {
     const user = await this.assertVendor(vendorUserId);
 
-    const driverUsers = await UserModel.find({
-      role: 'driver',
-      'driverProfile.vendorUserId': user._id,
-    })
-      .select('_id')
-      .lean()
-      .exec();
-    const driverIds = driverUsers.map((driver) => driver._id.toString());
+    const [legacyDriverUsers, activeMemberships] = await Promise.all([
+      UserModel.find({
+        role: 'driver',
+        'driverProfile.vendorUserId': user._id,
+      }).select('_id').lean().exec(),
+      DriverVendorMembershipModel.find({
+        vendorUserId: user._id,
+        status: 'ACTIVE',
+      }).select('driverUserId').lean().exec(),
+    ]);
+    const driverIds = Array.from(new Set([
+      ...legacyDriverUsers.map((driver) => driver._id.toString()),
+      ...activeMemberships.map((membership) => membership.driverUserId.toString()),
+    ]));
     const driverIdSet = new Set(driverIds);
 
     const query =
@@ -229,8 +267,17 @@ export class VendorBookingsService {
     if (!driver?.driverProfile) {
       throw new NotFoundError('Driver not found');
     }
-    if (driver.driverProfile.vendorUserId?.toString() !== vendorUserId) {
-      throw new ForbiddenError('Driver is not in your fleet');
+    const legacyVendorId = driver.driverProfile.vendorUserId?.toString();
+    const membership = await DriverVendorMembershipModel.exists({
+      vendorUserId: vendorUserId,
+      driverUserId: driver._id,
+      status: 'ACTIVE',
+    }).exec();
+    if (legacyVendorId !== vendorUserId && !membership) {
+      throw new ForbiddenError('Driver has not accepted your fleet invitation');
+    }
+    if (driver.driverProfile.status !== 'APPROVED') {
+      throw new BadRequestError('Driver account pending admin approval');
     }
     if (!isDriverEligibleForBooking(driver, dto.bookingType)) {
       throw new BadRequestError(
@@ -242,6 +289,10 @@ export class VendorBookingsService {
 
     let fleetVehicleLabel: string | undefined;
     let fleetVehicleId: string | undefined;
+
+    if (dto.bookingType === 'towing' && !dto.vehicleId) {
+      throw new BadRequestError('Select an active fleet vehicle for towing jobs');
+    }
 
     if (dto.vehicleId) {
       const vehicle = await VendorVehicleModel.findById(dto.vehicleId).exec();
@@ -268,7 +319,7 @@ export class VendorBookingsService {
       ...result,
       driver: assignedDriver,
       assignedFleetVehicleLabel: fleetVehicleLabel,
-      message: 'Driver and vehicle assigned — customer can see partner details now',
+      message: dto.bookingType === 'towing' ? 'Driver and fleet vehicle assigned' : 'Driver assigned',
     };
   }
 

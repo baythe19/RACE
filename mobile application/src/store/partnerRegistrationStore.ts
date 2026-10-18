@@ -8,6 +8,8 @@ export interface PartnerUploadedDocument {
   uri: string;
   name: string;
   mimeType?: string;
+  /** Durable URL returned by the backend after a successful upload. */
+  remoteUrl?: string;
 }
 
 export interface DriverPersonalInfo {
@@ -89,46 +91,16 @@ export const defaultMockDriverPersonal: DriverPersonalInfo = {
 };
 
 export const defaultMockDriverVehicle: DriverVehicleInfo = {
-  vehicleType: 'Flatbed Tow Truck',
-  vehicleNumber: 'OD 02 AB 1234',
-  rcNumber: 'RC-OD02-2022-987654',
-  licenseNumber: 'OD-0220190012345',
-  insuranceProvider: 'HDFC ERGO General Insurance',
-  insurancePolicyNumber: 'POL-78901234',
-  vehicleModel: 'Tata 407 Recovery Spec',
-  registeredTo: 'me',
+  vehicleType: 'Tow Driver',
+  vehicleNumber: '',
+  rcNumber: '',
+  licenseNumber: '',
+  insuranceProvider: '',
+  insurancePolicyNumber: '',
+  vehicleModel: '',
 };
 
-export const defaultMockDriverDocuments: PartnerUploadedDocument[] = [
-  {
-    id: 'aadhaar_card',
-    label: 'Aadhaar Card',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'aadhaar_front_back.pdf',
-    mimeType: 'application/pdf',
-  },
-  {
-    id: 'driving_license',
-    label: 'Driving License',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'driving_license_valid.jpg',
-    mimeType: 'image/jpeg',
-  },
-  {
-    id: 'vehicle_rc',
-    label: 'Vehicle RC',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'vehicle_rc_od02.jpg',
-    mimeType: 'image/jpeg',
-  },
-  {
-    id: 'vehicle_insurance',
-    label: 'Vehicle Insurance',
-    uri: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400',
-    name: 'hdfc_ergo_policy.pdf',
-    mimeType: 'application/pdf',
-  },
-];
+export const defaultMockDriverDocuments: PartnerUploadedDocument[] = [];
 
 export const defaultMockVendorBusiness: VendorBusinessInfo = {
   businessName: 'Kalinga Towing & Roadside Services',

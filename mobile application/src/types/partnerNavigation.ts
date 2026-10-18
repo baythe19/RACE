@@ -61,6 +61,7 @@ export type PartnerTabParamList = {
   PartnerJobs: NavigatorScreenParams<PartnerJobsStackParamList> | undefined;
   PartnerVehicles: NavigatorScreenParams<PartnerVehiclesStackParamList> | undefined;
   PartnerDrivers: NavigatorScreenParams<PartnerDriversStackParamList> | undefined;
+  PartnerVendor: undefined;
   PartnerAccount: NavigatorScreenParams<PartnerAccountStackParamList> | undefined;
 };
 

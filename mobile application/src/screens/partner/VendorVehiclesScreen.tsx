@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ArrowLeft,
   Calendar,
@@ -14,24 +14,20 @@ import {
 } from 'lucide-react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { jumpToPartnerAccountScreen } from '../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import VendorVehicleImage from '../../components/partner/VendorVehicleImage';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
-import type { FleetDriver } from '../../services/vendor/vendorDriversApi';
 import type { FleetVehicle, FleetVehicleStatus } from '../../services/vendor/vendorVehiclesApi';
 import {
-  useLinkVendorDriverVehicleMutation,
   useRemoveVendorVehicleMutation,
   useUpdateVendorVehicleMutation,
-  useVendorFleetDriversQuery,
+  useVendorBookingsQuery,
   useVendorFleetVehiclesQuery,
 } from '../../services/vendor/useVendorBookingsQueries';
 import type {
-  PartnerAccountStackParamList,
-  PartnerDriversStackParamList,
   PartnerJobsStackParamList,
 } from '../../types/partnerNavigation';
 import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
@@ -98,7 +94,7 @@ function statusMeta(status: string, driverBusy?: boolean) {
 }
 
 export default function VendorVehiclesScreen() {
-  const navigation = useNavigation<NavigationProp<PartnerAccountStackParamList & PartnerJobsStackParamList & PartnerDriversStackParamList>>();
+  const navigation = useNavigation<NavigationProp<PartnerJobsStackParamList>>();
   const insets = useSafeAreaInsets();
   const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
   const isApproved = vendor?.status === 'approved';
@@ -109,36 +105,36 @@ export default function VendorVehiclesScreen() {
     isRefetching,
     refetch,
   } = useVendorFleetVehiclesQuery(true, false);
-  const { data: drivers = [], refetch: refetchDrivers } = useVendorFleetDriversQuery(true);
+  const { data: activeBookings = [], refetch: refetchBookings } = useVendorBookingsQuery(true);
 
   const updateMutation = useUpdateVendorVehicleMutation();
   const removeMutation = useRemoveVendorVehicleMutation();
-  const linkDriverMutation = useLinkVendorDriverVehicleMutation();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [menuVehicle, setMenuVehicle] = useState<FleetVehicle | null>(null);
-  const [assignVehicle, setAssignVehicle] = useState<FleetVehicle | null>(null);
 
-  const driverByReg = useMemo(() => {
-    const map = new Map<string, FleetDriver>();
-    for (const driver of drivers) {
-      const key = normalizeReg(driver.vehicleRegistration);
-      if (key) map.set(key, driver);
+  const activeAssignments = useMemo(() => {
+    const active = new Map<string, (typeof activeBookings)[number]>();
+    for (const booking of activeBookings) {
+      if (
+        booking.assignedFleetVehicleId &&
+        ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(booking.status)
+      ) {
+        active.set(booking.assignedFleetVehicleId, booking);
+      }
     }
-    return map;
-  }, [drivers]);
+    return active;
+  }, [activeBookings]);
 
   const stats = useMemo(() => {
     const available = vehicles.filter(
-      vehicle =>
-        vehicle.status === 'ACTIVE' &&
-        !driverByReg.get(normalizeReg(vehicle.registrationNo))?.isBusy,
+      vehicle => vehicle.status === 'ACTIVE' && !activeAssignments.has(vehicle.id),
     ).length;
     const service = vehicles.filter(v => v.status === 'UNDER_MAINTENANCE').length;
     const inactive = vehicles.filter(v => v.status === 'INACTIVE').length;
     return { total: vehicles.length, available, service, inactive };
-  }, [vehicles, driverByReg]);
+  }, [vehicles, activeAssignments]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -160,15 +156,6 @@ export default function VendorVehiclesScreen() {
 
     return list;
   }, [vehicles, search, statusFilter]);
-
-  const goDrivers = () => {
-    jumpToPartnerAccountScreen('VendorDrivers');
-  };
-
-  const unassignedDrivers = useMemo(
-    () => drivers.filter(d => !normalizeReg(d.vehicleRegistration)),
-    [drivers],
-  );
 
   const openForm = () => {
     if (!isApproved) {
@@ -216,42 +203,6 @@ export default function VendorVehiclesScreen() {
     ]);
   };
 
-  const onLinkDriver = async (driver: FleetDriver) => {
-    if (!assignVehicle) return;
-    try {
-      await linkDriverMutation.mutateAsync({
-        driverId: driver.id,
-        vehicleRegistration: assignVehicle.registrationNo,
-      });
-      setAssignVehicle(null);
-      await refetchDrivers();
-      Alert.alert(
-        'Driver linked',
-        `${driver.name} is now linked to ${formatPlate(assignVehicle.registrationNo)}.`,
-      );
-    } catch (error) {
-      Alert.alert('Link failed', getApiErrorMessage(error, 'Please try again'));
-    }
-  };
-
-  const openAssign = (vehicle: FleetVehicle) => {
-    if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
-      return;
-    }
-    if (drivers.length === 0) {
-      Alert.alert('No drivers', 'Add a vendor driver first, then assign them to this vehicle.', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Add driver',
-          onPress: () => goDrivers(),
-        },
-      ]);
-      return;
-    }
-    setAssignVehicle(vehicle);
-  };
-
   return (
     <AppScreenLayout
       backgroundColor={PAGE_BG}
@@ -259,7 +210,7 @@ export default function VendorVehiclesScreen() {
       refreshing={isRefetching}
       onRefresh={() => {
         void refetch();
-        void refetchDrivers();
+        void refetchBookings();
       }}
       header={
         <View style={styles.headerPad}>
@@ -276,7 +227,7 @@ export default function VendorVehiclesScreen() {
             ) : null}
             <View style={{ flex: 1 }}>
               <PartnerText style={styles.title}>
-                {navigation?.canGoBack?.() ? 'Vendor vehicles' : 'Vehicles'}
+                Vehicles
               </PartnerText>
               {!navigation?.canGoBack?.() ? (
                 <PartnerText style={styles.subtitle}>
@@ -297,7 +248,7 @@ export default function VendorVehiclesScreen() {
         </View>
       }>
       {vendorLoading || isLoading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+        <DriverDataSkeleton variant="vehicles" />
       ) : (
         <View style={styles.content}>
           {!isApproved ? (
@@ -381,9 +332,10 @@ export default function VendorVehiclesScreen() {
             </View>
           ) : (
             filtered.map(vehicle => {
-              const driver = driverByReg.get(normalizeReg(vehicle.registrationNo));
+              const assignedJob = activeAssignments.get(vehicle.id);
+              const driver = assignedJob?.driver;
               const badge = typeBadge(vehicle.type);
-              const status = statusMeta(vehicle.status, driver?.isBusy);
+              const status = statusMeta(vehicle.status, Boolean(assignedJob));
               return (
                 <View key={vehicle.id} style={styles.vehicleCard}>
                   <View style={styles.vehicleTop}>
@@ -440,10 +392,8 @@ export default function VendorVehiclesScreen() {
                           </>
                         ) : (
                           <>
-                            <PartnerText style={styles.driverNameMuted}>Not assigned</PartnerText>
-                            <Pressable onPress={() => openAssign(vehicle)} hitSlop={6}>
-                              <PartnerText style={styles.assignLink}>Assign driver</PartnerText>
-                            </Pressable>
+                            <PartnerText style={styles.driverNameMuted}>Driver selected per job</PartnerText>
+                            <PartnerText style={styles.driverPhone}>No permanent vehicle link</PartnerText>
                           </>
                         )}
                       </View>
@@ -511,19 +461,6 @@ export default function VendorVehiclesScreen() {
               onPress={() => menuVehicle && void setVehicleStatus(menuVehicle, 'INACTIVE')}>
               <PartnerText style={styles.sheetItemText}>Mark Inactive</PartnerText>
             </Pressable>
-            {!driverByReg.get(normalizeReg(menuVehicle?.registrationNo)) ? (
-              <Pressable
-                style={styles.sheetItem}
-                onPress={() => {
-                  const vehicle = menuVehicle;
-                  setMenuVehicle(null);
-                  if (vehicle) openAssign(vehicle);
-                }}>
-                <PartnerText style={[styles.sheetItemText, { color: colors.primaryDark }]}>
-                  Assign driver
-                </PartnerText>
-              </Pressable>
-            ) : null}
             <Pressable
               style={styles.sheetItem}
               onPress={() => menuVehicle && onRemove(menuVehicle)}>
@@ -533,49 +470,7 @@ export default function VendorVehiclesScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        visible={Boolean(assignVehicle)}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setAssignVehicle(null)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setAssignVehicle(null)}>
-          <Pressable style={styles.assignSheet} onPress={e => e.stopPropagation()}>
-            <PartnerText style={styles.sheetTitle}>
-              Assign driver
-              {assignVehicle ? ` · ${formatPlate(assignVehicle.registrationNo)}` : ''}
-            </PartnerText>
-            <PartnerText style={styles.assignHint}>
-              Choose a vendor driver to link with this vehicle.
-            </PartnerText>
-            <ScrollView style={{ maxHeight: 320 }}>
-              {(unassignedDrivers.length > 0 ? unassignedDrivers : drivers).map(driver => (
-                <Pressable
-                  key={driver.id}
-                  style={styles.driverPick}
-                  onPress={() => void onLinkDriver(driver)}
-                  disabled={linkDriverMutation.isPending}>
-                  <View style={styles.driverAvatar}>
-                    <PartnerText style={styles.driverInitial}>{driver.name.charAt(0).toUpperCase()}</PartnerText>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <PartnerText style={styles.driverName}>{driver.name}</PartnerText>
-                    <PartnerText style={styles.driverPhone}>{driver.phone}</PartnerText>
-                  </View>
-                  <PartnerText style={styles.assignLink}>Assign</PartnerText>
-                </Pressable>
-              ))}
-            </ScrollView>
-            <Pressable
-              onPress={() => {
-                setAssignVehicle(null);
-                goDrivers();
-              }}
-              style={styles.addDriverLink}>
-              <PartnerText style={styles.assignLink}>Manage drivers</PartnerText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+
 
     </AppScreenLayout>
   );

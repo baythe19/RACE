@@ -41,6 +41,14 @@ router.post(
 
 router.use(requireRole('driver'));
 
+router.get('/vendor-invitations', driverController.listVendorInvitations);
+router.get('/vendor-membership', driverController.getVendorMembership);
+router.post(
+  '/vendor-invitations/:id/respond',
+  validate(z.object({ decision: z.enum(['accept', 'decline']) })),
+  driverController.respondVendorInvitation,
+);
+
 router.patch(
   '/availability',
   validate(updateDriverAvailabilitySchema),

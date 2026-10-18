@@ -6,11 +6,8 @@ import { vendorDocumentUpload } from '../../middleware/src/upload';
 import { validate } from '../../middleware/src/validation';
 import { vendorController } from './vendor';
 import {
-  assignVendorDriverVehicleSchema,
-  claimVendorDriverSchema,
-  createVendorDriverSchema,
-  resetVendorDriverPasswordSchema,
-  uploadVendorDriverDocumentSchema,
+  inviteVendorDriverSchema,
+  revokeVendorDriverMembershipSchema,
 } from '../../services/src/vendorDriversValidator';
 import { savePayoutAccountSchema } from '../../services/src/vendorValidator';
 import {
@@ -58,39 +55,19 @@ router.post(
 router.post('/selfie', vendorDocumentUpload.single('file'), vendorController.uploadSelfie);
 
 router.get('/drivers', requireRole('vendor'), vendorController.listDrivers);
+router.get('/drivers/memberships', requireRole('vendor'), vendorController.listDriverMemberships);
 router.post(
-  '/drivers',
+  '/drivers/invitations',
   requireRole('vendor'),
-  validate(createVendorDriverSchema),
-  vendorController.createDriver,
+  validate(inviteVendorDriverSchema),
+  vendorController.inviteDriver,
 );
-router.post(
-  '/drivers/:id/upload-document',
+router.delete(
+  '/drivers/memberships/:id',
   requireRole('vendor'),
-  vendorDocumentUpload.single('file'),
-  validate(uploadVendorDriverDocumentSchema),
-  vendorController.uploadDriverDocument,
+  validate(revokeVendorDriverMembershipSchema),
+  vendorController.revokeDriverMembership,
 );
-router.post(
-  '/drivers/claim',
-  requireRole('vendor'),
-  validate(claimVendorDriverSchema),
-  vendorController.claimDriver,
-);
-router.post(
-  '/drivers/:id/assign-vehicle',
-  requireRole('vendor'),
-  validate(assignVendorDriverVehicleSchema),
-  vendorController.assignDriverVehicle,
-);
-router.post(
-  '/drivers/:id/reset-password',
-  requireRole('vendor'),
-  validate(resetVendorDriverPasswordSchema),
-  vendorController.resetDriverPassword,
-);
-router.delete('/drivers/:id', requireRole('vendor'), vendorController.removeDriver);
-
 router.get('/vehicles', requireRole('vendor'), vendorController.listVehicles);
 router.post(
   '/vehicles',
@@ -114,6 +91,7 @@ router.put(
 router.delete('/vehicles/:id', requireRole('vendor'), vendorController.removeVehicle);
 
 router.get('/bookings', requireRole('vendor'), vendorController.listBookings);
+router.get('/bookings/:id/tracking', requireRole('vendor'), vendorController.getBookingTracking);
 router.get('/bookings/offers', requireRole('vendor'), vendorController.listBookingOffers);
 router.post(
   '/bookings/:id/approve',

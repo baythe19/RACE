@@ -90,7 +90,7 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
       }),
     );
     if (role === 'driver') {
-      navigation.navigate('PartnerDriverAuthMode');
+      navigation.navigate('PartnerLogin', { role: 'driver' });
       return;
     }
     navigation.navigate('PartnerLogin', { role });

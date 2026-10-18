@@ -1,12 +1,13 @@
 import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { MapPin, Navigation, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GlassCard from '../../components/ui/GlassCard';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import LiveTripMap from '../../components/booking/LiveTripMap';
 import { useDriverLocationReporting } from '../../hooks/useDriverLocationReporting';
 import {
@@ -110,7 +111,7 @@ export default function PartnerActiveJobScreen({ navigation, route }: Props) {
   if (isLoading) {
     return (
       <AppScreenLayout scrollable={false}>
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+        <DriverDataSkeleton variant="active-job" />
       </AppScreenLayout>
     );
   }

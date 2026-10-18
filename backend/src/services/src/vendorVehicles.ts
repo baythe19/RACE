@@ -4,6 +4,8 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/er
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
 import { storageService } from '../../storage/src/index';
 import { UserModel } from '../../models/src/user';
+import { TowingBookingModel } from '../../models/src/towingBooking';
+import { DriverBookingModel } from '../../models/src/driverBooking';
 import type { CreateVendorVehicleDto, UpdateVendorVehicleDto } from './vendorVehiclesValidator';
 
 function mapVehicle(doc: {
@@ -58,6 +60,24 @@ function buildMaintenanceNote(dto: CreateVendorVehicleDto): string | undefined {
 }
 
 export class VendorVehiclesService {
+  private async assertVehicleHasNoOpenAssignments(vehicleId: Types.ObjectId) {
+    const filter = {
+      assignedFleetVehicleId: vehicleId,
+      status: {
+        $in: ['CONFIRMED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'],
+      },
+    };
+    const [towingBooking, driverBooking] = await Promise.all([
+      TowingBookingModel.exists(filter).exec(),
+      DriverBookingModel.exists(filter).exec(),
+    ]);
+    if (towingBooking || driverBooking) {
+      throw new ConflictError(
+        'This vehicle is assigned to an open job. Complete or cancel the job before changing its status or removing it.',
+      );
+    }
+  }
+
   private async assertVendor(userId: string) {
     const user = await UserModel.findById(userId).exec();
     if (!user || user.role !== 'vendor') {
@@ -120,6 +140,9 @@ export class VendorVehiclesService {
       throw new ForbiddenError('Vehicle is not in your fleet');
     }
 
+    if (dto.status && dto.status !== 'ACTIVE') {
+      await this.assertVehicleHasNoOpenAssignments(vehicle._id);
+    }
     if (dto.type) vehicle.type = dto.type;
     if (dto.model) vehicle.vehicleModel = dto.model;
     if (dto.year !== undefined) vehicle.year = dto.year ?? undefined;
@@ -178,6 +201,7 @@ export class VendorVehiclesService {
     if (vehicle.vendorId.toString() !== vendorUserId) {
       throw new ForbiddenError('Vehicle is not in your fleet');
     }
+    await this.assertVehicleHasNoOpenAssignments(vehicle._id);
     await vehicle.deleteOne();
     return { removed: true, vehicleId };
   }

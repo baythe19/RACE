@@ -22,7 +22,7 @@ export default function DriverOnWayScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const { booking: draftBooking } = useDriverBooking();
   const bookingId = route.params?.bookingId;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'driver');
   const {
     etaLabel,
     etaMinutes,

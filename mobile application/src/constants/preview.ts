@@ -5,24 +5,31 @@
  * to prevent circular require cycles.
  */
 
-/**
- * PA-1 hardening (audit 21 / BUG-01 / VOC P0.1):
- * Preview mock-data fallback stays ON for dev/demo convenience, BUT a
- * production-shaped bundle (`__DEV__ === false`) must never silently
- * fabricate data. In release builds preview is disabled unless someone
- * explicitly opts in via EXPO_PUBLIC_UI_PREVIEW_MODE=true — and even then
- * the app logs a loud warning at startup.
- */
+/** Preview fixtures are opt-in for local/demo builds and are always disabled in release builds. */
 const isReleaseBuild = __DEV__ === false;
 
-export const UI_PREVIEW_MODE = isReleaseBuild
-  ? process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true'
-  : process.env.EXPO_PUBLIC_UI_PREVIEW_MODE !== 'false';
+export const UI_PREVIEW_MODE =
+  !isReleaseBuild && process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true';
 
-if (isReleaseBuild && UI_PREVIEW_MODE) {
+/** Mock mutation success must be explicitly enabled for local UI walkthroughs. */
+export const UI_PREVIEW_MUTATIONS_ENABLED =
+  !isReleaseBuild &&
+  UI_PREVIEW_MODE &&
+  process.env.EXPO_PUBLIC_UI_PREVIEW_MUTATIONS === 'true';
+
+if (isReleaseBuild && process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true') {
   console.warn(
-    '[RACE] ⚠️ Production build running with UI_PREVIEW_MODE — mock data fallbacks are ACTIVE. ' +
-      'Set EXPO_PUBLIC_UI_PREVIEW_MODE=false for any client-facing release build.',
+    '[RACE] UI preview was requested in a release build; mock data fallbacks are disabled.',
+  );
+} else if (UI_PREVIEW_MODE) {
+  console.warn(
+    '[RACE] UI preview is enabled; failed API reads may show demo fixtures instead of live data.',
+  );
+}
+
+if (UI_PREVIEW_MUTATIONS_ENABLED) {
+  console.warn(
+    '[RACE] Mock auth and mutation responses are enabled for a local walkthrough; they are not saved on the server.',
   );
 }
 
@@ -46,7 +53,7 @@ export const UI_PREVIEW_DRIVER_ALERT_ENABLED =
   process.env.EXPO_PUBLIC_UI_PREVIEW_DRIVER_ALERT === 'true';
 
 let runtimePermissiveMode: boolean =
-  process.env.EXPO_PUBLIC_UI_TEST_PERMISSIVE_MODE !== 'false';
+  !isReleaseBuild && process.env.EXPO_PUBLIC_UI_TEST_PERMISSIVE_MODE === 'true';
 
 type PermissiveModeListener = (enabled: boolean) => void;
 const listeners: Set<PermissiveModeListener> = new Set();
@@ -58,10 +65,10 @@ export function isUiTestPermissiveMode(): boolean {
 }
 
 export function setUiTestPermissiveMode(enabled: boolean): void {
-  runtimePermissiveMode = enabled;
+  runtimePermissiveMode = !isReleaseBuild && enabled;
   listeners.forEach(fn => {
     try {
-      fn(enabled);
+      fn(runtimePermissiveMode);
     } catch {
       // ignore listener error
     }

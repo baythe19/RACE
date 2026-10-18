@@ -16,6 +16,7 @@ import { PartnerText } from './PartnerText';
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import {
+  Building2,
   ClipboardList,
   House,
   Truck,
@@ -54,6 +55,7 @@ const TAB_CONFIG: Record<TabRouteName, { label: string; Icon: LucideIcon }> = {
   PartnerJobs: { label: 'Jobs', Icon: ClipboardList },
   PartnerVehicles: { label: 'Vehicles', Icon: Truck },
   PartnerDrivers: { label: 'Drivers', Icon: Users },
+  PartnerVendor: { label: 'My Vendor', Icon: Building2 },
   PartnerAccount: { label: 'Account', Icon: User },
 };
 

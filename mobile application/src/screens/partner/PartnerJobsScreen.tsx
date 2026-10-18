@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Bell,
   Briefcase,
@@ -21,6 +21,7 @@ import { openPartnerNotifications } from '../../navigation/partnerNavigationRef'
 import GlassCard from '../../components/ui/GlassCard';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useAppSelector } from '../../redux/hooks';
 import {
   useAcceptDriverJobMutation,
@@ -42,6 +43,7 @@ import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 const SUCCESS_GREEN = '#22C55E';
 
 const ACTIVE_STATUSES = new Set(['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS']);
+const TRACKABLE_STATUSES = new Set(['DRIVER_ASSIGNED', ...ACTIVE_STATUSES]);
 
 type JobTab = 'all' | 'new' | 'nearby' | 'assigned' | 'in_progress' | 'completed';
 
@@ -349,6 +351,7 @@ export default function PartnerJobsScreen() {
     const canAcceptOffer = isDriver && isOffer;
     const canRejectAssigned = isDriver && !isOffer && job.status === 'DRIVER_ASSIGNED';
     const isActive = isDriver && !isOffer && ACTIVE_STATUSES.has(job.status);
+    const canTrackVendorJob = isVendor && !isOffer && TRACKABLE_STATUSES.has(job.status);
 
     return (
       <GlassCard
@@ -459,7 +462,7 @@ export default function PartnerJobsScreen() {
         {isOffer && job.vendorApproved ? (
           <View style={styles.awaitingDriverBanner}>
             <PartnerText style={styles.awaitingDriverText}>
-              Awaiting driver — your fleet drivers can accept this job
+              Driver assignment needed
             </PartnerText>
           </View>
         ) : null}
@@ -479,7 +482,7 @@ export default function PartnerJobsScreen() {
                 })
               }
               style={styles.assignBtn}>
-              <PartnerText style={styles.assignLabel}>Assign vehicle</PartnerText>
+              <PartnerText style={styles.assignLabel}>{job.bookingType === 'towing' ? 'Assign Driver & Vehicle' : 'Assign Driver'}</PartnerText>
             </Pressable>
           </View>
         ) : null}
@@ -487,7 +490,7 @@ export default function PartnerJobsScreen() {
         {isVendor && isOffer && job.vendorApproved ? (
           <View style={styles.awaitingDriverBanner}>
             <PartnerText style={styles.awaitingDriverText}>
-              Awaiting driver — your fleet drivers can accept this job
+              Driver assignment needed
             </PartnerText>
           </View>
         ) : null}
@@ -518,7 +521,7 @@ export default function PartnerJobsScreen() {
           </View>
         ) : null}
 
-        {isActive ? (
+        {isActive || canTrackVendorJob ? (
           <Pressable
             onPress={() =>
               navigation.navigate('PartnerActiveJob', {
@@ -527,7 +530,7 @@ export default function PartnerJobsScreen() {
               })
             }
             style={styles.manageBtn}>
-            <PartnerText style={styles.manageLabel}>Manage active trip →</PartnerText>
+            <PartnerText style={styles.manageLabel}>{isVendor ? 'Track assigned job →' : 'Manage active trip →'}</PartnerText>
           </Pressable>
         ) : null}
       </GlassCard>
@@ -684,7 +687,7 @@ export default function PartnerJobsScreen() {
           </ScrollView>
 
           {isLoading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+            <DriverDataSkeleton variant="jobs" />
           ) : (
             <ScrollView
               style={styles.listScroll}

@@ -30,7 +30,8 @@ import { usePartnerOnboardingStore } from '../../store/partnerOnboardingStore';
 import { useDriverProfileQuery } from '../../services/driver/useDriverQueries';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
-import { UI_PREVIEW_MODE, switchMockRole } from '../../config/uiPreviewMode';
+import { switchMockRole } from '../../config/uiPreviewMode';
+import { UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 import { usePartnerPayoutStore } from '../../store/partnerPayoutStore';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
@@ -488,7 +489,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         </View>
 
         {/* Development Mode Role Switcher (gated to preview mode) */}
-        {UI_PREVIEW_MODE ? (
+        {UI_PREVIEW_MUTATIONS_ENABLED ? (
           <Pressable
             style={({ pressed }) => [
               styles.switchRoleButton,

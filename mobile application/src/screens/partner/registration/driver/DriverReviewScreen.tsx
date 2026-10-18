@@ -98,6 +98,10 @@ export default function DriverReviewScreen({ navigation, route }: Props) {
       // URIs. Failures surface per-document so the driver can retry.
       const documentsPayload: { type: string; url: string; status: 'PENDING' }[] = [];
       for (const doc of driverDocuments) {
+        if (doc.remoteUrl) {
+          documentsPayload.push({ type: doc.id, url: doc.remoteUrl, status: 'PENDING' });
+          continue;
+        }
         if (!doc.uri) continue;
         try {
           const formData = new FormData();

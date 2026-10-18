@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
 import { getApiErrorMessage } from '../services/api';
@@ -25,8 +26,13 @@ interface ConfirmResult {
 }
 
 export function useServiceBookingPayment() {
+  const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshBookings = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ['bookings'] }),
+    [queryClient],
+  );
 
   const confirmTowing = useCallback(async (payload: CreateTowingBookingRequest) => {
     setIsConfirming(true);
@@ -37,6 +43,7 @@ export function useServiceBookingPayment() {
       if (__DEV__ && isPreviewBookingMode()) {
         const booking = previewTowingBooking(payload);
         previewAdvancePayment(booking.id, 'towing');
+        await refreshBookings();
         return { booking } satisfies ConfirmResult;
       }
       if (!__DEV__) {
@@ -44,6 +51,7 @@ export function useServiceBookingPayment() {
       }
       const booking = await createTowingBooking(payload);
       await completeAdvancePayment(booking.id, 'towing');
+      await refreshBookings();
       return { booking } satisfies ConfirmResult;
     } catch (err) {
       const message = getApiErrorMessage(err, 'Unable to confirm towing booking');
@@ -53,7 +61,7 @@ export function useServiceBookingPayment() {
     } finally {
       setIsConfirming(false);
     }
-  }, []);
+  }, [refreshBookings]);
 
   const confirmDriver = useCallback(async (payload: CreateDriverBookingRequest) => {
     setIsConfirming(true);
@@ -62,6 +70,7 @@ export function useServiceBookingPayment() {
       if (__DEV__ && isPreviewBookingMode()) {
         const booking = previewDriverBooking(payload);
         previewAdvancePayment(booking.id, 'driver');
+        await refreshBookings();
         return { booking } satisfies ConfirmResult;
       }
       if (!__DEV__) {
@@ -69,6 +78,7 @@ export function useServiceBookingPayment() {
       }
       const booking = await createDriverBooking(payload);
       await completeAdvancePayment(booking.id, 'driver');
+      await refreshBookings();
       return { booking } satisfies ConfirmResult;
     } catch (err) {
       const message = getApiErrorMessage(err, 'Unable to confirm driver booking');
@@ -78,7 +88,7 @@ export function useServiceBookingPayment() {
     } finally {
       setIsConfirming(false);
     }
-  }, []);
+  }, [refreshBookings]);
 
   const confirmExistingBooking = useCallback(
     async (bookingId: string, bookingType: ServiceBookingType) => {
@@ -87,12 +97,14 @@ export function useServiceBookingPayment() {
       try {
         if (__DEV__ && isPreviewBookingMode()) {
           previewAdvancePayment(bookingId, bookingType);
+          await refreshBookings();
           return;
         }
         if (!__DEV__) {
           throw new Error('Online booking payments are not configured yet.');
         }
         await completeAdvancePayment(bookingId, bookingType);
+        await refreshBookings();
       } catch (err) {
         const message = getApiErrorMessage(err, 'Unable to record advance payment');
         setError(message);
@@ -102,7 +114,7 @@ export function useServiceBookingPayment() {
         setIsConfirming(false);
       }
     },
-    [],
+    [refreshBookings],
   );
 
   return { confirmTowing, confirmDriver, confirmExistingBooking, isConfirming, error };

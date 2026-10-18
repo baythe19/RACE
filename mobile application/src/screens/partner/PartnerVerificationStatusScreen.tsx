@@ -29,6 +29,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { brand } from '../../theme';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
@@ -172,9 +173,9 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
 
   if (isLoading) {
     return (
-      <View style={[styles.root, styles.centered, { paddingTop: insets.top }]}>
+      <View style={[styles.root, { paddingTop: insets.top }]}>
         <StatusBar barStyle="dark-content" backgroundColor={PAGE_BG} />
-        <ActivityIndicator size="large" color={colors.primary} />
+        <DriverDataSkeleton variant="verification" />
       </View>
     );
   }

@@ -48,18 +48,13 @@ export const MOCK_DRIVER_PROFILE: Profile = {
     licenseNo: 'OD-0220190012345',
     city: 'Bhubaneswar',
     state: 'Odisha',
-    vehicleRegistration: 'OD 02 AB 1234',
     policeVerificationStatus: previewDriverApproved ? 'VERIFIED' : 'PENDING',
     documents: previewDriverApproved
       ? [
           { type: 'driving_license', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
-          { type: 'vehicle_insurance', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
-          { type: 'rc', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
         ]
       : [
           { type: 'driving_license', status: 'VERIFIED', uploadedAt: '2026-10-09T09:12:00.000Z' },
-          { type: 'vehicle_insurance', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
-          { type: 'rc', status: 'PENDING', uploadedAt: '2026-10-09T09:12:00.000Z' },
         ],
     statusHistory: [{ status: UI_PREVIEW_DRIVER_STATUS, changedAt: '2026-10-09T09:12:00.000Z' }],
     submittedAt: '2026-10-09T09:12:00.000Z',
@@ -280,11 +275,11 @@ export const MOCK_DRIVER_JOBS: DriverJobBooking[] = [
 
 export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
   {
-    bookingType: 'towing',
-    id: 'RACE-TOW-MOCK-004',
-    bookingNumber: 'TOW-10048',
+    bookingType: 'driver',
+    id: 'RACE-DRIVER-MOCK-004',
+    bookingNumber: 'DRV-10048',
     status: 'ACCEPTED',
-    serviceLabel: 'Accident recovery tow',
+    serviceLabel: 'Professional driver request',
     pickup: {
       label: 'Saheed Nagar Commercial Center',
       address: 'Janpath Road, Saheed Nagar, Bhubaneswar',
@@ -309,11 +304,11 @@ export const MOCK_JOB_OFFERS: DriverJobBooking[] = [
     vendorApproved: false,
   },
   {
-    bookingType: 'towing',
-    id: 'RACE-TOW-MOCK-005',
-    bookingNumber: 'TOW-10049',
+    bookingType: 'driver',
+    id: 'RACE-DRIVER-MOCK-005',
+    bookingNumber: 'DRV-10049',
     status: 'ACCEPTED',
-    serviceLabel: 'Flat Tyre & Wheel Tow',
+    serviceLabel: 'Full-day driver request',
     pickup: {
       label: 'Chandrasekharpur Petrol Pump',
       address: 'Damana Square, Chandrasekharpur, Bhubaneswar',

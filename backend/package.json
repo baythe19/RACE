@@ -17,7 +17,8 @@
     "regenerate-vehicle-qrs": "tsx src/scripts/regenerate-vehicle-qrs.ts",
     "migrate:unified-users": "tsx src/database/src/migrate-unified-users.ts",
     "reset-test-data": "tsx src/scripts/reset-for-testing.ts",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "audit:partner-v6": "tsx src/scripts/partner-v6-offer-routing-audit.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",

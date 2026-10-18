@@ -23,6 +23,14 @@ export const claimVendorDriverSchema = z.object({
   phone: z.string().min(10).max(15),
 });
 
+export const inviteVendorDriverSchema = z.object({
+  phone: z.string().min(10).max(15),
+});
+
+export const revokeVendorDriverMembershipSchema = z.object({
+  reason: z.string().max(500).optional(),
+});
+
 /** Vendor resets a fleet driver's login password (driver forgot it). */
 export const resetVendorDriverPasswordSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').max(72),

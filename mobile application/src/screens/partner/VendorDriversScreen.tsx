@@ -31,6 +31,7 @@ import PartnerDocumentUploadList, {
   type PartnerDocumentUploadState,
 } from '../../components/partner/PartnerDocumentUploadList';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useAppSelector } from '../../redux/hooks';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import {
@@ -172,7 +173,7 @@ export default function VendorDriversScreen({ navigation }: any) {
   const isApproved = vendor?.status === 'approved';
 
   const { data: drivers = [], isLoading, isRefetching, refetch } = useVendorDriversQuery(isVendor);
-  const { data: vehicles = [] } = useVendorFleetVehiclesQuery(isVendor, false);
+  const { data: vehicles = [], isLoading: vehiclesLoading } = useVendorFleetVehiclesQuery(isVendor, false);
   const createMutation = useCreateVendorDriverMutation();
   const removeMutation = useRemoveVendorDriverMutation();
   const resetPasswordMutation = useResetVendorDriverPasswordMutation();
@@ -927,8 +928,8 @@ export default function VendorDriversScreen({ navigation }: any) {
           ))}
         </ScrollView>
 
-        {isLoading || vendorLoading ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xl }} />
+        {isLoading || vendorLoading || vehiclesLoading ? (
+          <DriverDataSkeleton variant="drivers" />
         ) : filtered.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.iconWrap}>

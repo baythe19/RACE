@@ -129,7 +129,7 @@ export class DriverService {
       },
       { new: true },
     )
-      .select('activeBookingId')
+      .select('activeBookingId activeBookingType')
       .exec();
     if (!updated) throw new NotFoundError('Driver not found');
 
@@ -138,25 +138,20 @@ export class DriverService {
       const activeStatus = {
         $in: ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'],
       };
-      const [towingBooking, driverBooking] = await Promise.all([
-        TowingBookingModel.findOne({
-          _id: activeBookingId,
-          driverId,
-          status: activeStatus,
-        })
-          .select('_id')
-          .lean()
-          .exec(),
-        DriverBookingModel.findOne({
-          _id: activeBookingId,
-          driverId,
-          status: activeStatus,
-        })
-          .select('_id')
-          .lean()
-          .exec(),
-      ]);
-      if (towingBooking || driverBooking) {
+      const filter = { _id: activeBookingId, driverId, status: activeStatus };
+      const update = {
+        $set: {
+          driverLatitude: dto.latitude,
+          driverLongitude: dto.longitude,
+          driverLocationUpdatedAt: updatedAt,
+        },
+      };
+      const updatedBooking = updated.activeBookingType === 'towing'
+        ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: false }).select('_id').lean().exec()
+        : updated.activeBookingType === 'driver'
+          ? await DriverBookingModel.findOneAndUpdate(filter, update, { new: false }).select('_id').lean().exec()
+          : null;
+      if (updatedBooking) {
         emitDriverLocation(activeBookingId, driverId, dto.latitude, dto.longitude);
       }
     }
@@ -203,6 +198,8 @@ export class DriverService {
         distanceKm: booking.distanceKm,
         createdAt: booking.createdAt.toISOString(),
         statusHistory: mapStatusHistory(booking.statusHistory),
+        vendorId: booking.vendorId?.toString(),
+        assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
       })),
       ...driverBookings.map((booking) => ({
         bookingType: 'driver' as const,
@@ -215,6 +212,8 @@ export class DriverService {
         finalFare: booking.finalFare,
         createdAt: booking.createdAt.toISOString(),
         statusHistory: mapStatusHistory(booking.statusHistory),
+        vendorId: booking.vendorId?.toString(),
+        assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
       })),
     ];
 
@@ -251,6 +250,8 @@ export class DriverService {
         distanceKm?: number;
         createdAt: Date;
         statusHistory?: Array<{ status: string; timestamp: Date }>;
+        vendorId?: { toString(): string } | null;
+        assignedFleetVehicleLabel?: string;
       },
     ) => ({
       bookingType: type,
@@ -264,6 +265,8 @@ export class DriverService {
       distanceKm: booking.distanceKm,
       createdAt: booking.createdAt.toISOString(),
       statusHistory: mapStatusHistory(booking.statusHistory),
+      vendorId: booking.vendorId?.toString(),
+      assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
     });
 
     if (bookingType === 'towing') {

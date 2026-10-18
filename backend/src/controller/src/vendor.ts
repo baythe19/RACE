@@ -8,6 +8,7 @@ import { vendorDriversService } from '../../services/src/vendorDrivers';
 import { vendorVehiclesService } from '../../services/src/vendorVehicles';
 import { vendorBookingsService } from '../../services/src/vendorBookings';
 import { vendorService } from '../../services/src/vendor';
+import { driverVendorMembershipService } from '../../services/src/driverVendorMembership';
 
 export class VendorController {
   saveDraft = asyncHandler(async (req: Request, res: Response) => {
@@ -134,6 +135,26 @@ export class VendorController {
     return sendSuccess(res, vendor);
   });
 
+  listDriverMemberships = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    return sendSuccess(res, await driverVendorMembershipService.listVendor(user.id));
+  });
+
+  inviteDriver = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    return sendSuccess(res, await driverVendorMembershipService.invite(user.id, req.body.phone), 202);
+  });
+
+  revokeDriverMembership = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverVendorMembershipService.revoke(
+      user.id,
+      getParamId(req.params.id),
+      req.body.reason,
+    );
+    return sendSuccess(res, result);
+  });
+
   listDrivers = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const drivers = await vendorDriversService.list(user.id);
@@ -231,6 +252,20 @@ export class VendorController {
     const user = getAuthUser(req);
     const offers = await vendorBookingsService.listOffers(user.id);
     return sendSuccess(res, offers);
+  });
+
+  getBookingTracking = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const bookingType = req.query.bookingType;
+    if (bookingType !== 'towing' && bookingType !== 'driver') {
+      throw new AppError('bookingType must be towing or driver', 400);
+    }
+    const tracking = await vendorBookingsService.getBookingTracking(
+      user.id,
+      getParamId(req.params.id),
+      bookingType,
+    );
+    return sendSuccess(res, tracking);
   });
 
   listBookings = asyncHandler(async (req: Request, res: Response) => {

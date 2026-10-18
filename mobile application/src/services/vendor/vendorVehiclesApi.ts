@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
-import { UI_PREVIEW_MODE } from '../../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 import { MOCK_VENDOR_VEHICLES } from '../../data/mockPartnerData';
 
 export type FleetVehicleStatus = 'ACTIVE' | 'UNDER_MAINTENANCE' | 'INACTIVE';
@@ -81,7 +81,7 @@ export async function createVendorVehicle(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const newVeh: FleetVehicle = {
         id: `veh-${Date.now()}`,
         vendorId: 'mock-vendor-001',
@@ -140,7 +140,7 @@ export async function uploadVendorVehicleDocument(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const vehicle = MOCK_VENDOR_VEHICLES.find(item => item.id === vehicleId);
       if (vehicle) {
         const document: FleetVehicleDocument = {
@@ -172,7 +172,7 @@ export async function updateVendorVehicle(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const found = MOCK_VENDOR_VEHICLES.find(v => v.id === vehicleId);
       if (found) {
         if (payload.type) found.type = payload.type;
@@ -196,7 +196,7 @@ export async function removeVendorVehicle(vehicleId: string): Promise<void> {
   try {
     await api.delete(API_ENDPOINTS.vendorVehicle(vehicleId));
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const idx = MOCK_VENDOR_VEHICLES.findIndex(v => v.id === vehicleId);
       if (idx !== -1) MOCK_VENDOR_VEHICLES.splice(idx, 1);
       return;

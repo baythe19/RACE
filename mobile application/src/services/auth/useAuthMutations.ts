@@ -74,7 +74,7 @@ export function useVerifyOtpMutation() {
             user: data.user,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
-            onboardingRequired: true,
+            onboardingRequired: data.onboardingRequired,
           }),
         );
       },

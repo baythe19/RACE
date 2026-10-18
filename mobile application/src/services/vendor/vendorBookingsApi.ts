@@ -2,7 +2,7 @@ import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { DriverJobBooking } from '../driver/driverApi';
-import { UI_PREVIEW_MODE } from '../../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 import { MOCK_JOB_OFFERS, MOCK_VENDOR_BOOKINGS } from '../../data/mockPartnerData';
 
 export type VendorApproveResult = {
@@ -32,6 +32,32 @@ export type VendorBookingItem = {
   assignedFleetVehicleLabel?: string;
   driver?: { id: string; name: string; phone: string; rating: number };
 };
+
+export type VendorBookingTracking = {
+  bookingType: 'towing' | 'driver';
+  id: string;
+  bookingNumber: string;
+  status: string;
+  serviceLabel: string;
+  pickup?: { address?: string; latitude?: number; longitude?: number };
+  dropoff?: { address?: string; latitude?: number; longitude?: number } | null;
+  assignedFleetVehicleLabel?: string;
+  driver?: { id: string; name: string; phone: string };
+  driverLocation?: { latitude: number; longitude: number; updatedAt?: string } | null;
+  isLocationFresh: boolean;
+  statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
+};
+
+export async function getVendorBookingTracking(input: {
+  bookingId: string;
+  bookingType: 'towing' | 'driver';
+}): Promise<VendorBookingTracking> {
+  const { data } = await api.get<ApiSuccessResponse<VendorBookingTracking>>(
+    API_ENDPOINTS.vendorBookingTracking(input.bookingId),
+    { params: { bookingType: input.bookingType } },
+  );
+  return data.data;
+}
 
 export async function listVendorBookings(): Promise<VendorBookingItem[]> {
   try {
@@ -70,26 +96,28 @@ export async function listVendorBookingOffers(): Promise<DriverJobBooking[]> {
 export async function approveVendorBooking(payload: {
   bookingId: string;
   bookingType: 'towing' | 'driver';
-  vehicleId: string;
+  driverId: string;
+  vehicleId?: string;
 }): Promise<VendorApproveResult> {
   try {
     const { data } = await api.post<ApiSuccessResponse<VendorApproveResult>>(
       API_ENDPOINTS.vendorBookingApprove(payload.bookingId),
       {
         bookingType: payload.bookingType,
-        vehicleId: payload.vehicleId,
+        driverId: payload.driverId,
+        ...(payload.vehicleId ? { vehicleId: payload.vehicleId } : {}),
       },
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return {
         id: payload.bookingId,
         status: 'CONFIRMED',
         bookingNumber: `TOW-${payload.bookingId.slice(-5)}`,
         vendorId: 'mock-vendor-001',
         assignedFleetVehicleLabel: 'Tata 407 (OD-02-TOW-1001)',
-        message: 'Booking approved with fleet vehicle',
+        message: 'Driver and fleet assignment confirmed',
       };
     }
     throw error;
@@ -114,7 +142,7 @@ export async function assignVendorBooking(payload: {
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return {
         id: payload.bookingId,
         status: 'DRIVER_ASSIGNED',

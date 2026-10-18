@@ -45,7 +45,7 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const bookingId = route.params?.bookingId;
   const fromBookings = route.params?.fromBookings;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'towing');
   const { etaLabel, status, driverLocation, driverName, driverRating, tripStartOtp: trackedOtp } =
     useBookingTracking(bookingId, 'towing');
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;

@@ -20,6 +20,7 @@ import {
   Truck,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
 
 import DriverAvatar from '../../components/bookings/DriverAvatar';
 import TripOtpCard from '../../components/booking/TripOtpCard';
@@ -84,7 +85,8 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
-  const booking = useBookingQuery(route.params.bookingId);
+  const booking = useBookingQuery(route.params.bookingId, route.params.bookingType);
+  const queryClient = useQueryClient();
 
   const isCompleted = booking ? isBookingCompleted(booking) : false;
   const isOngoing = booking ? isBookingOngoing(booking) : false;
@@ -152,12 +154,13 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
     try {
       setCancelSubmitting(true);
       const result = await cancelServiceBooking(booking.id, bookingType, cancelReason);
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] });
       setShowCancelModal(false);
       setCancelReason('');
       Alert.alert(
         'Booking Cancelled',
         result.refundAmount > 0
-          ? `Refund ₹${result.refundAmount} will be processed in 5-7 business days.`
+          ? `Refund ₹${result.refundAmount} is pending. It has not been processed yet.`
           : 'No refund applicable for this cancellation.',
       );
       navigation.navigate('BookingsMain');

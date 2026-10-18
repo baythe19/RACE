@@ -64,6 +64,7 @@ export interface IDriverBooking extends Document {
   refundStatus: 'NOT_APPLICABLE' | 'PENDING' | 'PROCESSED';
   driverLatitude?: number;
   driverLongitude?: number;
+  driverLocationUpdatedAt?: Date;
   rating?: {
     score: number;
     review?: string;
@@ -150,6 +151,7 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     },
     driverLatitude: { type: Number },
     driverLongitude: { type: Number },
+    driverLocationUpdatedAt: { type: Date },
     rating: { type: ServiceBookingRatingSchema },
   },
   { timestamps: true },
