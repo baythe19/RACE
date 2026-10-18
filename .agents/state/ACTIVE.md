@@ -1,9 +1,17 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-17
+> **Updated:** 2026-10-18
 > **Read this first in every new session.**
 
 ---
+
+## Latest session — Partner v6 role and dispatch scaffold (2026-10-18, branch changes-v6-partner-role-dispatch)
+
+- Added the first v6 capability, Driver–Vendor membership, service-aware dispatch, Driver onboarding, tracking, and typed customer booking-route changes. The product report, implementation map, and remaining-work ledger are in `docs/product/` and `docs/plans/`.
+- Published commit `88be358` to `origin/changes-v6-partner-role-dispatch`; the v5 checkout remains separate and unchanged.
+- **Verification:** backend, Partner mobile, and Customer lint/typechecks plus the focused `audit:partner-v6` and `git diff --check` passed in this worktree. Peach displayed the Driver documents step without captured errors. These checks do not establish database persistence, race safety, full invite-to-job flow, or native-device behavior; no server or simulator was restarted.
+- **Release blockers:** active Driver route still lacks the new assignment Accept/Decline gate; assignment reservations/expiry and legacy-link authorization need hardening; booking-kind socket/cache collisions, capability-aware app switching, migration, real storage, Admin projections, payout behavior, and native/background delivery remain to verify or implement.
+
 
 
 ## Latest session — Driver loading skeletons and realtime refresh (2026-10-17, branch v5.0.0--productions--works)
