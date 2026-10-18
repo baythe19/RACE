@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
   UI_QA_NAVIGATOR_ENABLED,
-  UI_PREVIEW_MODE,
+  UI_PREVIEW_MUTATIONS_ENABLED,
   isUiTestPermissiveMode,
   setUiTestPermissiveMode,
   subscribeUiTestPermissiveMode,
@@ -54,7 +54,7 @@ export default function UiTestNavigator() {
     });
   }, []);
 
-  if (!UI_PREVIEW_MODE || !UI_QA_NAVIGATOR_ENABLED) return null;
+  if (!UI_PREVIEW_MUTATIONS_ENABLED || !UI_QA_NAVIGATOR_ENABLED) return null;
 
   const togglePermissive = (val: boolean) => {
     setPermissiveMode(val);

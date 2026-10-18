@@ -1,6 +1,6 @@
 import { api, unwrapApi } from './api';
 import { API_ENDPOINTS } from '../config/api';
-import { UI_PREVIEW_MODE } from '../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../constants/preview';
 
 export type PartnerNotificationItem = {
   id: string;
@@ -115,7 +115,7 @@ export async function markNotificationRead(id: string): Promise<void> {
   try {
     await unwrapApi(api.patch(`${API_ENDPOINTS.notifications}/${id}/read`));
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       mockNotificationsState = mockNotificationsState.map(n =>
         n.id === id ? { ...n, isRead: true } : n,
       );
@@ -129,7 +129,7 @@ export async function markAllNotificationsRead(): Promise<void> {
   try {
     await unwrapApi(api.patch(`${API_ENDPOINTS.notifications}/read-all`));
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       mockNotificationsState = mockNotificationsState.map(n => ({ ...n, isRead: true }));
       return;
     }
@@ -158,7 +158,7 @@ export async function updateNotificationPreferences(
       api.patch(`${API_ENDPOINTS.notifications}/preferences`, prefs),
     );
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       mockNotificationPrefs = { ...mockNotificationPrefs, ...prefs };
       return { ...mockNotificationPrefs };
     }

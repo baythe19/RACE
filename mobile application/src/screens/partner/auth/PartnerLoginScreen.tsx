@@ -37,7 +37,7 @@ import {
   VENDOR_DRIVER_LOGIN_HINT,
 } from '../../../utils/vendorDriverLoginError';
 import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
-import { isUiTestPermissiveMode } from '../../../constants/preview';
+import { isUiTestPermissiveMode, UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 import { Sparkles } from 'lucide-react-native';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerLogin'>;
@@ -161,7 +161,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
       // --- OTP auth bypass (when SKIP_OTP_AUTH is active) ---
       if (SKIP_OTP_AUTH) {
-        const otp = result.devOtp ?? extractOtpFromMessage(result.message) ?? (UI_PREVIEW_MODE ? '123456' : null);
+        const otp = result.devOtp ?? extractOtpFromMessage(result.message) ?? (UI_PREVIEW_MUTATIONS_ENABLED ? '123456' : null);
         if (!otp) {
           setError('Dev OTP unavailable. Turn off SKIP_OTP_AUTH or use a non-production API.');
           return;
@@ -218,7 +218,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         setVendorDriverCta(true);
         return;
       }
-      if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode()) {
+      if (UI_PREVIEW_MUTATIONS_ENABLED) {
         navigation.navigate('PartnerOtpVerification', {
           mobileNumber: phoneToUse || '9876543210',
           role: partnerRole,
@@ -450,14 +450,14 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             {/* Quick Test Mode Buttons */}
             {UI_PREVIEW_MODE ? (
               <View style={{ marginTop: px(12), gap: px(8) }}>
-                <Pressable
+                {UI_PREVIEW_MUTATIONS_ENABLED ? <Pressable
                   style={styles.devBtn}
                   onPress={() => void handleQuickMockLogin(isDriver ? 'driver' : 'vendor')}>
                   <Zap size={14} color="#D97706" />
                   <PartnerText style={styles.devBtnText}>
                     ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Dashboard (Mock)
                   </PartnerText>
-                </Pressable>
+                </Pressable> : null}
                 <Pressable
                   style={styles.devBtn}
                   onPress={() => goToRegistration(isDriver ? 'driver' : 'vendor')}>
@@ -516,7 +516,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             </View>
 
             {/* Discreet Dev Demo Mode (for offline QA testing) */}
-            {(__DEV__ || UI_PREVIEW_MODE) && (
+            {UI_PREVIEW_MUTATIONS_ENABLED && (
               <View style={[styles.demoRow, { marginTop: px(14) }]}>
                 <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Quick Preview:</PartnerText>
                 <Pressable

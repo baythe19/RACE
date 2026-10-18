@@ -1,7 +1,7 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
-import { UI_PREVIEW_MODE } from '../../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 import { MOCK_VENDOR_DRIVERS } from '../../data/mockPartnerData';
 
 /** @deprecated Prefer VendorDriver */
@@ -60,7 +60,7 @@ export async function createVendorDriver(payload: CreateVendorDriverInput): Prom
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const newDriver: VendorDriver = {
         id: `mock-driver-${Date.now()}`,
         name: payload.name,
@@ -92,7 +92,7 @@ export async function claimVendorDriver(phone: string): Promise<VendorDriver> {
     });
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return MOCK_VENDOR_DRIVERS[0]!;
     }
     throw error;
@@ -114,7 +114,7 @@ export async function linkVendorDriverVehicle(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const driver =
         MOCK_VENDOR_DRIVERS.find(d => d.id === driverId) ?? MOCK_VENDOR_DRIVERS[0];
       if (driver) {
@@ -130,7 +130,7 @@ export async function removeVendorDriver(driverId: string): Promise<void> {
   try {
     await api.delete(API_ENDPOINTS.vendorDriver(driverId));
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const idx = MOCK_VENDOR_DRIVERS.findIndex(d => d.id === driverId);
       if (idx !== -1) MOCK_VENDOR_DRIVERS.splice(idx, 1);
       return;
@@ -150,7 +150,7 @@ export async function resetVendorDriverPassword(
   try {
     await api.post(API_ENDPOINTS.vendorDriverResetPassword(driverId), { password });
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const driver = MOCK_VENDOR_DRIVERS.find(d => d.id === driverId);
       if (driver) driver.hasPasswordLogin = true;
       return;
@@ -194,7 +194,7 @@ export async function uploadVendorDriverDocument(
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return MOCK_VENDOR_DRIVERS[0]!;
     }
     throw error;

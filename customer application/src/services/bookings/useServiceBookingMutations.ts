@@ -57,6 +57,7 @@ export function useCreateRoadsideBookingMutation() {
 }
 
 export function useCompleteAdvancePaymentMutation() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       bookingId,
@@ -65,5 +66,8 @@ export function useCompleteAdvancePaymentMutation() {
       bookingId: string;
       bookingType: ServiceBookingType;
     }) => completeAdvancePayment(bookingId, bookingType),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
   });
 }

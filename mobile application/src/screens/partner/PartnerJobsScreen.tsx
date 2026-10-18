@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Bell,
   Briefcase,
@@ -21,6 +21,7 @@ import { openPartnerNotifications } from '../../navigation/partnerNavigationRef'
 import GlassCard from '../../components/ui/GlassCard';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useAppSelector } from '../../redux/hooks';
 import {
   useAcceptDriverJobMutation,
@@ -684,7 +685,7 @@ export default function PartnerJobsScreen() {
           </ScrollView>
 
           {isLoading ? (
-            <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+            <DriverDataSkeleton variant="jobs" />
           ) : (
             <ScrollView
               style={styles.listScroll}

@@ -284,16 +284,40 @@ export class VendorDriversService {
       if (!vehicle) {
         throw new BadRequestError('Registration number does not match a vehicle in your fleet');
       }
-      if (vehicle.status === 'INACTIVE') {
-        throw new BadRequestError('This vehicle is inactive — set it to ACTIVE before assigning');
+      if (vehicle.status !== 'ACTIVE') {
+        throw new BadRequestError('Only ACTIVE vehicles can be assigned to a driver');
       }
-      driver.driverProfile.vehicleRegistration = registrationRaw;
-    } else {
-      driver.driverProfile.vehicleRegistration = undefined;
     }
 
-    await driver.save();
-    return mapVendorDriver(driver);
+    const update = registrationRaw
+      ? { $set: { 'driverProfile.vehicleRegistration': registrationRaw } }
+      : { $unset: { 'driverProfile.vehicleRegistration': 1 } };
+    const updated = await UserModel.findOneAndUpdate(
+      {
+        _id: driverId,
+        role: 'driver',
+        'driverProfile.vendorUserId': vendorUserId,
+        activeBookingId: null,
+      },
+      update,
+      { new: true, runValidators: true },
+    ).exec();
+
+    if (!updated?.driverProfile) {
+      const current = await UserModel.findOne({ _id: driverId, role: 'driver' })
+        .select('driverProfile.vendorUserId activeBookingId')
+        .exec();
+      if (!current?.driverProfile) throw new NotFoundError('Driver not found');
+      if (current.driverProfile.vendorUserId?.toString() !== vendorUserId) {
+        throw new ForbiddenError('Driver is not on your vendor team');
+      }
+      if (current.activeBookingId) {
+        throw new BadRequestError('Cannot change a driver vehicle during an active booking');
+      }
+      throw new ConflictError('Driver assignment changed while saving. Please try again.');
+    }
+
+    return mapVendorDriver(updated);
   }
 
   async uploadDocument(

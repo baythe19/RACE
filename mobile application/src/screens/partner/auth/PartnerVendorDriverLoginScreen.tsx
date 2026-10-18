@@ -26,7 +26,8 @@ import type {
   PartnerAuthStackParamList,
   PartnerRootStackParamList,
 } from '../../../types/partnerNavigation';
-import { loginAsMockDriver, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { loginAsMockDriver } from '../../../config/uiPreviewMode';
+import { UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerVendorDriverLogin'>;
 
@@ -82,7 +83,7 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
       dispatch(completeOnboarding(result.user));
       goToPartnerMain();
     } catch (err) {
-      if (UI_PREVIEW_MODE) {
+      if (UI_PREVIEW_MUTATIONS_ENABLED) {
         await loginAsMockDriver(dispatch);
         goToPartnerMain();
         return;
@@ -319,7 +320,7 @@ export default function PartnerVendorDriverLoginScreen({ navigation }: Props) {
             </View>
 
             {/* Discreet Dev Demo Mode (for offline QA testing) */}
-            {(__DEV__ || UI_PREVIEW_MODE) && (
+            {UI_PREVIEW_MUTATIONS_ENABLED && (
               <View style={[styles.demoRow, { marginTop: px(14) }]}>
                 <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Demo Login:</PartnerText>
                 <Pressable

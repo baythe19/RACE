@@ -4,7 +4,7 @@ import {
   sanitizeUpdateProfileRequest,
   type UpdateProfileRequest,
 } from '../utils/profilePayload';
-import { UI_PREVIEW_MODE } from '../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../constants/preview';
 import { MOCK_DRIVER_PROFILE, MOCK_VENDOR_PROFILE } from '../data/mockPartnerData';
 
 function getMockProfileForActiveUser(): Profile {
@@ -34,7 +34,7 @@ export async function updateProfile(data: UpdateProfileRequest): Promise<Profile
     const body = sanitizeUpdateProfileRequest(data);
     return await unwrapApi(api.put('/api/v1/profile', body));
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const base = getMockProfileForActiveUser();
       return {
         ...base,

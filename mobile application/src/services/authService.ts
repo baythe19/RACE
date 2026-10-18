@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store';
 import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
 import { clearTokens, saveTokens, unwrapApi, api } from './api';
 import type { User, VerifyOtpResponse } from '../types/auth';
-import { UI_PREVIEW_MODE } from '../constants/preview';
+import { UI_PREVIEW_MUTATIONS_ENABLED } from '../constants/preview';
 import { MOCK_DRIVER_USER, MOCK_VENDOR_USER } from '../data/mockPartnerData';
 
 export interface SendOtpPayload {
@@ -36,7 +36,7 @@ export async function sendOtp(payload: SendOtpPayload): Promise<SendOtpResult> {
       }),
     );
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return {
         message: 'Mock verification code is 123456',
         expiresIn: 300,
@@ -62,7 +62,7 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<VerifyOtpRes
     await saveTokens(result.accessToken, result.refreshToken);
     return result;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const mockUser = payload.role === 'vendor' ? MOCK_VENDOR_USER : MOCK_DRIVER_USER;
       const token = `mock-${payload.role}-token`;
       await saveTokens(token, token);
@@ -96,7 +96,7 @@ export async function loginDriverWithCredentials(
     await saveTokens(result.accessToken, result.refreshToken);
     return result;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       const token = 'mock-driver-token';
       await saveTokens(token, token);
       return {
@@ -122,7 +122,7 @@ export async function refreshAuthSession(): Promise<VerifyOtpResponse> {
     throw new Error('No refresh token');
   }
 
-  if (UI_PREVIEW_MODE && (refreshToken === 'mock-driver-token' || refreshToken === 'mock-vendor-token')) {
+  if (UI_PREVIEW_MUTATIONS_ENABLED && (refreshToken === 'mock-driver-token' || refreshToken === 'mock-vendor-token')) {
     const isVendor = refreshToken === 'mock-vendor-token';
     return {
       user: isVendor ? MOCK_VENDOR_USER : MOCK_DRIVER_USER,
@@ -140,7 +140,7 @@ export async function refreshAuthSession(): Promise<VerifyOtpResponse> {
     await saveTokens(result.accessToken, result.refreshToken);
     return result;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return {
         user: MOCK_DRIVER_USER,
         accessToken: 'mock-driver-token',

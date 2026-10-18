@@ -5,6 +5,7 @@ import { Check, Info, MapPin, Truck } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PartnerScreenLayout from '../../components/partner/PartnerScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { images } from '../../assets';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import {
@@ -171,9 +172,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
       {/* Vehicle List */}
       {vehiclesLoading ? (
-        <View style={styles.loaderWrap}>
-          <ActivityIndicator size="small" color={driverColors.amber} />
-        </View>
+        <DriverDataSkeleton variant="vehicles" />
       ) : vehicles.length === 0 ? (
         <View style={styles.emptyCard}>
           <Truck size={32} color={driverColors.greySoft} strokeWidth={1.8} />
@@ -353,10 +352,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: driverColors.ink,
-  },
-  loaderWrap: {
-    paddingVertical: 30,
-    alignItems: 'center',
   },
   emptyCard: {
     backgroundColor: driverColors.white,

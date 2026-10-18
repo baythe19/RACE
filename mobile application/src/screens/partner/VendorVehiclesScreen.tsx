@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ArrowLeft,
   Calendar,
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { jumpToPartnerAccountScreen } from '../../navigation/partnerNavigationRef';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import VendorVehicleImage from '../../components/partner/VendorVehicleImage';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
@@ -297,7 +298,7 @@ export default function VendorVehiclesScreen() {
         </View>
       }>
       {vendorLoading || isLoading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.xxl }} />
+        <DriverDataSkeleton variant="vehicles" />
       ) : (
         <View style={styles.content}>
           {!isApproved ? (

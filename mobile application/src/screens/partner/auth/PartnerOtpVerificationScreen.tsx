@@ -27,8 +27,7 @@ import {
   isVendorDriverLoginError,
   VENDOR_DRIVER_LOGIN_HINT,
 } from '../../../utils/vendorDriverLoginError';
-import { UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
-import { isUiTestPermissiveMode } from '../../../constants/preview';
+import { isUiTestPermissiveMode, UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 import { colors, radius, spacing, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerOtpVerification'>;
@@ -176,7 +175,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
           verifyLockRef.current = false;
           return;
         }
-        if (UI_PREVIEW_MODE || __DEV__ || isUiTestPermissiveMode()) {
+        if (UI_PREVIEW_MUTATIONS_ENABLED) {
           const fallbackRole = resolvePartnerRole();
           setVerified(true);
 

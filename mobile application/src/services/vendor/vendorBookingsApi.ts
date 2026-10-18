@@ -2,7 +2,7 @@ import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { DriverJobBooking } from '../driver/driverApi';
-import { UI_PREVIEW_MODE } from '../../constants/preview';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 import { MOCK_JOB_OFFERS, MOCK_VENDOR_BOOKINGS } from '../../data/mockPartnerData';
 
 export type VendorApproveResult = {
@@ -82,7 +82,7 @@ export async function approveVendorBooking(payload: {
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return {
         id: payload.bookingId,
         status: 'CONFIRMED',
@@ -114,7 +114,7 @@ export async function assignVendorBooking(payload: {
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
       return {
         id: payload.bookingId,
         status: 'DRIVER_ASSIGNED',

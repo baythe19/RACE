@@ -5,6 +5,7 @@ import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '.
 import { UserModel, type IUser } from '../../../models/src/user';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
+import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
 import { canTransition } from '../bookingStatusConstants';
 import { emitBookingStatusUpdate, emitToDriver } from '../socket';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
@@ -544,6 +545,25 @@ export async function claimOpenBookingOffer(
     throw new ForbiddenError('Your vendor must approve this job before you can accept it');
   }
 
+  const assignedFleetVehicleId =
+    'assignedFleetVehicleId' in existing
+      ? existing.assignedFleetVehicleId?.toString()
+      : undefined;
+  if (bookingVendorId && assignedFleetVehicleId) {
+    const activeFleetVehicle = await VendorVehicleModel.findOne({
+      _id: assignedFleetVehicleId,
+      vendorId: bookingVendorId,
+      status: 'ACTIVE',
+    })
+      .select('_id')
+      .exec();
+    if (!activeFleetVehicle) {
+      throw new ConflictError(
+        'The fleet vehicle assigned to this job is no longer active. Ask your vendor to review the assignment.',
+      );
+    }
+  }
+
   // Open marketplace offers run on the backend decision clock. Vendor-routed
   // jobs are exempt, since their approval can legitimately land later.
   if (!bookingVendorId && isOfferExpired(existing.createdAt)) {
@@ -551,9 +571,7 @@ export async function claimOpenBookingOffer(
   }
 
   const vendorId = bookingVendorId ?? options?.vendorId;
-  const fleetVehicleId =
-    ('assignedFleetVehicleId' in existing && existing.assignedFleetVehicleId?.toString()) ??
-    options?.fleetVehicleId;
+  const fleetVehicleId = assignedFleetVehicleId ?? options?.fleetVehicleId;
   const fleetVehicleLabel =
     ('assignedFleetVehicleLabel' in existing
       ? existing.assignedFleetVehicleLabel

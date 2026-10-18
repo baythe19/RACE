@@ -51,7 +51,11 @@ import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
 import { completeOnboarding } from '../../../../redux/auth/authSlice';
 import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlice';
 import { API_ENDPOINTS } from '../../../../config/api';
-import { isUiTestPermissiveMode, UI_PREVIEW_MODE } from '../../../../constants/preview';
+import {
+  isUiTestPermissiveMode,
+  UI_PREVIEW_MODE,
+  UI_PREVIEW_MUTATIONS_ENABLED,
+} from '../../../../constants/preview';
 import { api, saveTokens } from '../../../../services/api';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import type {
@@ -768,7 +772,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           registeredName = data.data.fullName;
         }
       } catch (err) {
-        if (!UI_PREVIEW_MODE) throw err;
+        if (!UI_PREVIEW_MUTATIONS_ENABLED) throw err;
         console.warn('Driver self registration API fallback:', err);
       }
 

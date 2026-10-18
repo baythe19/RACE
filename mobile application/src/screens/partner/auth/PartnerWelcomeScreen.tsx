@@ -14,7 +14,8 @@ import {
   type PartnerRole,
 } from '../../../store/partnerOnboardingStore';
 import type { PartnerAuthStackParamList } from '../../../types/partnerNavigation';
-import { loginAsMockDriver, loginAsMockVendor, UI_PREVIEW_MODE } from '../../../config/uiPreviewMode';
+import { loginAsMockDriver, loginAsMockVendor } from '../../../config/uiPreviewMode';
+import { UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 import { typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerWelcome'>;
@@ -255,7 +256,7 @@ export default function PartnerWelcomeScreen({ navigation }: Props) {
           </View>
 
           {/* Discreet Dev Demo Mode (for offline QA testing) */}
-          {(__DEV__ || UI_PREVIEW_MODE) && (
+          {UI_PREVIEW_MUTATIONS_ENABLED && (
             <View style={[styles.demoRow, { marginTop: px(12) }]}>
               <PartnerText style={[styles.demoLabel, { fontSize: px(10) }]}>Demo View:</PartnerText>
               <Pressable
