@@ -270,13 +270,14 @@ export class VendorBookingsService {
     if (!driver?.driverProfile) {
       throw new NotFoundError('Driver not found');
     }
-    const legacyVendorId = driver.driverProfile.vendorUserId?.toString();
+    // P0-3 (v6 audit): membership-only dispatch. The legacy embedded vendor
+    // pointer no longer authorizes NEW vendor dispatch.
     const membership = await DriverVendorMembershipModel.exists({
       vendorUserId: vendorUserId,
       driverUserId: driver._id,
       status: 'ACTIVE',
     }).exec();
-    if (legacyVendorId !== vendorUserId && !membership) {
+    if (!membership) {
       throw new ForbiddenError('Driver has not accepted your fleet invitation');
     }
     if (driver.driverProfile.status !== 'APPROVED') {

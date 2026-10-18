@@ -374,10 +374,23 @@ export async function listOpenBookingOffers(options?: {
   /** Vendor portal: open jobs + jobs this vendor already approved (awaiting driver). */
   forVendorId?: string;
 }): Promise<OpenBookingOffer[]> {
+  // P0-3 (v6 audit): a connected driver is defined by an ACTIVE membership —
+  // the legacy embedded vendor pointer no longer expands the offer feed.
+  let memberVendorUserId: string | undefined;
+  if (options?.forDriver) {
+    const membership = await DriverVendorMembershipModel.findOne({
+      driverUserId: new Types.ObjectId(options.forDriver.id),
+      status: 'ACTIVE',
+    })
+      .select('vendorUserId')
+      .lean()
+      .exec();
+    memberVendorUserId = membership?.vendorUserId?.toString();
+  }
   const selectedBookingTypes = selectOpenOfferBookingTypes({
     audience: options?.forVendorId ? 'vendor' : options?.forDriver ? 'driver' : 'internal',
     bookingType: options?.bookingType,
-    vendorLinkedDriver: Boolean(options?.forDriver?.driverProfile?.vendorUserId),
+    vendorLinkedDriver: Boolean(memberVendorUserId),
   });
   const includeTowing = selectedBookingTypes.includes('towing');
   const includeDriver = selectedBookingTypes.includes('driver');
@@ -390,7 +403,7 @@ export async function listOpenBookingOffers(options?: {
     status: 'CONFIRMED',
   };
 
-  const driverVendorId = options?.forDriver?.driverProfile?.vendorUserId?.toString();
+  const driverVendorId = memberVendorUserId;
 
   if (options?.forVendorId) {
     openFilter.$and = [
@@ -618,24 +631,31 @@ export async function claimOpenBookingOffer(
     throw new ConflictError('This job was just taken by another partner');
   }
 
-  const driverVendorId = driver.driverProfile?.vendorUserId?.toString();
   const bookingVendorId =
     'vendorId' in existing && existing.vendorId ? existing.vendorId.toString() : undefined;
 
   const routedVendorId = bookingVendorId ?? options?.vendorId;
-  const legacyVendorMatches = Boolean(driverVendorId && routedVendorId === driverVendorId);
+  // P0-3 (v6 audit): dispatch authorization is membership-only. The legacy
+  // embedded vendor pointer is history/continuation data — it can keep old
+  // in-flight bookings readable, but it must not authorize NEW dispatch.
+  const activeMembership = await DriverVendorMembershipModel.findOne({
+    driverUserId: new Types.ObjectId(driverId),
+    status: 'ACTIVE',
+  })
+    .select('vendorUserId')
+    .lean()
+    .exec();
+  const memberVendorUserId = activeMembership?.vendorUserId?.toString();
   const hasMembership = routedVendorId
-    ? Boolean(await DriverVendorMembershipModel.exists({
-        vendorUserId: new Types.ObjectId(routedVendorId),
-        driverUserId: new Types.ObjectId(driverId),
-        status: 'ACTIVE',
-      }).exec())
+    ? memberVendorUserId === routedVendorId
     : false;
 
-  if (routedVendorId && !legacyVendorMatches && !hasMembership) {
+  if (routedVendorId && !hasMembership) {
     throw new ForbiddenError('This job is reserved for connected Towing Vendor Drivers');
   }
-  if (!routedVendorId && driverVendorId) {
+  // P0-3: a connected (ACTIVE membership) driver is vendor-routed even on the
+  // open feed — an un-routed marketplace claim would silently bypass consent.
+  if (!routedVendorId && memberVendorUserId) {
     throw new ForbiddenError('Your Towing Vendor must assign this job to you');
   }
   if (bookingType === 'towing' && !routedVendorId) {
