@@ -138,3 +138,59 @@ Legend: ✅ implemented · 🟡 partial · ❌ missing. Backend = `backend/src`,
 3. Vendor invitation notification ka My Vendor deep-link (abhi sirf list item).
 4. Name-based driver discovery + rate limits (R7 ka bacha hua hissa).
 5. Admin bank-number masking (L-12) — backend+admin UI.
+
+---
+
+## Location-101 test (vendor + driver, mock-data walkthrough)
+
+**Scope:** driver location kaise share hota hai, vendor app mein kaisa dikhta hai, tracking screen ka poora UX. Neeche sab evidence Peach sim se, screenshots `docs/plans/v6-audit/` mein.
+
+### A. Driver side — location share kaise hota hai
+
+| Kya | Result | Evidence |
+|---|---|---|
+| Reporting engine | ✅ Singleton 12s interval, min 4s gap — dashboard+active-job dono subscribe karte hain, double-write guard hai | `useDriverLocationReporting.ts:9-103` |
+| Permission/GPS handling | ✅ permission_denied aur services_disabled alag health states, retry button dashboard card par | `useDriverLocationReporting.ts:34-60` |
+| Gating | ✅ Sirf `isApproved && isOnline` par report hota hai — offline driver location nahi bhejta | `DriverDashboardScreen.tsx:930` |
+| Health UX | ✅ "You're online / LIVE" green → toggle off → "You're offline" (screenshot `driver-dashboard-offline.png`); wapas online → LIVE restore | UI test live |
+| Send path | ✅ Fix capture → store → `PATCH /driver/location`; backend booking-scoped write first (post-accept only), global fallback | `driverApi.ts:153`, `driver.ts:updateLocation` |
+
+### B. Vendor side — location kaisi dikhti hai
+
+| Kya | Result | Evidence |
+|---|---|---|
+| Tracking screen | ✅ Map (pickup/drop/driver marker + destination switch at pickup), driver card + call button, fleet vehicle label, freshness line, progress timeline | `VendorBookingTrackingScreen.tsx`, screenshot `vendor-tracking-live-mock.png` |
+| Freshness rule | ✅ Location sirf EN_ROUTE/ARRIVED/IN_PROGRESS + ≤90s old hone par dikhti hai; warna map hide | Backend `vendorBookings.ts:105-113` |
+| Polling | ✅ Tracking 5s auto-refetch (error par 15s), foreground-only | `useVendorBookingsQueries.ts:57` |
+| Mock coverage | ✅ (NAYA) tracking mock fixture — live EN_ROUTE trip, fresh fix, real timeline; pehle ye screen mock me "could not load" thi | `vendorBookingsApi.ts` buildMockTracking, screenshot `vendor-tracking-live-mock.png` |
+
+### C. Mock se chalaya gaya poora flow
+
+1. Vendor → Drivers tab: **roster ab realistic** — Rakesh Sahoo (Tow Driver, Active, rating), Debasis Naik (Full-Time, busy), pending invitation card (screenshot `vendor-drivers-roster-mock.png`)
+2. Invite by phone → pending card UI + "already on fleet" duplicate guard (screenshot `vendor-invite-pending.png`)
+3. Driver mode → My Vendor membership + invitation lifecycle (preview state machine wired)
+4. Vendor Jobs → "Track assigned job" → **tracking screen live**: Emergency Towing, Driver En Route, Tata 407, Rakesh Sahoo +91…, call button, map, "Driver location updated 0 sec ago", progress timeline
+5. Driver accept → Active Job EN ROUTE TO PICKUP + Arrived at pickup CTA (screenshot `driver-active-job-mock.png`)
+6. Offline/online toggle ke dono states verified
+
+### D. Is walkthrough me fix hua
+
+- **Tracking mock fixture** (`vendorBookingsApi.ts`) — mock session me tracking screen pehli baar poori live dikhti hai
+- **Freshness counter tick** (`VendorBookingTrackingScreen.tsx`) — "updated N sec ago" ab har second tick karta hai (pehle sirf refetch par badalta tha); >45s par amber "checking for a newer fix…" warning
+
+**Verified:** t1=2s → t+6s=4s counter tick (no refetch), Peach 0 errors, partner tsc 0.
+
+### E. Improvement suggestions (user-perspective, priority)
+
+| # | Suggestion | Kyun (user ki nazar se) | Priority |
+|---|---|---|---|
+| 1 | **ETA to pickup** tracking card par (distance/duration from Maps API) | Vendor sirf "en route" nahi, "5 min away" janna chahta hai — abhi sirf marker | P1 |
+| 2 | **Location age badge map par** (chip: "live"/"12s old") | Sirf neeche text se pata chalta hai; map dekhte waqt awareness zero | P1 |
+| 3 | **Push on accept/arrived** (vendor ko) — ab 5s polling | Assigned job par vendor ko turant pata chale ki driver ne accept kiya | P1 |
+| 4 | Driver reporting frequency adaptive (12s → 5s jab EN_ROUTE) | Idle me battery bachao, trip me sharper tracking | P2 |
+| 5 | **Stale-location auto-hide toast** ("Driver's network is weak") | Ab bas amber line; user ko samajh nahi aata ki aage kya hoga | P2 |
+| 6 | Track screen se **call + cancel** ek card me | Do alag jagah — emergency me operations slow | P2 |
+| 7 | **Trip history replay** (poora din ka rasta) | Dispute/payout proof ke liye vendor chahta hai | P3 |
+| 8 | Driver side **battery/BG-location** honest banner | Background me permission deny hone par silent fail | P2 |
+
+> Note: 1, 2, 3 backend nirdhar (Maps billing, FCM wiring) — UI-only nahi.
