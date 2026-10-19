@@ -90,6 +90,25 @@ async function main(): Promise<void> {
     'unscoped legacy consumers retain both booking types',
   );
 
+  const { TOWING_DRIVER_TYPES } = await import(
+    '../services/src/bookings/driverAssignment'
+  );
+  assert.equal(
+    (TOWING_DRIVER_TYPES as readonly string[]).includes('Full-Time'),
+    true,
+    'connected Full-Time drivers must be eligible for towing bookings',
+  );
+  assert.equal(
+    (TOWING_DRIVER_TYPES as readonly string[]).includes('Tow Driver'),
+    true,
+    'Tow Drivers must be eligible for towing bookings',
+  );
+  assert.equal(
+    (TOWING_DRIVER_TYPES as readonly string[]).includes('Part-Time'),
+    false,
+    'Part-Time drivers must NEVER be eligible for towing bookings',
+  );
+
   console.log('PARTNER_V6_ROLE_DISPATCH_AUDIT_PASSED');
 }
 

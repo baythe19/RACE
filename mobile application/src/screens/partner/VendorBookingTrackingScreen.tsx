@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
-import { MapPin, Phone, Truck, UserRound } from 'lucide-react-native';
+import { ArrowLeft, MapPin, Phone, Truck, UserRound } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
@@ -51,11 +51,21 @@ export default function VendorBookingTrackingScreen({ route, navigation }: Props
   return (
     <AppScreenLayout
       header={
-        <View style={[styles.header, { paddingHorizontal: px(18), paddingTop: px(12), paddingBottom: px(12) }]}>
-          <PartnerText style={{ color: INK, fontSize: px(19), fontWeight: '800' }}>Job tracking</PartnerText>
-          <PartnerText style={{ color: MUTED, fontSize: px(12), marginTop: px(3) }}>
-            {data ? '#' + data.bookingNumber : 'Vendor fleet assignment'}
-          </PartnerText>
+        <View style={[styles.header, { paddingHorizontal: px(16), paddingTop: px(12), paddingBottom: px(12), flexDirection: 'row', alignItems: 'center' }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={12}
+            onPress={() => navigation.goBack()}
+            style={{ marginRight: px(12), padding: px(4) }}>
+            <ArrowLeft size={px(22)} color={INK} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <PartnerText style={{ color: INK, fontSize: px(18), fontWeight: '800' }}>Job tracking</PartnerText>
+            <PartnerText style={{ color: MUTED, fontSize: px(11.5), marginTop: px(2) }}>
+              {data ? '#' + data.bookingNumber : 'Vendor fleet assignment'}
+            </PartnerText>
+          </View>
         </View>
       }
       refreshing={false}

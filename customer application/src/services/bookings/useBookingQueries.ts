@@ -37,6 +37,8 @@ export function useBookingsQuery() {
     },
     staleTime: 0,
     refetchOnMount: 'always',
+    retry: 2,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data?.some(isBookingOngoing)) {

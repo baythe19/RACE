@@ -973,7 +973,11 @@ export async function unassignDriverFromBooking(
   };
   const update = {
     $set: { status: 'CONFIRMED' },
-    $unset: { driverId: 1 },
+    $unset: {
+      driverId: 1,
+      assignedFleetVehicleId: 1,
+      assignedFleetVehicleLabel: 1,
+    },
     $push: {
       statusHistory: {
         status: 'CONFIRMED',

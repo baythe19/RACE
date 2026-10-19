@@ -1454,6 +1454,15 @@ export default function DriverDashboardScreen() {
                 </PartnerText>{' '}
                 has invited you to join their fleet as a Full-Time driver.
               </PartnerText>
+              {vendorInvitations.length > 1 ? (
+                <Pressable
+                  onPress={() => navigation.navigate('PartnerVendor' as any)}
+                  style={{ marginTop: px(4) }}>
+                  <PartnerText style={{ fontSize: px(11), fontWeight: '700', color: '#2563EB' }}>
+                    +{vendorInvitations.length - 1} more invitation{vendorInvitations.length > 2 ? 's' : ''} in My Vendor →
+                  </PartnerText>
+                </Pressable>
+              ) : null}
             </View>
           </View>
 
@@ -1748,19 +1757,19 @@ export default function DriverDashboardScreen() {
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: '#ECFDF5',
+                  backgroundColor: activeJob.status === 'DRIVER_ASSIGNED' ? '#FEF3C7' : '#ECFDF5',
                   paddingHorizontal: px(8),
                   paddingVertical: px(3),
                   borderRadius: px(12),
                   borderWidth: 1,
-                  borderColor: '#A7F3D0',
+                  borderColor: activeJob.status === 'DRIVER_ASSIGNED' ? '#FDE68A' : '#A7F3D0',
                 }}>
                 <View
                   style={{
                     width: px(6),
                     height: px(6),
                     borderRadius: px(3),
-                    backgroundColor: '#10B981',
+                    backgroundColor: activeJob.status === 'DRIVER_ASSIGNED' ? '#D97706' : '#10B981',
                     marginRight: px(5),
                   }}
                 />
@@ -1768,10 +1777,12 @@ export default function DriverDashboardScreen() {
                   style={{
                     fontSize: px(9.5),
                     fontWeight: '800',
-                    color: '#059669',
+                    color: activeJob.status === 'DRIVER_ASSIGNED' ? '#B45309' : '#059669',
                     letterSpacing: 0.4,
                   }}>
-                  {activeStatusLabel(activeJob.status).toUpperCase()}
+                  {activeJob.status === 'DRIVER_ASSIGNED'
+                    ? 'ASSIGNED BY VENDOR'
+                    : activeStatusLabel(activeJob.status).toUpperCase()}
                 </PartnerText>
               </View>
 
@@ -1834,25 +1845,30 @@ export default function DriverDashboardScreen() {
                 }}>
                 {serviceTitle(activeJob)}
               </PartnerText>
-              {activeJob.distanceKm != null ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
-                  <MapPin size={px(10)} color="#059669" strokeWidth={2.4} />
-                  <PartnerText
-                    style={{
-                      fontSize: px(10.5),
-                      fontWeight: '600',
-                      color: '#059669',
-                      marginLeft: px(3),
-                    }}>
-                    {activeJob.distanceKm} km trip
-                  </PartnerText>
-                  {activeJob.assignedFleetVehicleLabel ? (
-                    <PartnerText style={{ fontSize: px(10.5), color: '#94A3B8', marginLeft: px(4) }}>
-                      • {activeJob.assignedFleetVehicleLabel}
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2), flexWrap: 'wrap' }}>
+                {activeJob.distanceKm != null ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <MapPin size={px(10)} color="#059669" strokeWidth={2.4} />
+                    <PartnerText
+                      style={{
+                        fontSize: px(10.5),
+                        fontWeight: '600',
+                        color: '#059669',
+                        marginLeft: px(3),
+                      }}>
+                      {activeJob.distanceKm} km trip
                     </PartnerText>
-                  ) : null}
-                </View>
-              ) : null}
+                  </View>
+                ) : null}
+                {activeJob.assignedFleetVehicleLabel ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: activeJob.distanceKm != null ? px(6) : 0 }}>
+                    <Truck size={px(11)} color="#2563EB" strokeWidth={2.2} />
+                    <PartnerText style={{ fontSize: px(11), color: '#1D4ED8', fontWeight: '700', marginLeft: px(3) }}>
+                      {activeJob.assignedFleetVehicleLabel}
+                    </PartnerText>
+                  </View>
+                ) : null}
+              </View>
             </View>
           </View>
 

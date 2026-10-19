@@ -266,6 +266,10 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
               <Text style={{ fontSize: t.caption, color: colors.success, marginTop: t.px(2) }}>
                 Partner location updating live
               </Text>
+            ) : status === 'DRIVER_ASSIGNED' ? (
+              <Text style={{ fontSize: t.caption, color: colors.warning, marginTop: t.px(2) }}>
+                Driver allotted · Awaiting confirmation & start
+              </Text>
             ) : null}
           </View>
         </View>

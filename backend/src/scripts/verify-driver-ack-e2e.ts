@@ -254,13 +254,100 @@ async function main() {
     check('7a. releaseDriver frees driver', driverAfterRelease?.isAvailable === true && !driverAfterRelease?.activeBookingId);
     check('7b. releaseDriver frees pinned vehicle', vehicleAfterRelease?.activeBookingId == null);
 
+    // Complete first booking so its open-job lifecycle is formally finished
+    await TowingBookingModel.findByIdAndUpdate(booking._id, { status: 'COMPLETED' });
+
+    // ── 8. Pre-accept rejection: atomic rollback & vehicle release ──
+    const assignedSecond = await vendorBookings.approveBooking(vendorId.toString(), secondBooking._id.toString(), {
+      bookingType: 'towing',
+      driverId: driverId.toString(),
+      vehicleId: vehicle._id.toString(),
+    } as never);
+    check('8a. second booking assigned to freed vehicle & driver', assignedSecond.status === 'DRIVER_ASSIGNED');
+    const vehicleDuringAssign = await VendorVehicleModel.findById(vehicle._id).exec();
+    check('8b. vehicle reserved for second booking', String(vehicleDuringAssign?.activeBookingId ?? '') === secondBooking._id.toString());
+
+    // Driver rejects pre-accept
+    const rejectResult = await driverService.rejectBooking(driverId.toString(), 'driver', secondBooking._id.toString(), 'towing');
+    check('8c. pre-accept reject succeeds', rejectResult.status === 'CONFIRMED');
+    const secondBookingAfterReject = await TowingBookingModel.findById(secondBooking._id).exec();
+    const vehicleAfterReject = await VendorVehicleModel.findById(vehicle._id).exec();
+    check('8d. booking status reverted to CONFIRMED', secondBookingAfterReject?.status === 'CONFIRMED');
+    check('8e. booking driverId unset', secondBookingAfterReject?.driverId == null);
+    check('8f. booking assignedFleetVehicleId unset', secondBookingAfterReject?.assignedFleetVehicleId == null);
+    check('8g. fleet vehicle activeBookingId released', vehicleAfterReject?.activeBookingId == null);
+
+    // ── 9. Search drivers: Full-Time included, Part-Time strictly excluded ──
+    const ftDriverId = new Types.ObjectId();
+    const ptDriverId = new Types.ObjectId();
+    const ftPhone = `+9198${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const ptPhone = `+9197${Math.floor(10000000 + Math.random() * 90000000)}`;
+    await UserModel.create([
+      {
+        _id: ftDriverId,
+        fullName: `FT Candidate ${suffix}`,
+        mobileNumber: ftPhone,
+        email: `ft-${suffix}@test.local`,
+        role: 'driver',
+        isVerified: true,
+        isAvailable: true,
+        driverProfile: {
+          status: 'APPROVED',
+          driverType: 'Full-Time',
+          driverCode: `FT-${suffix}`,
+          licenseNo: `FTDL${suffix}`,
+          city: 'Bhubaneswar',
+        },
+      },
+      {
+        _id: ptDriverId,
+        fullName: `PT Candidate ${suffix}`,
+        mobileNumber: ptPhone,
+        email: `pt-${suffix}@test.local`,
+        role: 'driver',
+        isVerified: true,
+        isAvailable: true,
+        driverProfile: {
+          status: 'APPROVED',
+          driverType: 'Part-Time',
+          driverCode: `PT-${suffix}`,
+          licenseNo: `PTDL${suffix}`,
+          city: 'Bhubaneswar',
+        },
+      },
+    ] as never);
+
+    const { driverVendorMembershipService } = await import('../services/src/driverVendorMembership');
+    const searchResults = await driverVendorMembershipService.searchDrivers(vendorId.toString(), `Candidate ${suffix}`);
+    const foundFt = searchResults.some((d) => d.id === ftDriverId.toString());
+    const foundPt = searchResults.some((d) => d.id === ptDriverId.toString());
+    check('9a. Full-Time driver found in vendor search', foundFt);
+    check('9b. Part-Time driver strictly excluded from vendor search', !foundPt);
+
+    // ── 10. Invitation lifecycle: Invite -> Pending -> Accept -> Active ──
+    await driverVendorMembershipService.invite(vendorId.toString(), ftPhone);
+    const invitations = await driverVendorMembershipService.listDriverInvitations(ftDriverId.toString());
+    const inv = invitations.find((i) => i.vendor.id === vendorId.toString());
+    check('10a. driver sees pending invitation from vendor', Boolean(inv));
+
+    if (inv) {
+      await driverVendorMembershipService.respond(ftDriverId.toString(), inv.id, 'accept');
+      const activeMembership = await driverVendorMembershipService.getDriverMembership(ftDriverId.toString());
+      check('10b. driver accepts -> active membership created', activeMembership?.vendor?.id === vendorId.toString());
+    }
+
     console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);
     process.exitCode = failures === 0 ? 0 : 1;
   } finally {
     await TowingBookingModel.deleteMany({ $or: [{ vendorId }, { bookingNumber: new RegExp(`^E2E-TOW.*${suffix}$`) }] });
     await DriverVendorMembershipModel.deleteMany({ $or: [{ vendorUserId: vendorId }, { driverUserId: driverId }] });
     await VendorVehicleModel.deleteMany({ _id: vehicleId });
-    await UserModel.deleteMany({ _id: { $in: [vendorId, driverId, customerId] } });
+    await UserModel.deleteMany({
+      $or: [
+        { _id: { $in: [vendorId, driverId, customerId] } },
+        { mobileNumber: new RegExp(`\\+9199[0-9]{3}${suffix}`) },
+      ],
+    });
     await mongoose.disconnect();
   }
 }

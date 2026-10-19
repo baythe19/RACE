@@ -50,6 +50,7 @@ const DriverVendorMembershipSchema = new Schema<IDriverVendorMembership>(
 );
 
 DriverVendorMembershipSchema.index({ driverLockKey: 1 }, { unique: true, sparse: true });
+DriverVendorMembershipSchema.index({ vendorUserId: 1, driverUserId: 1, status: 1 });
 DriverVendorMembershipSchema.index({ driverUserId: 1, status: 1, updatedAt: -1 });
 DriverVendorMembershipSchema.index({ vendorUserId: 1, status: 1, updatedAt: -1 });
 

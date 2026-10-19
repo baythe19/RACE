@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Building2, Check, Clock3, MapPin, ShieldCheck, X } from 'lucide-react-native';
+import { Building2, Check, ChevronRight, Clock3, MapPin, ShieldCheck, X } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import AppScreenLayout from '../../../components/ui/AppScreenLayout';
 import { PartnerText } from '../../../components/partner/PartnerText';
@@ -18,6 +19,7 @@ const MUTED = '#6B7280';
 
 export default function DriverMyVendorScreen() {
   const px = useScreenPx();
+  const navigation = useNavigation<any>();
   const membership = useDriverVendorMembershipQuery();
   const invitations = useDriverVendorInvitationsQuery(!membership.data);
   const respond = useRespondToVendorInvitationMutation();
@@ -81,26 +83,57 @@ export default function DriverMyVendorScreen() {
             Vendor assignments
           </PartnerText>
           {vendorJobs.length ? vendorJobs.map(job => (
-            <View key={job.id} style={[styles.assignmentCard, { borderRadius: px(12), padding: px(11), marginBottom: px(8) }]}>
+            <Pressable
+              key={job.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Open job #${job.bookingNumber}`}
+              onPress={() => {
+                navigation.navigate('PartnerJobs', {
+                  screen: 'PartnerActiveJob',
+                  params: { bookingId: job.id, bookingType: job.bookingType },
+                });
+              }}
+              style={({ pressed }) => [
+                styles.assignmentCard,
+                {
+                  borderRadius: px(12),
+                  padding: px(12),
+                  marginBottom: px(8),
+                  opacity: pressed ? 0.85 : 1,
+                  borderWidth: 1,
+                  borderColor: job.status === 'DRIVER_ASSIGNED' ? '#FDE68A' : '#EEEEEE',
+                  backgroundColor: job.status === 'DRIVER_ASSIGNED' ? '#FFFBEB' : '#FAFAFA',
+                },
+              ]}>
               <View style={styles.row}>
                 <View style={{ flex: 1 }}>
-                  <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '800' }}>
-                    #{job.bookingNumber}
-                  </PartnerText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6) }}>
+                    <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '800' }}>
+                      #{job.bookingNumber}
+                    </PartnerText>
+                    {job.status === 'DRIVER_ASSIGNED' ? (
+                      <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: px(6), paddingVertical: px(2), borderRadius: px(6) }}>
+                        <PartnerText style={{ color: '#B45309', fontSize: px(9.5), fontWeight: '800' }}>ACTION NEEDED</PartnerText>
+                      </View>
+                    ) : null}
+                  </View>
                   <PartnerText style={{ color: MUTED, fontSize: px(11), marginTop: px(3) }}>
                     {job.serviceLabel ?? (job.bookingType === 'towing' ? 'Towing' : 'Driver hire')}
                   </PartnerText>
                   {job.assignedFleetVehicleLabel ? (
-                    <PartnerText style={{ color: MUTED, fontSize: px(11), marginTop: px(3) }}>
+                    <PartnerText style={{ color: '#2563EB', fontSize: px(11), fontWeight: '600', marginTop: px(3) }}>
                       Vehicle: {job.assignedFleetVehicleLabel}
                     </PartnerText>
                   ) : null}
                 </View>
-                <PartnerText style={{ color: '#9A6700', fontSize: px(10), fontWeight: '700' }}>
-                  {job.status.replace(/_/g, ' ')}
-                </PartnerText>
+                <View style={{ alignItems: 'flex-end', gap: px(4) }}>
+                  <PartnerText style={{ color: job.status === 'DRIVER_ASSIGNED' ? '#B45309' : '#059669', fontSize: px(10), fontWeight: '700' }}>
+                    {job.status.replace(/_/g, ' ')}
+                  </PartnerText>
+                  <ChevronRight size={px(14)} color={MUTED} />
+                </View>
               </View>
-            </View>
+            </Pressable>
           )) : (
             <PartnerText style={{ color: MUTED, fontSize: px(12) }}>
               No active vendor assignments.

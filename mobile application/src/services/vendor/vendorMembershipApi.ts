@@ -50,6 +50,7 @@ export type DriverSearchResult = {
   name: string;
   phone: string;
   rawPhone: string;
+  maskedPhone?: string;
   driverCode?: string;
   city?: string;
   experienceYears?: number;

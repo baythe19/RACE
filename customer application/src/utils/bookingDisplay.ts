@@ -15,11 +15,31 @@ export const ONGOING_UNIFIED_STATUSES = [
 export const COMPLETED_UNIFIED_STATUSES = ['COMPLETED', 'RATED', 'CANCELLED'] as const;
 
 export function formatUnifiedStatusLabel(status: string): string {
-  return status
-    .toLowerCase()
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  switch (status) {
+    case 'PENDING':
+      return 'Finding Partner';
+    case 'CONFIRMED':
+      return 'Confirmed';
+    case 'DRIVER_ASSIGNED':
+      return 'Driver Assigned';
+    case 'DRIVER_EN_ROUTE':
+      return 'On the Way';
+    case 'DRIVER_ARRIVED':
+      return 'Driver Arrived';
+    case 'IN_PROGRESS':
+      return 'In Progress';
+    case 'COMPLETED':
+    case 'RATED':
+      return 'Completed';
+    case 'CANCELLED':
+      return 'Cancelled';
+    default:
+      return status
+        .toLowerCase()
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+  }
 }
 
 export function isOngoingUnifiedStatus(status?: string): boolean {

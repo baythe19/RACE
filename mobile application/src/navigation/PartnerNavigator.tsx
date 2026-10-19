@@ -87,7 +87,7 @@ function PartnerJobsStackNavigator() {
       <JobsStack.Screen
         name="PartnerActiveJob"
         component={isDriver ? DriverActiveJobScreen : VendorBookingTrackingScreen}
-        options={isDriver ? { headerShown: false } : { headerTitle: 'Active job' }}
+        options={{ headerShown: false }}
       />
       <JobsStack.Screen
         name="VendorVehicles"

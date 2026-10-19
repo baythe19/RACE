@@ -1,9 +1,30 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-18
+> **Updated:** 2026-10-19
 > **Read this first in every new session.**
 
 ---
+
+## Latest session — Comprehensive Vendor <-> Full-Time Driver Fleet & Towing Job Dispatch Polish & E2E Verification (2026-10-19, branch changes-v6-partner-role-dispatch)
+
+- **Comprehensive Vendor & Driver Review & Hardening:**
+  - **Vendor Driver Search:** Verified strict exclusion of Part-Time drivers. Vendors search registered Full-Time / Tow Drivers by name, mobile, and driver code. Results display status pills (`READY TO INVITE`, `INVITED_PENDING`, `ALREADY_IN_FLEET`, `IN_ANOTHER_FLEET`) with phone masking and 1-tap invite.
+  - **Invitation Management:** Added "Cancel invitation" action for `PENDING` invitations on `VendorDriverMembershipsScreen.tsx`.
+  - **Auto-Selection UX in `VendorAssignJobScreen.tsx`:** Added automatic single-choice pre-selection for vehicle and driver when only one available option exists, reducing dispatch friction.
+  - **Driver Assignment Flow Hardening:**
+    - Resolved circular navigation trap in `DriverActiveJobScreen.tsx`: removed dead early-return blocking block that previously forced drivers back to Jobs.
+    - Added dedicated "Accept Job & Start Route" primary action and "Decline Assignment" secondary action with confirmation dialog.
+    - Added unassign database cleanup in `driverAssignment.ts`: unsetting `assignedFleetVehicleId` and `assignedFleetVehicleLabel` and releasing the tow truck reservation atomically when a driver declines.
+  - **Driver My Vendor Integration:** Made assigned vendor jobs interactive in `DriverMyVendorScreen.tsx`, navigating directly to `DriverActiveJobScreen` with "ACTION NEEDED" badge for `DRIVER_ASSIGNED` jobs.
+  - **Vendor Live Tracking UX:** Added Back navigation button to `VendorBookingTrackingScreen.tsx` and unified stack header options (`headerShown: false`).
+  - **Customer App Polish:** Added clear `DRIVER_ASSIGNED` status labels ("Driver Assigned" / "Driver allotted · Awaiting confirmation & start") across `bookingDisplay.ts`, `TowingTrackScreen.tsx`, and `DriverTrackScreen.tsx` to prevent customer ambiguity before departure.
+  - **Dead Code Cleanup:** Removed superseded dead screen `mobile application/src/screens/partner/PartnerActiveJobScreen.tsx`.
+- **Automated Verification:**
+  - `mobile application/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+  - `backend/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+  - `customer application/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+  - `backend/`: `npx tsx src/scripts/partner-v6-offer-routing-audit.ts` -> **Exit code 0 (`PARTNER_V6_ROLE_DISPATCH_AUDIT_PASSED`)**.
+  - `backend/`: `npx tsx src/scripts/verify-driver-ack-e2e.ts` -> **Exit code 0 (`ALL E2E CHECKS PASSED` - 18 assertions)**.
 
 ## Latest session — Partner v6 source re-review and documentation (2026-10-18)
 

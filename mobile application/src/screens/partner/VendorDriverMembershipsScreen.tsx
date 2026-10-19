@@ -62,7 +62,7 @@ function DriverSearchResultCard({
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6), marginTop: px(2) }}>
-            <PartnerText style={[styles.sub, { fontSize: px(11.5) }]}>{driver.phone}</PartnerText>
+            <PartnerText style={[styles.sub, { fontSize: px(11.5) }]}>{driver.maskedPhone || driver.phone}</PartnerText>
             {driver.rating ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(2) }}>
                 <Star size={px(11)} color="#F59E0B" fill="#F59E0B" />
@@ -161,16 +161,16 @@ function MemberCard({
           </PartnerText>
         </View>
       </View>
-      {!pending ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy}
-          onPress={onRemove}
-          style={[styles.removeButton, { marginTop: px(12), paddingVertical: px(9), borderRadius: px(10) }]}>
-          {busy ? <ActivityIndicator size="small" color="#B42318" /> : <X size={px(15)} color="#B42318" />}
-          <PartnerText style={{ color: '#B42318', fontSize: px(12), fontWeight: '700' }}>Remove from fleet</PartnerText>
-        </Pressable>
-      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={onRemove}
+        style={[styles.removeButton, { marginTop: px(12), paddingVertical: px(9), borderRadius: px(10) }]}>
+        {busy ? <ActivityIndicator size="small" color="#B42318" /> : <X size={px(15)} color="#B42318" />}
+        <PartnerText style={{ color: '#B42318', fontSize: px(12), fontWeight: '700' }}>
+          {pending ? 'Cancel invitation' : 'Remove from fleet'}
+        </PartnerText>
+      </Pressable>
     </View>
   );
 }
@@ -204,18 +204,24 @@ export default function VendorDriverMembershipsScreen() {
   };
 
   const confirmRemove = (member: VendorMembership) => {
+    const isPending = member.status === 'PENDING';
     Alert.alert(
-      'Remove Driver?',
-      'This ends ' + (member.driver?.name ?? 'this Driver') + '’s fleet connection.',
+      isPending ? 'Cancel Invitation?' : 'Remove Driver?',
+      isPending
+        ? 'Withdraw the pending fleet invitation sent to this Driver?'
+        : 'This ends ' + (member.driver?.name ?? 'this Driver') + '’s fleet connection.',
       [
-        { text: 'Keep Driver', style: 'cancel' },
+        { text: 'Keep', style: 'cancel' },
         {
-          text: 'Remove',
+          text: isPending ? 'Cancel Invite' : 'Remove',
           style: 'destructive',
           onPress: () =>
             revoke.mutate(member.id, {
               onError: error =>
-                Alert.alert('Could not remove Driver', error instanceof Error ? error.message : 'Please try again.'),
+                Alert.alert(
+                  isPending ? 'Could not cancel invitation' : 'Could not remove Driver',
+                  error instanceof Error ? error.message : 'Please try again.',
+                ),
             }),
         },
       ],

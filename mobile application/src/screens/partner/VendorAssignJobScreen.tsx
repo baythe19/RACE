@@ -45,7 +45,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
   const { refetch: refetchOffers } = useVendorBookingOffersQuery(true);
   const { data: activeBookings = [] } = useVendorBookingsQuery(true);
   const approveMutation = useApproveVendorBookingMutation();
-  const reservedVehicleIds = new Set(
+  const reservedVehicleIds = React.useMemo(() => new Set(
     activeBookings
       .filter(booking =>
         booking.id !== bookingId &&
@@ -60,19 +60,40 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
             .includes(normalizeVehicleReference(vehicle.registrationNo))),
         )
         .map(vehicle => vehicle.id)),
-  );
+  ), [activeBookings, bookingId, vehicles]);
 
-  const eligibleDrivers = memberships.filter(member =>
+  const eligibleDrivers = React.useMemo(() => memberships.filter(member =>
     member.status === 'ACTIVE' &&
     Boolean(member.driver) &&
     member.driver?.driverStatus === 'APPROVED' &&
     (bookingType === 'towing'
       ? member.driver?.driverType === 'Tow Driver' || member.driver?.driverType === 'Full-Time'
       : member.driver?.driverType === 'Full-Time'),
-  );
+  ), [memberships, bookingType]);
 
   const [driverId, setDriverId] = useState<string | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
+
+  // Auto-select when only 1 vehicle or 1 driver is available to reduce dispatch friction
+  React.useEffect(() => {
+    if (bookingType === 'towing' && !vehicleId && vehicles.length > 0) {
+      const availableVehicles = vehicles.filter(v => !reservedVehicleIds.has(v.id));
+      if (availableVehicles.length === 1) {
+        setVehicleId(availableVehicles[0].id);
+      }
+    }
+  }, [bookingType, vehicleId, vehicles, reservedVehicleIds]);
+
+  React.useEffect(() => {
+    if (!driverId && eligibleDrivers.length > 0) {
+      const availableDrivers = eligibleDrivers.filter(
+        m => m.driver?.isAvailable && !m.driver?.isBusy,
+      );
+      if (availableDrivers.length === 1 && availableDrivers[0].driver?.id) {
+        setDriverId(availableDrivers[0].driver.id);
+      }
+    }
+  }, [driverId, eligibleDrivers]);
   const selectedVehicleIsAvailable =
     bookingType === 'driver' ||
     (Boolean(vehicleId) &&

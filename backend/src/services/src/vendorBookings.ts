@@ -286,7 +286,7 @@ export class VendorBookingsService {
     if (!isDriverEligibleForBooking(driver, dto.bookingType)) {
       throw new BadRequestError(
         dto.bookingType === 'towing'
-          ? 'Select a Tow Driver for towing requests'
+          ? 'Select an eligible driver (Tow Driver or Full-Time) for towing requests'
           : 'Select a Full-Time or Part-Time driver for driver-hire requests',
       );
     }
