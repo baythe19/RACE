@@ -17,6 +17,7 @@ import {
   reverseGeocodeToLocation,
 } from '../../utils/googlePlaces';
 import { formatLocationDisplay } from '../../utils/readableAddress';
+import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
 const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
@@ -191,12 +192,8 @@ export default function LocationPickerModal({
   const handleCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      const position = await getCurrentPositionWhenAllowed(Location.Accuracy.High);
+      if (!position) return;
       animateTo(position.coords.latitude, position.coords.longitude);
     } finally {
       setIsLocating(false);

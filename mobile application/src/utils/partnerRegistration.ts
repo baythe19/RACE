@@ -1,5 +1,10 @@
 import type { NavigationProp } from '@react-navigation/native';
 
+import {
+  UI_PREVIEW_MODE,
+  UI_PREVIEW_MUTATIONS_ENABLED,
+  isUiTestPermissiveMode,
+} from '../constants/preview';
 import { usePartnerSelectStore } from '../store/partnerSelectStore';
 import type {
   PartnerRegistrationStackParamList,
@@ -27,6 +32,11 @@ export function isValidEmail(value: string): boolean {
 
 export function isValidIndianPin(value: string): boolean {
   return /^\d{6}$/.test(value.trim());
+}
+
+/** UI preview / mock walkthroughs — skip harsh field validation and red error chrome. */
+export function isPartnerRegistrationRelaxedValidation(): boolean {
+  return UI_PREVIEW_MODE && (isUiTestPermissiveMode() || UI_PREVIEW_MUTATIONS_ENABLED);
 }
 
 const PREVIOUS_REGISTRATION_SCREEN: Partial<
@@ -65,8 +75,8 @@ export function partnerRegistrationGoBack(
     return;
   }
 
-  rootNavigation?.reset({
-    index: 0,
-    routes: [{ name: 'PartnerBootstrap' }],
+  (rootNavigation as any)?.navigate('PartnerBootstrap', {
+    screen: 'PartnerRoleSelection',
+    params: { mobileNumber: params.mobileNumber },
   });
 }

@@ -159,7 +159,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
           if (paramRole === 'driver' || paramRole === 'vendor') {
             goToRegistration(paramRole);
           } else {
-            navigation.navigate('PartnerRoleSelection');
+            navigation.replace('PartnerRoleSelection', { mobileNumber });
           }
         }
         return;
@@ -190,7 +190,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
           if (paramRole === 'driver' || paramRole === 'vendor') {
             goToRegistration(paramRole);
           } else {
-            navigation.navigate('PartnerRoleSelection');
+            navigation.replace('PartnerRoleSelection', { mobileNumber });
           }
           return;
         }

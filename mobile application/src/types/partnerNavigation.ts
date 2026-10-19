@@ -22,11 +22,6 @@ export type PartnerRegistrationStackParamList = {
 
 export type PartnerAuthStackParamList = {
   PartnerSplash: undefined;
-  PartnerWelcome: undefined;
-  PartnerRoleSelection: undefined;
-  // P2 (v6 audit): PartnerDriverAuthMode / PartnerVendorDriverLogin credential
-  // routes were removed from the live v6 auth stack (APIs removed backend-side
-  // too). The screen files stay on disk for reference until deletion is okayed.
   PartnerLogin: { role?: PartnerRole } | undefined;
   PartnerOtpVerification: {
     mobileNumber: string;
@@ -35,6 +30,7 @@ export type PartnerAuthStackParamList = {
     devOtp?: string;
     otpMessage?: string;
   };
+  PartnerRoleSelection: { mobileNumber?: string } | undefined;
 };
 
 export type PartnerRootStackParamList = {

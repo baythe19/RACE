@@ -10,7 +10,12 @@ import { PartnerText, PartnerTextInput } from '../../../../components/partner/Pa
 import { BUSINESS_TYPE_OPTIONS, VENDOR_REGISTRATION_STEPS } from '../../../../constants/partnerRegistration';
 import { usePartnerRegistrationStore } from '../../../../store/partnerRegistrationStore';
 import type { PartnerRegistrationStackParamList } from '../../../../types/partnerNavigation';
-import { isValidEmail, partnerRegistrationGoBack, showSelectOptions } from '../../../../utils/partnerRegistration';
+import {
+  isPartnerRegistrationRelaxedValidation,
+  isValidEmail,
+  partnerRegistrationGoBack,
+  showSelectOptions,
+} from '../../../../utils/partnerRegistration';
 import { colors } from '../../../../theme';
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, 'VendorBusinessInfo'>;
@@ -54,7 +59,13 @@ export default function VendorBusinessInfoScreen({ navigation, route }: Props) {
     [vendorBusiness],
   );
 
+  const relaxedValidation = isPartnerRegistrationRelaxedValidation();
+
   const validate = () => {
+    if (relaxedValidation) {
+      setErrors({});
+      return true;
+    }
     const next: Record<string, string> = {};
     if (vendorBusiness.businessName.trim().length < 2) next.businessName = 'Enter your business name';
     if (vendorBusiness.ownerName.trim().length < 2) next.ownerName = 'Enter the business owner name';

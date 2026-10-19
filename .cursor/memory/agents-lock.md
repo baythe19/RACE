@@ -10,7 +10,6 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 |---------|---------|------|----------------|
 | codex-cross-app-logic-audit | backend | Reconcile cross-app booking and availability state | 2026-10-17 |
 | codex-cross-app-audit-ledger | docs | Maintain the cross-app logic audit gates and findings | 2026-10-17 |
-| codex-partner-navigation | partner | Parent-child routes and deterministic back destinations | 2026-10-17 |
 
 
 

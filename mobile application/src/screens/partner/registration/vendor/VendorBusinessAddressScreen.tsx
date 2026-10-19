@@ -11,9 +11,15 @@ import { INDIAN_STATE_OPTIONS, VENDOR_REGISTRATION_STEPS } from '../../../../con
 import { usePartnerRegistrationStore } from '../../../../store/partnerRegistrationStore';
 import type { LocationResult } from '../../../../types/location';
 import type { PartnerRegistrationStackParamList } from '../../../../types/partnerNavigation';
-import { toAddressFormValues } from '../../../../utils/googlePlaces';
-import { isValidIndianPin, partnerRegistrationGoBack, showSelectOptions } from '../../../../utils/partnerRegistration';
+import { reverseGeocodeToLocation, toAddressFormValues } from '../../../../utils/googlePlaces';
+import {
+  isPartnerRegistrationRelaxedValidation,
+  isValidIndianPin,
+  partnerRegistrationGoBack,
+  showSelectOptions,
+} from '../../../../utils/partnerRegistration';
 import { resolveIndianPincode } from '../../../../utils/indianPincode';
+import { getCurrentPositionWhenAllowed } from '../../../../utils/locationPermission';
 import { colors } from '../../../../theme';
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, 'VendorBusinessAddress'>;
@@ -28,8 +34,28 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showLocationPicker, setShowLocationPicker] = useState(false);
   const [bankDetailsExpanded, setBankDetailsExpanded] = useState(false);
+  const relaxedValidation = isPartnerRegistrationRelaxedValidation();
 
   const handleBack = () => partnerRegistrationGoBack(navigation, 'VendorBusinessAddress', route.params);
+
+  const offerLiveLocation = async () => {
+    const pos = await getCurrentPositionWhenAllowed();
+    if (!pos) return;
+    try {
+      const place = await reverseGeocodeToLocation(pos.coords.latitude, pos.coords.longitude);
+      const mapped = toAddressFormValues(place);
+      setVendorAddress({
+        addressLine1: mapped.line1 || vendorAddress.addressLine1,
+        addressLine2: mapped.line2 || vendorAddress.addressLine2,
+        city: mapped.city || vendorAddress.city,
+        state: mapped.state || vendorAddress.state,
+        pinCode: mapped.pincode || vendorAddress.pinCode,
+      });
+      setErrors({});
+    } catch {
+      // GPS or geocode unavailable — user can type the address manually.
+    }
+  };
 
   const searchDisplayValue = [
     vendorAddress.addressLine1,
@@ -63,6 +89,10 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
   };
 
   const validate = () => {
+    if (relaxedValidation) {
+      setErrors({});
+      return true;
+    }
     const next: Record<string, string> = {};
     if (vendorAddress.addressLine1.trim().length < 3) next.addressLine1 = 'Enter your street address';
     if (vendorAddress.city.trim().length < 2) next.city = 'Enter your city';
@@ -135,6 +165,9 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
             <View style={[styles.inputWrap, errors.addressLine1 ? styles.inputError : null, fieldValid.addressLine1 && !errors.addressLine1 ? styles.inputValid : null]}>
               <PartnerTextInput
                 value={vendorAddress.addressLine1}
+                onFocus={() => {
+                  void offerLiveLocation();
+                }}
                 onChangeText={(addressLine1) => { setVendorAddress({ addressLine1 }); clearError('addressLine1'); }}
                 placeholder="House, building, street or locality"
                 placeholderTextColor={colors.textMuted}

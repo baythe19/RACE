@@ -3,6 +3,7 @@ import { AppState, Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
 
 import { updateDriverLocation } from '../services/driver/driverApi';
+import { ensureForegroundLocationPermission } from '../utils/locationPermission';
 import { useDriverPresenceStore, type DriverLocationHealth } from '../store/driverPresenceStore';
 
 const REPORT_INTERVAL_MS = 12_000;
@@ -40,19 +41,10 @@ async function runReport(): Promise<void> {
   );
 
   try {
-    // 1. Permission — request once while the OS still lets us ask.
-    const permission = await Location.getForegroundPermissionsAsync();
-    if (!permission.granted) {
-      if (permission.canAskAgain) {
-        const requested = await Location.requestForegroundPermissionsAsync();
-        if (!requested.granted) {
-          setHealth('permission_denied', { isReporting: false });
-          return;
-        }
-      } else {
-        setHealth('permission_denied', { isReporting: false });
-        return;
-      }
+    const granted = await ensureForegroundLocationPermission();
+    if (!granted) {
+      setHealth('permission_denied', { isReporting: false });
+      return;
     }
 
     // 2. Device location switch (GPS) — a granted permission is not enough.

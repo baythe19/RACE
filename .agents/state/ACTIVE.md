@@ -5,26 +5,28 @@
 
 ---
 
-## Latest session — Comprehensive Vendor <-> Full-Time Driver Fleet & Towing Job Dispatch Polish & E2E Verification (2026-10-19, branch changes-v6-partner-role-dispatch)
+## Latest session — Partner Login & Role Selection Simplification (2026-10-19, branch changes-v6-partner-role-dispatch)
 
-- **Comprehensive Vendor & Driver Review & Hardening:**
-  - **Vendor Driver Search:** Verified strict exclusion of Part-Time drivers. Vendors search registered Full-Time / Tow Drivers by name, mobile, and driver code. Results display status pills (`READY TO INVITE`, `INVITED_PENDING`, `ALREADY_IN_FLEET`, `IN_ANOTHER_FLEET`) with phone masking and 1-tap invite.
-  - **Invitation Management:** Added "Cancel invitation" action for `PENDING` invitations on `VendorDriverMembershipsScreen.tsx`.
-  - **Auto-Selection UX in `VendorAssignJobScreen.tsx`:** Added automatic single-choice pre-selection for vehicle and driver when only one available option exists, reducing dispatch friction.
-  - **Driver Assignment Flow Hardening:**
-    - Resolved circular navigation trap in `DriverActiveJobScreen.tsx`: removed dead early-return blocking block that previously forced drivers back to Jobs.
-    - Added dedicated "Accept Job & Start Route" primary action and "Decline Assignment" secondary action with confirmation dialog.
-    - Added unassign database cleanup in `driverAssignment.ts`: unsetting `assignedFleetVehicleId` and `assignedFleetVehicleLabel` and releasing the tow truck reservation atomically when a driver declines.
-  - **Driver My Vendor Integration:** Made assigned vendor jobs interactive in `DriverMyVendorScreen.tsx`, navigating directly to `DriverActiveJobScreen` with "ACTION NEEDED" badge for `DRIVER_ASSIGNED` jobs.
-  - **Vendor Live Tracking UX:** Added Back navigation button to `VendorBookingTrackingScreen.tsx` and unified stack header options (`headerShown: false`).
-  - **Customer App Polish:** Added clear `DRIVER_ASSIGNED` status labels ("Driver Assigned" / "Driver allotted · Awaiting confirmation & start") across `bookingDisplay.ts`, `TowingTrackScreen.tsx`, and `DriverTrackScreen.tsx` to prevent customer ambiguity before departure.
-  - **Dead Code Cleanup:** Removed superseded dead screen `mobile application/src/screens/partner/PartnerActiveJobScreen.tsx`.
-- **Automated Verification:**
+- **Partner Entry & Role Selection Streamlining:**
+  - **Clean Universal Login (`PartnerLoginScreen.tsx`):**
+    - Updated title from "Partner Sign In" to "Partner Login".
+    - Removed the "Roadside Partner Portal" banner card and bottom feature trust cards completely as requested by the user.
+    - All partners (driver or vendor) directly enter their 10-digit mobile number and receive OTP.
+    - Added automated role detection retry: if an existing vendor logs in, the app auto-retries send-otp under vendor role without manual friction.
+  - **Single Linear Flow (Login -> OTP -> Choose Role -> Registration):**
+    - OTP verification screen now uses `navigation.replace('PartnerRoleSelection')` for new users so the consumed OTP screen is removed from navigation history.
+    - Pressing Back on the role selection screen safely resets to `PartnerLogin`, never looping back to OTP.
+    - Backing out from Step 1 of Driver or Vendor registration safely returns to `PartnerRoleSelection` so the partner can switch roles if desired.
+  - **Role Selection Screen Redesign (`PartnerRoleSelectionScreen.tsx`):**
+    - Implemented the full-width artwork hero UI ("Welcome to RACE Partner / Choose how you work with RACE.") with clear Driver and Towing Vendor radio cards.
+    - Tapping "Continue as Driver" or "Continue as Towing Vendor" navigates **DIRECTLY** into the respective registration flow (`DriverPersonalInfo` / `VendorBusinessInfo`). It never asks for OTP or login again.
+  - **Eliminated Dead Code & Old Screens:**
+    - Deleted `PartnerWelcomeScreen.tsx`, `PartnerWelcomeFeatureChip.tsx`, and `PartnerWelcomeTrustCard.tsx` via `git rm`.
+    - Removed `PartnerWelcome` from navigation stacks, types, and auth store.
+- **Verification:**
   - `mobile application/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
   - `backend/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
-  - `customer application/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
-  - `backend/`: `npx tsx src/scripts/partner-v6-offer-routing-audit.ts` -> **Exit code 0 (`PARTNER_V6_ROLE_DISPATCH_AUDIT_PASSED`)**.
-  - `backend/`: `npx tsx src/scripts/verify-driver-ack-e2e.ts` -> **Exit code 0 (`ALL E2E CHECKS PASSED` - 18 assertions)**.
+  - `backend/`: `npx tsx src/scripts/verify-driver-ack-e2e.ts` -> **Exit code 0 (`ALL 18 E2E CHECKS PASSED`)**.
 
 ## Latest session — Partner v6 source re-review and documentation (2026-10-18)
 

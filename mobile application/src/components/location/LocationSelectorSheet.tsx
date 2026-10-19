@@ -1,7 +1,6 @@
 import { PartnerText } from '../partner/PartnerText';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
-import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Crosshair, Map as MapIcon, MapPin, Search } from 'lucide-react-native';
 
@@ -10,6 +9,7 @@ import LocationPickerMap from '../booking/LocationPickerMap';
 import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
 import { useLocationStore } from '../../store/locationStore';
 import { reverseGeocode } from '../../utils/googleMaps';
+import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
 interface LocationSelectorSheetProps {
@@ -44,18 +44,14 @@ export default function LocationSelectorSheet({
   const handleUseCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      const position = await getCurrentPositionWhenAllowed();
+      if (!position) {
         Alert.alert(
           'Permission needed',
           'Allow location access to use your current location, or search on the map.',
         );
         return;
       }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
       const { latitude, longitude } = position.coords;
       const address = await reverseGeocode(latitude, longitude);
       applyLocation({ address, latitude, longitude });

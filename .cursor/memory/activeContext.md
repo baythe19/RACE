@@ -1,8 +1,12 @@
 # Active context
 
-Updated: 2026-10-17
+Updated: 2026-10-19
 
 ## Current focus
+
+**Driver registration — 2026-10-19.** Emergency contact is inline on step 1 (name + mobile), no bottom sheet. Review sections open independently with label/value rows. Address asks location once; licence field lifts above the keyboard.
+
+
 
 **शेष-काम खाता (deep-research ledger) — DONE 2026-10-17.** Document: `docs/plans/remaining-work-ledger.md` — सारे documented registers (VOC P0/P1/P2, BUG-01..36, GAP-01..12, PAY/TRACK/DB/ENV) का वर्तमान-कोड से honest status: क्या fixed, क्या छूटा और **क्यों** (scope/निर्भरता/product-call), effort-estimates के साथ। अगली कतार उसी §6 में। मुख्य शेष क्लस्टर: (1) uploads-GCS+content-sniffing, (2) partner socket-client + customer tracking-marker, (3) atomic reservation (P1.1/P1.3), (4) test-runner+regression tests, (5) payment-gateway product-call, (6) QR-camera, SOS-dispatch, push-notifications, driver-map, background-location feature-cluster, (7) P2 governance (audit/retention/i18n/a11y/signed-artifacts).
 

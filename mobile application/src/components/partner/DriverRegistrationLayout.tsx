@@ -26,6 +26,10 @@ interface DriverRegistrationLayoutProps {
 
 const REF_W = 390;
 
+export const DriverRegScrollContext = React.createContext<{ liftFocusedField: () => void }>({
+  liftFocusedField: () => {},
+});
+
 export default function DriverRegistrationLayout({
   step,
   title,
@@ -248,6 +252,20 @@ export default function DriverRegistrationLayout({
       </View>
 
       {/* Main Content Area: KeyboardAwareScrollView automatically scrolls up when any input is focused */}
+      <DriverRegScrollContext.Provider
+        value={{
+          liftFocusedField: () => {
+            const scroller = scrollViewRef.current;
+            if (!scroller) return;
+            setTimeout(() => {
+              if (typeof scroller.scrollToEnd === 'function') {
+                scroller.scrollToEnd({ animated: true });
+              } else if (typeof scroller.scrollToPosition === 'function') {
+                scroller.scrollToPosition(0, 4000, true);
+              }
+            }, 280);
+          },
+        }}>
       <KeyboardAwareScrollView
         innerRef={(ref: any) => {
           scrollViewRef.current = ref;
@@ -256,8 +274,8 @@ export default function DriverRegistrationLayout({
         bounces={false}
         enableOnAndroid={true}
         enableAutomaticScroll={true}
-        extraScrollHeight={Platform.OS === 'ios' ? px(28) : px(85)}
-        extraHeight={Platform.OS === 'ios' ? px(48) : px(130)}
+        extraScrollHeight={px(160)}
+        extraHeight={px(220)}
         keyboardOpeningTime={Platform.OS === 'ios' ? 250 : 0}
         scrollEnabled={scrollEnabled !== undefined ? scrollEnabled : true}
         showsVerticalScrollIndicator={false}
@@ -279,6 +297,7 @@ export default function DriverRegistrationLayout({
         {/* Children Screen Body */}
         <View style={step === 4 ? styles.step4BodyWrap : undefined}>{children}</View>
       </KeyboardAwareScrollView>
+      </DriverRegScrollContext.Provider>
 
       {/* Sticky Bottom Actions Bar (auto-hidden when typing on steps 1-3 so input is never covered) */}
       {showFooter && (!keyboardVisible || step === 4) ? (

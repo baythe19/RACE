@@ -47,12 +47,20 @@ export default function UiTestNavigator() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [permissiveMode, setPermissiveMode] = useState(isUiTestPermissiveMode());
+  const [qaRole, setQaRole] = useState<'driver' | 'vendor'>(
+    user?.role === 'vendor' ? 'vendor' : 'driver',
+  );
 
   useEffect(() => {
     return subscribeUiTestPermissiveMode(enabled => {
       setPermissiveMode(enabled);
     });
   }, []);
+
+  useEffect(() => {
+    if (!modalVisible) return;
+    setQaRole(user?.role === 'vendor' ? 'vendor' : 'driver');
+  }, [modalVisible, user?.role]);
 
   if (!UI_PREVIEW_MUTATIONS_ENABLED || !UI_QA_NAVIGATOR_ENABLED) return null;
 
@@ -152,201 +160,208 @@ export default function UiTestNavigator() {
               <PartnerText style={styles.groupHeading}>1-Tap Role Switcher</PartnerText>
               <View style={styles.chipsRow}>
                 <Pressable
-                  style={[styles.roleChip, isDriver && styles.roleChipActive]}
+                  style={[styles.roleChip, qaRole === 'driver' && styles.roleChipActive]}
                   onPress={async () => {
-                    await loginAsMockDriver(dispatch);
-                    jumpToPartnerMainTab('PartnerHome');
-                    setModalVisible(false);
+                    setQaRole('driver');
+                    if (!isDriver) {
+                      await loginAsMockDriver(dispatch);
+                    }
                   }}>
-                  <Truck size={14} color={isDriver ? '#000000' : driverColors.grey} />
-                  <PartnerText style={[styles.roleChipText, isDriver && styles.roleChipTextActive]}>
+                  <Truck size={14} color={qaRole === 'driver' ? '#000000' : driverColors.grey} />
+                  <PartnerText
+                    style={[styles.roleChipText, qaRole === 'driver' && styles.roleChipTextActive]}>
                     Driver Mode
                   </PartnerText>
                 </Pressable>
 
                 <Pressable
-                  style={[styles.roleChip, isVendor && styles.roleChipActive]}
+                  style={[styles.roleChip, qaRole === 'vendor' && styles.roleChipActive]}
                   onPress={async () => {
-                    await loginAsMockVendor(dispatch);
-                    jumpToPartnerMainTab('PartnerHome');
-                    setModalVisible(false);
+                    setQaRole('vendor');
+                    if (!isVendor) {
+                      await loginAsMockVendor(dispatch);
+                    }
                   }}>
-                  <Users size={14} color={isVendor ? '#000000' : driverColors.grey} />
-                  <PartnerText style={[styles.roleChipText, isVendor && styles.roleChipTextActive]}>
+                  <Users size={14} color={qaRole === 'vendor' ? '#000000' : driverColors.grey} />
+                  <PartnerText
+                    style={[styles.roleChipText, qaRole === 'vendor' && styles.roleChipTextActive]}>
                     Vendor Mode
                   </PartnerText>
                 </Pressable>
               </View>
 
-              {/* Driver Screens */}
-              <PartnerText style={styles.groupHeading}>Driver Flow (1-Tap Jump)</PartnerText>
+              <PartnerText style={styles.groupHeading}>
+                {qaRole === 'driver' ? 'Driver Flow (1-Tap Jump)' : 'Vendor Flow (1-Tap Jump)'}
+              </PartnerText>
               <View style={styles.menuGroup}>
                 <JumpRow
-                  label="1. Welcome Screen"
-                  sub="Role selector entry point"
+                  label="1. Choose Role Screen"
+                  sub="Driver vs Towing Vendor selection"
                   onPress={() => {
                     setModalVisible(false);
-                    jumpToPartnerAuth('PartnerWelcome');
+                    jumpToPartnerAuth('PartnerRoleSelection');
                   }}
                 />
-                <JumpRow
-                  label="2. Driver Registration: Personal Info"
-                  sub="Step 1: Name, DOB, City, Address"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('driver', 'DriverPersonalInfo');
-                  }}
-                />
-                <JumpRow
-                  label="3. Driver Registration: Vehicle Info"
-                  sub="Step 2: Vehicle Type, Registration, Model"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('driver', 'DriverVehicleInfo');
-                  }}
-                />
-                <JumpRow
-                  label="4. Driver Registration: Documents"
-                  sub="Step 3: DL, Aadhaar, RC, Permit"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('driver', 'DriverDocuments');
-                  }}
-                />
-                <JumpRow
-                  label="5. Driver Registration: Review & Submit"
-                  sub="Step 4: Summary card & final submission"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('driver', 'DriverReview');
-                  }}
-                />
-                <JumpRow
-                  label="6. Driver Verification Gate"
-                  sub="Under-review status with step tracker"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToDriverVerificationGate();
-                  }}
-                />
-                <JumpRow
-                  label="7. Driver Dashboard"
-                  sub="Live status, availability toggle & KPIs"
-                  onPress={() =>
-                    ensureDriverAndNavigate(() => jumpToPartnerMainTab('PartnerHome'))
-                  }
-                />
-                <JumpRow
-                  label="8. Driver Jobs List"
-                  sub="Filters (All, Available, Active, Done)"
-                  onPress={() =>
-                    ensureDriverAndNavigate(() => jumpToPartnerMainTab('PartnerJobs'))
-                  }
-                />
-                <JumpRow
-                  label="9. Driver Active Job"
-                  sub="4-step trip execution & OTP verification"
-                  onPress={() =>
-                    ensureDriverAndNavigate(() => {
-                      ensureMockDriverActiveJob();
-                      openDriverActiveJob();
-                    })
-                  }
-                />
-              </View>
-
-              {/* Vendor Screens */}
-              <PartnerText style={styles.groupHeading}>Vendor Flow (1-Tap Jump)</PartnerText>
-              <View style={styles.menuGroup}>
-                <JumpRow
-                  label="1. Vendor Registration: Business Info"
-                  sub="Step 1: Business name, owner, type"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('vendor', 'VendorBusinessInfo');
-                  }}
-                />
-                <JumpRow
-                  label="2. Vendor Registration: Address"
-                  sub="Step 2: Operating address & PIN code"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('vendor', 'VendorBusinessAddress');
-                  }}
-                />
-                <JumpRow
-                  label="3. Vendor Registration: Documents"
-                  sub="Step 3: GST, PAN, Trade license"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('vendor', 'VendorDocuments');
-                  }}
-                />
-                <JumpRow
-                  label="4. Vendor Registration: Review & Submit"
-                  sub="Step 4: Agreement & business summary"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerRegistration('vendor', 'VendorReview');
-                  }}
-                />
-                <JumpRow
-                  label="5. Vendor Home"
-                  sub="Incoming leads card, fleet KPIs & actions"
-                  onPress={() =>
-                    ensureVendorAndNavigate(() => jumpToPartnerMainTab('PartnerHome'))
-                  }
-                />
-                <JumpRow
-                  label="6. Vendor Leads & Jobs"
-                  sub="Triage incoming booking requests"
-                  onPress={() =>
-                    ensureVendorAndNavigate(() => jumpToPartnerMainTab('PartnerJobs'))
-                  }
-                />
-                <JumpRow
-                  label="7. Vendor Assign Job"
-                  sub="Select vehicle & dispatch to driver"
-                  onPress={() =>
-                    ensureVendorAndNavigate(() =>
-                      jumpToPartnerJobsScreen('VendorAssignJob', {
-                        bookingId: 'lead-101',
-                        bookingType: 'towing',
-                        bookingNumber: 'TOW-10048',
-                        serviceLabel: 'Flatbed Towing',
-                        pickupAddress: 'Patia Square, Bhubaneswar',
-                        estimatedFare: 1650,
-                      }),
-                    )
-                  }
-                />
-                <JumpRow
-                  label="8. Manage Drivers (Tab)"
-                  sub="Fleet driver roster & credentials"
-                  onPress={() =>
-                    ensureVendorAndNavigate(() =>
-                      jumpToPartnerMainTab('PartnerDrivers'),
-                    )
-                  }
-                />
-                <JumpRow
-                  label="9. Manage Vehicles"
-                  sub="Tow truck fleet & maintenance status"
-                  onPress={() =>
-                    ensureVendorAndNavigate(() =>
-                      jumpToPartnerAccountScreen('VendorVehicles'),
-                    )
-                  }
-                />
-                <JumpRow
-                  label="10. Verification Status"
-                  sub="Document review stages & badge"
-                  onPress={() =>
-                    ensureVendorAndNavigate(() =>
-                      jumpToPartnerAccountScreen('VendorVerificationStatus'),
-                    )
-                  }
-                />
+                {qaRole === 'driver' ? (
+                  <>
+                    <JumpRow
+                      label="2. Driver Registration: Personal Info"
+                      sub="Step 1: Name, DOB, City, Address"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('driver', 'DriverPersonalInfo');
+                      }}
+                    />
+                    <JumpRow
+                      label="3. Driver Registration: Vehicle Info"
+                      sub="Step 2: Vehicle Type, Registration, Model"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('driver', 'DriverVehicleInfo');
+                      }}
+                    />
+                    <JumpRow
+                      label="4. Driver Registration: Documents"
+                      sub="Step 3: DL, Aadhaar, RC, Permit"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('driver', 'DriverDocuments');
+                      }}
+                    />
+                    <JumpRow
+                      label="5. Driver Registration: Review & Submit"
+                      sub="Step 4: Summary card & final submission"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('driver', 'DriverReview');
+                      }}
+                    />
+                    <JumpRow
+                      label="6. Driver Verification Gate"
+                      sub="Under-review status with step tracker"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToDriverVerificationGate();
+                      }}
+                    />
+                    <JumpRow
+                      label="7. Driver Dashboard"
+                      sub="Live status, availability toggle & KPIs"
+                      onPress={() =>
+                        ensureDriverAndNavigate(() => jumpToPartnerMainTab('PartnerHome'))
+                      }
+                    />
+                    <JumpRow
+                      label="8. Driver Jobs List"
+                      sub="Filters (All, Available, Active, Done)"
+                      onPress={() =>
+                        ensureDriverAndNavigate(() => jumpToPartnerMainTab('PartnerJobs'))
+                      }
+                    />
+                    <JumpRow
+                      label="9. Driver Active Job"
+                      sub="4-step trip execution & OTP verification"
+                      onPress={() =>
+                        ensureDriverAndNavigate(() => {
+                          ensureMockDriverActiveJob();
+                          openDriverActiveJob();
+                        })
+                      }
+                    />
+                  </>
+                ) : (
+                  <>
+                    <JumpRow
+                      label="2. Vendor Registration: Business Info"
+                      sub="Step 1: Business name, owner, type"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('vendor', 'VendorBusinessInfo');
+                      }}
+                    />
+                    <JumpRow
+                      label="3. Vendor Registration: Address"
+                      sub="Step 2: Operating address & PIN code"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('vendor', 'VendorBusinessAddress');
+                      }}
+                    />
+                    <JumpRow
+                      label="4. Vendor Registration: Documents"
+                      sub="Step 3: GST, PAN, Trade license"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('vendor', 'VendorDocuments');
+                      }}
+                    />
+                    <JumpRow
+                      label="5. Vendor Registration: Review & Submit"
+                      sub="Step 4: Agreement & business summary"
+                      onPress={() => {
+                        setModalVisible(false);
+                        jumpToPartnerRegistration('vendor', 'VendorReview');
+                      }}
+                    />
+                    <JumpRow
+                      label="6. Vendor Home"
+                      sub="Incoming leads card, fleet KPIs & actions"
+                      onPress={() =>
+                        ensureVendorAndNavigate(() => jumpToPartnerMainTab('PartnerHome'))
+                      }
+                    />
+                    <JumpRow
+                      label="7. Vendor Leads & Jobs"
+                      sub="Triage incoming booking requests"
+                      onPress={() =>
+                        ensureVendorAndNavigate(() => jumpToPartnerMainTab('PartnerJobs'))
+                      }
+                    />
+                    <JumpRow
+                      label="8. Vendor Assign Job"
+                      sub="Select vehicle & dispatch to driver"
+                      onPress={() =>
+                        ensureVendorAndNavigate(() =>
+                          jumpToPartnerJobsScreen('VendorAssignJob', {
+                            bookingId: 'lead-101',
+                            bookingType: 'towing',
+                            bookingNumber: 'TOW-10048',
+                            serviceLabel: 'Flatbed Towing',
+                            pickupAddress: 'Patia Square, Bhubaneswar',
+                            estimatedFare: 1650,
+                          }),
+                        )
+                      }
+                    />
+                    <JumpRow
+                      label="9. Manage Drivers (Tab)"
+                      sub="Fleet driver roster & credentials"
+                      onPress={() =>
+                        ensureVendorAndNavigate(() =>
+                          jumpToPartnerMainTab('PartnerDrivers'),
+                        )
+                      }
+                    />
+                    <JumpRow
+                      label="10. Manage Vehicles"
+                      sub="Tow truck fleet & maintenance status"
+                      onPress={() =>
+                        ensureVendorAndNavigate(() =>
+                          jumpToPartnerAccountScreen('VendorVehicles'),
+                        )
+                      }
+                    />
+                    <JumpRow
+                      label="11. Verification Status"
+                      sub="Document review stages & badge"
+                      onPress={() =>
+                        ensureVendorAndNavigate(() =>
+                          jumpToPartnerAccountScreen('VendorVerificationStatus'),
+                        )
+                      }
+                    />
+                  </>
+                )}
               </View>
 
               {/* Shared Account Subsystem */}

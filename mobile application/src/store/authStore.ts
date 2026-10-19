@@ -19,7 +19,7 @@ interface AuthState {
   error: string | null;
   onboardingRequired: boolean;
   /** After logout, partner app opens this auth screen instead of splash. */
-  partnerAuthEntry: 'PartnerSplash' | 'PartnerWelcome' | 'PartnerLogin';
+  partnerAuthEntry: 'PartnerSplash' | 'PartnerLogin' | 'PartnerRoleSelection';
   /** Bumps on logout so navigation remounts reliably. */
   authSessionVersion: number;
   sendOtp: (payload: SendOtpPayload) => Promise<authService.SendOtpResult>;
@@ -161,7 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     const nextSessionVersion = get().authSessionVersion + 1;
     set({
-      partnerAuthEntry: 'PartnerWelcome',
+      partnerAuthEntry: 'PartnerLogin',
       authSessionVersion: nextSessionVersion,
     });
 
@@ -178,7 +178,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await syncReduxLogout();
 
     set({
-      partnerAuthEntry: 'PartnerWelcome',
+      partnerAuthEntry: 'PartnerLogin',
       authSessionVersion: nextSessionVersion,
       user: null,
       isAuthenticated: false,

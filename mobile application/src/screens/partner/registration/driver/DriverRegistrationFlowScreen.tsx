@@ -30,7 +30,6 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
-  Briefcase,
   Truck,
   Upload,
   User,
@@ -38,7 +37,9 @@ import {
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import DriverRegistrationLayout from '../../../../components/partner/DriverRegistrationLayout';
+import DriverRegistrationLayout, {
+  DriverRegScrollContext,
+} from '../../../../components/partner/DriverRegistrationLayout';
 import {
   CONDITIONAL_DOCUMENTS,
   CORE_REVIEW_DOCUMENTS,
@@ -64,8 +65,25 @@ import type {
 import type { ApiSuccessResponse } from '../../../../types/auth';
 import { partnerRegistrationGoBack } from '../../../../utils/partnerRegistration';
 import { resolveIndianPincode, lookupPincodeOffline } from '../../../../utils/indianPincode';
+import { reverseGeocodeToLocation } from '../../../../utils/googlePlaces';
+import { getCurrentPositionWhenAllowed } from '../../../../utils/locationPermission';
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, any>;
+
+function LicenceInput(
+  props: React.ComponentProps<typeof PartnerTextInput>,
+) {
+  const { liftFocusedField } = React.useContext(DriverRegScrollContext);
+  return (
+    <PartnerTextInput
+      {...props}
+      onFocus={(event) => {
+        props.onFocus?.(event);
+        liftFocusedField();
+      }}
+    />
+  );
+}
 
 function normalizeIndianPhone(raw: string): string {
   const digits = raw.replace(/\D/g, '');
@@ -204,6 +222,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const authUser = useAppSelector((state) => state.auth.user);
   const { driverPersonal, driverVehicle, driverDocuments } = usePartnerRegistrationStore();
   const setDriverPersonal = usePartnerRegistrationStore((s) => s.setDriverPersonal);
+  const [licenceFocused, setLicenceFocused] = useState(false);
   const setDriverVehicle = usePartnerRegistrationStore((s) => s.setDriverVehicle);
   const addDriverDocument = usePartnerRegistrationStore((s) => s.addDriverDocument);
   const removeDriverDocument = usePartnerRegistrationStore((s) => s.removeDriverDocument);
@@ -213,7 +232,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // -------------------------------------------------------------
   const [cityModalVisible, setCityModalVisible] = useState(false);
   const [citySearch, setCitySearch] = useState('');
-  const [emergencyModalVisible, setEmergencyModalVisible] = useState(false);
+  const [emergencyOpen, setEmergencyOpen] = useState(
+    Boolean(driverPersonal.emergencyContactName || driverPersonal.emergencyContactNumber),
+  );
 
   // Interactive DOB Calendar Modal States
   const [calendarModalVisible, setCalendarModalVisible] = useState(false);
@@ -573,8 +594,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // -------------------------------------------------------------
   const [confirmAgreed, setConfirmAgreed] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  // Collapsible review sections: all collapsed by default (user request 2026-10-16).
-  // Accordion: opening one section closes the others. Edit stays a separate action.
+  // Each review section opens on its own. Several can stay open together.
   const [reviewExpanded, setReviewExpanded] = useState<{
     personal: boolean;
     vehicle: boolean;
@@ -582,11 +602,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   }>({ personal: false, vehicle: false, documents: false });
 
   const toggleReviewSection = (key: 'personal' | 'vehicle' | 'documents') =>
-    setReviewExpanded((prev) => {
-      const next = { personal: false, vehicle: false, documents: false };
-      next[key] = !prev[key];
-      return next;
-    });
+    setReviewExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // -------------------------------------------------------------
   // Unified Flow Navigation Handlers (3 Steps: Details -> Docs -> Review)
@@ -825,6 +841,23 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // -------------------------------------------------------------
   // Render Step 1: Personal & Driver Details (Unified 3-Step Flow)
   // -------------------------------------------------------------
+  const offerLiveLocation = async () => {
+    const pos = await getCurrentPositionWhenAllowed();
+    if (!pos) return;
+    try {
+      const place = await reverseGeocodeToLocation(pos.coords.latitude, pos.coords.longitude);
+      const pin = (place.pincode || '').replace(/\D/g, '').slice(0, 6);
+      setDriverPersonal({
+        ...(place.address ? { address: place.address.slice(0, 120) } : {}),
+        ...(pin ? { pincode: pin } : {}),
+        ...(place.city ? { city: place.city } : {}),
+        ...(place.state ? { state: place.state } : {}),
+      });
+    } catch {
+      // GPS or geocode unavailable — user fills address and PIN by hand.
+    }
+  };
+
   const renderStep1PersonalInfo = () => (
     <View>
       {/* Card 1: Personal Information */}
@@ -940,36 +973,29 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               {driverPersonal.address.length}/120
             </PartnerText>
           </View>
-          <View
-            style={[
-              styles.inputContainer,
-              styles.addressInputContainer,
-              { height: px(64), paddingHorizontal: px(10), paddingVertical: px(8) },
-            ]}>
-            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={[styles.leftInputIcon, { marginTop: px(2) }]} />
+          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerTextInput
-              style={[styles.textInput, styles.multilineInput, { fontSize: px(13), flex: 1 }]}
-              placeholder="House/Plot no, street, landmark, area"
+              style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
+              placeholder="House, street, landmark, area"
               placeholderTextColor="#9CA3AF"
-              multiline
               maxLength={120}
-              numberOfLines={2}
               value={driverPersonal.address}
-              onChangeText={(address) => setDriverPersonal({ address })}
+              onFocus={() => {
+                void offerLiveLocation();
+              }}
+              onChangeText={(address) => {
+                setDriverPersonal({ address });
+              }}
             />
           </View>
         </View>
 
         {/* Pincode & State Auto-fill */}
         <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-          <View style={styles.inputLabelRow}>
-            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-              PIN code <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-            </PartnerText>
-            <PartnerText style={[styles.charCountText, { fontSize: px(10.5), color: '#059669', fontWeight: '600' }]}>
-              Auto-fills City & State
-            </PartnerText>
-          </View>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+            PIN code <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
           <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
             <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerTextInput
@@ -1026,9 +1052,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           </Pressable>
         </View>
 
-        {/* Emergency Contact */}
+        {/* Emergency Contact — inline fields, no sheet */}
         <View style={[styles.alertBanner, { padding: px(10), borderRadius: px(8) }]}>
-          <View style={styles.alertContentRow}>
+          <Pressable
+            onPress={() => setEmergencyOpen((open) => !open)}
+            style={styles.alertContentRow}>
             <View style={[styles.alertIconCircle, { width: px(24), height: px(24), borderRadius: px(12) }]}>
               <Phone size={px(13)} color="#D97706" />
             </View>
@@ -1040,35 +1068,65 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   : 'Recommended for safety'}
               </PartnerText>
             </View>
-            <Pressable
-              hitSlop={10}
-              onPress={() => setEmergencyModalVisible(true)}
-              style={styles.alertActionBtn}>
+            <View style={styles.alertActionBtn}>
               <PartnerText style={[styles.alertActionText, { fontSize: px(11.5) }]}>
-                {driverPersonal.emergencyContactNumber ? 'Edit' : '+ Add'}
+                {emergencyOpen ? 'Hide' : driverPersonal.emergencyContactNumber ? 'Edit' : '+ Add'}
               </PartnerText>
-            </Pressable>
-          </View>
+            </View>
+          </Pressable>
+          {emergencyOpen ? (
+            <View style={{ marginTop: px(10), gap: px(8) }}>
+              <View>
+                <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(4) }]}>
+                  Contact name
+                </PartnerText>
+                <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10), backgroundColor: '#FFFFFF' }]}>
+                  <User size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+                  <PartnerTextInput
+                    style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
+                    placeholder="Name (e.g. brother)"
+                    placeholderTextColor="#9CA3AF"
+                    maxLength={35}
+                    autoCapitalize="words"
+                    value={driverPersonal.emergencyContactName ?? ''}
+                    onChangeText={(text) =>
+                      setDriverPersonal({
+                        emergencyContactName: text.replace(/[^a-zA-Z\s.-]/g, ''),
+                      })
+                    }
+                  />
+                </View>
+              </View>
+              <View>
+                <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(4) }]}>
+                  Mobile number
+                </PartnerText>
+                <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10), backgroundColor: '#FFFFFF' }]}>
+                  <PartnerText style={[styles.countryPrefix, { fontSize: px(13.5) }]}>+91</PartnerText>
+                  <PartnerTextInput
+                    style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
+                    keyboardType="number-pad"
+                    maxLength={10}
+                    placeholder="10-digit number"
+                    placeholderTextColor="#9CA3AF"
+                    value={driverPersonal.emergencyContactNumber ?? ''}
+                    onChangeText={(emergencyContactNumber) =>
+                      setDriverPersonal({
+                        emergencyContactNumber: emergencyContactNumber.replace(/[^0-9]/g, '').slice(0, 10),
+                      })
+                    }
+                  />
+                </View>
+              </View>
+            </View>
+          ) : null}
         </View>
-      </View>
 
-      {/* Card 2: Driving Licence & Work Preference */}
-      <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
-        <View style={styles.cardHeaderRow}>
-          <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
-            <Briefcase size={px(17)} color="#D97706" strokeWidth={2.4} />
-          </View>
-          <View style={styles.headerTextWrap}>
-            <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>
-              Licence & work preference
-            </PartnerText>
-            <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
-              Choose your work availability and enter your Driving Licence.
-            </PartnerText>
-          </View>
-        </View>
+        <View style={[styles.cardDivider, { marginTop: px(4), marginBottom: px(12) }]} />
 
-        <View style={styles.cardDivider} />
+        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(8) }]}>
+          Licence & work preference
+        </PartnerText>
 
         {/* Work Preference / Driver Type (Full-Time vs Part-Time) */}
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
@@ -1109,17 +1167,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                       </PartnerText>
                     </View>
                   </View>
-                  <PartnerText style={[styles.choiceDesc, { fontSize: px(11), marginTop: px(3) }]}>
-                    Connect with Towing Vendors & accept direct customer bookings. Fixed daily & trip earnings.
+                  <PartnerText style={[styles.choiceDesc, { fontSize: px(11), marginTop: px(2) }]}>
+                    Vendor fleet · fixed daily & trip pay
                   </PartnerText>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(4), gap: px(10) }}>
-                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
-                      ✓ Towing Vendor Fleet Ready
-                    </PartnerText>
-                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
-                      ✓ Priority Bookings
-                    </PartnerText>
-                  </View>
                 </View>
               </View>
             </Pressable>
@@ -1154,17 +1204,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                       </PartnerText>
                     </View>
                   </View>
-                  <PartnerText style={[styles.choiceDesc, { fontSize: px(11), marginTop: px(3) }]}>
-                    Work flexible on-demand hours on your own schedule. Direct customer driver-hire gigs.
+                  <PartnerText style={[styles.choiceDesc, { fontSize: px(11), marginTop: px(2) }]}>
+                    On-demand hours · direct customer gigs
                   </PartnerText>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(4), gap: px(10) }}>
-                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
-                      ✓ Independent Gigs Only
-                    </PartnerText>
-                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
-                      ✓ Hourly / On-Demand
-                    </PartnerText>
-                  </View>
                 </View>
               </View>
             </Pressable>
@@ -1185,7 +1227,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           </View>
           <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(10) }]}>
             <FileText size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-            <PartnerTextInput
+            <LicenceInput
               style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
               placeholder="Enter DL number (e.g. OD0220190012345)"
               placeholderTextColor="#9CA3AF"
@@ -1193,6 +1235,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               autoCorrect={false}
               maxLength={18}
               value={driverPersonal.licenseNumber || driverVehicle.licenseNumber}
+              onFocus={() => setLicenceFocused(true)}
+              onBlur={() => setLicenceFocused(false)}
               onChangeText={(text) => {
                 const val = text.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
                 setDriverPersonal({ licenseNumber: val });
@@ -1231,11 +1275,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           <View style={styles.noticeBannerRow}>
             <Info size={px(15)} color="#2563EB" />
             <PartnerText style={[styles.noticeBannerText, { fontSize: px(11), flex: 1 }]}>
-              Vehicle ownership is not required. RACE drivers are professional operators. Towing Vendors provide tow trucks and customers provide vehicles for driver-hire.
+              No vehicle needed. Vendors supply tow trucks; customers supply driver-hire cars.
             </PartnerText>
           </View>
         </View>
       </View>
+      {licenceFocused ? <View style={{ height: px(280) }} /> : null}
     </View>
   );
 
@@ -1573,12 +1618,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       {/* Unified Compact Review Card (3 sections matching Board 1 Screen 4) */}
       <View style={[styles.summaryCard, { padding: px(10), marginBottom: px(8), borderRadius: px(12) }]}>
         {/* Section 1: Personal Details */}
-        <View style={styles.summarySectionCol}>
-          <View style={styles.summarySectionHeader}>
-            <Pressable
-              hitSlop={8}
-              onPress={() => toggleReviewSection('personal')}
-              style={({ pressed }) => [styles.summarySectionLeft, pressed && { opacity: 0.8 }]}>
+        <View style={[styles.summarySectionCol, !reviewExpanded.personal && styles.summarySectionClosed]}>
+          <Pressable onPress={() => toggleReviewSection('personal')} style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionLeft}>
               <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
                 <Check size={px(11)} color="#15803D" strokeWidth={3} />
               </View>
@@ -1591,7 +1633,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                 </View>
               </View>
-            </Pressable>
+            </View>
             <View style={styles.summarySectionRight}>
               <Pressable
                 hitSlop={8}
@@ -1603,43 +1645,31 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
                 <ChevronRight size={px(13)} color="#2563EB" />
               </Pressable>
-              <Pressable
-                hitSlop={10}
-                onPress={() => toggleReviewSection('personal')}
-                style={({ pressed }) => [styles.sectionDropdownBtn, pressed && { opacity: 0.8 }]}>
-                <ChevronDown
-                  size={px(16)}
-                  color="#6B7280"
-                  strokeWidth={2.4}
-                  style={{ transform: [{ rotate: reviewExpanded.personal ? '180deg' : '0deg' }] }}
-                />
-              </Pressable>
+              <View style={styles.sectionDropdownBtn}>
+                {reviewExpanded.personal ? (
+                  <ChevronUp size={px(16)} color="#374151" strokeWidth={2.4} />
+                ) : (
+                  <ChevronDown size={px(16)} color="#374151" strokeWidth={2.4} />
+                )}
+              </View>
             </View>
-          </View>
+          </Pressable>
 
-          {/* Key Information Points (Personal Details) — expands stacked below */}
           {reviewExpanded.personal && (
-            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  <PartnerText style={styles.reviewPointBold}>{driverPersonal.fullName || 'Rajesh Kumar'}</PartnerText>
-                  {'  •  '}+91 {driverPersonal.mobileNumber || '9876543210'}
-                </PartnerText>
-              </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  DOB: <PartnerText style={styles.reviewPointBold}>{driverPersonal.dateOfBirth || '15/05/1992'}</PartnerText>
-                  {'  •  '}{driverPersonal.city || 'Bhubaneswar'}
-                </PartnerText>
-              </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1} ellipsizeMode="tail">
-                  Address: <PartnerText style={styles.reviewPointBold}>{driverPersonal.address || 'Plot 42, Saheed Nagar, Janpath Road'}</PartnerText>
-                </PartnerText>
-              </View>
+            <View style={[styles.reviewDetailsBox, { paddingHorizontal: px(10), paddingVertical: px(4), marginTop: px(8), borderRadius: px(8) }]}>
+              {[
+                ['Name', driverPersonal.fullName || '—'],
+                ['Mobile', driverPersonal.mobileNumber ? `+91 ${driverPersonal.mobileNumber}` : '—'],
+                ['Date of birth', driverPersonal.dateOfBirth || '—'],
+                ['City', [driverPersonal.city, driverPersonal.state].filter(Boolean).join(', ') || '—'],
+                ['PIN code', driverPersonal.pincode || '—'],
+                ['Address', driverPersonal.address || '—'],
+              ].map(([label, value]) => (
+                <View key={label} style={styles.reviewFieldRow}>
+                  <PartnerText style={[styles.reviewFieldLabel, { fontSize: px(12) }]}>{label}</PartnerText>
+                  <PartnerText style={[styles.reviewFieldValue, { fontSize: px(12.5) }]}>{value}</PartnerText>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -1647,12 +1677,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
 
         {/* Section 2: Driver Details */}
-        <View style={styles.summarySectionCol}>
-          <View style={styles.summarySectionHeader}>
-            <Pressable
-              hitSlop={8}
-              onPress={() => toggleReviewSection('vehicle')}
-              style={({ pressed }) => [styles.summarySectionLeft, pressed && { opacity: 0.8 }]}>
+        <View style={[styles.summarySectionCol, !reviewExpanded.vehicle && styles.summarySectionClosed]}>
+          <Pressable onPress={() => toggleReviewSection('vehicle')} style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionLeft}>
               <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
                 <Check size={px(11)} color="#15803D" strokeWidth={3} />
               </View>
@@ -1665,7 +1692,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   <PartnerText style={[styles.checkedPillText, { fontSize: px(9.5) }]}>Checked</PartnerText>
                 </View>
               </View>
-            </Pressable>
+            </View>
             <View style={styles.summarySectionRight}>
               <Pressable
                 hitSlop={8}
@@ -1677,37 +1704,28 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
                 <ChevronRight size={px(13)} color="#2563EB" />
               </Pressable>
-              <Pressable
-                hitSlop={10}
-                onPress={() => toggleReviewSection('vehicle')}
-                style={({ pressed }) => [styles.sectionDropdownBtn, pressed && { opacity: 0.8 }]}>
-                <ChevronDown
-                  size={px(16)}
-                  color="#6B7280"
-                  strokeWidth={2.4}
-                  style={{ transform: [{ rotate: reviewExpanded.vehicle ? '180deg' : '0deg' }] }}
-                />
-              </Pressable>
+              <View style={styles.sectionDropdownBtn}>
+                {reviewExpanded.vehicle ? (
+                  <ChevronUp size={px(16)} color="#374151" strokeWidth={2.4} />
+                ) : (
+                  <ChevronDown size={px(16)} color="#374151" strokeWidth={2.4} />
+                )}
+              </View>
             </View>
-          </View>
+          </Pressable>
 
           {reviewExpanded.vehicle && (
-            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]}>
-                  Work type: <PartnerText style={styles.reviewPointBold}>{driverPersonal.driverType || 'Full-Time'}</PartnerText>
-                </PartnerText>
-              </View>
-              <View style={styles.reviewPointRow}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]}>
-                  Driving licence: <PartnerText style={styles.reviewPointBold}>{driverPersonal.licenseNumber || driverVehicle.licenseNumber || 'Not entered'}</PartnerText>
-                </PartnerText>
-              </View>
-              <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5), marginLeft: px(9) }]}>
-                No personal vehicle is required for a Driver account.
-              </PartnerText>
+            <View style={[styles.reviewDetailsBox, { paddingHorizontal: px(10), paddingVertical: px(4), marginTop: px(8), borderRadius: px(8) }]}>
+              {[
+                ['Work type', driverPersonal.driverType || 'Full-Time'],
+                ['Licence number', driverPersonal.licenseNumber || driverVehicle.licenseNumber || '—'],
+                ['Experience', driverPersonal.yearsOfExperience || '—'],
+              ].map(([label, value]) => (
+                <View key={label} style={styles.reviewFieldRow}>
+                  <PartnerText style={[styles.reviewFieldLabel, { fontSize: px(12) }]}>{label}</PartnerText>
+                  <PartnerText style={[styles.reviewFieldValue, { fontSize: px(12.5) }]}>{value}</PartnerText>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -1715,12 +1733,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
 
         {/* Section 3: Documents */}
-        <View style={styles.summarySectionCol}>
-          <View style={styles.summarySectionHeader}>
-            <Pressable
-              hitSlop={8}
-              onPress={() => toggleReviewSection('documents')}
-              style={({ pressed }) => [styles.summarySectionLeft, pressed && { opacity: 0.8 }]}>
+        <View style={[styles.summarySectionCol, !reviewExpanded.documents && styles.summarySectionClosed]}>
+          <Pressable onPress={() => toggleReviewSection('documents')} style={styles.summarySectionHeader}>
+            <View style={styles.summarySectionLeft}>
               <View
                 style={[
                   styles.headerCheckBadge,
@@ -1754,7 +1769,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   </PartnerText>
                 </View>
               </View>
-            </Pressable>
+            </View>
             <View style={styles.summarySectionRight}>
               <Pressable
                 hitSlop={8}
@@ -1766,42 +1781,35 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
                 <ChevronRight size={px(13)} color="#2563EB" />
               </Pressable>
-              <Pressable
-                hitSlop={10}
-                onPress={() => toggleReviewSection('documents')}
-                style={({ pressed }) => [styles.sectionDropdownBtn, pressed && { opacity: 0.8 }]}>
-                <ChevronDown
-                  size={px(16)}
-                  color="#6B7280"
-                  strokeWidth={2.4}
-                  style={{ transform: [{ rotate: reviewExpanded.documents ? '180deg' : '0deg' }] }}
-                />
-              </Pressable>
+              <View style={styles.sectionDropdownBtn}>
+                {reviewExpanded.documents ? (
+                  <ChevronUp size={px(16)} color="#374151" strokeWidth={2.4} />
+                ) : (
+                  <ChevronDown size={px(16)} color="#374151" strokeWidth={2.4} />
+                )}
+              </View>
             </View>
-          </View>
+          </Pressable>
 
-          {/* Key Document Status & Badges — expands stacked below */}
           {reviewExpanded.documents && (
-            <View style={[styles.reviewDetailsBox, { padding: px(6), marginTop: px(5), borderRadius: px(7) }]}>
-              <View style={styles.reviewDocTagsRow}>
-                {CORE_REVIEW_DOCUMENTS.map((doc) => (
-                  <View
-                    key={doc.id}
-                    style={[
-                      styles.docReviewTag,
-                      { paddingHorizontal: px(5), paddingVertical: px(1.5), borderRadius: px(4) },
-                    ]}>
-                    <Check size={px(8.5)} color="#047857" strokeWidth={3} style={{ marginRight: px(3) }} />
-                    <PartnerText style={[styles.docReviewTagText, { fontSize: px(9.5) }]}>{doc.title}</PartnerText>
+            <View style={[styles.reviewDetailsBox, { paddingHorizontal: px(10), paddingVertical: px(4), marginTop: px(8), borderRadius: px(8) }]}>
+              {CORE_REVIEW_DOCUMENTS.map((doc) => {
+                const uploaded = isDocUploaded(doc.id);
+                return (
+                  <View key={doc.id} style={styles.reviewFieldRow}>
+                    <PartnerText style={[styles.reviewFieldLabel, { fontSize: px(12), width: undefined, flex: 1 }]}>
+                      {doc.title}
+                    </PartnerText>
+                    <PartnerText
+                      style={[
+                        styles.reviewFieldValue,
+                        { fontSize: px(12.5), flex: 0, color: uploaded ? '#047857' : '#B45309' },
+                      ]}>
+                      {uploaded ? 'Uploaded' : 'Pending'}
+                    </PartnerText>
                   </View>
-                ))}
-              </View>
-              <View style={[styles.reviewPointRow, { marginTop: px(3) }]}>
-                <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
-                <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]} numberOfLines={1}>
-                  {coreUploadedCount} of {CORE_REVIEW_DOCUMENTS.length} core documents uploaded & verified
-                </PartnerText>
-              </View>
+                );
+              })}
             </View>
           )}
         </View>
@@ -2095,65 +2103,6 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         </Pressable>
       </Modal>
 
-      {/* Emergency Contact Modal (Step 1) */}
-      <Modal visible={emergencyModalVisible} transparent animationType="slide">
-        <Pressable style={styles.modalOverlay} onPress={() => setEmergencyModalVisible(false)}>
-          <Pressable
-            style={[styles.modalSheet, { borderTopLeftRadius: px(16), borderTopRightRadius: px(16) }]}
-            onPress={(e) => e.stopPropagation()}>
-            <View style={styles.sheetHeader}>
-              <PartnerText style={[styles.sheetTitle, { fontSize: px(15) }]}>Emergency Contact</PartnerText>
-              <Pressable hitSlop={12} onPress={() => setEmergencyModalVisible(false)}>
-                <X size={px(18)} color="#4B5563" />
-              </Pressable>
-            </View>
-            <PartnerText style={[styles.dobHint, { fontSize: px(11.5), marginBottom: px(12) }]}>
-              This contact will only be called in case of road accidents or emergencies.
-            </PartnerText>
-            <View style={{ marginBottom: px(10) }}>
-              <View style={styles.inputLabelRow}>
-                <PartnerText style={[styles.inputLabel, { fontSize: px(11.5) }]}>Contact Name</PartnerText>
-                {driverPersonal.emergencyContactName && driverPersonal.emergencyContactName.length >= 20 ? (
-                  <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
-                    {driverPersonal.emergencyContactName.length}/35
-                  </PartnerText>
-                ) : null}
-              </View>
-              <PartnerTextInput
-                style={[styles.simpleInput, { height: px(40), fontSize: px(13) }]}
-                placeholder="e.g. Ramesh Kumar (Brother)"
-                maxLength={35}
-                value={driverPersonal.emergencyContactName ?? ''}
-                onChangeText={(text) =>
-                  setDriverPersonal({
-                    emergencyContactName: text.replace(/[^a-zA-Z\s.-]/g, ''),
-                  })
-                }
-              />
-            </View>
-            <View style={{ marginBottom: px(14) }}>
-              <PartnerText style={[styles.inputLabel, { fontSize: px(11.5) }]}>Mobile Number</PartnerText>
-              <PartnerTextInput
-                style={[styles.simpleInput, { height: px(40), fontSize: px(13) }]}
-                keyboardType="number-pad"
-                maxLength={10}
-                placeholder="10-digit emergency number"
-                value={driverPersonal.emergencyContactNumber ?? ''}
-                onChangeText={(emergencyContactNumber) =>
-                  setDriverPersonal({
-                    emergencyContactNumber: emergencyContactNumber.replace(/[^0-9]/g, ''),
-                  })
-                }
-              />
-            </View>
-            <Pressable
-              onPress={() => setEmergencyModalVisible(false)}
-              style={[styles.primaryModalBtn, { height: px(40), borderRadius: px(8) }]}>
-              <PartnerText style={[styles.primaryModalBtnText, { fontSize: px(13.5) }]}>Save Emergency Contact</PartnerText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
 
 
@@ -3429,7 +3378,12 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   summarySectionCol: {
-    paddingVertical: 3,
+    paddingVertical: 4,
+  },
+  summarySectionClosed: {
+    paddingVertical: 10,
+    minHeight: 52,
+    justifyContent: 'center',
   },
   summarySectionHeader: {
     flexDirection: 'row',
@@ -3454,12 +3408,32 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   sectionDropdownBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
+  },
+  reviewFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E5E7EB',
+  },
+  reviewFieldLabel: {
+    width: 108,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  reviewFieldValue: {
+    flex: 1,
+    color: '#111827',
+    fontWeight: '600',
+    textAlign: 'right',
   },
   sectionIconWrap: {
     backgroundColor: '#FEF3C7',
@@ -3603,8 +3577,9 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
     borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: 0,
   },
   choiceCardSelected: {
     borderColor: '#2563EB',

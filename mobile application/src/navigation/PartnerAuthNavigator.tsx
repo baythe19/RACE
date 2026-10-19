@@ -5,7 +5,6 @@ import PartnerLoginScreen from '../screens/partner/auth/PartnerLoginScreen';
 import PartnerOtpVerificationScreen from '../screens/partner/auth/PartnerOtpVerificationScreen';
 import PartnerRoleSelectionScreen from '../screens/partner/auth/PartnerRoleSelectionScreen';
 import PartnerSplashScreen from '../screens/partner/auth/PartnerSplashScreen';
-import PartnerWelcomeScreen from '../screens/partner/auth/PartnerWelcomeScreen';
 import { useAuthStore } from '../store/authStore';
 import type { PartnerAuthStackParamList } from '../types/partnerNavigation';
 import { colors } from '../theme';
@@ -26,7 +25,7 @@ export default function PartnerAuthNavigator() {
   return (
     <Stack.Navigator
       key={partnerAuthEntry}
-      initialRouteName={partnerAuthEntry === 'PartnerWelcome' ? 'PartnerLogin' : partnerAuthEntry}
+      initialRouteName={partnerAuthEntry === 'PartnerSplash' ? 'PartnerSplash' : 'PartnerLogin'}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
@@ -36,7 +35,6 @@ export default function PartnerAuthNavigator() {
       <Stack.Screen name="PartnerLogin" component={PartnerLoginScreen} />
       <Stack.Screen name="PartnerOtpVerification" component={PartnerOtpVerificationScreen} />
       <Stack.Screen name="PartnerRoleSelection" component={PartnerRoleSelectionScreen} />
-      <Stack.Screen name="PartnerWelcome" component={PartnerWelcomeScreen} />
     </Stack.Navigator>
   );
 }

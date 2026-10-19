@@ -8,6 +8,7 @@ import { ArrowLeft, Crosshair, MapPin, Search } from 'lucide-react-native';
 
 import { BHUBANESWAR_DEFAULT, forwardGeocode, reverseGeocode } from '../../utils/googleMaps';
 import { formatLocationDisplay } from '../../utils/readableAddress';
+import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
 const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
@@ -126,18 +127,14 @@ export default function LocationPickerMap({
   const handleCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      const position = await getCurrentPositionWhenAllowed(Location.Accuracy.High);
+      if (!position) {
         Alert.alert(
           'Location access denied',
           'Location access denied. Please search or move map manually.',
         );
         return;
       }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
       animateTo(position.coords.latitude, position.coords.longitude);
     } catch {
       Alert.alert('Location error', 'Unable to get your location. Please search or move the map.');

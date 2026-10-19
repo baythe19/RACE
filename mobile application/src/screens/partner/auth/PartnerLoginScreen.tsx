@@ -173,7 +173,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         if (hasExplicitRole && partnerRole) {
           goToRegistration(partnerRole);
         } else {
-          navigation.navigate('PartnerRoleSelection');
+          navigation.navigate('PartnerRoleSelection', { mobileNumber });
         }
         return;
       }
@@ -191,14 +191,44 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
       if (errMsg.toLowerCase().includes('registered as a vendor')) {
         setPartnerRole('vendor');
         setSelectedRole('vendor');
-        setError('Detected Vendor account! Switched to Vendor mode — tap Send OTP.');
-        return;
+        try {
+          const vendorResult = await sendOtpMutation.mutateAsync({
+            mobileNumber: phoneToUse || '9876543210',
+            role: 'vendor',
+          });
+          navigation.navigate('PartnerOtpVerification', {
+            mobileNumber: phoneToUse || '9876543210',
+            role: 'vendor',
+            isExistingUser: vendorResult.isExistingUser ?? false,
+            devOtp: vendorResult.devOtp,
+            otpMessage: vendorResult.message,
+          });
+          return;
+        } catch {
+          setError('Detected Vendor account! Tap Send OTP again to continue.');
+          return;
+        }
       }
       if (errMsg.toLowerCase().includes('registered as a driver')) {
         setPartnerRole('driver');
         setSelectedRole('driver');
-        setError('Detected Driver account! Switched to Driver mode — tap Send OTP.');
-        return;
+        try {
+          const driverResult = await sendOtpMutation.mutateAsync({
+            mobileNumber: phoneToUse || '9876543210',
+            role: 'driver',
+          });
+          navigation.navigate('PartnerOtpVerification', {
+            mobileNumber: phoneToUse || '9876543210',
+            role: 'driver',
+            isExistingUser: driverResult.isExistingUser ?? false,
+            devOtp: driverResult.devOtp,
+            otpMessage: driverResult.message,
+          });
+          return;
+        } catch {
+          setError('Detected Driver account! Tap Send OTP again to continue.');
+          return;
+        }
       }
       if (isRoleMismatchError(err)) {
         setError(
@@ -278,103 +308,15 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
             {/* Title & Subtitle */}
             <View style={[styles.titleSection, { marginTop: px(18) }]}>
               <PartnerText style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
-                {hasExplicitRole ? 'Sign in to RACE' : 'Partner Sign In'}
+                Partner Login
               </PartnerText>
               <PartnerText style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
-                {hasExplicitRole
-                  ? "We'll verify your partner account with a secure OTP."
-                  : 'Enter your phone number to sign in or register as a partner.'}
+                Enter your phone number to sign in or register as a partner.
               </PartnerText>
             </View>
 
-            {/* Role Card / Universal Partner Badge */}
-            {hasExplicitRole && partnerRole ? (
-              <View
-                style={[
-                  styles.roleBadgeCard,
-                  {
-                    marginTop: px(22),
-                    paddingHorizontal: px(12),
-                    paddingVertical: px(11),
-                    borderRadius: px(16),
-                  },
-                ]}>
-                <View
-                  style={[
-                    styles.roleIconBox,
-                    {
-                      width: px(36),
-                      height: px(36),
-                      borderRadius: px(10),
-                      backgroundColor: isDriver ? '#FEF3C7' : '#F3F4F6',
-                    },
-                  ]}>
-                  {isDriver ? (
-                    <Image
-                      source={images.icons.truck}
-                      style={{ width: px(28), height: px(18) }}
-                      resizeMode="contain"
-                      accessibilityLabel="Driver"
-                    />
-                  ) : (
-                    <Building2 size={px(20)} color="#374151" strokeWidth={2.2} />
-                  )}
-                </View>
-
-                <PartnerText style={[styles.roleBadgeTitle, { fontSize: px(14.5) }]} numberOfLines={1}>
-                  {roleDisplayTitle}
-                </PartnerText>
-
-                <View style={[styles.roleDivider, { height: px(18), marginHorizontal: px(8) }]} />
-
-                <Pressable
-                  onPress={handleChangeRole}
-                  hitSlop={8}
-                  style={({ pressed }) => [pressed && styles.pressed]}>
-                  <PartnerText style={[styles.changeRoleText, { fontSize: px(13.5) }]}>
-                    {roleChangeLabel}
-                  </PartnerText>
-                </Pressable>
-              </View>
-            ) : (
-              <View
-                style={[
-                  styles.roleBadgeCard,
-                  {
-                    marginTop: px(20),
-                    paddingHorizontal: px(14),
-                    paddingVertical: px(10),
-                    borderRadius: px(14),
-                    backgroundColor: '#F8FAFC',
-                    borderColor: '#E2E8F0',
-                    borderWidth: 1,
-                  },
-                ]}>
-                <View
-                  style={[
-                    styles.roleIconBox,
-                    {
-                      width: px(34),
-                      height: px(34),
-                      borderRadius: px(10),
-                      backgroundColor: '#FEF3C7',
-                    },
-                  ]}>
-                  <Sparkles size={px(17)} color="#D97706" strokeWidth={2.4} />
-                </View>
-                <View style={{ flex: 1, marginLeft: px(10) }}>
-                  <PartnerText style={{ fontSize: px(13.5), fontWeight: '700', color: '#1E293B' }}>
-                    Roadside Partner Portal
-                  </PartnerText>
-                  <PartnerText style={{ fontSize: px(11.5), color: '#64748B', marginTop: px(1) }}>
-                    Driver & Towing Vendor registration / sign in
-                  </PartnerText>
-                </View>
-              </View>
-            )}
-
             {/* Mobile Number Label & Inputs */}
-            <View style={[styles.inputSection, { marginTop: px(26) }]}>
+            <View style={[styles.inputSection, { marginTop: px(28) }]}>
               <PartnerText style={[styles.fieldLabel, { fontSize: px(14) }]}>Mobile number</PartnerText>
 
               <View style={[styles.phoneRow, { marginTop: px(8), gap: px(10) }]}>
@@ -452,66 +394,19 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
               />
             </Pressable>
 
-            {/* Quick Test Mode Buttons */}
-            {UI_PREVIEW_MODE ? (
-              <View style={{ marginTop: px(12), gap: px(8) }}>
-                {UI_PREVIEW_MUTATIONS_ENABLED ? <Pressable
-                  style={styles.devBtn}
-                  onPress={() => void handleQuickMockLogin(isDriver ? 'driver' : 'vendor')}>
-                  <Zap size={14} color="#D97706" />
-                  <PartnerText style={styles.devBtnText}>
-                    ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Dashboard (Mock)
-                  </PartnerText>
-                </Pressable> : null}
-                <Pressable
-                  style={styles.devBtn}
-                  onPress={() => goToRegistration(isDriver ? 'driver' : 'vendor')}>
-                  <Sparkles size={14} color="#D97706" />
-                  <PartnerText style={styles.devBtnText}>
-                    ⚡ 1-Tap {isDriver ? 'Driver' : 'Vendor'} Registration Flow
-                  </PartnerText>
-                </Pressable>
-              </View>
-            ) : null}
-
             {/* Security Assurance with Word Wrapping */}
-            <View style={[styles.securityNotice, { marginTop: px(16) }]}>
+            <View style={[styles.securityNotice, { marginTop: px(18) }]}>
               <ShieldCheck size={px(18)} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />
               <PartnerText style={[styles.securityText, { fontSize: px(12.5) }]}>
                 Your number is used to verify your partner account.
               </PartnerText>
             </View>
 
-            {/* Partner Benefits Trust Card (Fills bottom void professionally) */}
-            <View style={[styles.trustSectionCard, { marginTop: px(26), padding: px(16), borderRadius: px(16) }]}>
-              <View style={styles.trustRow}>
-                <View style={[styles.trustIconCircle, { backgroundColor: '#FEF3C7' }]}>
-                  <Zap size={px(16)} color="#D97706" strokeWidth={2.4} />
-                </View>
-                <View style={styles.trustTextCol}>
-                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>{isDriver ? 'Driver-Hire requests' : 'Towing & Driver-Hire leads'}</PartnerText>
-                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>{isDriver ? 'Receive requests from customers who need a driver' : 'Review service requests for your fleet'}</PartnerText>
-                </View>
-              </View>
-
-              <View style={[styles.trustInnerDivider, { marginVertical: px(12) }]} />
-
-              <View style={styles.trustRow}>
-                <View style={[styles.trustIconCircle, { backgroundColor: '#ECFDF5' }]}>
-                  <Wallet size={px(16)} color="#059669" strokeWidth={2.4} />
-                </View>
-                <View style={styles.trustTextCol}>
-                  <PartnerText style={[styles.trustTitle, { fontSize: px(13.5) }]}>{isDriver ? 'Vendor job details' : 'Connected Drivers'}</PartnerText>
-                  <PartnerText style={[styles.trustSubtitle, { fontSize: px(12) }]}>{isDriver ? 'See assigned vehicles and job updates in your account' : 'Connect verified Drivers and assign fleet vehicles per job'}</PartnerText>
-                </View>
-              </View>
-            </View>
-
             {/* Subtle Horizontal Divider */}
-            <View style={[styles.footerDivider, { marginTop: px(26) }]} />
+            <View style={[styles.footerDivider, { marginTop: px(36) }]} />
 
             {/* Terms and Privacy Footer */}
-            <View style={[styles.footerBlock, { marginTop: px(10) }]}>
+            <View style={[styles.footerBlock, { marginTop: px(12) }]}>
               <PartnerText style={[styles.footerText, { fontSize: px(12) }]}>
                 By continuing, you agree to our
               </PartnerText>
