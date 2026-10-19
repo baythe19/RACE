@@ -12,6 +12,10 @@ import DriverDashboardScreen from '../screens/partner/driver/DriverDashboardScre
 import DriverJobsScreen from '../screens/partner/driver/DriverJobsScreen';
 import DriverActiveJobScreen from '../screens/partner/driver/DriverActiveJobScreen';
 import DriverMyVendorScreen from '../screens/partner/driver/DriverMyVendorScreen';
+import {
+  useDriverVendorInvitationsQuery,
+  useDriverVendorMembershipQuery,
+} from '../services/vendor/useVendorMembershipQueries';
 import PartnerJobsScreen from '../screens/partner/PartnerJobsScreen';
 import VendorBookingTrackingScreen from '../screens/partner/VendorBookingTrackingScreen';
 import PartnerAccountScreen from '../screens/partner/PartnerAccountScreen';
@@ -230,6 +234,10 @@ export default function PartnerNavigator() {
   const isPartner = user?.role === 'driver' || user?.role === 'vendor';
   const isDriver = user?.role === 'driver';
 
+  const { data: driverMembership } = useDriverVendorMembershipQuery(isDriver);
+  const { data: driverInvitations = [] } = useDriverVendorInvitationsQuery(isDriver && !driverMembership);
+  const showVendorTab = isDriver && Boolean(driverMembership || driverInvitations.length > 0);
+
   return (
     /* The incoming-request alert wraps the navigator so it can pop over any tab
        without being re-mounted per screen. */
@@ -257,7 +265,7 @@ export default function PartnerNavigator() {
           options={{ title: 'Drivers' }}
         />
       ) : null}
-      {isDriver ? (
+      {showVendorTab ? (
         <Tab.Screen
           name="PartnerVendor"
           component={DriverMyVendorScreen}

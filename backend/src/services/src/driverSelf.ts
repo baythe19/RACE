@@ -13,6 +13,8 @@ export const registerDriverSelfSchema = z.object({
   driverType: z.enum(['Tow Driver', 'Full-Time', 'Part-Time']).default('Tow Driver'),
   vehicleRegistration: z.string().min(4).max(20).optional(),
   city: z.string().min(2).max(100).optional(),
+  state: z.string().max(100).optional(),
+  pincode: z.string().max(10).optional(),
   vehicleType: z.string().max(50).optional(),
   dateOfBirth: z.string().optional(),
   emergencyContact: z
@@ -73,14 +75,15 @@ export class DriverSelfService {
         user.address = {
           line1: dto.address,
           city: dto.city ?? user.address?.city ?? 'Bhubaneswar',
-          state: 'Odisha',
-          pincode: user.address?.pincode ?? '751001',
+          state: dto.state ?? user.address?.state ?? 'Odisha',
+          pincode: dto.pincode ?? user.address?.pincode ?? '751001',
           country: 'India',
         };
       }
       user.driverProfile.licenseNo = dto.licenseNo;
       user.driverProfile.driverType = dto.driverType;
       user.driverProfile.city = dto.city ?? user.driverProfile.city ?? 'Bhubaneswar';
+      user.driverProfile.state = dto.state ?? user.driverProfile.state ?? 'Odisha';
       if (dto.vehicleRegistration) {
         user.driverProfile.vehicleRegistration = dto.vehicleRegistration;
       }
@@ -125,8 +128,8 @@ export class DriverSelfService {
       user.address = {
         line1: dto.address,
         city: dto.city ?? 'Bhubaneswar',
-        state: 'Odisha',
-        pincode: '751001',
+        state: dto.state ?? 'Odisha',
+        pincode: dto.pincode ?? '751001',
         country: 'India',
       };
     }
@@ -140,7 +143,7 @@ export class DriverSelfService {
       licenseNo: dto.licenseNo,
       driverType: dto.driverType,
       city: dto.city ?? 'Bhubaneswar',
-      state: 'Odisha',
+      state: dto.state ?? 'Odisha',
       vehicleRegistration: dto.vehicleRegistration,
       experienceYears: dto.experienceYears,
       languages: dto.languages,

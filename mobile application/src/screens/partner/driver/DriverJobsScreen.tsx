@@ -32,6 +32,7 @@ import {
   RefreshCw,
   Route,
   TriangleAlert,
+  Truck,
   User,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -728,11 +729,14 @@ function ActiveJobRow({
           marginTop: px(12),
           height: px(42),
           borderRadius: px(12),
-          backgroundColor: pressed ? '#047857' : '#059669',
+          backgroundColor:
+            job.status === 'DRIVER_ASSIGNED'
+              ? pressed ? '#B45309' : '#D97706'
+              : pressed ? '#047857' : '#059669',
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          shadowColor: '#059669',
+          shadowColor: job.status === 'DRIVER_ASSIGNED' ? '#D97706' : '#059669',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.18,
           shadowRadius: 4,
@@ -746,7 +750,9 @@ function ActiveJobRow({
             color: '#FFFFFF',
             letterSpacing: 0.3,
           }}>
-          Continue Active Trip
+          {job.status === 'DRIVER_ASSIGNED'
+            ? 'Accept Assignment & Start Navigation'
+            : 'Continue Active Trip'}
         </PartnerText>
         <ArrowRight size={px(15)} color="#FFFFFF" strokeWidth={2.6} style={{ marginLeft: px(6) }} />
       </Pressable>

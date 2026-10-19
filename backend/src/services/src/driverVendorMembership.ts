@@ -38,7 +38,8 @@ export class DriverVendorMembershipService {
     if (!driver || !driver.isVerified || !driver.driverProfile ||
         !hasUserCapability(driver, 'driver') || driver.driverProfile.status !== 'APPROVED' ||
         driver.activeBookingId || driver.accountStatus === 'SUSPENDED' ||
-        driver.accountStatus === 'INACTIVE') {
+        driver.accountStatus === 'INACTIVE' ||
+        driver.driverProfile.driverType === 'Part-Time') {
       return GENERIC_INVITE_RESULT;
     }
 
@@ -344,6 +345,91 @@ export class DriverVendorMembershipService {
       }
     }
     return { id: updated.id, status: updated.status, revokedAt: updated.revokedAt?.toISOString() };
+  }
+
+  /**
+   * Search registered Full-Time drivers by name, phone, or driver code.
+   * Invariant: Part-Time drivers are strictly excluded from vendor search.
+   */
+  async searchDrivers(vendorUserId: string, rawQuery: string) {
+    const vendor = await this.approvedVendor(vendorUserId);
+    const query = rawQuery?.trim() ?? '';
+    if (query.length < 2) return [];
+
+    const digits = query.replace(/\D/g, '');
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const searchOr: Array<Record<string, unknown>> = [
+      { fullName: { $regex: escaped, $options: 'i' } },
+      { 'driverProfile.driverCode': { $regex: escaped, $options: 'i' } },
+    ];
+    if (digits.length >= 3) {
+      searchOr.push({ mobileNumber: { $regex: digits } });
+    }
+
+    const drivers = await UserModel.find({
+      role: 'driver',
+      isVerified: true,
+      'driverProfile.status': 'APPROVED',
+      'driverProfile.driverType': { $in: ['Full-Time', 'Tow Driver'] },
+      accountStatus: { $nin: ['SUSPENDED', 'INACTIVE'] },
+      $or: searchOr,
+    })
+      .select('fullName mobileNumber email driverProfile.driverCode driverProfile.driverType driverProfile.experienceYears driverProfile.city driverProfile.rating isAvailable activeBookingId')
+      .limit(20)
+      .lean()
+      .exec();
+
+    if (drivers.length === 0) return [];
+
+    const driverIds = drivers.map((d) => d._id);
+    const memberships = await DriverVendorMembershipModel.find({
+      driverUserId: { $in: driverIds },
+      status: { $in: ['PENDING', 'ACTIVE'] },
+    }).lean().exec();
+
+    const vendorIdStr = vendor._id.toString();
+
+    return drivers.map((d) => {
+      const driverIdStr = d._id.toString();
+      const relevant = memberships.filter((m) => m.driverUserId.toString() === driverIdStr);
+      const activeForVendor = relevant.find((m) => m.vendorUserId.toString() === vendorIdStr && m.status === 'ACTIVE');
+      const pendingForVendor = relevant.find((m) => m.vendorUserId.toString() === vendorIdStr && m.status === 'PENDING');
+      const activeForOther = relevant.find((m) => m.vendorUserId.toString() !== vendorIdStr && m.status === 'ACTIVE');
+
+      let membershipStatus: 'AVAILABLE_FOR_INVITE' | 'INVITED_PENDING' | 'ALREADY_IN_FLEET' | 'IN_ANOTHER_FLEET' = 'AVAILABLE_FOR_INVITE';
+      let invitationId: string | undefined;
+
+      if (activeForVendor) {
+        membershipStatus = 'ALREADY_IN_FLEET';
+        invitationId = activeForVendor._id.toString();
+      } else if (pendingForVendor) {
+        membershipStatus = 'INVITED_PENDING';
+        invitationId = pendingForVendor._id.toString();
+      } else if (activeForOther) {
+        membershipStatus = 'IN_ANOTHER_FLEET';
+      }
+
+      const rawPhone = d.mobileNumber || '';
+      const maskedPhone = rawPhone.length >= 10
+        ? `${rawPhone.slice(0, 3)}****${rawPhone.slice(-3)}`
+        : rawPhone;
+
+      return {
+        id: driverIdStr,
+        name: d.fullName ?? 'Driver',
+        maskedPhone,
+        phone: rawPhone,
+        driverCode: d.driverProfile?.driverCode ?? 'DRV',
+        driverType: d.driverProfile?.driverType ?? 'Full-Time',
+        experienceYears: d.driverProfile?.experienceYears,
+        city: d.driverProfile?.city,
+        rating: d.driverProfile?.rating ?? 0,
+        isAvailable: d.isAvailable === true,
+        isBusy: Boolean(d.activeBookingId),
+        membershipStatus,
+        invitationId,
+      };
+    });
   }
 }
 

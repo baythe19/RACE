@@ -24,6 +24,7 @@ import { ActivityIndicator, Alert, Animated, Image, Linking, Modal, Pressable, S
 import {
   ArrowRight,
   Bell,
+  Building2,
   CalendarDays,
   Car,
   Check,
@@ -35,6 +36,7 @@ import {
   Phone,
   ShieldCheck,
   TriangleAlert,
+  Truck,
   User,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -64,6 +66,11 @@ import {
   useDriverProfileQuery,
   useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
+import {
+  useDriverVendorInvitationsQuery,
+  useDriverVendorMembershipQuery,
+  useRespondToVendorInvitationMutation,
+} from '../../../services/vendor/useVendorMembershipQueries';
 import { useNotificationsQuery } from '../../../services/useNotificationQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
@@ -907,6 +914,13 @@ export default function DriverDashboardScreen() {
     isError: activeError,
     refetch: refetchActive,
   } = useDriverActiveJobQuery(isApproved);
+  const { data: driverMembership } = useDriverVendorMembershipQuery(isApproved);
+  const {
+    data: vendorInvitations = [],
+    refetch: refetchVendorInvitations,
+  } = useDriverVendorInvitationsQuery(isApproved && !driverMembership);
+  const respondInvitationMutation = useRespondToVendorInvitationMutation();
+
   const availabilityMutation = useDriverAvailabilityMutation();
   useRefreshDriverDataOnFocus(true);
 
@@ -1022,11 +1036,17 @@ export default function DriverDashboardScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([refetchProfile(), refetchJobs(), refetchOffers(), refetchActive()]);
+      await Promise.all([
+        refetchProfile(),
+        refetchJobs(),
+        refetchOffers(),
+        refetchActive(),
+        refetchVendorInvitations(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [refetchActive, refetchJobs, refetchOffers, refetchProfile]);
+  }, [refetchActive, refetchJobs, refetchOffers, refetchProfile, refetchVendorInvitations]);
 
   const name = firstName(user?.fullName);
   const availableBars = bars.some(bar => bar.value > 0);
@@ -1367,6 +1387,144 @@ export default function DriverDashboardScreen() {
           </View>
         )}
       </View>
+
+      {/* vendor fleet invitation card ------------------------------------ */}
+      {vendorInvitations.length > 0 ? (
+        <View
+          style={{
+            marginTop: px(10),
+            borderRadius: px(16),
+            borderWidth: 1.5,
+            borderColor: '#FCD34D',
+            backgroundColor: '#FFFDF5',
+            padding: px(14),
+            shadowColor: '#F59E0B',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 6,
+            elevation: 2,
+          }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                width: px(38),
+                height: px(38),
+                borderRadius: px(12),
+                backgroundColor: '#FEF3C7',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: '#FDE68A',
+              }}>
+              <Building2 size={px(20)} color="#D97706" strokeWidth={2.4} />
+            </View>
+            <View style={{ flex: 1, marginLeft: px(10) }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <PartnerText
+                  style={{
+                    fontSize: px(14),
+                    fontWeight: '800',
+                    color: '#1E293B',
+                  }}>
+                  Vendor Fleet Invitation
+                </PartnerText>
+                <View
+                  style={{
+                    backgroundColor: '#FEF3C7',
+                    borderRadius: px(R.pill),
+                    paddingHorizontal: px(7),
+                    paddingVertical: px(2),
+                    borderWidth: 1,
+                    borderColor: '#FDE68A',
+                  }}>
+                  <PartnerText style={{ fontSize: px(9.5), fontWeight: '700', color: '#B45309' }}>
+                    NEW
+                  </PartnerText>
+                </View>
+              </View>
+              <PartnerText
+                style={{
+                  fontSize: px(12),
+                  lineHeight: px(16),
+                  color: '#475569',
+                  marginTop: px(2),
+                }}>
+                <PartnerText style={{ fontWeight: '700', color: '#0F172A' }}>
+                  {vendorInvitations[0].vendor.name}
+                </PartnerText>{' '}
+                has invited you to join their fleet as a Full-Time driver.
+              </PartnerText>
+            </View>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(8), marginTop: px(12) }}>
+            <Pressable
+              disabled={respondInvitationMutation.isPending}
+              onPress={() => {
+                respondInvitationMutation.mutate(
+                  { id: vendorInvitations[0].id, decision: 'decline' },
+                  {
+                    onError: error =>
+                      Alert.alert('Could not update', error instanceof Error ? error.message : 'Please try again.'),
+                  },
+                );
+              }}
+              style={({ pressed }) => ({
+                flex: 1,
+                height: px(36),
+                borderRadius: px(10),
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                backgroundColor: pressed ? '#F1F5F9' : '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+              })}>
+              <PartnerText style={{ fontSize: px(12.5), fontWeight: '700', color: '#64748B' }}>
+                Decline
+              </PartnerText>
+            </Pressable>
+
+            <Pressable
+              disabled={respondInvitationMutation.isPending}
+              onPress={() => {
+                respondInvitationMutation.mutate(
+                  { id: vendorInvitations[0].id, decision: 'accept' },
+                  {
+                    onSuccess: () => {
+                      Alert.alert(
+                        'Connected to Fleet',
+                        `You are now officially connected with ${vendorInvitations[0].vendor.name}.`,
+                      );
+                    },
+                    onError: error =>
+                      Alert.alert('Could not update', error instanceof Error ? error.message : 'Please try again.'),
+                  },
+                );
+              }}
+              style={({ pressed }) => ({
+                flex: 1.5,
+                height: px(36),
+                borderRadius: px(10),
+                backgroundColor: pressed ? '#E08A00' : '#FEA701',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'row',
+                gap: px(5),
+              })}>
+              {respondInvitationMutation.isPending ? (
+                <ActivityIndicator size="small" color="#000000" />
+              ) : (
+                <>
+                  <Check size={px(15)} color="#000000" strokeWidth={2.8} />
+                  <PartnerText style={{ fontSize: px(12.5), fontWeight: '800', color: '#000000' }}>
+                    Accept & Connect
+                  </PartnerText>
+                </>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
 
       {/* location health -------------------------------------------------- */}
       {isOnline && locationIssue ? (
@@ -1878,20 +2036,23 @@ export default function DriverDashboardScreen() {
             </View>
           ) : null}
 
-          {/* Primary Action Button (Clear CTA so user knows to click to get access) */}
+          {/* Primary Action Button */}
           <Pressable
             onPress={openActiveJob}
             accessibilityRole="button"
             accessibilityLabel={`Open active job #${activeJob.bookingNumber}`}
             style={({ pressed }) => ({
               marginTop: px(10),
-              height: px(38),
+              height: px(40),
               borderRadius: px(11),
-              backgroundColor: pressed ? '#047857' : '#059669',
+              backgroundColor:
+                activeJob.status === 'DRIVER_ASSIGNED'
+                  ? pressed ? '#B45309' : '#D97706'
+                  : pressed ? '#047857' : '#059669',
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'center',
-              shadowColor: '#059669',
+              shadowColor: activeJob.status === 'DRIVER_ASSIGNED' ? '#D97706' : '#059669',
               shadowOffset: { width: 0, height: 2 },
               shadowOpacity: 0.18,
               shadowRadius: 4,
@@ -1905,7 +2066,9 @@ export default function DriverDashboardScreen() {
                 color: '#FFFFFF',
                 letterSpacing: 0.3,
               }}>
-              Continue Active Trip
+              {activeJob.status === 'DRIVER_ASSIGNED'
+                ? 'Accept Assignment & Start Navigation'
+                : 'Continue Active Trip'}
             </PartnerText>
             <ArrowRight size={px(14)} color="#FFFFFF" strokeWidth={2.6} style={{ marginLeft: px(5) }} />
           </Pressable>

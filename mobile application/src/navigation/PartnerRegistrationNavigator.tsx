@@ -32,7 +32,7 @@ function DriverVehicleInfoFlowScreen(props: any) {
   return (
     <DriverRegistrationFlowScreen
       {...props}
-      route={{ ...props.route, params: { ...props.route?.params, initialStep: 2 } }}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 1 } }}
     />
   );
 }
@@ -41,7 +41,7 @@ function DriverDocumentsFlowScreen(props: any) {
   return (
     <DriverRegistrationFlowScreen
       {...props}
-      route={{ ...props.route, params: { ...props.route?.params, initialStep: 3 } }}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 2 } }}
     />
   );
 }
@@ -50,7 +50,7 @@ function DriverReviewFlowScreen(props: any) {
   return (
     <DriverRegistrationFlowScreen
       {...props}
-      route={{ ...props.route, params: { ...props.route?.params, initialStep: 4 } }}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 3 } }}
     />
   );
 }

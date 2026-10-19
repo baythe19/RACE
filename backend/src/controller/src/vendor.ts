@@ -140,6 +140,12 @@ export class VendorController {
     return sendSuccess(res, await driverVendorMembershipService.listVendor(user.id));
   });
 
+  searchDrivers = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const query = String(req.query.q ?? '');
+    return sendSuccess(res, await driverVendorMembershipService.searchDrivers(user.id, query));
+  });
+
   inviteDriver = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     return sendSuccess(res, await driverVendorMembershipService.invite(user.id, req.body.phone), 202);

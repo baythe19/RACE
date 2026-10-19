@@ -24,7 +24,8 @@ import {
   usePartnerOnboardingStore,
   type PartnerRole,
 } from '../../../store/partnerOnboardingStore';
-import type { PartnerAuthStackParamList } from '../../../types/partnerNavigation';
+import { usePartnerRegistrationStore } from '../../../store/partnerRegistrationStore';
+import type { PartnerAuthStackParamList, PartnerRootStackParamList } from '../../../types/partnerNavigation';
 import { colors, layout, spacing, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerRoleSelection'>;

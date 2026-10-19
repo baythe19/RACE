@@ -67,8 +67,8 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     Boolean(member.driver) &&
     member.driver?.driverStatus === 'APPROVED' &&
     (bookingType === 'towing'
-      ? member.driver?.driverType === 'Tow Driver'
-      : member.driver?.driverType === 'Full-Time' || member.driver?.driverType === 'Part-Time'),
+      ? member.driver?.driverType === 'Tow Driver' || member.driver?.driverType === 'Full-Time'
+      : member.driver?.driverType === 'Full-Time'),
   );
 
   const [driverId, setDriverId] = useState<string | null>(null);
@@ -182,72 +182,10 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         </PartnerText>
       </View>
 
-      <View style={styles.sectionHeader}>
-        <PartnerText style={styles.sectionTitle}>Available connected Drivers</PartnerText>
-      </View>
-      {driversLoading ? (
-        <View style={styles.emptyCard}><ActivityIndicator color={driverColors.amber} /></View>
-      ) : eligibleDrivers.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <UserRound size={30} color={driverColors.greySoft} />
-          <PartnerText style={styles.emptyTitle}>No eligible connected Drivers</PartnerText>
-          <PartnerText style={styles.emptySub}>
-            Invite an approved Driver with the matching service type before assigning this job.
-          </PartnerText>
-          <Pressable style={styles.addVehicleBtn} onPress={() => navigation.navigate('VendorDrivers')}>
-            <PartnerText style={styles.addVehicleBtnText}>Manage Drivers</PartnerText>
-          </Pressable>
-        </View>
-      ) : (
-        <View style={styles.vehiclesList}>
-          {eligibleDrivers.map(member => {
-            const driver = member.driver!;
-            const selected = driverId === driver.id;
-            const available = driver.isAvailable && !driver.isBusy;
-            return (
-              <Pressable
-                key={member.id}
-                accessibilityRole="radio"
-                accessibilityLabel={driver.name + (available ? ', Available' : ', Busy')}
-                accessibilityState={{ selected, disabled: !available }}
-                onPress={() => available && setDriverId(driver.id)}
-                disabled={!available}
-                style={({ pressed }) => [
-                  styles.optionCard,
-                  { minHeight: 82 },
-                  selected && styles.optionCardSelected,
-                  !available && styles.optionCardUnavailable,
-                  getPressableFeedback(pressed),
-                ]}>
-                <View style={styles.artworkCircle}>
-                  <UserRound size={25} color={driverColors.amberText} />
-                </View>
-                <View style={styles.optionCopy}>
-                  <PartnerText style={styles.optionPlate}>{driver.name}</PartnerText>
-                  <PartnerText style={styles.optionMeta}>{driver.phone}</PartnerText>
-                  <PartnerText style={styles.optionMeta}>
-                    {driver.driverType + (driver.city ? ' · ' + driver.city : '')}
-                  </PartnerText>
-                  <View style={styles.availabilityRow}>
-                    <View style={[styles.availableDot, !available && styles.unavailableDot]} />
-                    <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
-                      {available ? 'Available' : driver.isBusy ? 'On an active job' : 'Offline'}
-                    </PartnerText>
-                  </View>
-                </View>
-                <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
-                  {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
-
       {bookingType === 'towing' ? (
         <>
-          <View style={[styles.sectionHeader, { marginTop: 18 }]}>
-            <PartnerText style={styles.sectionTitle}>Available fleet vehicles</PartnerText>
+          <View style={styles.sectionHeader}>
+            <PartnerText style={styles.sectionTitle}>1. Select Fleet Tow Truck</PartnerText>
           </View>
           {vehiclesLoading ? (
             <DriverDataSkeleton variant="vehicles" />
@@ -306,6 +244,70 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           )}
         </>
       ) : null}
+
+      <View style={[styles.sectionHeader, { marginTop: bookingType === 'towing' ? 20 : 0 }]}>
+        <PartnerText style={styles.sectionTitle}>
+          {bookingType === 'towing' ? '2. Assign Connected Driver' : 'Select Connected Driver'}
+        </PartnerText>
+      </View>
+      {driversLoading ? (
+        <View style={styles.emptyCard}><ActivityIndicator color={driverColors.amber} /></View>
+      ) : eligibleDrivers.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <UserRound size={30} color={driverColors.greySoft} />
+          <PartnerText style={styles.emptyTitle}>No eligible connected Drivers</PartnerText>
+          <PartnerText style={styles.emptySub}>
+            Invite an approved Full-Time or Tow Driver to your fleet before assigning this job.
+          </PartnerText>
+          <Pressable style={styles.addVehicleBtn} onPress={() => navigation.navigate('VendorDrivers')}>
+            <PartnerText style={styles.addVehicleBtnText}>Manage Drivers</PartnerText>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.vehiclesList}>
+          {eligibleDrivers.map(member => {
+            const driver = member.driver!;
+            const selected = driverId === driver.id;
+            const available = driver.isAvailable && !driver.isBusy;
+            return (
+              <Pressable
+                key={member.id}
+                accessibilityRole="radio"
+                accessibilityLabel={driver.name + (available ? ', Available' : ', Busy')}
+                accessibilityState={{ selected, disabled: !available }}
+                onPress={() => available && setDriverId(driver.id)}
+                disabled={!available}
+                style={({ pressed }) => [
+                  styles.optionCard,
+                  { minHeight: 82 },
+                  selected && styles.optionCardSelected,
+                  !available && styles.optionCardUnavailable,
+                  getPressableFeedback(pressed),
+                ]}>
+                <View style={styles.artworkCircle}>
+                  <UserRound size={25} color={driverColors.amberText} />
+                </View>
+                <View style={styles.optionCopy}>
+                  <PartnerText style={styles.optionPlate}>{driver.name}</PartnerText>
+                  <PartnerText style={styles.optionMeta}>{driver.phone}</PartnerText>
+                  <PartnerText style={styles.optionMeta}>
+                    {driver.driverType + (driver.city ? ' · ' + driver.city : '')}
+                  </PartnerText>
+                  <View style={styles.availabilityRow}>
+                    <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                    <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                      {available ? 'Available' : driver.isBusy ? 'On an active job' : 'Offline'}
+                    </PartnerText>
+                  </View>
+                </View>
+                <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                  {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </PartnerScreenLayout>
   );
 }

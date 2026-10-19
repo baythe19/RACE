@@ -59,6 +59,7 @@ import {
   Route,
   ShieldCheck,
   TriangleAlert,
+  Truck,
   User,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -554,6 +555,10 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   const onPrimaryPress = useCallback(() => {
     if (acting || !job) return;
+    if (job.status === 'DRIVER_ASSIGNED') {
+      void runStatusUpdate('DRIVER_EN_ROUTE');
+      return;
+    }
     if (step === 'en_route') {
       void runStatusUpdate('DRIVER_ARRIVED');
       return;
@@ -588,13 +593,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   }, [acting, job, navigation, runStatusUpdate, step, tripOtp]);
 
   const primaryLabel =
-    step === 'en_route'
-      ? 'Arrived at pickup'
-      : step === 'verify_otp'
-        ? 'Verify & start service'
-        : step === 'in_progress'
-          ? 'Complete job'
-          : 'Back to Home';
+    job?.status === 'DRIVER_ASSIGNED'
+      ? 'Accept Job & Start Route'
+      : step === 'en_route'
+        ? 'Arrived at pickup'
+        : step === 'verify_otp'
+          ? 'Verify & start service'
+          : step === 'in_progress'
+            ? 'Complete job'
+            : 'Back to Home';
 
   /** The backend confirms the amount at completion; only then is it final. */
   const backendConfirmedFare = typeof job?.finalFare === 'number';
@@ -1193,7 +1200,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                       justifyContent: 'space-between',
                       marginBottom: px(8),
                     }}>
-                    <StatusChip label="EN ROUTE TO PICKUP" tone="info" px={px} />
+                    <StatusChip
+                      label={job.status === 'DRIVER_ASSIGNED' ? 'ASSIGNED · ACCEPT TO START' : 'EN ROUTE TO PICKUP'}
+                      tone="info"
+                      px={px}
+                    />
                     {mapDistanceKm != null ? (
                       <PartnerText style={[T.small, { fontSize: px(12), fontWeight: '700', color: '#2563EB' }]}>
                         {mapDistanceKm} km trip
@@ -1222,6 +1233,14 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                   ]}>
                   #{job.bookingNumber}
                 </PartnerText>
+                {job.assignedFleetVehicleLabel ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(3) }}>
+                    <Truck size={px(12)} color="#2563EB" strokeWidth={2.4} />
+                    <PartnerText style={{ fontSize: px(11.5), color: '#1D4ED8', fontWeight: '700', marginLeft: px(4) }}>
+                      Tow Truck: {job.assignedFleetVehicleLabel}
+                    </PartnerText>
+                  </View>
+                ) : null}
 
                 {/* Perfectly Aligned Route Block */}
                 <View

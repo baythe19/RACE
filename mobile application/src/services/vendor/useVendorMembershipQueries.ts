@@ -7,13 +7,25 @@ import {
   listVendorMemberships,
   respondToVendorInvitation,
   revokeVendorDriverMembership,
+  searchVendorDrivers,
 } from './vendorMembershipApi';
 
 export const vendorMembershipKeys = {
   vendor: ['vendor', 'driver-memberships'] as const,
   driver: ['driver', 'vendor-membership'] as const,
   invitations: ['driver', 'vendor-invitations'] as const,
+  search: (query: string) => ['vendor', 'search-drivers', query] as const,
 };
+
+export function useSearchVendorDriversQuery(query: string, enabled = true) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: vendorMembershipKeys.search(trimmed),
+    queryFn: () => searchVendorDrivers(trimmed),
+    enabled: enabled && trimmed.length >= 2,
+    staleTime: 5_000,
+  });
+}
 
 export function useVendorMembershipsQuery(enabled = true) {
   return useQuery({
@@ -49,7 +61,10 @@ export function useInviteVendorDriverMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: inviteVendorDriver,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor });
+      void queryClient.invalidateQueries({ queryKey: ['vendor', 'search-drivers'] });
+    },
   });
 }
 
@@ -57,7 +72,10 @@ export function useRevokeVendorDriverMembershipMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: revokeVendorDriverMembership,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor });
+      void queryClient.invalidateQueries({ queryKey: ['vendor', 'search-drivers'] });
+    },
   });
 }
 

@@ -39,8 +39,8 @@ export function isOfferExpired(createdAt: Date, now: Date = new Date()): boolean
   return now.getTime() > offerExpiresAt(createdAt).getTime();
 }
 
-/** Drivers eligible for towing / roadside tow bookings */
-export const TOWING_DRIVER_TYPES = ['Tow Driver'] as const;
+/** Drivers eligible for towing / roadside tow bookings (including connected fleet drivers) */
+export const TOWING_DRIVER_TYPES = ['Tow Driver', 'Full-Time'] as const;
 
 /** Drivers eligible for hire-a-driver (any package duration) */
 export const DRIVER_SERVICE_TYPES = ['Full-Time', 'Part-Time'] as const;

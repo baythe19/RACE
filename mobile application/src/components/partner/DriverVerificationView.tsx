@@ -101,7 +101,7 @@ function verificationSummary(state: DriverVerificationSummary['state']) {
     case 'unknown':
       return 'We could not read your application status right now. Refresh to check the RACE server again.';
     default:
-      return 'Thank you for registering with RACE. Our compliance team is reviewing your profile, vehicle records, and uploaded documents.';
+      return 'Thank you for registering with RACE. Our compliance team is reviewing your profile, driver credentials, and uploaded documents.';
   }
 }
 
@@ -307,7 +307,7 @@ export default function DriverVerificationView({
             const lineDone = step.state === 'completed';
 
             let stepSubtext = '';
-            if (step.id === 'submitted') stepSubtext = 'Personal, vehicle & document forms submitted';
+            if (step.id === 'submitted') stepSubtext = 'Personal, driver details & documents submitted';
             else if (step.id === 'under_review') stepSubtext = 'Compliance team actively checking records';
             else if (step.id === 'background_check') stepSubtext = 'Identity verification & police records';
             else if (step.id === 'approved') stepSubtext = 'Account activation & job dispatch access';
@@ -443,7 +443,7 @@ export default function DriverVerificationView({
               {detailRow('Driver type', application.driverType, px)}
               {detailRow('Licence number', application.licenseNo, px)}
               {detailRow('Operating city', application.city, px)}
-              {detailRow('Vehicle', application.vehicleRegistration, px)}
+              {application.vehicleRegistration ? detailRow('Vehicle', application.vehicleRegistration, px) : null}
               {detailRow('Submitted on', submittedLabel, px)}
               {detailRow('Added by', application.fleetSource === 'vendor' ? 'Vendor fleet' : application.fleetSource === 'admin' ? 'RACE admin' : undefined, px)}
               {detailRow(

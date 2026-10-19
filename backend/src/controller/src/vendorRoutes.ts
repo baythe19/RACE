@@ -56,6 +56,7 @@ router.post('/selfie', vendorDocumentUpload.single('file'), vendorController.upl
 
 router.get('/drivers', requireRole('vendor'), vendorController.listDrivers);
 router.get('/drivers/memberships', requireRole('vendor'), vendorController.listDriverMemberships);
+router.get('/drivers/search', requireRole('vendor'), vendorController.searchDrivers);
 router.post(
   '/drivers/invitations',
   requireRole('vendor'),

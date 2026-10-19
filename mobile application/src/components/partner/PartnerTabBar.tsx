@@ -32,6 +32,10 @@ import {
   useDriverJobOffersQuery,
   useDriverProfileQuery,
 } from '../../services/driver/useDriverQueries';
+import {
+  useDriverVendorInvitationsQuery,
+  useDriverVendorMembershipQuery,
+} from '../../services/vendor/useVendorMembershipQueries';
 import { useAppSelector } from '../../redux/hooks';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import type { PartnerTabParamList } from '../../types/partnerNavigation';
@@ -68,6 +72,9 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
   const isApproved = buildDriverVerification(profile).isApproved;
   const { data: offers = [] } = useDriverJobOffersQuery(isDriver && isApproved);
   const pendingRequests = isDriver && isApproved ? offers.length : 0;
+  const { data: driverMembership } = useDriverVendorMembershipQuery(isDriver);
+  const { data: driverInvitations = [] } = useDriverVendorInvitationsQuery(isDriver && !driverMembership);
+  const pendingVendorInvites = isDriver && !driverMembership ? driverInvitations.length : 0;
 
   const activeRoute = state.routes[state.index];
   const nestedRouteName = activeRoute ? getFocusedRouteNameFromRoute(activeRoute) : undefined;
@@ -99,7 +106,10 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
         const { options } = descriptors[route.key];
         const isFocused = state.index === index;
         const { label, Icon } = tabConfig;
-        const showBadge = routeName === 'PartnerJobs' && pendingRequests > 0;
+        const isJobBadge = routeName === 'PartnerJobs' && pendingRequests > 0;
+        const isVendorBadge = routeName === 'PartnerVendor' && pendingVendorInvites > 0;
+        const showBadge = isJobBadge || isVendorBadge;
+        const currentBadgeCount = isJobBadge ? pendingRequests : pendingVendorInvites;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -130,7 +140,7 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={
               showBadge
-                ? `${options.tabBarAccessibilityLabel ?? label}, ${pendingRequests} new`
+                ? `${options.tabBarAccessibilityLabel ?? label}, ${currentBadgeCount} new`
                 : options.tabBarAccessibilityLabel ?? label
             }
             style={{
@@ -169,7 +179,7 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
                       fontWeight: '700',
                       color: '#FFFFFF',
                     }}>
-                    {pendingRequests > 9 ? '9+' : pendingRequests}
+                    {currentBadgeCount > 9 ? '9+' : currentBadgeCount}
                   </PartnerText>
                 </View>
               ) : null}

@@ -30,6 +30,7 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Briefcase,
   Truck,
   Upload,
   User,
@@ -62,6 +63,7 @@ import type {
 } from '../../../../types/partnerNavigation';
 import type { ApiSuccessResponse } from '../../../../types/auth';
 import { partnerRegistrationGoBack } from '../../../../utils/partnerRegistration';
+import { resolveIndianPincode, lookupPincodeOffline } from '../../../../utils/indianPincode';
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, any>;
 
@@ -155,9 +157,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const fromReviewParam = Boolean(route.params?.fromReview);
   const isResubmitParam = Boolean((route.params as any)?.isResubmit);
 
-  // Flow Step State (1: Personal, 2: Driver details, 3: Documents, 4: Review)
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(
-    initialStepParam >= 1 && initialStepParam <= 4 ? (initialStepParam as any) : 1,
+  // Flow Step State (1: Personal & Driver Details, 2: Documents, 3: Review)
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(
+    initialStepParam >= 1 && initialStepParam <= 3 ? (initialStepParam as any) : 1,
   );
   const [returnToReviewAfterEdit, setReturnToReviewAfterEdit] = useState(fromReviewParam);
   const [isResubmitApplication, setIsResubmitApplication] = useState(isResubmitParam);
@@ -172,15 +174,15 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     if (
       route.params?.initialStep &&
       route.params.initialStep >= 1 &&
-      route.params.initialStep <= 4 &&
+      route.params.initialStep <= 3 &&
       route.params.initialStep !== currentStep
     ) {
-      setCurrentStep(route.params.initialStep as 1 | 2 | 3 | 4);
+      setCurrentStep(route.params.initialStep as 1 | 2 | 3);
     }
   }, [route.params?.initialStep]);
 
   // Clean, seamless step transition: dismiss keyboard and update step directly without jumpy translation
-  const animateToStep = (newStep: 1 | 2 | 3 | 4, _direction: 'forward' | 'backward') => {
+  const animateToStep = (newStep: 1 | 2 | 3, _direction: 'forward' | 'backward') => {
     Keyboard.dismiss();
     setCurrentStep(newStep);
   };
@@ -587,12 +589,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     });
 
   // -------------------------------------------------------------
-  // Unified Flow Navigation Handlers
+  // Unified Flow Navigation Handlers (3 Steps: Details -> Docs -> Review)
   // -------------------------------------------------------------
   const handleFlowBack = () => {
     if (returnToReviewAfterEdit) {
       setReturnToReviewAfterEdit(false);
-      animateToStep(4, 'backward');
+      animateToStep(3, 'backward');
       return;
     }
 
@@ -605,8 +607,6 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       animateToStep(1, 'backward');
     } else if (currentStep === 3) {
       animateToStep(2, 'backward');
-    } else if (currentStep === 4) {
-      animateToStep(3, 'backward');
     }
   };
 
@@ -633,15 +633,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       Alert.alert('City required', 'Select your operating city.');
       return false;
     }
-    return true;
-  };
-
-  const validateVehicleStep = () => {
-    if (!DRIVER_SERVICE_TYPES.includes(driverVehicle.vehicleType as (typeof DRIVER_SERVICE_TYPES)[number])) {
-      Alert.alert('Driver type required', 'Choose Tow Driver, Full-Time or Part-Time.');
-      return false;
-    }
-    if (driverVehicle.licenseNumber.trim().length < 4) {
+    const dlNumber = (driverPersonal.licenseNumber || driverVehicle.licenseNumber || '').trim();
+    if (dlNumber.length < 4) {
       Alert.alert('Driving licence required', 'Enter your driving licence number.');
       return false;
     }
@@ -661,17 +654,18 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     const permissivePreview = UI_PREVIEW_MODE && isUiTestPermissiveMode();
     if (!permissivePreview) {
       if (currentStep === 1 && !validatePersonalStep()) return;
-      if (currentStep === 2 && !validateVehicleStep()) return;
-      if (currentStep === 3 && !validateDocumentsStep()) return;
+      if (currentStep === 2 && !validateDocumentsStep()) return;
     }
 
     if (returnToReviewAfterEdit) {
       setReturnToReviewAfterEdit(false);
-      animateToStep(4, 'forward');
+      animateToStep(3, 'forward');
       return;
     }
 
     if (currentStep === 1) {
+      const selectedType = driverPersonal.driverType || 'Full-Time';
+      const dlNumber = (driverPersonal.licenseNumber || driverVehicle.licenseNumber || '').trim() || (permissivePreview ? 'OD-0220190012345' : '');
       setDriverPersonal({
         fullName: driverPersonal.fullName.trim() || (permissivePreview ? 'Rajesh Kumar' : ''),
         dateOfBirth:
@@ -680,14 +674,14 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           driverPersonal.address.trim() ||
           (permissivePreview ? 'Plot 42, Saheed Nagar, Janpath Road' : ''),
         city: driverPersonal.city?.trim() || (permissivePreview ? 'Bhubaneswar' : undefined),
+        state: driverPersonal.state?.trim() || (permissivePreview ? 'Odisha' : undefined),
+        pincode: driverPersonal.pincode?.trim() || (permissivePreview ? '751007' : undefined),
+        licenseNumber: dlNumber,
+        driverType: selectedType,
       });
-      animateToStep(2, 'forward');
-    } else if (currentStep === 2) {
       setDriverVehicle({
-        vehicleType: DRIVER_SERVICE_TYPES.includes(driverVehicle.vehicleType as (typeof DRIVER_SERVICE_TYPES)[number])
-          ? driverVehicle.vehicleType
-          : permissivePreview ? 'Tow Driver' : '',
-        licenseNumber: driverVehicle.licenseNumber.trim() || (permissivePreview ? 'OD-0220190012345' : ''),
+        vehicleType: selectedType,
+        licenseNumber: dlNumber,
         vehicleNumber: '',
         rcNumber: '',
         vehicleModel: '',
@@ -695,8 +689,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         insurancePolicyNumber: '',
         registeredTo: undefined,
       });
-      animateToStep(3, 'forward');
-    } else if (currentStep === 3) {
+      animateToStep(2, 'forward');
+    } else if (currentStep === 2) {
       if (permissivePreview && missingCoreDocs.length > 0) {
         missingCoreDocs.forEach(doc => {
           addDriverDocument({
@@ -708,8 +702,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           });
         });
       }
-      animateToStep(4, 'forward');
-    } else if (currentStep === 4) {
+      animateToStep(3, 'forward');
+    } else if (currentStep === 3) {
       void handleSubmit();
     }
   };
@@ -737,10 +731,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         email: driverPersonal.email.trim() || undefined,
         address: driverPersonal.address.trim() || undefined,
         city: driverPersonal.city?.trim() || undefined,
+        state: driverPersonal.state?.trim() || undefined,
+        pincode: driverPersonal.pincode?.trim() || undefined,
         dateOfBirth: normalizeDobForApi(driverPersonal.dateOfBirth),
         emergencyContact,
-        licenseNo: driverVehicle.licenseNumber.trim(),
-        driverType: driverVehicle.vehicleType.trim() as 'Tow Driver' | 'Full-Time' | 'Part-Time',
+        licenseNo: (driverPersonal.licenseNumber || driverVehicle.licenseNumber).trim(),
+        driverType: (driverPersonal.driverType || driverVehicle.vehicleType || 'Full-Time').trim() as 'Tow Driver' | 'Full-Time' | 'Part-Time',
         documents: documentsPayload,
         experienceYears: driverPersonal.yearsOfExperience
           ? Number(driverPersonal.yearsOfExperience)
@@ -819,7 +815,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
   const getContinueLabel = () => {
     if (returnToReviewAfterEdit) return 'Save & Return';
-    if (currentStep === 4) {
+    if (currentStep === 3) {
       if (submitting) return 'Submitting...';
       return isResubmitApplication ? 'Re-submit application' : 'Submit application';
     }
@@ -827,278 +823,417 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   };
 
   // -------------------------------------------------------------
-  // Render Step 1: Personal Info
+  // Render Step 1: Personal & Driver Details (Unified 3-Step Flow)
   // -------------------------------------------------------------
   const renderStep1PersonalInfo = () => (
-    <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
-      {/* Card Header Row */}
-      <View style={styles.cardHeaderRow}>
-        <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
-          <User size={px(17)} color="#D97706" strokeWidth={2.4} />
-        </View>
-        <View style={styles.headerTextWrap}>
-          <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>Personal information</PartnerText>
-          <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
-            Enter your details as they appear on official IDs.
-          </PartnerText>
-        </View>
-      </View>
-
-      <View style={styles.cardDivider} />
-
-      {/* Full Name */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <View style={styles.inputLabelRow}>
-          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-            Full name <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-          </PartnerText>
-          {driverPersonal.fullName.length >= 25 ? (
-            <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
-              {driverPersonal.fullName.length}/40
+    <View>
+      {/* Card 1: Personal Information */}
+      <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
+            <User size={px(17)} color="#D97706" strokeWidth={2.4} />
+          </View>
+          <View style={styles.headerTextWrap}>
+            <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>Personal information</PartnerText>
+            <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
+              Enter your details as they appear on official IDs.
             </PartnerText>
-          ) : null}
-        </View>
-        <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-          <User size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerTextInput
-            style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
-            placeholder="Enter full name (as on DL)"
-            placeholderTextColor="#9CA3AF"
-            value={driverPersonal.fullName}
-            maxLength={40}
-            autoCapitalize="words"
-            autoCorrect={false}
-            onChangeText={(text) => {
-              const sanitized = text.replace(/[^a-zA-Z\s.-]/g, '');
-              setDriverPersonal({ fullName: sanitized });
-            }}
-          />
-        </View>
-      </View>
-
-      {/* Mobile Number (Locked / Verified) */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Mobile number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-        </PartnerText>
-        <View
-          style={[
-            styles.inputContainer,
-            styles.lockedInputContainer,
-            { height: px(44), paddingHorizontal: px(10) },
-          ]}>
-          <Phone size={px(16)} color="#6B7280" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerText style={[styles.countryPrefix, { fontSize: px(13.5) }]}>+91</PartnerText>
-          <PartnerTextInput
-            style={[styles.textInput, styles.lockedTextInput, { fontSize: px(13.5), flex: 1 }]}
-            editable={false}
-            value={driverPersonal.mobileNumber || '9876543210'}
-          />
-          <View style={styles.verifiedBadge}>
-            <Check size={px(11)} color="#15803D" strokeWidth={3} />
-            <PartnerText style={[styles.verifiedText, { fontSize: px(10.5) }]}>Verified</PartnerText>
           </View>
         </View>
-      </View>
 
-      {/* Date of Birth (DD/MM/YYYY) */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Date of birth <PartnerText style={styles.requiredAsterisk}>*</PartnerText>{' '}
-          <PartnerText style={[styles.optionalText, { fontSize: px(11) }]}>[DD/MM/YYYY]</PartnerText>
-        </PartnerText>
-        <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-          <Calendar size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerTextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
-            placeholder="15/05/1995"
-            placeholderTextColor="#9CA3AF"
-            keyboardType="number-pad"
-            maxLength={10}
-            value={driverPersonal.dateOfBirth}
-            onChangeText={(text) => {
-              const cleaned = text.replace(/[^0-9]/g, '');
-              let formatted = cleaned;
-              if (cleaned.length > 2 && cleaned.length <= 4) {
-                formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
-              } else if (cleaned.length > 4) {
-                formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
-              }
-              setDriverPersonal({ dateOfBirth: formatted });
-            }}
-          />
-          <Pressable hitSlop={10} onPress={openCalendarModal} style={styles.calendarIconButton}>
-            <Calendar size={px(18)} color="#D97706" strokeWidth={2.4} />
-          </Pressable>
+        <View style={styles.cardDivider} />
+
+        {/* Full Name */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <View style={styles.inputLabelRow}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+              Full name <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
+            {driverPersonal.fullName.length >= 25 ? (
+              <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                {driverPersonal.fullName.length}/40
+              </PartnerText>
+            ) : null}
+          </View>
+          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+            <User size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <PartnerTextInput
+              style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
+              placeholder="Enter full name (as on DL)"
+              placeholderTextColor="#9CA3AF"
+              value={driverPersonal.fullName}
+              maxLength={40}
+              autoCapitalize="words"
+              autoCorrect={false}
+              onChangeText={(text) => {
+                const sanitized = text.replace(/[^a-zA-Z\s.-]/g, '');
+                setDriverPersonal({ fullName: sanitized });
+              }}
+            />
+          </View>
         </View>
-      </View>
 
-      {/* Current Address */}
-      <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
-        <View style={styles.inputLabelRow}>
+        {/* Mobile Number (Locked / Verified from OTP) */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
           <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-            Current address <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            Mobile number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
           </PartnerText>
-          <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
-            {driverPersonal.address.length}/120
-          </PartnerText>
-        </View>
-        <View
-          style={[
-            styles.inputContainer,
-            styles.addressInputContainer,
-            { height: px(68), paddingHorizontal: px(10), paddingVertical: px(8) },
-          ]}>
-          <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={[styles.leftInputIcon, { marginTop: px(2) }]} />
-          <PartnerTextInput
-            style={[styles.textInput, styles.multilineInput, { fontSize: px(13), flex: 1 }]}
-            placeholder="House/Plot no, street, landmark, area"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            maxLength={120}
-            numberOfLines={2}
-            value={driverPersonal.address}
-            onChangeText={(address) => setDriverPersonal({ address })}
-          />
-        </View>
-      </View>
-
-      {/* Operating City */}
-      <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-          Operating city <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-        </PartnerText>
-        <Pressable
-          onPress={() => setCityModalVisible(true)}
-          style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-          <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerText
+          <View
             style={[
-              styles.textValue,
-              { fontSize: px(13.5) },
-              !driverPersonal.city && styles.textPlaceholder,
+              styles.inputContainer,
+              styles.lockedInputContainer,
+              { height: px(44), paddingHorizontal: px(10) },
             ]}>
-            {driverPersonal.city || 'Select city'}
-          </PartnerText>
-          <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
-        </Pressable>
-      </View>
+            <Phone size={px(16)} color="#6B7280" strokeWidth={2} style={styles.leftInputIcon} />
+            <PartnerText style={[styles.countryPrefix, { fontSize: px(13.5) }]}>+91</PartnerText>
+            <PartnerTextInput
+              style={[styles.textInput, styles.lockedTextInput, { fontSize: px(13.5), flex: 1 }]}
+              editable={false}
+              value={driverPersonal.mobileNumber || '9876543210'}
+            />
+            <View style={styles.verifiedBadge}>
+              <Check size={px(11)} color="#15803D" strokeWidth={3} />
+              <PartnerText style={[styles.verifiedText, { fontSize: px(10.5) }]}>Verified</PartnerText>
+            </View>
+          </View>
+        </View>
 
-      {/* Emergency Contact Shortcut */}
-      <View style={[styles.alertBanner, { padding: px(10), borderRadius: px(8) }]}>
-        <View style={styles.alertContentRow}>
-          <View style={[styles.alertIconCircle, { width: px(24), height: px(24), borderRadius: px(12) }]}>
-            <Phone size={px(13)} color="#D97706" />
+        {/* Date of Birth (DD/MM/YYYY) */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Date of birth <PartnerText style={styles.requiredAsterisk}>*</PartnerText>{' '}
+            <PartnerText style={[styles.optionalText, { fontSize: px(11) }]}>[DD/MM/YYYY]</PartnerText>
+          </PartnerText>
+          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+            <Calendar size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <PartnerTextInput
+              style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
+              placeholder="15/05/1995"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              maxLength={10}
+              value={driverPersonal.dateOfBirth}
+              onChangeText={(text) => {
+                const cleaned = text.replace(/[^0-9]/g, '');
+                let formatted = cleaned;
+                if (cleaned.length > 2 && cleaned.length <= 4) {
+                  formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2)}`;
+                } else if (cleaned.length > 4) {
+                  formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
+                }
+                setDriverPersonal({ dateOfBirth: formatted });
+              }}
+            />
+            <Pressable hitSlop={10} onPress={openCalendarModal} style={styles.calendarIconButton}>
+              <Calendar size={px(18)} color="#D97706" strokeWidth={2.4} />
+            </Pressable>
           </View>
-          <View style={styles.alertTextWrap}>
-            <PartnerText style={[styles.alertTitle, { fontSize: px(12) }]}>Emergency contact</PartnerText>
-            <PartnerText numberOfLines={1} style={[styles.alertSubtitle, { fontSize: px(10.5) }]}>
-              {driverPersonal.emergencyContactNumber
-                ? `${driverPersonal.emergencyContactName || 'Contact'}: +91 ${driverPersonal.emergencyContactNumber}`
-                : 'Recommended for safety'}
+        </View>
+
+        {/* Current Address */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <View style={styles.inputLabelRow}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+              Current address <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
+            <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
+              {driverPersonal.address.length}/120
             </PartnerText>
           </View>
+          <View
+            style={[
+              styles.inputContainer,
+              styles.addressInputContainer,
+              { height: px(64), paddingHorizontal: px(10), paddingVertical: px(8) },
+            ]}>
+            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={[styles.leftInputIcon, { marginTop: px(2) }]} />
+            <PartnerTextInput
+              style={[styles.textInput, styles.multilineInput, { fontSize: px(13), flex: 1 }]}
+              placeholder="House/Plot no, street, landmark, area"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              maxLength={120}
+              numberOfLines={2}
+              value={driverPersonal.address}
+              onChangeText={(address) => setDriverPersonal({ address })}
+            />
+          </View>
+        </View>
+
+        {/* Pincode & State Auto-fill */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <View style={styles.inputLabelRow}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+              PIN code <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
+            <PartnerText style={[styles.charCountText, { fontSize: px(10.5), color: '#059669', fontWeight: '600' }]}>
+              Auto-fills City & State
+            </PartnerText>
+          </View>
+          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <PartnerTextInput
+              style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
+              placeholder="Enter 6-digit PIN code (e.g. 751001)"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              maxLength={6}
+              value={driverPersonal.pincode}
+              onChangeText={async (text) => {
+                const clean = text.replace(/[^0-9]/g, '').slice(0, 6);
+                setDriverPersonal({ pincode: clean });
+                if (clean.length >= 3) {
+                  const off = lookupPincodeOffline(clean);
+                  if (off) {
+                    setDriverPersonal({
+                      city: off.city || driverPersonal.city,
+                      state: off.state || driverPersonal.state,
+                    });
+                  }
+                }
+                if (clean.length === 6) {
+                  const res = await resolveIndianPincode(clean);
+                  if (res) {
+                    setDriverPersonal({
+                      city: res.city || driverPersonal.city,
+                      state: res.state || driverPersonal.state,
+                    });
+                  }
+                }
+              }}
+            />
+          </View>
+        </View>
+
+        {/* Operating City & State Display */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+            Operating city <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+          </PartnerText>
           <Pressable
-            hitSlop={10}
-            onPress={() => setEmergencyModalVisible(true)}
-            style={styles.alertActionBtn}>
-            <PartnerText style={[styles.alertActionText, { fontSize: px(11.5) }]}>
-              {driverPersonal.emergencyContactNumber ? 'Edit' : '+ Add'}
+            onPress={() => setCityModalVisible(true)}
+            style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
+            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <PartnerText
+              style={[
+                styles.textValue,
+                { fontSize: px(13.5) },
+                !driverPersonal.city && styles.textPlaceholder,
+              ]}>
+              {driverPersonal.city ? `${driverPersonal.city}${driverPersonal.state ? `, ${driverPersonal.state}` : ''}` : 'Select city'}
             </PartnerText>
+            <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
           </Pressable>
         </View>
-      </View>
-    </View>
-  );
 
-  // -------------------------------------------------------------
-  // Render Step 2: Vehicle Info
-  // -------------------------------------------------------------
-  const renderStep2VehicleInfo = () => (
-    <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
-      <View style={styles.cardHeaderRow}>
-        <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
-          <User size={px(17)} color="#D97706" strokeWidth={2.4} />
+        {/* Emergency Contact */}
+        <View style={[styles.alertBanner, { padding: px(10), borderRadius: px(8) }]}>
+          <View style={styles.alertContentRow}>
+            <View style={[styles.alertIconCircle, { width: px(24), height: px(24), borderRadius: px(12) }]}>
+              <Phone size={px(13)} color="#D97706" />
+            </View>
+            <View style={styles.alertTextWrap}>
+              <PartnerText style={[styles.alertTitle, { fontSize: px(12) }]}>Emergency contact</PartnerText>
+              <PartnerText numberOfLines={1} style={[styles.alertSubtitle, { fontSize: px(10.5) }]}>
+                {driverPersonal.emergencyContactNumber
+                  ? `${driverPersonal.emergencyContactName || 'Contact'}: +91 ${driverPersonal.emergencyContactNumber}`
+                  : 'Recommended for safety'}
+              </PartnerText>
+            </View>
+            <Pressable
+              hitSlop={10}
+              onPress={() => setEmergencyModalVisible(true)}
+              style={styles.alertActionBtn}>
+              <PartnerText style={[styles.alertActionText, { fontSize: px(11.5) }]}>
+                {driverPersonal.emergencyContactNumber ? 'Edit' : '+ Add'}
+              </PartnerText>
+            </Pressable>
+          </View>
         </View>
-        <View style={styles.headerTextWrap}>
-          <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>Driver details</PartnerText>
-          <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
-            Choose the work you want to accept and add your driving licence.
-          </PartnerText>
-        </View>
-      </View>
-
-      <View style={styles.cardDivider} />
-
-      <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(7) }]}>
-          Driver type <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-        </PartnerText>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(7) }}>
-          {DRIVER_SERVICE_TYPES.map(type => {
-            const selected = driverVehicle.vehicleType === type;
-            return (
-              <Pressable
-                key={type}
-                accessibilityRole="radio"
-                accessibilityState={{ selected }}
-                onPress={() => setDriverVehicle({ vehicleType: type })}
-                style={({ pressed }) => [
-                  styles.vehicleCard,
-                  { minWidth: px(88), paddingHorizontal: px(11), paddingVertical: px(10), borderRadius: px(10) },
-                  selected ? styles.vehicleCardSelected : styles.vehicleCardIdle,
-                  pressed && styles.pressed,
-                ]}>
-                <PartnerText style={[
-                  styles.vehicleCardLabel,
-                  { fontSize: px(12) },
-                  selected ? styles.vehicleCardLabelSelected : styles.vehicleCardLabelIdle,
-                ]}>
-                  {type}
-                </PartnerText>
-              </Pressable>
-            );
-          })}
-        </View>
-        <PartnerText style={{ color: '#6B7280', fontSize: px(11), lineHeight: px(16), marginTop: px(7) }}>
-          Tow Driver gets towing assignments from a connected Towing Vendor. Full-Time and Part-Time Drivers can receive driver-hire requests.
-        </PartnerText>
       </View>
 
-      <View style={[styles.inputGroup, { marginBottom: px(8) }]}>
-        <View style={styles.inputLabelRow}>
-          <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
-            Driving licence number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
-          </PartnerText>
-          {driverVehicle.licenseNumber.length >= 12 ? (
-            <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
-              {driverVehicle.licenseNumber.length}/18
+      {/* Card 2: Driving Licence & Work Preference */}
+      <View style={[styles.card, { padding: px(14), marginBottom: px(12) }]}>
+        <View style={styles.cardHeaderRow}>
+          <View style={[styles.headerIconBox, { width: px(34), height: px(34), borderRadius: px(8) }]}>
+            <Briefcase size={px(17)} color="#D97706" strokeWidth={2.4} />
+          </View>
+          <View style={styles.headerTextWrap}>
+            <PartnerText style={[styles.cardHeaderTitle, { fontSize: px(14.5) }]}>
+              Licence & work preference
             </PartnerText>
-          ) : null}
+            <PartnerText style={[styles.cardHeaderSubtitle, { fontSize: px(11.5) }]}>
+              Choose your work availability and enter your Driving Licence.
+            </PartnerText>
+          </View>
         </View>
-        <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(10) }]}>
-          <FileText size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
-          <PartnerTextInput
-            style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
-            placeholder="Enter your DL number"
-            placeholderTextColor="#9CA3AF"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            maxLength={18}
-            value={driverVehicle.licenseNumber}
-            onChangeText={text => setDriverVehicle({
-              licenseNumber: text.replace(/[^A-Za-z0-9-]/g, '').toUpperCase(),
-            })}
-          />
-        </View>
-      </View>
 
-      <View style={[styles.blueNoticeBanner, { paddingVertical: px(9), paddingHorizontal: px(10), borderRadius: px(8) }]}>
-        <View style={styles.noticeBannerRow}>
-          <Info size={px(15)} color="#2563EB" />
-          <PartnerText style={[styles.noticeBannerText, { fontSize: px(11), flex: 1 }]}>
-            You do not need to own a vehicle. Towing Vendors register their fleet vehicles separately and assign one to a towing job.
+        <View style={styles.cardDivider} />
+
+        {/* Work Preference / Driver Type (Full-Time vs Part-Time) */}
+        <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
+          <View style={styles.inputLabelRow}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+              Employment / work type <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
+          </View>
+
+          <View style={{ gap: px(8), marginTop: px(4) }}>
+            {/* Card 1: Full-Time Partner Driver */}
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ selected: (driverPersonal.driverType || 'Full-Time') === 'Full-Time' }}
+              onPress={() => {
+                setDriverPersonal({ driverType: 'Full-Time' });
+                setDriverVehicle({ vehicleType: 'Full-Time' });
+              }}
+              style={({ pressed }) => [
+                styles.choiceCard,
+                (driverPersonal.driverType || 'Full-Time') === 'Full-Time' && styles.choiceCardSelected,
+                pressed && styles.pressed,
+              ]}>
+              <View style={styles.choiceHeaderRow}>
+                <View style={[styles.choiceRadioCircle, (driverPersonal.driverType || 'Full-Time') === 'Full-Time' && styles.choiceRadioSelected]}>
+                  {(driverPersonal.driverType || 'Full-Time') === 'Full-Time' && (
+                    <View style={styles.choiceRadioInnerDot} />
+                  )}
+                </View>
+                <View style={{ flex: 1, marginLeft: px(8) }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <PartnerText style={[styles.choiceTitle, { fontSize: px(13.5) }]}>
+                      Full-Time Partner Driver
+                    </PartnerText>
+                    <View style={[styles.badgeSoftAmber, { paddingHorizontal: px(6), paddingVertical: px(2), borderRadius: px(4) }]}>
+                      <PartnerText style={[styles.badgeSoftAmberText, { fontSize: px(9.5) }]}>
+                        High Earning
+                      </PartnerText>
+                    </View>
+                  </View>
+                  <PartnerText style={[styles.choiceDesc, { fontSize: px(11), marginTop: px(3) }]}>
+                    Connect with Towing Vendors & accept direct customer bookings. Fixed daily & trip earnings.
+                  </PartnerText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(4), gap: px(10) }}>
+                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
+                      ✓ Towing Vendor Fleet Ready
+                    </PartnerText>
+                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
+                      ✓ Priority Bookings
+                    </PartnerText>
+                  </View>
+                </View>
+              </View>
+            </Pressable>
+
+            {/* Card 2: Part-Time Flexible Driver */}
+            <Pressable
+              accessibilityRole="radio"
+              accessibilityState={{ selected: driverPersonal.driverType === 'Part-Time' }}
+              onPress={() => {
+                setDriverPersonal({ driverType: 'Part-Time' });
+                setDriverVehicle({ vehicleType: 'Part-Time' });
+              }}
+              style={({ pressed }) => [
+                styles.choiceCard,
+                driverPersonal.driverType === 'Part-Time' && styles.choiceCardSelected,
+                pressed && styles.pressed,
+              ]}>
+              <View style={styles.choiceHeaderRow}>
+                <View style={[styles.choiceRadioCircle, driverPersonal.driverType === 'Part-Time' && styles.choiceRadioSelected]}>
+                  {driverPersonal.driverType === 'Part-Time' && (
+                    <View style={styles.choiceRadioInnerDot} />
+                  )}
+                </View>
+                <View style={{ flex: 1, marginLeft: px(8) }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <PartnerText style={[styles.choiceTitle, { fontSize: px(13.5) }]}>
+                      Part-Time Flexible Driver
+                    </PartnerText>
+                    <View style={[styles.badgeSoftBlue, { paddingHorizontal: px(6), paddingVertical: px(2), borderRadius: px(4) }]}>
+                      <PartnerText style={[styles.badgeSoftBlueText, { fontSize: px(9.5) }]}>
+                        Flexible Hours
+                      </PartnerText>
+                    </View>
+                  </View>
+                  <PartnerText style={[styles.choiceDesc, { fontSize: px(11), marginTop: px(3) }]}>
+                    Work flexible on-demand hours on your own schedule. Direct customer driver-hire gigs.
+                  </PartnerText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(4), gap: px(10) }}>
+                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
+                      ✓ Independent Gigs Only
+                    </PartnerText>
+                    <PartnerText style={[styles.choicePerk, { fontSize: px(10.5) }]}>
+                      ✓ Hourly / On-Demand
+                    </PartnerText>
+                  </View>
+                </View>
+              </View>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Driving Licence Number */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <View style={styles.inputLabelRow}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
+              Driving licence number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
+            </PartnerText>
+            {(driverPersonal.licenseNumber || driverVehicle.licenseNumber).length >= 10 ? (
+              <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
+                {(driverPersonal.licenseNumber || driverVehicle.licenseNumber).length}/18
+              </PartnerText>
+            ) : null}
+          </View>
+          <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(10) }]}>
+            <FileText size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            <PartnerTextInput
+              style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
+              placeholder="Enter DL number (e.g. OD0220190012345)"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={18}
+              value={driverPersonal.licenseNumber || driverVehicle.licenseNumber}
+              onChangeText={(text) => {
+                const val = text.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
+                setDriverPersonal({ licenseNumber: val });
+                setDriverVehicle({ licenseNumber: val });
+              }}
+            />
+          </View>
+        </View>
+
+        {/* Driving Experience Chips */}
+        <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
+          <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(6) }]}>
+            Commercial driving experience <PartnerText style={[styles.optionalText, { fontSize: px(11) }]}>[Years]</PartnerText>
           </PartnerText>
+          <View style={{ flexDirection: 'row', gap: px(8) }}>
+            {['1-2 yrs', '3-5 yrs', '5-10 yrs', '10+ yrs'].map((exp) => {
+              const isSelected =
+                driverPersonal.yearsOfExperience === exp ||
+                (!driverPersonal.yearsOfExperience && exp === '3-5 yrs');
+              return (
+                <Pressable
+                  key={exp}
+                  onPress={() => setDriverPersonal({ yearsOfExperience: exp })}
+                  style={[styles.expChip, isSelected && styles.expChipSelected]}>
+                  <PartnerText style={[styles.expChipText, isSelected && styles.expChipTextSelected]}>
+                    {exp}
+                  </PartnerText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Zero Vehicle Ownership Notice */}
+        <View style={[styles.blueNoticeBanner, { paddingVertical: px(9), paddingHorizontal: px(10), borderRadius: px(8), marginTop: px(4) }]}>
+          <View style={styles.noticeBannerRow}>
+            <Info size={px(15)} color="#2563EB" />
+            <PartnerText style={[styles.noticeBannerText, { fontSize: px(11), flex: 1 }]}>
+              Vehicle ownership is not required. RACE drivers are professional operators. Towing Vendors provide tow trucks and customers provide vehicles for driver-hire.
+            </PartnerText>
+          </View>
         </View>
       </View>
     </View>
@@ -1536,7 +1671,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 hitSlop={8}
                 onPress={() => {
                   setReturnToReviewAfterEdit(true);
-                  animateToStep(2, 'backward');
+                  animateToStep(1, 'backward');
                 }}
                 style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.8 }]}>
                 <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
@@ -1561,13 +1696,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
                 <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]}>
-                  Work type: <PartnerText style={styles.reviewPointBold}>{driverVehicle.vehicleType || 'Select a Driver type'}</PartnerText>
+                  Work type: <PartnerText style={styles.reviewPointBold}>{driverPersonal.driverType || 'Full-Time'}</PartnerText>
                 </PartnerText>
               </View>
               <View style={styles.reviewPointRow}>
                 <View style={[styles.reviewPointDot, { width: px(4), height: px(4), borderRadius: px(2) }]} />
                 <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5) }]}>
-                  Driving licence: <PartnerText style={styles.reviewPointBold}>{driverVehicle.licenseNumber || 'Not entered'}</PartnerText>
+                  Driving licence: <PartnerText style={styles.reviewPointBold}>{driverPersonal.licenseNumber || driverVehicle.licenseNumber || 'Not entered'}</PartnerText>
                 </PartnerText>
               </View>
               <PartnerText style={[styles.reviewPointText, { fontSize: px(10.5), marginLeft: px(9) }]}>
@@ -1625,7 +1760,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 hitSlop={8}
                 onPress={() => {
                   setReturnToReviewAfterEdit(true);
-                  animateToStep(3, 'backward');
+                  animateToStep(2, 'backward');
                 }}
                 style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.8 }]}>
                 <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
@@ -1719,8 +1854,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       onBack={handleFlowBack}
       onContinue={handleFlowContinue}
       continueLabel={getContinueLabel()}
-      continueDisabled={currentStep === 4 ? !confirmAgreed || submitting : false}
-      continueLoading={currentStep === 4 ? submitting : false}
+      continueDisabled={currentStep === 3 ? !confirmAgreed || submitting : false}
+      continueLoading={currentStep === 3 ? submitting : false}
       showFooter={true}>
       {/* Animated Sliding Container: only form cards slide smoothly! */}
       <Animated.View
@@ -1729,9 +1864,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           transform: [{ translateX: slideAnim }],
         }}>
         {currentStep === 1 && renderStep1PersonalInfo()}
-        {currentStep === 2 && renderStep2VehicleInfo()}
-        {currentStep === 3 && renderStep3Documents()}
-        {currentStep === 4 && renderStep4Review()}
+        {currentStep === 2 && renderStep3Documents()}
+        {currentStep === 3 && renderStep4Review()}
       </Animated.View>
 
       {/* ----------------- MODALS ----------------- */}
@@ -2237,7 +2371,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </View>
 
             <View style={{ marginTop: px(10) }}>
-              {/* Option 1: Personal Info */}
+              {/* Option 1: Personal & Driver Details */}
               <Pressable
                 onPress={() => {
                   setEditSectionModalVisible(false);
@@ -2249,15 +2383,15 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   <User size={px(18)} color="#D97706" />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>1. Personal details</PartnerText>
+                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>1. Personal & Driver details</PartnerText>
                   <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
-                    Full name, Mobile number, Date of birth, City, Address
+                    Name, DOB, address, DL number & work preference
                   </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />
               </Pressable>
 
-              {/* Option 2: Vehicle Info */}
+              {/* Option 2: Documents */}
               <Pressable
                 onPress={() => {
                   setEditSectionModalVisible(false);
@@ -2266,30 +2400,10 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 }}
                 style={({ pressed }) => [styles.pickerOptionCard, pressed && styles.pressed]}>
                 <View style={[styles.pickerIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                  <Truck size={px(18)} color="#D97706" />
-                </View>
-                <View style={styles.pickerTextWrap}>
-                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Driver details</PartnerText>
-                  <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
-                    Driver type and driving licence
-                  </PartnerText>
-                </View>
-                <ChevronRight size={px(16)} color="#9CA3AF" />
-              </Pressable>
-
-              {/* Option 3: Documents */}
-              <Pressable
-                onPress={() => {
-                  setEditSectionModalVisible(false);
-                  setReturnToReviewAfterEdit(true);
-                  animateToStep(3, 'backward');
-                }}
-                style={({ pressed }) => [styles.pickerOptionCard, pressed && styles.pressed]}>
-                <View style={[styles.pickerIconWrap, { backgroundColor: '#FEF3C7' }]}>
                   <FileText size={px(18)} color="#D97706" />
                 </View>
                 <View style={styles.pickerTextWrap}>
-                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>3. Uploaded documents</PartnerText>
+                  <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Uploaded documents</PartnerText>
                   <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
                     Driving licence, government photo ID, profile photo
                   </PartnerText>
@@ -3483,6 +3597,90 @@ const styles = StyleSheet.create({
   pickerCancelText: {
     color: '#374151',
     fontWeight: '600',
+  },
+  choiceCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  choiceCardSelected: {
+    borderColor: '#2563EB',
+    backgroundColor: '#F0F7FF',
+  },
+  choiceHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  choiceRadioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  choiceRadioSelected: {
+    borderColor: '#2563EB',
+  },
+  choiceRadioInnerDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#2563EB',
+  },
+  choiceTitle: {
+    fontWeight: '700',
+    color: '#111827',
+  },
+  choiceDesc: {
+    color: '#6B7280',
+    lineHeight: 16,
+  },
+  choicePerk: {
+    color: '#059669',
+    fontWeight: '600',
+  },
+  badgeSoftAmber: {
+    backgroundColor: '#FEF3C7',
+  },
+  badgeSoftAmberText: {
+    color: '#B45309',
+    fontWeight: '700',
+  },
+  badgeSoftBlue: {
+    backgroundColor: '#DBEAFE',
+  },
+  badgeSoftBlueText: {
+    color: '#1D4ED8',
+    fontWeight: '700',
+  },
+  expChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  expChipSelected: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  expChipText: {
+    color: '#4B5563',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  expChipTextSelected: {
+    color: '#2563EB',
+    fontWeight: '700',
   },
   pressed: {
     opacity: 0.85,

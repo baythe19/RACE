@@ -13,6 +13,7 @@ import type { LocationResult } from '../../../../types/location';
 import type { PartnerRegistrationStackParamList } from '../../../../types/partnerNavigation';
 import { toAddressFormValues } from '../../../../utils/googlePlaces';
 import { isValidIndianPin, partnerRegistrationGoBack, showSelectOptions } from '../../../../utils/partnerRegistration';
+import { resolveIndianPincode } from '../../../../utils/indianPincode';
 import { colors } from '../../../../theme';
 
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, 'VendorBusinessAddress'>;
@@ -178,7 +179,23 @@ export default function VendorBusinessAddressScreen({ navigation, route }: Props
                 <View style={[styles.inputWrap, errors.pinCode ? styles.inputError : null, fieldValid.pinCode && !errors.pinCode ? styles.inputValid : null]}>
                   <PartnerTextInput
                     value={vendorAddress.pinCode}
-                    onChangeText={(pinCode) => { setVendorAddress({ pinCode: pinCode.replace(/\D/g, '').slice(0, 6) }); clearError('pinCode'); }}
+                    onChangeText={async (text) => {
+                      const pin = text.replace(/\D/g, '').slice(0, 6);
+                      setVendorAddress({ pinCode: pin });
+                      clearError('pinCode');
+                      if (pin.length === 6) {
+                        const geo = await resolveIndianPincode(pin);
+                        if (geo) {
+                          setVendorAddress({
+                            pinCode: pin,
+                            city: vendorAddress.city ? vendorAddress.city : geo.district,
+                            state: vendorAddress.state ? vendorAddress.state : geo.state,
+                          });
+                          clearError('city');
+                          clearError('state');
+                        }
+                      }
+                    }}
                     keyboardType="number-pad"
                     maxLength={6}
                     placeholder="751001"

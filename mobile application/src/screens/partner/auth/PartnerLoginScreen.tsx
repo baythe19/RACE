@@ -148,7 +148,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
     try {
       const result = await sendOtpMutation.mutateAsync({
         mobileNumber: phoneToUse || '9876543210',
-        role: partnerRole,
+        role: partnerRole ?? 'driver',
       });
 
       // --- OTP auth bypass (when SKIP_OTP_AUTH is active) ---
@@ -161,7 +161,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         const verifyResult = await verifyOtpMutation.mutateAsync({
           mobileNumber,
           otp,
-          role: partnerRole,
+          role: partnerRole ?? 'driver',
         });
         const backendRole = verifyResult.user.role;
         const isApprovedPartner =
@@ -212,7 +212,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
       if (UI_PREVIEW_MUTATIONS_ENABLED) {
         navigation.navigate('PartnerOtpVerification', {
           mobileNumber: phoneToUse || '9876543210',
-          role: partnerRole,
+          role: partnerRole ?? undefined,
           isExistingUser: false,
           devOtp: '123456',
           otpMessage: 'Dev mode: use OTP 123456',
@@ -240,14 +240,18 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
               height: insets.top + px(54),
             },
           ]}>
-          <Pressable
-            onPress={handleChangeRole}
-            hitSlop={12}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <ArrowLeft size={px(24)} color="#111827" strokeWidth={2.4} />
-          </Pressable>
+          {navigation.canGoBack() ? (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              hitSlop={12}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Go back">
+              <ArrowLeft size={px(24)} color="#111827" strokeWidth={2.4} />
+            </Pressable>
+          ) : (
+            <View style={{ width: px(32) }} />
+          )}
 
           <View style={styles.headerLogoContainer}>
             <PartnerHeaderLogo width={px(104)} />

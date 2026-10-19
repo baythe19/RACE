@@ -71,6 +71,7 @@ export const API_ENDPOINTS = {
   driverBookingAccept: (id: string) => `/api/v1/driver/bookings/${id}/accept`,
   driverBookingReject: (id: string) => `/api/v1/driver/bookings/${id}/reject`,
   vendorDrivers: '/api/v1/vendor/drivers',
+  vendorDriverSearch: '/api/v1/vendor/drivers/search',
   vendorDriverMemberships: '/api/v1/vendor/drivers/memberships',
   vendorDriverInvitations: '/api/v1/driver/vendor-invitations',
   driverVendorMembership: '/api/v1/driver/vendor-membership',

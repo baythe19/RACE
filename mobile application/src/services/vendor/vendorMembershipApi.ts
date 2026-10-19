@@ -45,6 +45,25 @@ export type DriverVendorMembership = {
   };
 };
 
+export type DriverSearchResult = {
+  id: string;
+  name: string;
+  phone: string;
+  rawPhone: string;
+  driverCode?: string;
+  city?: string;
+  experienceYears?: number;
+  driverType: 'Full-Time' | 'Tow Driver';
+  rating: number;
+  isAvailable: boolean;
+  isBusy: boolean;
+  membershipStatus:
+    | 'AVAILABLE_FOR_INVITE'
+    | 'INVITED_PENDING'
+    | 'ALREADY_IN_FLEET'
+    | 'IN_ANOTHER_FLEET';
+};
+
 /* ------------------------------------------------------------------ *
  * Preview fixtures (P1 QA): the membership UI previously had no demo  *
  * state at all, so every mock walkthrough showed honest errors. These *
@@ -138,6 +157,65 @@ const previewMemberships = [...MOCK_VENDOR_MEMBERSHIPS];
 let previewInvitations = [...MOCK_DRIVER_INVITATIONS];
 const previewDriverMembership: { current: DriverVendorMembership | null } = { current: null };
 
+const MOCK_SEARCHABLE_DRIVERS: DriverSearchResult[] = [
+  {
+    id: 'mock-driver-bikram-team-1',
+    name: 'Rakesh Sahoo',
+    phone: '+91 98*** 12345',
+    rawPhone: '+919876123401',
+    driverCode: 'RC-DR-1042',
+    driverType: 'Tow Driver',
+    city: 'Bhubaneswar',
+    experienceYears: 4,
+    rating: 4.8,
+    isAvailable: true,
+    isBusy: false,
+    membershipStatus: 'ALREADY_IN_FLEET',
+  },
+  {
+    id: 'mock-driver-bikram-team-2',
+    name: 'Debasis Naik',
+    phone: '+91 98*** 12346',
+    rawPhone: '+919876123402',
+    driverCode: 'RC-DR-1057',
+    driverType: 'Full-Time',
+    city: 'Cuttack',
+    experienceYears: 6,
+    rating: 4.6,
+    isAvailable: false,
+    isBusy: true,
+    membershipStatus: 'ALREADY_IN_FLEET',
+  },
+  {
+    id: 'mock-driver-ft-available-1',
+    name: 'Manas Ranjan Jena',
+    phone: '+91 94*** 98765',
+    rawPhone: '+919437198765',
+    driverCode: 'RC-DR-1088',
+    driverType: 'Full-Time',
+    city: 'Bhubaneswar',
+    experienceYears: 5,
+    rating: 4.9,
+    isAvailable: true,
+    isBusy: false,
+    membershipStatus: 'AVAILABLE_FOR_INVITE',
+  },
+  {
+    id: 'mock-driver-ft-available-2',
+    name: 'Satyajit Mohanty',
+    phone: '+91 82*** 54321',
+    rawPhone: '+918249054321',
+    driverCode: 'RC-DR-1094',
+    driverType: 'Full-Time',
+    city: 'Puri',
+    experienceYears: 3,
+    rating: 4.7,
+    isAvailable: true,
+    isBusy: false,
+    membershipStatus: 'AVAILABLE_FOR_INVITE',
+  },
+];
+
 export async function listVendorMemberships(): Promise<VendorMembership[]> {
   try {
     const { data } = await api.get<ApiSuccessResponse<VendorMembership[]>>(
@@ -146,6 +224,29 @@ export async function listVendorMemberships(): Promise<VendorMembership[]> {
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) return previewMemberships;
+    throw error;
+  }
+}
+
+export async function searchVendorDrivers(query: string): Promise<DriverSearchResult[]> {
+  const trimmed = query.trim();
+  if (trimmed.length < 2) return [];
+  try {
+    const { data } = await api.get<ApiSuccessResponse<DriverSearchResult[]>>(
+      API_ENDPOINTS.vendorDriverSearch,
+      { params: { q: trimmed } },
+    );
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      const q = trimmed.toLowerCase();
+      const digits = trimmed.replace(/\D/g, '');
+      return MOCK_SEARCHABLE_DRIVERS.filter(d =>
+        d.name.toLowerCase().includes(q) ||
+        (d.driverCode && d.driverCode.toLowerCase().includes(q)) ||
+        (digits.length >= 2 && d.rawPhone.includes(digits)),
+      );
+    }
     throw error;
   }
 }
