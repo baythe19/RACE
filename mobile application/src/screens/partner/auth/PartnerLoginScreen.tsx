@@ -70,14 +70,16 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
   // Allow any 10-digit mobile number for seamless testing with mock/real data
   const isValid = useMemo(() => mobileNumber.length === 10, [mobileNumber]);
 
+  const hasExplicitRole = Boolean(route.params?.role);
+
   // Read role from navigation params or store
-  const [partnerRole, setPartnerRole] = useState<PartnerRole>(
+  const [partnerRole, setPartnerRole] = useState<PartnerRole | null>(
     route.params?.role ??
     (signupAccountType === 'vendor' || signupAccountType === 'driver'
       ? signupAccountType
       : null) ??
     selectedRole ??
-    'driver',
+    null,
   );
 
   useEffect(() => {
@@ -88,11 +90,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
   }, [route.params?.role, setSelectedRole]);
 
   const handleChangeRole = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
-      return;
-    }
-    navigation.navigate('PartnerWelcome');
+    navigation.navigate('PartnerRoleSelection');
   };
 
   const isDriver = partnerRole === 'driver';
@@ -172,14 +170,18 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
           !verifyResult.onboardingRequired;
 
         // Route straight to registration wizard instead of bypassing to dashboard
-        goToRegistration(partnerRole);
+        if (hasExplicitRole && partnerRole) {
+          goToRegistration(partnerRole);
+        } else {
+          navigation.navigate('PartnerRoleSelection');
+        }
         return;
       }
       // --- end OTP bypass ---
 
       navigation.navigate('PartnerOtpVerification', {
         mobileNumber: phoneToUse || '9876543210',
-        role: partnerRole,
+        role: hasExplicitRole && partnerRole ? partnerRole : undefined,
         isExistingUser: result.isExistingUser ?? false,
         devOtp: result.devOtp,
         otpMessage: result.message,
@@ -269,66 +271,103 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                 paddingBottom: insets.bottom + px(18),
               },
             ]}>
-            {/* Title & Subtitle — Left Aligned, Clean & Meaningful */}
+            {/* Title & Subtitle */}
             <View style={[styles.titleSection, { marginTop: px(18) }]}>
               <PartnerText style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
-                Sign in to RACE
+                {hasExplicitRole ? 'Sign in to RACE' : 'Partner Sign In'}
               </PartnerText>
               <PartnerText style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
-                We'll verify your partner account with a secure OTP.
+                {hasExplicitRole
+                  ? "We'll verify your partner account with a secure OTP."
+                  : 'Enter your phone number to sign in or register as a partner.'}
               </PartnerText>
             </View>
 
-            {/* Pre-Selected Role Card / Badge */}
-            <View
-              style={[
-                styles.roleBadgeCard,
-                {
-                  marginTop: px(24),
-                  paddingHorizontal: px(12),
-                  paddingVertical: px(11),
-                  borderRadius: px(16),
-                },
-              ]}>
+            {/* Role Card / Universal Partner Badge */}
+            {hasExplicitRole && partnerRole ? (
               <View
                 style={[
-                  styles.roleIconBox,
+                  styles.roleBadgeCard,
                   {
-                    width: px(36),
-                    height: px(36),
-                    borderRadius: px(10),
-                    backgroundColor: isDriver ? '#FEF3C7' : '#F3F4F6',
+                    marginTop: px(22),
+                    paddingHorizontal: px(12),
+                    paddingVertical: px(11),
+                    borderRadius: px(16),
                   },
                 ]}>
-                {isDriver ? (
-                  <Image
-                    source={images.icons.truck}
-                    style={{ width: px(28), height: px(18) }}
-                    resizeMode="contain"
-                    accessibilityLabel="Driver"
-                  />
-                ) : (
-                  <Building2 size={px(20)} color="#374151" strokeWidth={2.2} />
-                )}
-              </View>
+                <View
+                  style={[
+                    styles.roleIconBox,
+                    {
+                      width: px(36),
+                      height: px(36),
+                      borderRadius: px(10),
+                      backgroundColor: isDriver ? '#FEF3C7' : '#F3F4F6',
+                    },
+                  ]}>
+                  {isDriver ? (
+                    <Image
+                      source={images.icons.truck}
+                      style={{ width: px(28), height: px(18) }}
+                      resizeMode="contain"
+                      accessibilityLabel="Driver"
+                    />
+                  ) : (
+                    <Building2 size={px(20)} color="#374151" strokeWidth={2.2} />
+                  )}
+                </View>
 
-              <PartnerText style={[styles.roleBadgeTitle, { fontSize: px(14.5) }]} numberOfLines={1}>
-                {roleDisplayTitle}
-              </PartnerText>
-
-              {/* Vertical divider */}
-              <View style={[styles.roleDivider, { height: px(18), marginHorizontal: px(8) }]} />
-
-              {/* Change role link */}
-              <Pressable
-                onPress={handleChangeRole}
-                hitSlop={8}
-                style={({ pressed }) => [pressed && styles.pressed]}>
-                <PartnerText style={[styles.changeRoleText, { fontSize: px(13.5) }]}>
-                  {roleChangeLabel}
+                <PartnerText style={[styles.roleBadgeTitle, { fontSize: px(14.5) }]} numberOfLines={1}>
+                  {roleDisplayTitle}
                 </PartnerText>
-              </Pressable>
-            </View>
+
+                <View style={[styles.roleDivider, { height: px(18), marginHorizontal: px(8) }]} />
+
+                <Pressable
+                  onPress={handleChangeRole}
+                  hitSlop={8}
+                  style={({ pressed }) => [pressed && styles.pressed]}>
+                  <PartnerText style={[styles.changeRoleText, { fontSize: px(13.5) }]}>
+                    {roleChangeLabel}
+                  </PartnerText>
+                </Pressable>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.roleBadgeCard,
+                  {
+                    marginTop: px(20),
+                    paddingHorizontal: px(14),
+                    paddingVertical: px(10),
+                    borderRadius: px(14),
+                    backgroundColor: '#F8FAFC',
+                    borderColor: '#E2E8F0',
+                    borderWidth: 1,
+                  },
+                ]}>
+                <View
+                  style={[
+                    styles.roleIconBox,
+                    {
+                      width: px(34),
+                      height: px(34),
+                      borderRadius: px(10),
+                      backgroundColor: '#FEF3C7',
+                    },
+                  ]}>
+                  <Sparkles size={px(17)} color="#D97706" strokeWidth={2.4} />
+                </View>
+                <View style={{ flex: 1, marginLeft: px(10) }}>
+                  <PartnerText style={{ fontSize: px(13.5), fontWeight: '700', color: '#1E293B' }}>
+                    Roadside Partner Portal
+                  </PartnerText>
+                  <PartnerText style={{ fontSize: px(11.5), color: '#64748B', marginTop: px(1) }}>
+                    Driver & Towing Vendor registration / sign in
+                  </PartnerText>
+                </View>
+              </View>
+            )}
 
             {/* Mobile Number Label & Inputs */}
             <View style={[styles.inputSection, { marginTop: px(26) }]}>

@@ -19,6 +19,10 @@ export interface DriverPersonalInfo {
   dateOfBirth: string;
   address: string;
   city?: string;
+  state?: string;
+  pincode?: string;
+  licenseNumber?: string;
+  driverType?: 'Full-Time' | 'Part-Time';
   emergencyContactName?: string;
   emergencyContactNumber?: string;
   yearsOfExperience?: string;
@@ -88,6 +92,10 @@ export const defaultDriverPersonal: DriverPersonalInfo = {
   dateOfBirth: '',
   address: '',
   city: '',
+  state: '',
+  pincode: '',
+  licenseNumber: '',
+  driverType: 'Full-Time',
   emergencyContactName: '',
   emergencyContactNumber: '',
   yearsOfExperience: '',

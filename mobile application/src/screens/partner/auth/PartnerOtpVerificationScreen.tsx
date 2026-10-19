@@ -156,7 +156,11 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         );
 
         if (result.onboardingRequired) {
-          goToRegistration(role);
+          if (paramRole === 'driver' || paramRole === 'vendor') {
+            goToRegistration(paramRole);
+          } else {
+            navigation.navigate('PartnerRoleSelection');
+          }
         }
         return;
       } catch (err) {
@@ -164,7 +168,6 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
           const fallbackRole = resolvePartnerRole();
           setVerified(true);
 
-          // For mock/dev mode: always route to 4-step registration & verification screens
           const token = `mock-${fallbackRole}-token`;
           await saveTokens(token, token);
           dispatch(
@@ -184,7 +187,11 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
             }),
           );
 
-          goToRegistration(fallbackRole);
+          if (paramRole === 'driver' || paramRole === 'vendor') {
+            goToRegistration(paramRole);
+          } else {
+            navigation.navigate('PartnerRoleSelection');
+          }
           return;
         }
         if (isRoleMismatchError(err)) {

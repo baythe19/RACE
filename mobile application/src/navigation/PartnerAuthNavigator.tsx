@@ -26,17 +26,17 @@ export default function PartnerAuthNavigator() {
   return (
     <Stack.Navigator
       key={partnerAuthEntry}
-      initialRouteName={partnerAuthEntry}
+      initialRouteName={partnerAuthEntry === 'PartnerWelcome' ? 'PartnerLogin' : partnerAuthEntry}
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: colors.background },
         animation: 'fade',
       }}>
       <Stack.Screen name="PartnerSplash" component={PartnerSplashScreen} />
-      <Stack.Screen name="PartnerWelcome" component={PartnerWelcomeScreen} />
-      <Stack.Screen name="PartnerRoleSelection" component={PartnerWelcomeScreen as any} />
       <Stack.Screen name="PartnerLogin" component={PartnerLoginScreen} />
       <Stack.Screen name="PartnerOtpVerification" component={PartnerOtpVerificationScreen} />
+      <Stack.Screen name="PartnerRoleSelection" component={PartnerRoleSelectionScreen} />
+      <Stack.Screen name="PartnerWelcome" component={PartnerWelcomeScreen} />
     </Stack.Navigator>
   );
 }

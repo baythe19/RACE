@@ -35,26 +35,27 @@ const PAGE_BG = '#F7F7F5';
 
 const ROLE_OPTIONS = [
   {
-    role: 'vendor' as const,
-    title: 'Vendor',
+    role: 'driver' as const,
+    title: 'Driver',
     description:
-      'Register your towing company, manage drivers, vehicles, and track verification status.',
-    Icon: Building2,
+      'Drive & Earn — Full-Time or Part-Time flexible driver jobs. No personal vehicle needed.',
+    Icon: CircleUser,
     features: [
-      { label: 'Manage drivers', Icon: Shield },
-      { label: 'Assign drivers', Icon: Users },
-      { label: 'Track earnings', Icon: BarChart3 },
+      { label: 'Full-Time & Part-Time driver jobs', Icon: Smartphone },
+      { label: 'Connect with Towing Vendors (Full-Time)', Icon: Users },
+      { label: 'Weekly automated payouts', Icon: Wallet },
     ],
   },
   {
-    role: 'driver' as const,
-    title: 'Driver',
-    description: 'Go online, accept allotted jobs, and update trip status live.',
-    Icon: CircleUser,
+    role: 'vendor' as const,
+    title: 'Towing Vendor',
+    description:
+      'Fleet & Business — Own tow trucks, manage fleet drivers, and fulfill roadside towing jobs.',
+    Icon: Building2,
     features: [
-      { label: 'Get jobs', Icon: Smartphone },
-      { label: 'Update trips', Icon: Send },
-      { label: 'Receive payouts', Icon: Wallet },
+      { label: 'Register & manage tow trucks', Icon: Shield },
+      { label: 'Invite & assign verified drivers', Icon: Users },
+      { label: 'Live job tracking & business analytics', Icon: BarChart3 },
     ],
   },
 ];
@@ -68,7 +69,7 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
 
   const storedRole = usePartnerOnboardingStore((state) => state.selectedRole);
   const setSelectedRole = usePartnerOnboardingStore((state) => state.setSelectedRole);
-  const [selectedRole, setLocalRole] = useState<PartnerRole | null>(storedRole ?? 'vendor');
+  const [selectedRole, setLocalRole] = useState<PartnerRole | null>(storedRole ?? 'driver');
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
@@ -77,7 +78,7 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
     }
     navigation.reset({
       index: 0,
-      routes: [{ name: 'PartnerWelcome' }],
+      routes: [{ name: 'PartnerLogin' }],
     });
   };
 
@@ -89,11 +90,15 @@ export default function PartnerRoleSelectionScreen({ navigation }: Props) {
         vendorType: null,
       }),
     );
-    if (role === 'driver') {
-      navigation.navigate('PartnerLogin', { role: 'driver' });
-      return;
+    usePartnerRegistrationStore.getState().setRole(role);
+
+    const rootNavigation =
+      navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
+    if (rootNavigation) {
+      rootNavigation.navigate('PartnerRegistration', { role });
+    } else {
+      (navigation as any).navigate('PartnerRegistration', { role });
     }
-    navigation.navigate('PartnerLogin', { role });
   };
 
   const handleContinue = () => {

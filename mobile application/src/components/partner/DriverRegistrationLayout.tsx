@@ -87,12 +87,10 @@ export default function DriverRegistrationLayout({
   const resolvedSubtitle =
     subtitle ??
     (step === 1
-      ? "Let's start with your basic details."
+      ? "Let's start with your personal and driving details."
       : step === 2
-        ? 'Tell us about your vehicle.'
-        : step === 3
-          ? 'Upload clear, readable photos or PDFs.'
-          : 'Please review your details before submitting.');
+        ? 'Upload clear, readable photos of your KYC documents.'
+        : 'Please review your details before submitting.');
 
   return (
     <View style={styles.root}>

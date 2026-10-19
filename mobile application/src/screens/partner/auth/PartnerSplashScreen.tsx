@@ -42,7 +42,7 @@ export default function PartnerSplashScreen() {
       return;
     }
 
-    navigation.replace('PartnerWelcome');
+    navigation.replace('PartnerLogin');
   }, [isAuthenticated, navigation, rootNavigation, user]);
 
   useEffect(() => {

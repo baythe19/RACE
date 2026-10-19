@@ -1,6 +1,7 @@
 import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
+import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
 
 export type VendorMembership = {
   id: string;
@@ -44,46 +45,211 @@ export type DriverVendorMembership = {
   };
 };
 
+/* ------------------------------------------------------------------ *
+ * Preview fixtures (P1 QA): the membership UI previously had no demo  *
+ * state at all, so every mock walkthrough showed honest errors. These *
+ * fixtures mirror the real API contracts and flip together with the   *
+ * rest of the preview system — real API responses always win.         *
+ * ------------------------------------------------------------------ */
+
+const MOCK_INVITED_AT = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
+
+const MOCK_VENDOR_MEMBERSHIPS: VendorMembership[] = [
+  {
+    id: 'mock-membership-active-1',
+    status: 'ACTIVE',
+    invitedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+    acceptedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+    driver: {
+      id: 'mock-driver-bikram-team-1',
+      name: 'Rakesh Sahoo',
+      phone: '+919876123401',
+      email: 'rakesh.sahoo@racepartner.test',
+      driverCode: 'RC-DR-1042',
+      driverStatus: 'APPROVED',
+      driverType: 'Tow Driver',
+      city: 'Bhubaneswar',
+      rating: 4.8,
+      isAvailable: true,
+      isBusy: false,
+    },
+  },
+  {
+    id: 'mock-membership-active-2',
+    status: 'ACTIVE',
+    invitedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    acceptedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    driver: {
+      id: 'mock-driver-bikram-team-2',
+      name: 'Debasis Naik',
+      phone: '+919876123402',
+      email: 'debasis.naik@racepartner.test',
+      driverCode: 'RC-DR-1057',
+      driverStatus: 'APPROVED',
+      driverType: 'Full-Time',
+      city: 'Cuttack',
+      rating: 4.6,
+      isAvailable: false,
+      isBusy: true,
+    },
+  },
+  {
+    id: 'mock-membership-pending-1',
+    status: 'PENDING',
+    invitedAt: MOCK_INVITED_AT,
+    driver: undefined,
+  },
+];
+
+const MOCK_DRIVER_INVITATIONS: DriverVendorInvitation[] = [
+  {
+    id: 'mock-invitation-1',
+    invitedAt: MOCK_INVITED_AT,
+    vendor: {
+      id: 'mock-vendor-001',
+      name: 'Kalinga Towing & Roadside Services',
+      ownerName: 'Amit Pattnaik',
+      address: {
+        line1: 'Unit 4, Master Canteen Square',
+        city: 'Bhubaneswar',
+        state: 'Odisha',
+      },
+    },
+  },
+];
+
+const MOCK_DRIVER_MEMBERSHIP: DriverVendorMembership = {
+  id: 'mock-membership-active-1',
+  acceptedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+  vendor: {
+    id: 'mock-vendor-001',
+    name: 'Kalinga Towing & Roadside Services',
+    ownerName: 'Amit Pattnaik',
+    address: {
+      line1: 'Unit 4, Master Canteen Square',
+      city: 'Bhubaneswar',
+      state: 'Odisha',
+    },
+  },
+};
+
+/** Mutated preview state — invite/accept flows update this so the UI responds. */
+const previewMemberships = [...MOCK_VENDOR_MEMBERSHIPS];
+let previewInvitations = [...MOCK_DRIVER_INVITATIONS];
+const previewDriverMembership: { current: DriverVendorMembership | null } = { current: null };
+
 export async function listVendorMemberships(): Promise<VendorMembership[]> {
-  const { data } = await api.get<ApiSuccessResponse<VendorMembership[]>>(
-    API_ENDPOINTS.vendorDriverMemberships,
-  );
-  return data.data ?? [];
+  try {
+    const { data } = await api.get<ApiSuccessResponse<VendorMembership[]>>(
+      API_ENDPOINTS.vendorDriverMemberships,
+    );
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) return previewMemberships;
+    throw error;
+  }
 }
 
 export async function inviteVendorDriver(phone: string): Promise<{ accepted: boolean; message: string }> {
-  const { data } = await api.post<ApiSuccessResponse<{ accepted: boolean; message: string }>>(
-    API_ENDPOINTS.vendorDriverInvite,
-    { phone },
-  );
-  return data.data;
+  try {
+    const { data } = await api.post<ApiSuccessResponse<{ accepted: boolean; message: string }>>(
+      API_ENDPOINTS.vendorDriverInvite,
+      { phone },
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      const normalized = phone.replace(/\D/g, '').slice(-10);
+      const existing = previewMemberships.find(
+        (membership) => membership.driver?.phone.endsWith(normalized),
+      );
+      if (existing) {
+        return {
+          accepted: false,
+          message: 'This Driver is already on your fleet or has a pending invitation.',
+        };
+      }
+      previewMemberships.push({
+        id: `mock-membership-pending-${Date.now()}`,
+        status: 'PENDING',
+        invitedAt: new Date().toISOString(),
+        driver: undefined,
+      });
+      return {
+        accepted: true,
+        message: `If a verified Driver matches +91 ${normalized}, an invitation has been sent.`,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function revokeVendorDriverMembership(id: string): Promise<void> {
-  await api.delete(API_ENDPOINTS.vendorDriverMembershipRevoke(id));
+  try {
+    await api.delete(API_ENDPOINTS.vendorDriverMembershipRevoke(id));
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      const index = previewMemberships.findIndex((membership) => membership.id === id);
+      if (index >= 0) previewMemberships.splice(index, 1);
+      return;
+    }
+    throw error;
+  }
 }
 
 export async function listDriverVendorInvitations(): Promise<DriverVendorInvitation[]> {
-  const { data } = await api.get<ApiSuccessResponse<DriverVendorInvitation[]>>(
-    API_ENDPOINTS.vendorDriverInvitations,
-  );
-  return data.data ?? [];
+  try {
+    const { data } = await api.get<ApiSuccessResponse<DriverVendorInvitation[]>>(
+      API_ENDPOINTS.vendorDriverInvitations,
+    );
+    return data.data ?? [];
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      // Once the driver accepts in preview, the invitation disappears —
+      // matching the real lifecycle.
+      return previewDriverMembership.current ? [] : previewInvitations;
+    }
+    throw error;
+  }
 }
 
 export async function getDriverVendorMembership(): Promise<DriverVendorMembership | null> {
-  const { data } = await api.get<ApiSuccessResponse<DriverVendorMembership | null>>(
-    API_ENDPOINTS.driverVendorMembership,
-  );
-  return data.data ?? null;
+  try {
+    const { data } = await api.get<ApiSuccessResponse<DriverVendorMembership | null>>(
+      API_ENDPOINTS.driverVendorMembership,
+    );
+    return data.data ?? null;
+  } catch (error) {
+    if (UI_PREVIEW_MODE) return previewDriverMembership.current ?? MOCK_DRIVER_MEMBERSHIP;
+    throw error;
+  }
 }
 
 export async function respondToVendorInvitation(
   id: string,
   decision: 'accept' | 'decline',
 ): Promise<{ id: string; status: string; decidedAt?: string }> {
-  const { data } = await api.post<ApiSuccessResponse<{ id: string; status: string; decidedAt?: string }>>(
-    API_ENDPOINTS.driverVendorInvitationRespond(id),
-    { decision },
-  );
-  return data.data;
+  try {
+    const { data } = await api.post<ApiSuccessResponse<{ id: string; status: string; decidedAt?: string }>>(
+      API_ENDPOINTS.driverVendorInvitationRespond(id),
+      { decision },
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      previewInvitations = previewInvitations.filter((invitation) => invitation.id !== id);
+      if (decision === 'accept') {
+        previewDriverMembership.current = {
+          ...MOCK_DRIVER_MEMBERSHIP,
+          acceptedAt: new Date().toISOString(),
+        };
+      }
+      return {
+        id,
+        status: decision === 'accept' ? 'ACTIVE' : 'DECLINED',
+        decidedAt: new Date().toISOString(),
+      };
+    }
+    throw error;
+  }
 }
