@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { notificationQueryKeys } from '../useNotificationQueries';
+
 import { getProfile } from '../profileService';
 import {
   acceptDriverJob,
@@ -106,6 +108,8 @@ export function useAcceptDriverJobMutation() {
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.jobs });
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.offers });
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.active });
+      void queryClient.invalidateQueries({ queryKey: ['vendor', 'bookings'] });
+      void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
     },
   });
 }

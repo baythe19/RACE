@@ -1,17 +1,31 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import {
   Check,
   Clock3,
+  Info,
   Phone,
   Search,
   ShieldCheck,
   Star,
   UserCheck,
+  ClipboardList,
+  MoreVertical,
   UserRound,
   UserRoundPlus,
   X,
 } from 'lucide-react-native';
+import { jumpToPartnerJobsScreen } from '../../navigation/partnerNavigationRef';
+import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQueries';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { PartnerText } from '../../components/partner/PartnerText';
@@ -27,6 +41,9 @@ import type { DriverSearchResult, VendorMembership } from '../../services/vendor
 const AMBER = '#F9A602';
 const INK = '#191919';
 const MUTED = '#6B7280';
+
+const DRIVERS_HELP_MESSAGE =
+  'Search and phone invite both send the same fleet invitation. Use search for name or driver code; use phone when you only have their verified mobile. After the driver accepts, they appear under Connected fleet drivers and in Assign driver on new jobs.';
 
 function DriverSearchResultCard({
   driver,
@@ -129,13 +146,39 @@ function MemberCard({
   member,
   busy,
   onRemove,
+  onAssign,
 }: {
   member: VendorMembership;
   busy: boolean;
   onRemove: () => void;
+  onAssign?: () => void;
 }) {
   const px = useScreenPx();
   const pending = member.status === 'PENDING';
+
+  const openMenu = () => {
+    const name = member.driver?.name ?? 'Driver';
+    const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
+    if (!pending && member.driver?.phone) {
+      options.push({
+        text: 'Call driver',
+        onPress: () => {
+          void Linking.openURL(`tel:${member.driver?.phone}`);
+        },
+      });
+    }
+    if (!pending && onAssign) {
+      options.push({ text: 'Assign to job', onPress: onAssign });
+    }
+    options.push({
+      text: pending ? 'Cancel invitation' : 'Remove from fleet',
+      style: 'destructive',
+      onPress: onRemove,
+    });
+    options.push({ text: 'Close', style: 'cancel' });
+    Alert.alert(name, pending ? 'Pending fleet invitation' : 'Fleet driver', options);
+  };
+
   return (
     <View style={[styles.card, { borderRadius: px(16), padding: px(14), marginBottom: px(10) }]}>
       <View style={styles.row}>
@@ -144,10 +187,14 @@ function MemberCard({
         </View>
         <View style={styles.grow}>
           <PartnerText style={[styles.name, { fontSize: px(15) }]}>
-            {pending ? 'Invitation pending' : member.driver?.name ?? 'Driver'}
+            {pending ? member.driver?.name ?? 'Invitation pending' : member.driver?.name ?? 'Driver'}
           </PartnerText>
           <PartnerText style={[styles.sub, { fontSize: px(12) }]}>
-            {pending ? 'Waiting for the Driver to accept' : member.driver?.phone ?? 'Connected Driver'}
+            {pending
+              ? member.driver?.name
+                ? `Waiting for ${member.driver.name} to accept in the driver app`
+                : 'Waiting for the Driver to accept'
+              : member.driver?.phone ?? 'Connected Driver'}
           </PartnerText>
           {!pending && member.driver?.driverType ? (
             <PartnerText style={[styles.sub, { fontSize: px(11), marginTop: px(3) }]}>
@@ -160,17 +207,37 @@ function MemberCard({
             {pending ? 'Pending' : 'Active'}
           </PartnerText>
         </View>
+        <Pressable
+          onPress={openMenu}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Driver options"
+          style={{ padding: px(4), marginLeft: px(4) }}>
+          <MoreVertical size={px(20)} color={MUTED} strokeWidth={2.2} />
+        </Pressable>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={onRemove}
-        style={[styles.removeButton, { marginTop: px(12), paddingVertical: px(9), borderRadius: px(10) }]}>
-        {busy ? <ActivityIndicator size="small" color="#B42318" /> : <X size={px(15)} color="#B42318" />}
-        <PartnerText style={{ color: '#B42318', fontSize: px(12), fontWeight: '700' }}>
-          {pending ? 'Cancel invitation' : 'Remove from fleet'}
-        </PartnerText>
-      </Pressable>
+      {!pending && onAssign ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy || member.driver?.isBusy}
+          onPress={onAssign}
+          style={[
+            styles.primaryButton,
+            {
+              flexDirection: 'row',
+              marginTop: px(12),
+              height: px(44),
+              borderRadius: px(11),
+              backgroundColor: member.driver?.isBusy ? '#E5E7EB' : AMBER,
+              opacity: busy ? 0.7 : 1,
+            },
+          ]}>
+          <ClipboardList size={px(16)} color={INK} strokeWidth={2.3} />
+          <PartnerText style={{ color: INK, fontSize: px(13.5), fontWeight: '700', marginLeft: px(6) }}>
+            {member.driver?.isBusy ? 'On another job' : 'Assign to open job'}
+          </PartnerText>
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -185,6 +252,38 @@ export default function VendorDriverMembershipsScreen() {
   const { data: searchResults = [], isLoading: searchLoading } = useSearchVendorDriversQuery(searchQuery);
   const invite = useInviteVendorDriverMutation();
   const revoke = useRevokeVendorDriverMembershipMutation();
+  const { data: vendorBookings = [] } = useVendorBookingsQuery(true);
+
+  const openAssignForMember = (member: VendorMembership) => {
+    const driverId = member.driver?.id;
+    if (!driverId) return;
+    const openJob = vendorBookings.find(
+      b =>
+        (b.status === 'REQUESTED' || b.status === 'CONFIRMED') &&
+        !b.driver,
+    );
+    if (!openJob) {
+      Alert.alert(
+        'No open jobs',
+        'Go to Jobs → New leads and pick a customer request to assign this driver.',
+        [
+          { text: 'Go to Jobs', onPress: () => jumpToPartnerJobsScreen('PartnerJobsList') },
+          { text: 'OK', style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    jumpToPartnerJobsScreen('VendorAssignJob', {
+      bookingId: openJob.id,
+      bookingType: openJob.bookingType,
+      bookingNumber: openJob.bookingNumber,
+      serviceLabel: openJob.serviceLabel,
+      pickupAddress: openJob.pickup?.address,
+      dropoffAddress: openJob.dropoff?.address ?? undefined,
+      estimatedFare: openJob.estimatedFare,
+      preferredDriverId: driverId,
+    });
+  };
 
   const normalizedPhone = useMemo(() => phone.replace(/\D/g, ''), [phone]);
 
@@ -235,7 +334,19 @@ export default function VendorDriverMembershipsScreen() {
     <AppScreenLayout
       header={
         <View style={[styles.header, { paddingHorizontal: px(18), paddingTop: px(14), paddingBottom: px(12) }]}>
-          <PartnerText style={[styles.title, { fontSize: px(22) }]}>Drivers</PartnerText>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <PartnerText style={[styles.title, { fontSize: px(22) }]}>Drivers</PartnerText>
+            <Pressable
+              onPress={() =>
+                Alert.alert('Search vs phone invite', DRIVERS_HELP_MESSAGE, [{ text: 'OK' }])
+              }
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="How search and phone invite work"
+              style={{ marginLeft: px(8), padding: px(2) }}>
+              <Info size={px(20)} color={MUTED} strokeWidth={2.3} />
+            </Pressable>
+          </View>
           <PartnerText style={[styles.subtitle, { fontSize: px(13) }]}>
             Search & invite verified Full-Time drivers to your fleet.
           </PartnerText>
@@ -260,14 +371,22 @@ export default function VendorDriverMembershipsScreen() {
           </View>
         </View>
 
-        <View style={[styles.searchInputRow, { marginTop: px(12), borderRadius: px(12), height: px(46) }]}>
-          <Search size={px(17)} color={MUTED} />
+        <View style={[styles.searchInputRow, { marginTop: px(12), borderRadius: px(12), height: px(44) }]}>
+          <Search size={px(16)} color={MUTED} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search by Name, Mobile, or Code (e.g. RC-DR-1042)"
             placeholderTextColor="#9CA3AF"
-            style={[styles.input, { fontSize: px(13.5) }]}
+            style={[
+              styles.input,
+              {
+                fontSize: px(13.5),
+                paddingHorizontal: 0,
+                marginLeft: 0,
+                ...(Platform.OS === 'android' ? { includeFontPadding: false } : null),
+              },
+            ]}
             accessibilityLabel="Search full time drivers"
             autoCapitalize="none"
           />
@@ -321,13 +440,13 @@ export default function VendorDriverMembershipsScreen() {
       {/* Manual Invite by Phone Collapsible */}
       <View style={[styles.inviteCard, { borderRadius: px(16), padding: px(14), marginBottom: px(18) }]}>
         <Pressable
-          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
+          style={{ flexDirection: 'row', alignItems: 'center' }}
           onPress={() => setShowManualPhone(prev => !prev)}>
-          <View style={styles.row}>
+          <View style={[styles.row, { flex: 1, minWidth: 0, marginRight: px(10) }]}>
             <View style={[styles.avatar, { width: px(34), height: px(34), borderRadius: px(11), backgroundColor: '#FFF7E5' }]}>
               <UserRoundPlus size={px(17)} color={AMBER} />
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <PartnerText style={{ color: INK, fontWeight: '700', fontSize: px(13.5) }}>
                 Invite by Verified Phone Number
               </PartnerText>
@@ -336,8 +455,15 @@ export default function VendorDriverMembershipsScreen() {
               </PartnerText>
             </View>
           </View>
-          <PartnerText style={{ color: '#2563EB', fontSize: px(12), fontWeight: '700' }}>
-            {showManualPhone ? 'Hide' : 'Enter phone'}
+          <PartnerText
+            style={{
+              color: '#2563EB',
+              fontSize: px(12),
+              fontWeight: '700',
+              flexShrink: 0,
+              paddingLeft: px(4),
+            }}>
+            {showManualPhone ? 'Hide' : 'Enter'}
           </PartnerText>
         </Pressable>
 
@@ -419,6 +545,7 @@ export default function VendorDriverMembershipsScreen() {
             member={member}
             busy={revoke.isPending}
             onRemove={() => confirmRemove(member)}
+            onAssign={() => openAssignForMember(member)}
           />
         ))
       ) : (
@@ -466,8 +593,8 @@ const styles = StyleSheet.create({
   searchInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
+    gap: 6,
+    paddingHorizontal: 10,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -482,7 +609,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E9EAEC',
   },
-  input: { flex: 1, color: INK, paddingVertical: 0 },
+  input: { flex: 1, color: INK, paddingVertical: 0, minWidth: 0 },
   primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',

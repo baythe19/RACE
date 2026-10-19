@@ -34,6 +34,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     pickupAddress,
     dropoffAddress,
     estimatedFare,
+    preferredDriverId,
   } = route.params;
 
   const {
@@ -85,6 +86,13 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
   }, [bookingType, vehicleId, vehicles, reservedVehicleIds]);
 
   React.useEffect(() => {
+    if (!driverId && preferredDriverId) {
+      const preferred = eligibleDrivers.find(m => m.driver?.id === preferredDriverId);
+      if (preferred?.driver?.id) {
+        setDriverId(preferred.driver.id);
+        return;
+      }
+    }
     if (!driverId && eligibleDrivers.length > 0) {
       const availableDrivers = eligibleDrivers.filter(
         m => m.driver?.isAvailable && !m.driver?.isBusy,
@@ -93,7 +101,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         setDriverId(availableDrivers[0].driver.id);
       }
     }
-  }, [driverId, eligibleDrivers]);
+  }, [driverId, eligibleDrivers, preferredDriverId]);
   const selectedVehicleIsAvailable =
     bookingType === 'driver' ||
     (Boolean(vehicleId) &&

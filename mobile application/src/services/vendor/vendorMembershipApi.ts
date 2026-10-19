@@ -2,10 +2,16 @@ import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
+import { getDriverVendorPreviewScenario } from './driverVendorPreview';
 import {
-  getDriverVendorPreviewScenario,
-  setDriverVendorPreviewScenario,
-} from './driverVendorPreview';
+  getPreviewDriverInvitations,
+  getPreviewDriverVendorMembership,
+  getPreviewMemberships,
+  getPreviewSearchableDrivers,
+  previewInviteDriverByPhone,
+  previewRespondToVendorInvitation,
+  previewRevokeMembership,
+} from '../../data/previewPartnerWorld';
 
 export type VendorMembership = {
   id: string;
@@ -69,157 +75,7 @@ export type DriverSearchResult = {
     | 'IN_ANOTHER_FLEET';
 };
 
-/* ------------------------------------------------------------------ *
- * Preview fixtures (P1 QA): the membership UI previously had no demo  *
- * state at all, so every mock walkthrough showed honest errors. These *
- * fixtures mirror the real API contracts and flip together with the   *
- * rest of the preview system — real API responses always win.         *
- * ------------------------------------------------------------------ */
-
-const MOCK_INVITED_AT = new Date(Date.now() - 26 * 60 * 60 * 1000).toISOString();
-
-const MOCK_VENDOR_MEMBERSHIPS: VendorMembership[] = [
-  {
-    id: 'mock-membership-active-1',
-    status: 'ACTIVE',
-    invitedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    acceptedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-    driver: {
-      id: 'mock-driver-bikram-team-1',
-      name: 'Rakesh Sahoo',
-      phone: '+919876123401',
-      email: 'rakesh.sahoo@racepartner.test',
-      driverCode: 'RC-DR-1042',
-      driverStatus: 'APPROVED',
-      driverType: 'Tow Driver',
-      city: 'Bhubaneswar',
-      rating: 4.8,
-      isAvailable: true,
-      isBusy: false,
-    },
-  },
-  {
-    id: 'mock-membership-active-2',
-    status: 'ACTIVE',
-    invitedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    acceptedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    driver: {
-      id: 'mock-driver-bikram-team-2',
-      name: 'Debasis Naik',
-      phone: '+919876123402',
-      email: 'debasis.naik@racepartner.test',
-      driverCode: 'RC-DR-1057',
-      driverStatus: 'APPROVED',
-      driverType: 'Full-Time',
-      city: 'Cuttack',
-      rating: 4.6,
-      isAvailable: false,
-      isBusy: true,
-    },
-  },
-  {
-    id: 'mock-membership-pending-1',
-    status: 'PENDING',
-    invitedAt: MOCK_INVITED_AT,
-    driver: undefined,
-  },
-];
-
-const MOCK_DRIVER_INVITATIONS: DriverVendorInvitation[] = [
-  {
-    id: 'mock-invitation-1',
-    invitedAt: MOCK_INVITED_AT,
-    vendor: {
-      id: 'mock-vendor-001',
-      name: 'Kalinga Towing & Roadside Services',
-      ownerName: 'Amit Pattnaik',
-      address: {
-        line1: 'Unit 4, Master Canteen Square',
-        city: 'Bhubaneswar',
-        state: 'Odisha',
-      },
-    },
-  },
-];
-
-const MOCK_DRIVER_MEMBERSHIP: DriverVendorMembership = {
-  id: 'mock-membership-active-1',
-  acceptedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
-  vendor: {
-    id: 'mock-vendor-001',
-    name: 'Kalinga Towing & Roadside Services',
-    ownerName: 'Amit Pattnaik',
-    address: {
-      line1: 'Unit 4, Master Canteen Square',
-      city: 'Bhubaneswar',
-      state: 'Odisha',
-    },
-  },
-};
-
-/** Mutated preview state — invite/accept flows update this so the UI responds. */
-const previewMemberships = [...MOCK_VENDOR_MEMBERSHIPS];
-let previewInvitations = [...MOCK_DRIVER_INVITATIONS];
-const previewDriverMembership: { current: DriverVendorMembership | null } = { current: null };
-
-const MOCK_SEARCHABLE_DRIVERS: DriverSearchResult[] = [
-  {
-    id: 'mock-driver-bikram-team-1',
-    name: 'Rakesh Sahoo',
-    phone: '+91 98*** 12345',
-    rawPhone: '+919876123401',
-    driverCode: 'RC-DR-1042',
-    driverType: 'Tow Driver',
-    city: 'Bhubaneswar',
-    experienceYears: 4,
-    rating: 4.8,
-    isAvailable: true,
-    isBusy: false,
-    membershipStatus: 'ALREADY_IN_FLEET',
-  },
-  {
-    id: 'mock-driver-bikram-team-2',
-    name: 'Debasis Naik',
-    phone: '+91 98*** 12346',
-    rawPhone: '+919876123402',
-    driverCode: 'RC-DR-1057',
-    driverType: 'Full-Time',
-    city: 'Cuttack',
-    experienceYears: 6,
-    rating: 4.6,
-    isAvailable: false,
-    isBusy: true,
-    membershipStatus: 'ALREADY_IN_FLEET',
-  },
-  {
-    id: 'mock-driver-ft-available-1',
-    name: 'Manas Ranjan Jena',
-    phone: '+91 94*** 98765',
-    rawPhone: '+919437198765',
-    driverCode: 'RC-DR-1088',
-    driverType: 'Full-Time',
-    city: 'Bhubaneswar',
-    experienceYears: 5,
-    rating: 4.9,
-    isAvailable: true,
-    isBusy: false,
-    membershipStatus: 'AVAILABLE_FOR_INVITE',
-  },
-  {
-    id: 'mock-driver-ft-available-2',
-    name: 'Satyajit Mohanty',
-    phone: '+91 82*** 54321',
-    rawPhone: '+918249054321',
-    driverCode: 'RC-DR-1094',
-    driverType: 'Full-Time',
-    city: 'Puri',
-    experienceYears: 3,
-    rating: 4.7,
-    isAvailable: true,
-    isBusy: false,
-    membershipStatus: 'AVAILABLE_FOR_INVITE',
-  },
-];
+/* Preview: linked Bikram ↔ Abhishek world in `previewPartnerWorld.ts`. */
 
 export async function listVendorMemberships(): Promise<VendorMembership[]> {
   try {
@@ -228,7 +84,7 @@ export async function listVendorMemberships(): Promise<VendorMembership[]> {
     );
     return data.data ?? [];
   } catch (error) {
-    if (UI_PREVIEW_MODE) return previewMemberships;
+    if (UI_PREVIEW_MODE) return getPreviewMemberships();
     throw error;
   }
 }
@@ -246,7 +102,7 @@ export async function searchVendorDrivers(query: string): Promise<DriverSearchRe
     if (UI_PREVIEW_MODE) {
       const q = trimmed.toLowerCase();
       const digits = trimmed.replace(/\D/g, '');
-      return MOCK_SEARCHABLE_DRIVERS.filter(d =>
+      return getPreviewSearchableDrivers().filter(d =>
         d.name.toLowerCase().includes(q) ||
         (d.driverCode && d.driverCode.toLowerCase().includes(q)) ||
         (digits.length >= 2 && d.rawPhone.includes(digits)),
@@ -265,26 +121,8 @@ export async function inviteVendorDriver(phone: string): Promise<{ accepted: boo
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      const normalized = phone.replace(/\D/g, '').slice(-10);
-      const existing = previewMemberships.find(
-        (membership) => membership.driver?.phone.endsWith(normalized),
-      );
-      if (existing) {
-        return {
-          accepted: false,
-          message: 'This Driver is already on your fleet or has a pending invitation.',
-        };
-      }
-      previewMemberships.push({
-        id: `mock-membership-pending-${Date.now()}`,
-        status: 'PENDING',
-        invitedAt: new Date().toISOString(),
-        driver: undefined,
-      });
-      return {
-        accepted: true,
-        message: `If a verified Driver matches +91 ${normalized}, an invitation has been sent.`,
-      };
+      const result = previewInviteDriverByPhone(phone);
+      return { accepted: result.ok, message: result.message };
     }
     throw error;
   }
@@ -295,8 +133,7 @@ export async function revokeVendorDriverMembership(id: string): Promise<void> {
     await api.delete(API_ENDPOINTS.vendorDriverMembershipRevoke(id));
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      const index = previewMemberships.findIndex((membership) => membership.id === id);
-      if (index >= 0) previewMemberships.splice(index, 1);
+      previewRevokeMembership(id);
       return;
     }
     throw error;
@@ -312,7 +149,7 @@ export async function listDriverVendorInvitations(): Promise<DriverVendorInvitat
   } catch (error) {
     if (UI_PREVIEW_MODE) {
       if (getDriverVendorPreviewScenario() !== 'request') return [];
-      return previewInvitations;
+      return getPreviewDriverInvitations();
     }
     throw error;
   }
@@ -328,7 +165,7 @@ export async function getDriverVendorMembership(): Promise<DriverVendorMembershi
     if (UI_PREVIEW_MODE) {
       const previewScenario = getDriverVendorPreviewScenario();
       if (previewScenario === 'connected' || previewScenario === 'assignment') {
-        return previewDriverMembership.current ?? MOCK_DRIVER_MEMBERSHIP;
+        return getPreviewDriverVendorMembership();
       }
       return null;
     }
@@ -348,17 +185,7 @@ export async function respondToVendorInvitation(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      previewInvitations = previewInvitations.filter((invitation) => invitation.id !== id);
-      if (decision === 'accept') {
-        previewDriverMembership.current = {
-          ...MOCK_DRIVER_MEMBERSHIP,
-          acceptedAt: new Date().toISOString(),
-        };
-        setDriverVendorPreviewScenario('connected');
-      } else if (previewInvitations.length === 0) {
-        previewDriverMembership.current = null;
-        setDriverVendorPreviewScenario('none');
-      }
+      previewRespondToVendorInvitation(id, decision);
       return {
         id,
         status: decision === 'accept' ? 'ACTIVE' : 'DECLINED',

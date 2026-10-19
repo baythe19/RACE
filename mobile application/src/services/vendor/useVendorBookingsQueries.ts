@@ -26,6 +26,7 @@ import {
   type CreateVendorDriverInput,
 } from './vendorDriversApi';
 import { driverQueryKeys } from '../driver/useDriverQueries';
+import { notificationQueryKeys } from '../useNotificationQueries';
 import { vendorDriverKeys } from './useVendorDriversQueries';
 
 export const vendorBookingQueryKeys = {
@@ -166,7 +167,9 @@ export function useApproveVendorBookingMutation() {
       void queryClient.invalidateQueries({ queryKey: vendorBookingQueryKeys.bookings });
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.offers });
       void queryClient.invalidateQueries({ queryKey: driverQueryKeys.jobs });
+      void queryClient.invalidateQueries({ queryKey: driverQueryKeys.active });
       void queryClient.invalidateQueries({ queryKey: vendorDriverKeys.list });
+      void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
     },
   });
 }

@@ -10,10 +10,14 @@ import {
   acceptMockDriverJob,
   getMockDriverJobOffers,
   MOCK_DRIVER_JOBS,
-  mockActiveJobState,
   rejectMockDriverJob,
+  syncMockActiveJobExport,
   updateMockActiveJobStatus,
 } from '../../data/mockPartnerData';
+import {
+  ensurePreviewAssignmentOffer,
+  getPreviewMockActiveJob,
+} from '../../data/previewPartnerWorld';
 import { getDriverVendorPreviewScenario } from '../vendor/driverVendorPreview';
 
 export type DriverJobBooking = {
@@ -84,34 +88,6 @@ export async function setDriverAvailability(isAvailable: boolean): Promise<{
   }
 }
 
-const PREVIEW_FLEET_ASSIGNMENT: DriverJobBooking = {
-  bookingType: 'towing',
-  id: 'RACE-TOW-FLEET-ASSIGN-1',
-  bookingNumber: 'TOW-10048',
-  status: 'DRIVER_ASSIGNED',
-  serviceLabel: 'Instant Towing',
-  pickup: {
-    label: 'Saheed Nagar',
-    address: 'Janpath Road, Saheed Nagar, Bhubaneswar',
-  },
-  dropoff: {
-    label: 'Mancheswar',
-    address: 'Sector B, Mancheswar, Bhubaneswar',
-  },
-  estimatedFare: 1650,
-  distanceKm: 12.5,
-  createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-  vendorId: 'mock-vendor-001',
-  assignedFleetVehicleLabel: 'OD 02 TOW 1001 · Flatbed',
-  vendorApproved: true,
-};
-
-function withPreviewFleetAssignment(jobs: DriverJobBooking[], completedOnly: boolean): DriverJobBooking[] {
-  if (completedOnly || getDriverVendorPreviewScenario() !== 'assignment') return jobs;
-  if (jobs.some(job => job.id === PREVIEW_FLEET_ASSIGNMENT.id)) return jobs;
-  return [PREVIEW_FLEET_ASSIGNMENT, ...jobs];
-}
-
 export async function listDriverJobs(params?: {
   status?: string;
   type?: 'towing' | 'driver';
@@ -124,26 +100,19 @@ export async function listDriverJobs(params?: {
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      const active = getPreviewMockActiveJob();
       if (params?.status === 'COMPLETED') {
-        const completedActive =
-          mockActiveJobState?.status === 'COMPLETED' ? [mockActiveJobState] : [];
-        return withPreviewFleetAssignment(
-          [
-            ...completedActive,
-            ...MOCK_DRIVER_JOBS.filter(
-              job => job.status === 'COMPLETED' && job.id !== mockActiveJobState?.id,
-            ),
-          ],
-          true,
-        );
+        const completedActive = active?.status === 'COMPLETED' ? [active] : [];
+        return [
+          ...completedActive,
+          ...MOCK_DRIVER_JOBS.filter(
+            job => job.status === 'COMPLETED' && job.id !== active?.id,
+          ),
+        ];
       }
-      const active = mockActiveJobState;
-      return withPreviewFleetAssignment(
-        active
-          ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
-          : MOCK_DRIVER_JOBS,
-        false,
-      );
+      return active
+        ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
+        : MOCK_DRIVER_JOBS;
     }
     throw error;
   }
@@ -157,6 +126,9 @@ export async function listDriverJobOffers(): Promise<DriverJobBooking[]> {
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
+      if (getDriverVendorPreviewScenario() === 'assignment') {
+        ensurePreviewAssignmentOffer();
+      }
       return getMockDriverJobOffers();
     }
     throw error;
@@ -176,10 +148,11 @@ export async function getDriverActiveJob(): Promise<DriverJobBooking | null> {
     return payload as DriverJobBooking;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      if (!mockActiveJobState || ['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)) {
+      const active = getPreviewMockActiveJob();
+      if (!active || ['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(active.status)) {
         return null;
       }
-      return mockActiveJobState;
+      return active;
     }
     throw error;
   }
@@ -245,15 +218,14 @@ export async function acceptDriverJob(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      if (
-        mockActiveJobState &&
-        !['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(mockActiveJobState.status)
-      ) {
+      const active = getPreviewMockActiveJob();
+      if (active && !['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(active.status)) {
         throw new Error('You already have an active trip in progress. Finish it before accepting another.');
       }
       if (!acceptMockDriverJob(bookingId, bookingType)) {
         throw new Error('This trip is no longer available. Refresh the Jobs tab.');
       }
+      syncMockActiveJobExport();
       return { success: true, message: 'Job accepted' };
     }
     throw error;

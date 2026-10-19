@@ -3,7 +3,14 @@ import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { DriverJobBooking } from '../driver/driverApi';
 import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
-import { MOCK_JOB_OFFERS, MOCK_VENDOR_BOOKINGS } from '../../data/mockPartnerData';
+import {
+  PREVIEW_DRIVER,
+  PREVIEW_VENDOR,
+  getPreviewDriverJobOffers,
+  getPreviewVendorBookings,
+  getPreviewVendorBookingTracking,
+  previewApproveVendorBooking,
+} from '../../data/previewPartnerWorld';
 
 export type VendorApproveResult = {
   id: string;
@@ -69,7 +76,11 @@ const buildMockTracking = (bookingId: string, bookingType: 'towing' | 'driver'):
     longitude: 85.8678,
   },
   assignedFleetVehicleLabel: 'Tata 407 (OD-02-TOW-1001)',
-  driver: { id: 'mock-driver-1', name: 'Rakesh Sahoo', phone: '+919876123401' },
+  driver: {
+    id: PREVIEW_DRIVER.id,
+    name: PREVIEW_DRIVER.fullName,
+    phone: PREVIEW_DRIVER.phone,
+  },
   driverLocation: {
     latitude: MOCK_TRACKING_LAT,
     longitude: 85.852,
@@ -85,7 +96,7 @@ const buildMockTracking = (bookingId: string, bookingType: 'towing' | 'driver'):
     {
       status: 'DRIVER_ASSIGNED',
       timestamp: new Date(Date.now() - 26 * 60 * 1000).toISOString(),
-      note: 'Rakesh Sahoo assigned with Tata 407',
+      note: `${PREVIEW_DRIVER.fullName} assigned with Tata 407`,
     },
     {
       status: 'DRIVER_EN_ROUTE',
@@ -109,6 +120,8 @@ export async function getVendorBookingTracking(input: {
     if (UI_PREVIEW_MODE) {
       // Location-101 preview: serve the live-trip fixture so the tracking
       // screen (map, fresh driver marker, progress timeline) is testable.
+      const linked = getPreviewVendorBookingTracking(input.bookingId, input.bookingType);
+      if (linked) return linked;
       return buildMockTracking(input.bookingId, input.bookingType);
     }
     throw error;
@@ -123,7 +136,7 @@ export async function listVendorBookings(): Promise<VendorBookingItem[]> {
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      return MOCK_VENDOR_BOOKINGS;
+      return getPreviewVendorBookings();
     }
     throw error;
   }
@@ -143,7 +156,7 @@ export async function listVendorBookingOffers(): Promise<DriverJobBooking[]> {
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      return MOCK_JOB_OFFERS;
+      return getPreviewDriverJobOffers();
     }
     throw error;
   }
@@ -167,12 +180,19 @@ export async function approveVendorBooking(payload: {
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      previewApproveVendorBooking({
+        bookingId: payload.bookingId,
+        bookingType: payload.bookingType,
+        driverId: payload.driverId,
+        vehicleLabel: 'OD 02 TOW 1001 · Flatbed Tow Truck · Tata 407 Recovery',
+      });
+      const booking = getPreviewVendorBookings().find(b => b.id === payload.bookingId);
       return {
         id: payload.bookingId,
-        status: 'CONFIRMED',
-        bookingNumber: `TOW-${payload.bookingId.slice(-5)}`,
-        vendorId: 'mock-vendor-001',
-        assignedFleetVehicleLabel: 'Tata 407 (OD-02-TOW-1001)',
+        status: 'DRIVER_ASSIGNED',
+        bookingNumber: booking?.bookingNumber ?? `TOW-${payload.bookingId.slice(-5)}`,
+        vendorId: PREVIEW_VENDOR.id,
+        assignedFleetVehicleLabel: 'OD 02 TOW 1001 · Flatbed Tow Truck · Tata 407 Recovery',
         message: 'Driver and fleet assignment confirmed',
       };
     }
@@ -203,7 +223,7 @@ export async function assignVendorBooking(payload: {
         id: payload.bookingId,
         status: 'DRIVER_ASSIGNED',
         bookingNumber: `TOW-${payload.bookingId.slice(-5)}`,
-        vendorId: 'mock-vendor-001',
+        vendorId: PREVIEW_VENDOR.id,
         driverId: payload.driverId,
         message: 'Driver assigned successfully',
       };

@@ -7,11 +7,15 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
-import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Path, Rect, G } from 'react-native-svg';
 
-import { BHUBANESWAR_DEFAULT, getGoogleMapsApiKey } from '../../utils/googleMaps';
+import { BHUBANESWAR_DEFAULT } from '../../utils/googleMaps';
 import { colors } from '../../theme';
-import { haversineKm, shouldRefreshRoute, type LatLng } from '../../services/driver/tripNavigation';
+import { haversineKm, type LatLng } from '../../services/driver/tripNavigation';
+import {
+  fetchRoadRoute,
+  type RoadRouteResult,
+} from '../../services/driver/roadRoutingService';
 
 const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
 
@@ -52,6 +56,12 @@ type Props = {
    * driver, pickup, and drop stay in the visible strip above that sheet.
    */
   bottomCoverRatio?: number;
+  /** Navigation mode tilts and follows the vehicle in 3D heading-up view */
+  navigationMode?: boolean;
+  vehicleHeading?: number;
+  vehicleType?: 'tow_truck' | 'car';
+  isOffRoute?: boolean;
+  onRouteCalculated?: (route: RoadRouteResult) => void;
   onRouteMetaChange?: (meta: RouteMeta | null) => void;
 };
 
@@ -71,7 +81,7 @@ function regionForPoints(points: MapPoint[], bottomCover = 0): Region {
     return { ...BHUBANESWAR_DEFAULT };
   }
   if (points.length === 1) {
-    const span = 0.02;
+    const span = 0.015;
     const latitudeDelta = span / visible;
     return {
       latitude: points[0].latitude - (latitudeDelta - span) / 2,
@@ -92,7 +102,6 @@ function regionForPoints(points: MapPoint[], bottomCover = 0): Region {
   const latPad = Math.max(latSpan * 0.22, 0.003);
   const lngPad = Math.max(lngSpan * 0.22, 0.003);
   const latitudeDelta = (latSpan + latPad * 2) / visible;
-  // Push the camera south so the pins sit above a bottom sheet.
   const extraSouth = latitudeDelta * cover;
 
   return {
@@ -103,72 +112,6 @@ function regionForPoints(points: MapPoint[], bottomCover = 0): Region {
   };
 }
 
-/** Points the map can place itself. A native polyline is not drawn in Peach. */
-function routeSamples(coords: MapPoint[], maxPoints = 16): MapPoint[] {
-  if (coords.length < 2) return [];
-  if (coords.length === 2) {
-    const [start, end] = coords;
-    const samples: MapPoint[] = [];
-    for (let index = 0; index < maxPoints; index += 1) {
-      const t = index / (maxPoints - 1);
-      samples.push({
-        latitude: start.latitude + (end.latitude - start.latitude) * t,
-        longitude: start.longitude + (end.longitude - start.longitude) * t,
-      });
-    }
-    return samples;
-  }
-  if (coords.length <= maxPoints) return coords;
-  const samples: MapPoint[] = [];
-  const step = (coords.length - 1) / (maxPoints - 1);
-  for (let index = 0; index < maxPoints; index += 1) {
-    samples.push(coords[Math.round(index * step)]);
-  }
-  return samples;
-}
-
-function decodeGooglePolyline(encoded: string): MapPoint[] {
-  const points: MapPoint[] = [];
-  let index = 0;
-  let latitude = 0;
-  let longitude = 0;
-
-  while (index < encoded.length) {
-    let result = 0;
-    let shift = 0;
-    let byte: number;
-    do {
-      byte = encoded.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20 && index < encoded.length);
-    latitude += result & 1 ? ~(result >> 1) : result >> 1;
-
-    result = 0;
-    shift = 0;
-    do {
-      byte = encoded.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20 && index < encoded.length);
-    longitude += result & 1 ? ~(result >> 1) : result >> 1;
-
-    points.push({ latitude: latitude / 100000, longitude: longitude / 100000 });
-  }
-
-  return points;
-}
-
-type GoogleDirectionsResponse = {
-  routes?: Array<{
-    overview_polyline?: { points?: string };
-    legs?: Array<{
-      distance?: { value?: number };
-      duration?: { value?: number };
-    }>;
-  }>;
-};
-
 export default function LiveTripMap({
   pickup,
   dropoff,
@@ -176,15 +119,20 @@ export default function LiveTripMap({
   activeDestination,
   style,
   borderRadius = 16,
-  showsUserLocation = true,
-  routeColor = colors.primary,
+  showsUserLocation = false,
+  routeColor = '#2563EB',
   pickupColor = '#16A34A',
   dropoffColor = colors.error,
   recenterTrigger,
   previewMap = false,
-  routeApiEnabled = false,
+  routeApiEnabled = true,
   straightFallback = false,
   bottomCoverRatio = 0,
+  navigationMode = false,
+  vehicleHeading = 0,
+  vehicleType = 'tow_truck',
+  isOffRoute = false,
+  onRouteCalculated,
   onRouteMetaChange,
 }: Props) {
   const mapRef = useRef<MapView>(null);
@@ -192,7 +140,8 @@ export default function LiveTripMap({
   const [routeApproximate, setRouteApproximate] = useState(false);
   const metaCb = useRef(onRouteMetaChange);
   metaCb.current = onRouteMetaChange;
-  const routeMemory = useRef<{ at: number; origin: LatLng; destinationKey: string; path: LatLng[] } | null>(null);
+  const calculatedCb = useRef(onRouteCalculated);
+  calculatedCb.current = onRouteCalculated;
 
   const routeOrigin = useMemo(
     () =>
@@ -220,6 +169,7 @@ export default function LiveTripMap({
     isValidPoint(routeOrigin) ? `${routeOrigin.latitude},${routeOrigin.longitude}` : '',
     isValidPoint(routeDestination) ? `${routeDestination.latitude},${routeDestination.longitude}` : '',
     bottomCoverRatio,
+    navigationMode,
   ].join('|');
 
   const points = useMemo(() => {
@@ -232,7 +182,6 @@ export default function LiveTripMap({
       if (routeDestination) list.push(routeDestination);
     }
     return list;
-    // pointKey is the coordinate identity. Object props are new every parent render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointKey]);
 
@@ -241,7 +190,7 @@ export default function LiveTripMap({
     [bottomCoverRatio, points],
   );
   const [holdFrame, setHoldFrame] = useState(true);
-  const frameKey = `${region.latitude.toFixed(5)}:${region.longitude.toFixed(5)}:${region.latitudeDelta.toFixed(5)}:${region.longitudeDelta.toFixed(5)}:${recenterTrigger ?? 0}`;
+  const frameKey = `${region.latitude.toFixed(5)}:${region.longitude.toFixed(5)}:${region.latitudeDelta.toFixed(5)}:${region.longitudeDelta.toFixed(5)}:${recenterTrigger ?? 0}:${navigationMode}`;
 
   useEffect(() => {
     setHoldFrame(true);
@@ -254,6 +203,7 @@ export default function LiveTripMap({
     ? `${routeDestination.latitude.toFixed(5)},${routeDestination.longitude.toFixed(5)}`
     : '';
 
+  // Fetch authentic road route (Google Routes API v2 / OSRM / High-precision road curve)
   useEffect(() => {
     const origin = routeOrigin;
     const destination = routeDestination;
@@ -264,115 +214,64 @@ export default function LiveTripMap({
       return undefined;
     }
 
-    const publishStraightLine = () => {
-      if (!straightFallback) {
-        setRoadRoute([]);
-        setRouteApproximate(false);
-        metaCb.current?.(null);
-        return;
-      }
-      setRoadRoute([origin, destination]);
-      setRouteApproximate(true);
-      metaCb.current?.({
-        distanceKm: haversineKm(origin, destination),
-        approximate: true,
-      });
-    };
-
-    if (!routeApiEnabled) {
-      publishStraightLine();
-      return undefined;
-    }
-
-    const key = getGoogleMapsApiKey();
-    if (!key) {
-      publishStraightLine();
-      return undefined;
-    }
-
-    const memory = routeMemory.current;
-    const refresh = shouldRefreshRoute({
-      now: Date.now(),
-      lastFetchedAt: memory?.at ?? null,
-      lastOrigin: memory?.origin ?? null,
-      origin,
-      path: memory?.path ?? [],
-      destinationChanged: memory?.destinationKey !== destinationKey,
-    });
-    if (!refresh && memory && memory.path.length >= 2) {
-      return undefined;
-    }
-
-    const controller = new AbortController();
     let cancelled = false;
 
-    const loadRoadRoute = async () => {
+    const loadRoute = async () => {
       try {
-        const params = new URLSearchParams({
-          origin: `${origin.latitude},${origin.longitude}`,
-          destination: `${destination.latitude},${destination.longitude}`,
-          mode: 'driving',
-          region: 'in',
-          language: 'en',
-          key,
-        });
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`,
-          { signal: controller.signal },
+        const routeResult = await fetchRoadRoute(
+          origin,
+          destination,
+          destination.label || 'Destination',
         );
-        if (!response.ok) throw new Error(`Directions request failed: ${response.status}`);
-        const payload = (await response.json()) as GoogleDirectionsResponse;
-        const route = payload.routes?.[0];
-        const encoded = route?.overview_polyline?.points;
-        const decoded = encoded ? decodeGooglePolyline(encoded) : [];
         if (cancelled) return;
 
-        if (decoded.length < 2) {
-          publishStraightLine();
-          return;
-        }
-
-        setRoadRoute(decoded);
-        setRouteApproximate(false);
-        routeMemory.current = {
-          at: Date.now(),
-          origin,
-          destinationKey,
-          path: decoded,
-        };
-        const distanceMeters = (route?.legs ?? []).reduce(
-          (total, leg) => total + (leg.distance?.value ?? 0),
-          0,
-        );
-        const durationSeconds = (route?.legs ?? []).reduce(
-          (total, leg) => total + (leg.duration?.value ?? 0),
-          0,
-        );
-        metaCb.current?.(
-          distanceMeters > 0
-            ? {
-                distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
-                durationMinutes:
-                  durationSeconds > 0 ? Math.max(1, Math.round(durationSeconds / 60)) : undefined,
-                approximate: false,
-              }
-            : null,
-        );
-      } catch (error) {
-        if (!cancelled && (error as { name?: string })?.name !== 'AbortError') {
-          publishStraightLine();
+        setRoadRoute(routeResult.coordinates);
+        setRouteApproximate(routeResult.approximate);
+        metaCb.current?.({
+          distanceKm: routeResult.distanceKm,
+          durationMinutes: routeResult.durationMinutes,
+          approximate: routeResult.approximate,
+        });
+        calculatedCb.current?.(routeResult);
+      } catch {
+        if (!cancelled) {
+          if (straightFallback) {
+            setRoadRoute([origin, destination]);
+            setRouteApproximate(true);
+            metaCb.current?.({
+              distanceKm: haversineKm(origin, destination),
+              approximate: true,
+            });
+          }
         }
       }
     };
 
-    void loadRoadRoute();
+    void loadRoute();
     return () => {
       cancelled = true;
-      controller.abort();
     };
   }, [destinationKey, originKey, previewMap, routeApiEnabled, straightFallback]);
 
-  // Native polylines do not paint in Peach, so the active leg is also dotted markers.
+  // Turn-by-turn navigation camera tracking
+  useEffect(() => {
+    if (navigationMode && isValidPoint(driverLocation) && mapRef.current) {
+      mapRef.current.animateCamera(
+        {
+          center: {
+            latitude: driverLocation.latitude,
+            longitude: driverLocation.longitude,
+          },
+          pitch: 42,
+          heading: vehicleHeading || 0,
+          altitude: 400,
+          zoom: 17,
+        },
+        { duration: 600 },
+      );
+    }
+  }, [driverLocation, navigationMode, vehicleHeading]);
+
   const displayRouteCoords = roadRoute.length >= 2 ? roadRoute : [];
 
   const preview = previewMap ? (
@@ -385,8 +284,6 @@ export default function LiveTripMap({
     />
   ) : null;
 
-  const routeDots = routeSamples(displayRouteCoords).filter((_, index, all) => index > 0 && index < all.length - 1);
-
   return (
     <View style={[styles.wrap, { borderRadius }, style]}>
       {preview ? (
@@ -397,95 +294,151 @@ export default function LiveTripMap({
           style={StyleSheet.absoluteFill}
           provider={MAP_PROVIDER}
           initialRegion={region}
-          region={holdFrame ? region : undefined}
+          region={holdFrame && !navigationMode ? region : undefined}
           onRegionChangeComplete={(_next, details) => {
             if (details?.isGesture) setHoldFrame(false);
           }}
           mapType="standard"
           loadingEnabled
           loadingBackgroundColor="#E8EEF0"
-          loadingIndicatorColor="#64748B"
+          loadingIndicatorColor="#2563EB"
           showsUserLocation={showsUserLocation}
           showsMyLocationButton={false}
           showsCompass={false}
           toolbarEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}>
+          pitchEnabled={navigationMode}
+          rotateEnabled={navigationMode}>
+          {/* Outer white casing border for high-contrast road visibility */}
           {displayRouteCoords.length >= 2 ? (
             <Polyline
               coordinates={displayRouteCoords}
-              strokeColor={routeApproximate ? '#64748B' : routeColor}
-              strokeWidth={routeApproximate ? 3 : 5}
-              lineDashPattern={routeApproximate ? [8, 6] : undefined}
+              strokeColor="#FFFFFF"
+              strokeWidth={8}
+              lineCap="round"
+              lineJoin="round"
             />
           ) : null}
 
+          {/* Active Navigation Polyline with Traffic / Status Coloring */}
+          {displayRouteCoords.length >= 2 ? (
+            <Polyline
+              coordinates={displayRouteCoords}
+              strokeColor={isOffRoute ? '#DC2626' : routeApproximate ? '#64748B' : routeColor}
+              strokeWidth={5}
+              lineCap="round"
+              lineJoin="round"
+              lineDashPattern={isOffRoute ? [8, 6] : routeApproximate ? [8, 6] : undefined}
+            />
+          ) : null}
+
+          {/* Real Driver Vehicle Marker with Heading & Pulse Ring */}
           {isValidPoint(driverLocation) ? (
             <Marker
               coordinate={{ latitude: driverLocation.latitude, longitude: driverLocation.longitude }}
               title={driverLocation.label || 'You'}
-              anchor={{ x: 0.5, y: 1 }}
-              pinColor="#2563EB">
-              <MapPin color="#2563EB" label={driverLocation.label || 'You'} />
+              anchor={{ x: 0.5, y: 0.5 }}
+              flat={navigationMode}
+              rotation={vehicleHeading || 0}>
+              <VehicleMarker
+                label={driverLocation.label || 'Your location'}
+                heading={vehicleHeading}
+                vehicleType={vehicleType}
+              />
             </Marker>
           ) : null}
 
+          {/* Pickup Pin */}
           {isValidPoint(pickup) ? (
             <Marker
               coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}
               title={pickup.label || 'Pickup'}
-              anchor={{ x: 0.5, y: 1 }}
-              pinColor={pickupColor}>
-              <MapPin color={pickupColor} label={pickup.label || 'Pickup'} />
+              anchor={{ x: 0.5, y: 1 }}>
+              <DestinationPin color={pickupColor} label={pickup.label || 'Pickup'} type="pickup" />
             </Marker>
           ) : null}
 
+          {/* Dropoff Pin */}
           {isValidPoint(dropoff) ? (
             <Marker
               coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}
               title={dropoff.label || 'Drop'}
-              anchor={{ x: 0.5, y: 1 }}
-              pinColor={dropoffColor}>
-              <MapPin color={dropoffColor} label={dropoff.label || 'Drop'} />
+              anchor={{ x: 0.5, y: 1 }}>
+              <DestinationPin color={dropoffColor} label={dropoff.label || 'Drop'} type="drop" />
             </Marker>
           ) : null}
-          {routeDots.map((point, index) => (
-            <Marker
-              key={`route-${index}-${point.latitude.toFixed(5)}`}
-              coordinate={{ latitude: point.latitude, longitude: point.longitude }}
-              anchor={{ x: 0.5, y: 0.5 }}>
-              <View
-                style={[
-                  styles.routeDot,
-                  { backgroundColor: routeApproximate ? '#64748B' : routeColor },
-                ]}
-              />
-            </Marker>
-          ))}
         </MapView>
       )}
     </View>
   );
 }
 
-function MapPin({ color, label }: { color: string; label: string }) {
+/** Vehicle Marker matching Rapido / Uber driver interface */
+function VehicleMarker({
+  label,
+  heading = 0,
+  vehicleType = 'tow_truck',
+}: {
+  label: string;
+  heading?: number;
+  vehicleType?: 'tow_truck' | 'car';
+}) {
   return (
-    <View style={styles.pin} pointerEvents="none">
-      <View style={[styles.pinLabel, { backgroundColor: color }]}>
-        <Text style={styles.pinText}>{label}</Text>
+    <View style={styles.vehicleMarkerContainer} pointerEvents="none">
+      {/* Blue radar pulse halo */}
+      <View style={styles.pulseRing} />
+      {/* Heading arrow / vehicle badge */}
+      <View style={styles.vehicleBody}>
+        {vehicleType === 'tow_truck' ? (
+          <Svg width={28} height={28} viewBox="0 0 28 28">
+            {/* Truck chassis */}
+            <Rect x={8} y={4} width={12} height={20} rx={3} fill="#FEA701" stroke="#D97706" strokeWidth={1.5} />
+            {/* Windshield */}
+            <Rect x={10} y={6} width={8} height={4} rx={1} fill="#1E293B" />
+            {/* Flatbed towing arm */}
+            <Path d="M14 13 L14 20 M11 17 L17 17" stroke="#475569" strokeWidth={1.5} strokeLinecap="round" />
+            {/* Emergency beacon */}
+            <Circle cx={14} cy={3.5} r={1.5} fill="#EF4444" />
+          </Svg>
+        ) : (
+          <Svg width={26} height={26} viewBox="0 0 26 26">
+            {/* Sedan car body */}
+            <Rect x={7} y={4} width={12} height={18} rx={4} fill="#FEA701" stroke="#D97706" strokeWidth={1.5} />
+            {/* Windshield front */}
+            <Rect x={9} y={7} width={8} height={3} rx={1} fill="#1E293B" />
+            {/* Rear window */}
+            <Rect x={9} y={16} width={8} height={2.5} rx={1} fill="#1E293B" />
+          </Svg>
+        )}
       </View>
-      <View style={[styles.pinStem, { backgroundColor: color }]} />
+      <View style={styles.vehiclePill}>
+        <Text style={styles.vehiclePillText}>{label}</Text>
+      </View>
     </View>
   );
 }
 
-/**
- * The reference boards use a light, stylised route map. Expo Go/Android can
- * show a black Google tile surface when the native maps key is unavailable, so
- * preview mode uses this deterministic visual while production keeps the real
- * MapView above. It is deliberately a visual fallback, not a source of route
- * or distance data.
- */
+/** Clean Location Pin with Drop Pin Shape & Label */
+function DestinationPin({
+  color,
+  label,
+  type,
+}: {
+  color: string;
+  label: string;
+  type: 'pickup' | 'drop';
+}) {
+  return (
+    <View style={styles.pin} pointerEvents="none">
+      <View style={[styles.pinLabel, { backgroundColor: color }]}>
+        <View style={styles.pinDot} />
+        <Text style={styles.pinText}>{label}</Text>
+      </View>
+      <View style={[styles.pinStem, { backgroundColor: color }]} />
+      <View style={[styles.pinPoint, { borderTopColor: color }]} />
+    </View>
+  );
+}
+
 function PreviewMap({
   hasPickup,
   hasDropoff,
@@ -499,77 +452,27 @@ function PreviewMap({
   pickupColor: string;
   dropoffColor: string;
 }) {
-  const pickup = hasDropoff ? { x: 74, y: 126 } : { x: 316, y: 62 };
-  const dropoff = { x: 312, y: 112 };
-  const current = { x: 66, y: 196 };
-  const route = hasDropoff
-    ? 'M 74 126 C 132 150, 168 168, 214 140 S 270 116, 312 112'
-    : 'M 66 196 C 112 180, 164 150, 206 128 S 268 80, 316 62';
-
   return (
     <View style={StyleSheet.absoluteFill}>
       <Svg width="100%" height="100%" viewBox="0 0 390 260" preserveAspectRatio="xMidYMid slice">
         <Rect width="390" height="260" fill="#E8EEF0" />
+        <Path d="M0 18C44 34 46 80 30 111C14 142 20 195 0 220V18Z" fill="#D7EAE4" />
+        <Path d="M267 0C236 36 250 62 279 78C312 96 302 139 337 161C355 172 376 170 390 162V0H267Z" fill="#E0EEDB" />
+        {/* Road grid illustration */}
+        <Path d="M-20 90 L410 110 M-20 170 L410 160 M120 -10 L140 280 M280 -10 L260 280" stroke="#FFFFFF" strokeWidth={6} />
+        {/* Curving Road Route */}
         <Path
-          d="M0 18C44 34 46 80 30 111C14 142 20 195 0 220V18Z"
-          fill="#D7EAE4"
+          d="M 66 196 C 112 180, 164 150, 206 128 S 268 80, 316 62"
+          stroke={routeColor}
+          strokeWidth={5}
+          fill="none"
+          strokeLinecap="round"
         />
-        <Path
-          d="M267 0C236 36 250 62 279 78C312 96 302 139 337 161C355 172 376 170 390 162V0H267Z"
-          fill="#E0EEDB"
-        />
-        <Path d="M0 70L390 216" stroke="#D1DADF" strokeWidth="18" fill="none" />
-        <Path d="M0 70L390 216" stroke="#FFFFFF" strokeWidth="2" fill="none" />
-        <Path d="M40 260L175 0" stroke="#D1DADF" strokeWidth="15" fill="none" />
-        <Path d="M40 260L175 0" stroke="#FFFFFF" strokeWidth="2" fill="none" />
-        <Path d="M0 172C86 140 140 166 192 88C231 30 289 48 390 30" stroke="#D2D9DD" strokeWidth="12" fill="none" />
-        <Path d="M0 172C86 140 140 166 192 88C231 30 289 48 390 30" stroke="#FFFFFF" strokeWidth="2" fill="none" />
-        <Path d={route} stroke="#FFFFFF" strokeWidth="10" fill="none" strokeLinecap="round" />
-        <Path d={route} stroke={routeColor} strokeWidth="5" fill="none" strokeLinecap="round" />
-        <SvgText x="236" y="44" fill="#45515B" fontSize="11" fontWeight="600">
-          Saheed Nagar
-        </SvgText>
-        <SvgText x="200" y="184" fill="#45515B" fontSize="11" fontWeight="600">
-          Bhubaneswar
-        </SvgText>
-        <SvgText x="285" y="86" fill="#68747D" fontSize="8">
-          Kalinga Stadium
-        </SvgText>
-        <SvgText x="252" y="148" fill="#68747D" fontSize="8">
-          Mancheswar
-        </SvgText>
-        {hasPickup ? (
-          <G>
-            <Circle cx={pickup.x} cy={pickup.y} r="16" fill={pickupColor} opacity="0.18" />
-            <Path
-              d={`M ${pickup.x} ${pickup.y - 19} C ${pickup.x - 8} ${pickup.y - 19}, ${pickup.x - 12} ${pickup.y - 13}, ${pickup.x - 12} ${pickup.y - 6} C ${pickup.x - 12} ${pickup.y + 2}, ${pickup.x} ${pickup.y + 13}, ${pickup.x} ${pickup.y + 13} C ${pickup.x} ${pickup.y + 13}, ${pickup.x + 12} ${pickup.y + 2}, ${pickup.x + 12} ${pickup.y - 6} C ${pickup.x + 12} ${pickup.y - 13}, ${pickup.x + 8} ${pickup.y - 19}, ${pickup.x} ${pickup.y - 19}Z`}
-              fill={pickupColor}
-            />
-            <Circle cx={pickup.x} cy={pickup.y - 7} r="4" fill="#FFFFFF" />
-          </G>
-        ) : null}
-        {hasDropoff ? (
-          <G>
-            <Circle cx={dropoff.x} cy={dropoff.y} r="16" fill={dropoffColor} opacity="0.18" />
-            <Path
-              d={`M ${dropoff.x} ${dropoff.y - 19} C ${dropoff.x - 8} ${dropoff.y - 19}, ${dropoff.x - 12} ${dropoff.y - 13}, ${dropoff.x - 12} ${dropoff.y - 6} C ${dropoff.x - 12} ${dropoff.y + 2}, ${dropoff.x} ${dropoff.y + 13}, ${dropoff.x} ${dropoff.y + 13} C ${dropoff.x} ${dropoff.y + 13}, ${dropoff.x + 12} ${dropoff.y + 2}, ${dropoff.x + 12} ${dropoff.y - 6} C ${dropoff.x + 12} ${dropoff.y - 13}, ${dropoff.x + 8} ${dropoff.y - 19}, ${dropoff.x} ${dropoff.y - 19}Z`}
-              fill={dropoffColor}
-            />
-            <Circle cx={dropoff.x} cy={dropoff.y - 7} r="4" fill="#FFFFFF" />
-            <G transform="translate(202 132) rotate(-18 12 8)">
-              <Rect x="2" y="3" width="18" height="10" rx="2" fill="#FEA701" stroke="#111827" strokeWidth="1.5" />
-              <Path d="M20 6H24L27 10V13H20Z" fill="#FEA701" stroke="#111827" strokeWidth="1.5" />
-              <Path d="M22 7H24L25.5 10H22Z" fill="#E0F2FE" />
-              <Circle cx="7" cy="15" r="2.5" fill="#111827" />
-              <Circle cx="22" cy="15" r="2.5" fill="#111827" />
-            </G>
-          </G>
-        ) : (
-          <G>
-            <Circle cx={current.x} cy={current.y} r="17" fill="#FFFFFF" opacity="0.9" />
-            <Circle cx={current.x} cy={current.y} r="10" fill={routeColor} />
-          </G>
-        )}
+        {/* Driver location */}
+        <Circle cx={66} cy={196} r={10} fill="#3B82F6" fillOpacity={0.25} />
+        <Circle cx={66} cy={196} r={6} fill="#2563EB" stroke="#FFFFFF" strokeWidth={2} />
+        {/* Destination pin */}
+        <Circle cx={316} cy={62} r={7} fill={hasDropoff ? dropoffColor : pickupColor} stroke="#FFFFFF" strokeWidth={2} />
       </Svg>
     </View>
   );
@@ -581,30 +484,86 @@ const styles = StyleSheet.create({
     backgroundColor: colors.lightGrey,
     minHeight: 200,
   },
+  vehicleMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    height: 60,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#3B82F6',
+    opacity: 0.22,
+  },
+  vehicleBody: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  vehiclePill: {
+    position: 'absolute',
+    bottom: -14,
+    backgroundColor: '#1E293B',
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+  },
+  vehiclePillText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '700',
+  },
   pin: {
     alignItems: 'center',
   },
   pinLabel: {
-    borderRadius: 8,
-    borderWidth: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1.5,
     borderColor: '#FFFFFF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  pinDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#FFFFFF',
+    marginRight: 4,
   },
   pinText: {
     color: '#FFFFFF',
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
   },
   pinStem: {
-    width: 2,
-    height: 8,
+    width: 2.5,
+    height: 6,
   },
-  routeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+  pinPoint: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 4,
+    borderRightWidth: 4,
+    borderTopWidth: 5,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
   },
 });

@@ -68,6 +68,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import LiveTripMap from '../../../components/booking/LiveTripMap';
+import RouteOverviewCards from '../../../components/partner/driver/RouteOverviewCards';
+import NavTurnBanner from '../../../components/partner/driver/NavTurnBanner';
+import NavBottomBar from '../../../components/partner/driver/NavBottomBar';
+import ArrivedPickupCard from '../../../components/partner/driver/ArrivedPickupCard';
+import CustomerOtpModal from '../../../components/partner/driver/CustomerOtpModal';
+import TripInProgressSheet from '../../../components/partner/driver/TripInProgressSheet';
+import JobCompletedModal from '../../../components/partner/driver/JobCompletedModal';
+import { OffRouteBanner, WeakGpsAlert } from '../../../components/partner/driver/NavigationAlertBanners';
+import type { RoadRouteResult, RouteManeuverStep } from '../../../services/driver/roadRoutingService';
 import { images } from '../../../assets';
 import {
   isUiTestPermissiveMode,
@@ -429,6 +438,18 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const otpInputRef = useRef<TextInput>(null);
   const driverLocation = useDriverPresenceStore(state => state.driverLocation);
+
+  const [navMode, setNavMode] = useState<'overview' | 'turn_by_turn'>('overview');
+  const [voiceMuted, setVoiceMuted] = useState(false);
+  const [compassHeadingUp, setCompassHeadingUp] = useState(false);
+  const [isOffRoute, setIsOffRoute] = useState(false);
+  const [weakGps, setWeakGps] = useState(false);
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [previewScreen, setPreviewScreen] = useState<number | null>(null);
+  const [calculatedRoute, setCalculatedRoute] = useState<RoadRouteResult | null>(null);
+  const [vehicleHeading, setVehicleHeading] = useState(25);
+  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [qaMenuOpen, setQaMenuOpen] = useState(false);
 
   const toggleSheet = useCallback(() => {
     setSheetCollapsed(prev => !prev);
@@ -1067,1215 +1088,330 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     );
   }
 
-  if (step === 'en_route' || step === 'in_progress') {
-    return (
-      <View style={{ flex: 1, backgroundColor: C.pageBg }}>
-        {header}
+  // Effective Screen Number (computed from real step / navMode, or previewScreen override)
+  const effectiveScreen = useMemo(() => {
+    if (previewScreen != null) return previewScreen;
+    if (step === 'completed') return 10;
+    if (step === 'verify_otp') return otpModalOpen ? 7 : 6;
+    if (step === 'en_route') return navMode === 'turn_by_turn' ? 5 : 4;
+    if (step === 'in_progress') return navMode === 'turn_by_turn' ? 8 : 9;
+    return 4;
+  }, [navMode, otpModalOpen, previewScreen, step]);
 
-        {/* Full-bleed interactive navigation map container */}
-        <View style={{ flex: 1, position: 'relative' }}>
-          <LiveTripMap
-            style={StyleSheet.absoluteFill}
-            borderRadius={0}
-            showsUserLocation
-            driverLocation={displayDriverLocation}
-            pickup={
-              hasPickupCoords && job.pickup
-                ? { latitude: job.pickup.latitude as number, longitude: job.pickup.longitude as number, label: 'Pickup' }
-                : null
-            }
-            dropoff={
-              hasDropCoords && job.dropoff
-                ? { latitude: job.dropoff.latitude as number, longitude: job.dropoff.longitude as number, label: 'Drop' }
-                : null
-            }
-            activeDestination={activeDestinationPoint}
-            routeApiEnabled
-            straightFallback
-            bottomCoverRatio={sheetCollapsed ? 0.42 : 0.7}
-            onRouteMetaChange={onLegMeta}
-            recenterTrigger={recenterTrigger}
-          />
-          <Pressable
-            onPress={recenterMap}
-            accessibilityRole="button"
-            accessibilityLabel="Recenter map"
-            hitSlop={8}
-            style={({ pressed }) => ({
-              position: 'absolute',
-              right: px(16),
-              top: px(14),
-              width: px(42),
-              height: px(42),
-              borderRadius: px(21),
-              backgroundColor: pressed ? '#F1F5F9' : C.white,
-              alignItems: 'center',
-              justifyContent: 'center',
-              elevation: 3,
-            })}>
-            <LocateFixed size={px(19)} color={C.ink} strokeWidth={2.3} />
-          </Pressable>
-          <View
-            pointerEvents="none"
-            style={{
-              position: 'absolute',
-              left: px(16),
-              top: px(14),
-              right: px(70),
-              backgroundColor: C.white,
-              borderRadius: px(12),
-              paddingHorizontal: px(12),
-              paddingVertical: px(8),
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-            }}>
-            <PartnerText style={{ fontSize: px(11), fontWeight: '700', color: '#2563EB' }}>
-              {legTitle(tripLeg)}
-            </PartnerText>
-            <PartnerText style={{ fontSize: px(14), fontWeight: '800', color: C.ink, marginTop: px(1) }}>
-              {legDistanceLabel}
-            </PartnerText>
-          </View>
-
-          {/* Floating Bottom Sheet Card firmly docked at bottom without empty void */}
-          <View
-            style={{
-              position: 'absolute',
-              left: 0,
-              right: 0,
-              bottom: 0,
-              maxHeight: screenHeight - insets.top - px(54),
-              backgroundColor: C.card,
-              borderTopLeftRadius: px(24),
-              borderTopRightRadius: px(24),
-              paddingHorizontal: px(M.pagePadding),
-              paddingTop: px(8),
-              paddingBottom: Math.max(insets.bottom + px(6), px(14)),
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-              shadowColor: '#0F172A',
-              shadowOffset: { width: 0, height: -3 },
-              shadowOpacity: 0.12,
-              shadowRadius: 8,
-              elevation: 8,
-            }}>
-            {/* Interactive Collapsible Drag Handle (No text, toggles open/close) */}
-            <Pressable
-              onPress={toggleSheet}
-              hitSlop={{ top: 16, bottom: 20, left: 50, right: 50 }}
-              accessibilityRole="button"
-              accessibilityLabel={sheetCollapsed ? 'Expand trip details' : 'Minimize trip details'}
-              style={({ pressed }) => ({
-                alignItems: 'center',
-                paddingVertical: px(6),
-                marginBottom: px(4),
-                opacity: pressed ? 0.6 : 1,
-              })}>
-              <View
-                style={{
-                  width: px(44),
-                  height: px(4.5),
-                  borderRadius: px(2.5),
-                  backgroundColor: '#CBD5E1',
-                }}
-              />
-            </Pressable>
-
-            {sheetCollapsed ? (
-              /* ----------------- COMPACT / HALF-CLOSED NAVIGATION MODE ----------------- */
-              <View>
-                <PartnerText style={{ fontSize: px(13), fontWeight: '800', color: C.ink, marginBottom: px(8) }}>
-                  {legTitle(tripLeg)} · {legDistanceLabel}
-                </PartnerText>
-                {/* Customer Row */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: px(14),
-                    padding: px(10),
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                    marginBottom: px(10),
-                  }}>
-                  <View
-                    style={{
-                      width: px(38),
-                      height: px(38),
-                      borderRadius: px(19),
-                      backgroundColor: '#E2E8F0',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <User size={px(18)} color="#475569" strokeWidth={2.2} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: px(10) }}>
-                    <PartnerText style={{ fontSize: px(14.5), fontWeight: '700', color: C.ink }}>
-                      {job.customer?.name || 'Customer'}
-                    </PartnerText>
-                    <PartnerText style={{ fontSize: px(12), color: '#64748B', marginTop: px(1) }}>
-                      {job.customer?.mobileNumber || 'Number unavailable'} · Customer
-                    </PartnerText>
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      job.customer?.mobileNumber ? void Linking.openURL(`tel:${job.customer.mobileNumber}`) : undefined
-                    }
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Call customer"
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: pressed ? '#DCFCE7' : '#F0FDF4',
-                      borderWidth: 1,
-                      borderColor: '#86EFAC',
-                      paddingHorizontal: px(12),
-                      paddingVertical: px(7),
-                      borderRadius: px(18),
-                    })}>
-                    <Phone size={px(14)} color="#15803D" strokeWidth={2.4} />
-                    <PartnerText
-                      style={{
-                        fontSize: px(12),
-                        fontWeight: '700',
-                        color: '#15803D',
-                        marginLeft: px(5),
-                      }}>
-                      Call
-                    </PartnerText>
-                  </Pressable>
-                </View>
-
-                {/* Primary CTA (Arrived at pickup / Complete job) */}
-                <Pressable
-                  onPress={onPrimaryPress}
-                  disabled={acting}
-                  accessibilityRole="button"
-                  accessibilityLabel={primaryLabel}
-                  style={({ pressed }) => ({
-                    height: px(48),
-                    borderRadius: px(R.button),
-                    backgroundColor: C.amber,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    opacity: pressed ? 0.9 : 1,
-                    shadowColor: '#D97706',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.2,
-                    shadowRadius: 4,
-                    elevation: 2,
-                  })}>
-                  {acting ? (
-                    <ActivityIndicator size="small" color={C.ink} />
-                  ) : (
-                    <PartnerText
-                      style={[
-                        T.button,
-                        { fontSize: px(16), fontWeight: '800', color: C.ink },
-                      ]}>
-                      {primaryLabel}
-                    </PartnerText>
-                  )}
-                </Pressable>
-                {job?.status === 'DRIVER_ASSIGNED' ? (
-                  <Pressable
-                    onPress={onDeclineAssignment}
-                    disabled={acting}
-                    accessibilityRole="button"
-                    accessibilityLabel="Decline Assignment"
-                    style={({ pressed }) => ({
-                      marginTop: px(8),
-                      height: px(40),
-                      borderRadius: px(R.button),
-                      backgroundColor: '#FEF2F2',
-                      borderWidth: 1,
-                      borderColor: '#FECACA',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.85 : 1,
-                    })}>
-                    <PartnerText
-                      style={{
-                        fontSize: px(13.5),
-                        fontWeight: '700',
-                        color: '#DC2626',
-                      }}>
-                      Decline Assignment
-                    </PartnerText>
-                  </Pressable>
-                ) : null}
-              </View>
-            ) : (
-              /* ----------------- FULL EXPANDED DETAIL MODE ----------------- */
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                bounces={false}
-                contentContainerStyle={{ paddingBottom: px(4) }}>
-                {/* Status row */}
-                {step === 'en_route' ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: px(8),
-                    }}>
-                    <StatusChip
-                      label={job.status === 'DRIVER_ASSIGNED' ? 'ASSIGNED · ACCEPT TO START' : 'EN ROUTE TO PICKUP'}
-                      tone="info"
-                      px={px}
-                    />
-                    <PartnerText style={[T.small, { fontSize: px(12), fontWeight: '700', color: '#2563EB' }]}>
-                      {legTitle(tripLeg)} · {legDistanceLabel}
-                    </PartnerText>
-                  </View>
-                ) : null}
-
-                {/* Trip Title & Booking Number */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}>
-                  <PartnerText
-                    numberOfLines={1}
-                    style={[T.jobTitle, { flex: 1, fontSize: px(15.5), color: C.ink }]}>
-                    {serviceName}
-                  </PartnerText>
-                </View>
-                <PartnerText
-                  style={[
-                    T.meta,
-                    { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(1) },
-                  ]}>
-                  #{job.bookingNumber}
-                </PartnerText>
-                {job.assignedFleetVehicleLabel ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(3) }}>
-                    <Truck size={px(12)} color="#2563EB" strokeWidth={2.4} />
-                    <PartnerText style={{ fontSize: px(11.5), color: '#1D4ED8', fontWeight: '700', marginLeft: px(4) }}>
-                      Tow Truck: {job.assignedFleetVehicleLabel}
-                    </PartnerText>
-                  </View>
-                ) : null}
-
-                {/* Perfectly Aligned Route Block */}
-                <View
-                  style={{
-                    marginTop: px(10),
-                    backgroundColor: '#F8FAFC',
-                    borderRadius: px(14),
-                    padding: px(10),
-                    borderWidth: 1,
-                    borderColor: '#E2E8F0',
-                  }}>
-                  {/* Pickup Row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                    <View style={{ width: px(22), alignItems: 'center', paddingTop: px(1) }}>
-                      <MapPin size={px(17)} color="#2563EB" strokeWidth={2.4} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: px(8) }}>
-                      <PartnerText
-                        style={{
-                          fontSize: px(10.5),
-                          fontWeight: '700',
-                          color: '#2563EB',
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.3,
-                        }}>
-                        Pickup
-                      </PartnerText>
-                      <PartnerText
-                        numberOfLines={1}
-                        style={{
-                          fontSize: px(13),
-                          fontWeight: '700',
-                          color: C.ink,
-                          marginTop: px(1),
-                        }}>
-                        {pickup || 'Saheed Nagar, Bhubaneswar'}
-                      </PartnerText>
-                    </View>
-                  </View>
-
-                  {/* Dotted Vertical Connector Line with Distance Badge */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginVertical: px(2),
-                    }}>
-                    <View style={{ width: px(22), alignItems: 'center' }}>
-                      {[0, 1, 2].map(idx => (
-                        <View
-                          key={idx}
-                          style={{
-                            width: px(2),
-                            height: px(2.5),
-                            marginVertical: px(1),
-                            borderRadius: px(1),
-                            backgroundColor: '#94A3B8',
-                          }}
-                        />
-                      ))}
-                    </View>
-                    {mapDistanceKm != null ? (
-                      <View
-                        style={{
-                          marginLeft: px(8),
-                          backgroundColor: '#EFF6FF',
-                          borderWidth: 1,
-                          borderColor: '#BFDBFE',
-                          paddingHorizontal: px(7),
-                          paddingVertical: px(1.5),
-                          borderRadius: px(10),
-                        }}>
-                        <PartnerText
-                          style={{
-                            fontSize: px(10.5),
-                            fontWeight: '700',
-                            color: '#1D4ED8',
-                          }}>
-                          {mapDistanceKm} km trip
-                        </PartnerText>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  {/* Drop Row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                    <View style={{ width: px(22), alignItems: 'center', paddingTop: px(1) }}>
-                      <MapPin size={px(17)} color="#D97706" strokeWidth={2.4} />
-                    </View>
-                    <View style={{ flex: 1, marginLeft: px(8) }}>
-                      <PartnerText
-                        style={{
-                          fontSize: px(10.5),
-                          fontWeight: '700',
-                          color: '#D97706',
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.3,
-                        }}>
-                        Drop
-                      </PartnerText>
-                      <PartnerText
-                        numberOfLines={1}
-                        style={{
-                          fontSize: px(13),
-                          fontWeight: '700',
-                          color: C.ink,
-                          marginTop: px(1),
-                        }}>
-                        {dropoff || 'Mancheswar, Bhubaneswar'}
-                      </PartnerText>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Customer Row */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginTop: px(10),
-                    paddingTop: px(10),
-                    borderTopWidth: 1,
-                    borderTopColor: '#E2E8F0',
-                  }}>
-                  <View
-                    style={{
-                      width: px(36),
-                      height: px(36),
-                      borderRadius: px(18),
-                      backgroundColor: '#F1F5F9',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                    }}>
-                    <User size={px(17)} color="#475569" strokeWidth={2.2} />
-                  </View>
-                  <View style={{ flex: 1, marginLeft: px(10) }}>
-                    <PartnerText style={{ fontSize: px(14), fontWeight: '700', color: C.ink }}>
-                      {job.customer?.name || 'Customer'}
-                    </PartnerText>
-                    <PartnerText style={{ fontSize: px(11.5), color: '#64748B', marginTop: px(1) }}>
-                      {job.customer?.mobileNumber || 'Number unavailable'} · Customer
-                    </PartnerText>
-                  </View>
-                  <Pressable
-                    onPress={() =>
-                      job.customer?.mobileNumber ? void Linking.openURL(`tel:${job.customer.mobileNumber}`) : undefined
-                    }
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Call customer"
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: pressed ? '#DCFCE7' : '#F0FDF4',
-                      borderWidth: 1,
-                      borderColor: '#86EFAC',
-                      paddingHorizontal: px(12),
-                      paddingVertical: px(6),
-                      borderRadius: px(18),
-                    })}>
-                    <Phone size={px(13)} color="#15803D" strokeWidth={2.4} />
-                    <PartnerText
-                      style={{
-                        fontSize: px(11.5),
-                        fontWeight: '700',
-                        color: '#15803D',
-                        marginLeft: px(5),
-                      }}>
-                      Call
-                    </PartnerText>
-                  </Pressable>
-                </View>
-
-                <View style={{ marginTop: px(12) }}>
-                  {/* Primary Action Button */}
-                  <Pressable
-                    onPress={onPrimaryPress}
-                    disabled={acting}
-                    accessibilityRole="button"
-                    accessibilityLabel={primaryLabel}
-                    style={({ pressed }) => ({
-                      height: px(48),
-                      borderRadius: px(R.button),
-                      backgroundColor: C.amber,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: pressed ? 0.9 : 1,
-                      shadowColor: '#D97706',
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.2,
-                      shadowRadius: 4,
-                      elevation: 2,
-                    })}>
-                    {acting ? (
-                      <ActivityIndicator size="small" color={C.ink} />
-                    ) : (
-                      <PartnerText
-                        style={[
-                          T.button,
-                          { fontSize: px(16), fontWeight: '800', color: C.ink },
-                        ]}>
-                        {primaryLabel}
-                      </PartnerText>
-                    )}
-                  </Pressable>
-                  {job?.status === 'DRIVER_ASSIGNED' ? (
-                    <Pressable
-                      onPress={onDeclineAssignment}
-                      disabled={acting}
-                      accessibilityRole="button"
-                      accessibilityLabel="Decline Assignment"
-                      style={({ pressed }) => ({
-                        marginTop: px(8),
-                        height: px(40),
-                        borderRadius: px(R.button),
-                        backgroundColor: '#FEF2F2',
-                        borderWidth: 1,
-                        borderColor: '#FECACA',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        opacity: pressed ? 0.85 : 1,
-                      })}>
-                      <PartnerText
-                        style={{
-                          fontSize: px(13.5),
-                          fontWeight: '700',
-                          color: '#DC2626',
-                        }}>
-                        Decline Assignment
-                      </PartnerText>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </ScrollView>
-            )}
-          </View>
-        </View>
-
-        {menuModal}
-      </View>
-    );
-  }
-
-  const showMap = step !== 'completed' && !(step === 'verify_otp' && keyboardVisible);
+  const isNavigating = effectiveScreen === 5 || effectiveScreen === 8;
+  const legLabel = legTitle(tripLeg);
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.pageBg }}>
-      {step === 'completed' ? null : header}
+    <View style={{ flex: 1, backgroundColor: C.pageBg, position: 'relative' }}>
+      {/* Top Header Bar (Shown during overview and when not full navigation mode) */}
+      {!isNavigating && effectiveScreen !== 10 && !otpModalOpen && effectiveScreen !== 7 ? header : null}
 
-      {step === 'verify_otp' ? (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + px(54) : 0}>
-          <View
-            style={{
-              flex: 1,
-              justifyContent: keyboardVisible ? 'flex-end' : 'flex-start',
-            }}>
-            {showMap ? <View style={{ flex: 1, minHeight: px(100) }}>{mapBlock}</View> : null}
-            <View
-              style={{
-                alignSelf: 'stretch',
-                marginTop: showMap ? px(-18) : 0,
-                backgroundColor: C.card,
-                borderTopLeftRadius: px(24),
-                borderTopRightRadius: px(24),
-                paddingHorizontal: px(M.pagePadding),
-                paddingTop: keyboardVisible ? px(8) : px(14),
-                paddingBottom: keyboardVisible ? px(10) : Math.max(insets.bottom + px(2), px(10)),
-                alignItems: 'center',
-              }}>
-            {!keyboardVisible ? (
-              <View
-                style={{
-                  alignSelf: 'center',
-                  width: px(32),
-                  height: px(4),
-                  borderRadius: px(2),
-                  backgroundColor: '#D9DBDE',
-                  marginBottom: px(8),
-                }}
-              />
-            ) : null}
-            <Pressable
-              onPress={confirmUndoPickupArrival}
-              disabled={acting}
-              accessibilityRole="button"
-              accessibilityLabel="Not at pickup yet, go back to navigation"
-              hitSlop={8}
-              style={({ pressed }) => ({
-                alignSelf: 'stretch',
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: px(keyboardVisible ? 4 : 2),
-                marginBottom: keyboardVisible ? px(2) : px(4),
-                opacity: pressed ? 0.72 : acting ? 0.5 : 1,
-              })}>
-              <ArrowLeft size={px(18)} color={C.grey} strokeWidth={2.4} />
-              <PartnerText
-                style={{
-                  marginLeft: px(4),
-                  fontSize: px(14),
-                  lineHeight: px(18),
-                  fontWeight: '600',
-                  color: C.grey,
-                }}>
-                Not at pickup yet
-              </PartnerText>
-            </Pressable>
-            {!keyboardVisible ? (
-              <View
-                style={{
-                  width: px(52),
-                  height: px(52),
-                  borderRadius: px(26),
-                  backgroundColor: '#FEF3C7',
-                  borderWidth: 2,
-                  borderColor: '#FDE68A',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <View
-                  style={{
-                    width: px(38),
-                    height: px(38),
-                    borderRadius: px(19),
-                    backgroundColor: '#FEA701',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    shadowColor: '#FEA701',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.3,
-                    shadowRadius: 4,
-                    elevation: 2,
-                  }}>
-                  <ShieldCheck size={px(20)} color="#FFFFFF" strokeWidth={2.5} />
-                </View>
-              </View>
-            ) : null}
+      {/* Full-bleed Interactive Navigation Map in background */}
+      <View style={{ flex: 1, position: 'relative' }} accessibilityLabel={legLabel}>
+        <LiveTripMap
+          style={StyleSheet.absoluteFill}
+          borderRadius={0}
+          showsUserLocation
+          driverLocation={displayDriverLocation}
+          pickup={
+            hasPickupCoords && job.pickup
+              ? { latitude: job.pickup.latitude as number, longitude: job.pickup.longitude as number, label: 'Pickup' }
+              : null
+          }
+          dropoff={
+            hasDropCoords && job.dropoff
+              ? { latitude: job.dropoff.latitude as number, longitude: job.dropoff.longitude as number, label: 'Drop' }
+              : null
+          }
+          activeDestination={activeDestinationPoint}
+          routeApiEnabled
+          straightFallback={false}
+          navigationMode={isNavigating}
+          vehicleHeading={vehicleHeading}
+          vehicleType={job.bookingType === 'driver' ? 'car' : 'tow_truck'}
+          isOffRoute={isOffRoute || effectiveScreen === 11}
+          onRouteCalculated={setCalculatedRoute}
+          onRouteMetaChange={onLegMeta}
+          recenterTrigger={recenterTrigger}
+        />
 
-            <PartnerText
-              style={[
-                T.sectionTitle,
-                {
-                  fontSize: keyboardVisible ? px(16) : px(19),
-                  lineHeight: keyboardVisible ? px(20) : px(25),
-                  color: C.ink,
-                  marginTop: keyboardVisible ? px(4) : px(10),
-                  textAlign: 'center',
-                },
-              ]}>
-              Confirm customer pickup
-            </PartnerText>
-            {!keyboardVisible ? (
-              <PartnerText
-                style={[
-                  T.body,
-                  {
-                    fontSize: px(13),
-                    lineHeight: px(18),
-                    color: C.grey,
-                    marginTop: px(4),
-                    textAlign: 'center',
-                    paddingHorizontal: px(10),
-                  },
-                ]}>
-                Ask the customer for the 4-digit code shown in their RACE app.
-              </PartnerText>
-            ) : null}
-
-            {/* OTP Boxes with transparent overlay input for reliable tap & IME cursor */}
-            <Pressable
-              onPress={() => otpInputRef.current?.focus()}
-              accessibilityRole="button"
-              accessibilityLabel="Trip OTP input"
-              style={{
-                flexDirection: 'row',
-                marginTop: keyboardVisible ? px(8) : px(14),
-                gap: px(10),
-                position: 'relative',
-              }}>
-              {Array.from({ length: OTP_LENGTH }, (_, index) => {
-                const char = tripOtp[index] ?? '';
-                const focused = tripOtp.length === index;
-                return (
-                  <View
-                    key={index}
-                    style={{
-                      width: keyboardVisible ? px(42) : px(50),
-                      height: keyboardVisible ? px(42) : px(50),
-                      borderRadius: px(14),
-                      borderWidth: 1.5,
-                      borderColor: otpError ? C.red : focused ? C.amber : '#CBD5E1',
-                      backgroundColor: C.white,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <PartnerText
-                      style={{
-                        fontSize: px(24),
-                        lineHeight: px(28),
-                        fontWeight: '700',
-                        color: C.ink,
-                      }}>
-                      {char}
-                    </PartnerText>
-                  </View>
-                );
-              })}
-              <PartnerTextInput
-                ref={otpInputRef}
-                value={tripOtp}
-                testID="tripOtpInput"
-                onChangeText={text => {
-                  setOtpError('');
-                  setTripOtp(text.replace(/\D/g, '').slice(0, OTP_LENGTH));
-                }}
-                keyboardType="number-pad"
-                maxLength={OTP_LENGTH}
-                style={{
-                  ...StyleSheet.absoluteFill,
-                  opacity: 0.01,
-                }}
-              />
-            </Pressable>
-
-            {otpError ? (
-              <PartnerText
-                style={[
-                  T.small,
-                  { fontSize: px(12.5), lineHeight: px(17), color: C.red, marginTop: px(10) },
-                ]}>
-                {otpError}
-              </PartnerText>
-            ) : null}
-
-            {!keyboardVisible ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  marginTop: px(12),
-                  paddingVertical: px(8),
-                  paddingHorizontal: px(12),
-                  borderRadius: px(12),
-                  backgroundColor: '#EFF6FF',
-                  borderWidth: 1,
-                  borderColor: '#DBEAFE',
-                  alignSelf: 'stretch',
-                }}>
-                <View
-                  style={{
-                    width: px(22),
-                    height: px(22),
-                    borderRadius: px(11),
-                    backgroundColor: '#DBEAFE',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: px(9),
-                  }}>
-                  <Info size={px(13)} color="#2563EB" strokeWidth={2.5} />
-                </View>
-                <PartnerText
-                  style={{
-                    flex: 1,
-                    fontSize: px(12.5),
-                    lineHeight: px(17),
-                    fontWeight: '500',
-                    color: '#1E40AF',
-                  }}>
-                  The trip starts after the code is verified.
-                </PartnerText>
-              </View>
-            ) : null}
-
-            {/* Primary Action Button */}
-            <Pressable
-              onPress={onPrimaryPress}
-              disabled={acting}
-              accessibilityRole="button"
-              accessibilityLabel="Verify and start service"
-              accessibilityState={{ disabled: acting }}
-              style={({ pressed }) => ({
-                alignSelf: 'stretch',
-                height: px(50),
-                marginTop: keyboardVisible ? px(6) : px(12),
-                borderRadius: px(R.button),
-                backgroundColor: acting ? C.amberBorder : C.amber,
-                alignItems: 'center',
-                justifyContent: 'center',
-                opacity: pressed ? 0.94 : 1,
-              })}>
-              {acting ? (
-                <ActivityIndicator color={C.ink} />
-              ) : (
-                <PartnerText style={[T.button, { fontSize: px(16), color: C.ink }]}>
-                  {primaryLabel}
-                </PartnerText>
-              )}
-            </Pressable>
-
-            {/* Need Help link cleanly placed below button */}
-            {!keyboardVisible ? (
-              <Pressable
-                onPress={() => void Linking.openURL(SUPPORT_NUMBER)}
-                hitSlop={8}
-                accessibilityRole="button"
-                style={{
-                  marginTop: px(8),
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  paddingVertical: px(4),
-                }}>
-                <Phone size={px(13)} color="#64748B" strokeWidth={2.2} />
-                <PartnerText
-                  style={{
-                    fontSize: px(12.5),
-                    fontWeight: '600',
-                    color: '#64748B',
-                    marginLeft: px(5),
-                  }}>
-                  Need help? Call Support
-                </PartnerText>
-              </Pressable>
-            ) : null}
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      ) : (
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + px(54) : 0}>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{
-              flexGrow: 1,
-              paddingTop: step === 'completed' ? insets.top : 0,
-              paddingBottom: 0,
-            }}>
-        {/* board 05 — job completed summary */}
-        {step === 'completed' ? (
-          <View style={{ paddingHorizontal: px(M.pagePadding), paddingTop: px(10) }}>
-            <View style={{ alignItems: 'center', paddingVertical: px(18), position: 'relative' }}>
-              {[
-                { left: px(48), top: px(18), color: C.amber, size: 5 },
-                { left: px(72), top: px(4), color: C.green, size: 4 },
-                { left: px(96), top: px(20), color: C.blue, size: 3 },
-                { left: px(122), top: px(2), color: C.amber, size: 3 },
-                { left: px(148), top: px(12), color: C.green, size: 4 },
-                { left: px(190), top: px(8), color: C.amber, size: 4 },
-                { left: px(232), top: px(30), color: C.blue, size: 3 },
-                { left: px(260), top: px(52), color: C.green, size: 4 },
-                { left: px(42), top: px(68), color: C.blue, size: 3 },
-                { left: px(76), top: px(92), color: C.amber, size: 3 },
-                { left: px(112), top: px(104), color: C.green, size: 3 },
-                { left: px(178), top: px(100), color: C.blue, size: 3 },
-                { left: px(246), top: px(78), color: C.amber, size: 5 },
-                { left: px(274), top: px(96), color: C.amber, size: 3 },
-              ].map((dot, index) => (
-                <View
-                  key={index}
-                  style={{
-                    position: 'absolute',
-                    left: dot.left,
-                    top: dot.top,
-                    width: px(dot.size),
-                    height: px(dot.size),
-                    borderRadius: px(dot.size / 2),
-                    backgroundColor: dot.color,
-                  }}
-                />
-              ))}
-              <View
-                style={{
-                  width: px(84),
-                  height: px(84),
-                  borderRadius: px(42),
-                  backgroundColor: C.greenCard,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <View
-                  style={{
-                    width: px(60),
-                    height: px(60),
-                    borderRadius: px(30),
-                    backgroundColor: C.green,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <Check size={px(32)} color={C.white} strokeWidth={3} />
-                </View>
-              </View>
-              <PartnerText
-                style={[
-                  T.sectionTitle,
-                  { fontSize: px(24), lineHeight: px(30), color: C.ink, marginTop: px(16) },
-                ]}>
-                Job completed
-              </PartnerText>
-              <PartnerText
-                style={[
-                  T.meta,
-                  { fontSize: px(13), lineHeight: px(18), color: C.greySoft, marginTop: px(4) },
-                ]}>
-                #{job.bookingNumber}
-              </PartnerText>
-            </View>
-
-            <View
-              style={{
-                borderRadius: px(R.card),
-                borderWidth: 1,
-                borderColor: C.hairline,
-                backgroundColor: C.card,
-                padding: px(M.cardPadding),
-                ...driverShadow,
-              }}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                <View
-                  style={{
-                    width: px(34),
-                    height: px(34),
-                    borderRadius: px(17),
-                    backgroundColor: C.creamRow,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  {job.bookingType === 'towing' ? (
-                    <Image
-                      source={images.icons.towing}
-                      style={{ width: px(22), height: px(17) }}
-                      resizeMode="contain"
-                    />
-                  ) : (
-                    <Car size={px(20)} color={C.ink} strokeWidth={2} />
-                  )}
-                </View>
-                <PartnerText
-                  numberOfLines={1}
-                  style={[T.jobTitle, { flex: 1, fontSize: px(15.5), color: C.ink, marginLeft: px(10) }]}>
-                  {serviceName}
-                </PartnerText>
-                <View
-                  style={{
-                    height: px(M.rowPillHeight),
-                    paddingHorizontal: px(10),
-                    borderRadius: px(R.pill),
-                    backgroundColor: C.greenPill,
-                    justifyContent: 'center',
-                    marginLeft: px(8),
-                  }}>
-                  <PartnerText style={[T.pill, { fontSize: px(12), color: C.green }]}>Completed</PartnerText>
-                </View>
-              </View>
-
-              <View style={{ marginTop: px(12), flexDirection: 'row', alignItems: 'flex-start' }}>
-                <View style={{ width: px(18), alignItems: 'center' }}>
-                  <View
-                    style={{
-                      width: px(12),
-                      height: px(12),
-                      borderRadius: px(6),
-                      backgroundColor: C.blue,
-                      marginTop: px(2),
-                    }}
-                  />
-                  {[0, 1, 2].map(index => (
-                    <View
-                      key={index}
-                      style={{
-                        width: px(1.5),
-                        height: px(3),
-                        marginTop: px(2),
-                        borderRadius: px(1),
-                        backgroundColor: '#C9CBD3',
-                      }}
-                    />
-                  ))}
-                  <View
-                    style={{
-                      width: px(11),
-                      height: px(11),
-                      borderRadius: px(6),
-                      backgroundColor: C.amber,
-                      marginTop: px(2),
-                    }}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: px(10) }}>
-                  <PartnerText
-                    numberOfLines={1}
-                    style={[T.jobTitle, { fontSize: px(14), lineHeight: px(19), color: C.ink }]}>
-                    {pickup || 'Pickup location'}
-                  </PartnerText>
-                  <View
-                    style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
-                    <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
-                    <PartnerText
-                      style={[
-                        T.meta,
-                        { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginLeft: px(5) },
-                      ]}>
-                      {formatWhen(job.createdAt)}
-                    </PartnerText>
-                  </View>
-
-                  <PartnerText
-                    style={[
-                      T.jobTitle,
-                      { fontSize: px(14), lineHeight: px(19), color: C.ink, marginTop: px(12) },
-                    ]}>
-                    {dropoff || 'Drop location'}
-                  </PartnerText>
-                  {completedAt(job) ? (
-                    <View
-                      style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
-                      <CalendarDays size={px(13)} color={C.greySoft} strokeWidth={2.2} />
-                      <PartnerText
-                        style={[
-                          T.meta,
-                          {
-                            fontSize: px(12),
-                            lineHeight: px(16),
-                            color: C.greySoft,
-                            marginLeft: px(5),
-                          },
-                        ]}>
-                        {completedAt(job)}
-                      </PartnerText>
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              {fareAmount != null ? (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    marginTop: px(14),
-                    padding: px(10),
-                    borderRadius: px(R.innerCard),
-                    backgroundColor: C.greenCard,
-                  }}>
-                  <View
-                    style={{
-                      width: px(30),
-                      height: px(30),
-                      borderRadius: px(15),
-                      backgroundColor: C.greenTile,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <PartnerText style={{ fontSize: px(16), fontWeight: '800', color: C.green }}>₹</PartnerText>
-                  </View>
-                  <View style={{ flex: 1, marginLeft: px(10) }}>
-                    <PartnerText
-                      style={[
-                        T.metricValue,
-                        { fontSize: px(22), lineHeight: px(27), color: C.ink },
-                      ]}>
-                      {formatInr(fareAmount)}
-                    </PartnerText>
-                    <PartnerText
-                      style={[
-                        T.meta,
-                        { fontSize: px(12.5), lineHeight: px(17), color: C.greySoft, marginTop: px(2) },
-                      ]}>
-                      {backendConfirmedFare ? 'Final trip fare' : 'Estimated trip fare'}
-                    </PartnerText>
-                  </View>
-                  {backendConfirmedFare ? (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        width: px(92),
-                        minHeight: px(M.pillHeight + 12),
-                        paddingHorizontal: px(8),
-                        paddingVertical: px(6),
-                        borderRadius: px(R.innerCard),
-                        backgroundColor: C.greenPill,
-                      }}>
-                      <Check size={px(14)} color={C.green} strokeWidth={3} />
-                      <PartnerText
-                        numberOfLines={2}
-                        style={[
-                          T.pill,
-                          {
-                            flex: 1,
-                            fontSize: px(11),
-                            lineHeight: px(14),
-                            color: C.green,
-                            marginLeft: px(5),
-                            textAlign: 'center',
-                          },
-                        ]}>
-                        Fare confirmed
-                      </PartnerText>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {tripDuration || job.distanceKm != null ? (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    marginTop: px(12),
-                    padding: px(12),
-                    borderRadius: px(R.innerCard),
-                    backgroundColor: '#F4F8FC',
-                  }}>
-                  {tripDuration ? (
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                      <View
-                        style={{
-                          width: px(28),
-                          height: px(28),
-                          borderRadius: px(14),
-                          backgroundColor: C.bluePill,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                        <Clock3 size={px(15)} color={C.blue} strokeWidth={2.4} />
-                      </View>
-                      <View style={{ marginLeft: px(8) }}>
-                        <PartnerText style={[T.small, { fontSize: px(11.5), color: C.greySoft }]}>Total time</PartnerText>
-                        <PartnerText style={[T.jobTitle, { fontSize: px(15), color: C.ink, marginTop: px(1) }]}>
-                          {tripDuration}
-                        </PartnerText>
-                      </View>
-                    </View>
-                  ) : null}
-                  {job.distanceKm != null ? (
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                      <View
-                        style={{
-                          width: px(28),
-                          height: px(28),
-                          borderRadius: px(14),
-                          backgroundColor: C.bluePill,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}>
-                        <Route size={px(15)} color={C.blue} strokeWidth={2.4} />
-                      </View>
-                      <View style={{ marginLeft: px(8) }}>
-                        <PartnerText style={[T.small, { fontSize: px(11.5), color: C.greySoft }]}>Total distance</PartnerText>
-                        <PartnerText style={[T.jobTitle, { fontSize: px(15), color: C.ink, marginTop: px(1) }]}>
-                          {job.distanceKm} km
-                        </PartnerText>
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              <Pressable
-                onPress={onPrimaryPress}
-                disabled={acting}
-                accessibilityRole="button"
-                accessibilityLabel="Back to Home"
-                accessibilityState={{ disabled: acting }}
-                style={({ pressed }) => ({
-                  height: px(52),
-                  marginTop: px(16),
-                  borderRadius: px(R.button),
-                  backgroundColor: acting ? C.amberBorder : C.amber,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: pressed ? 0.94 : 1,
-                })}>
-                <House size={px(17)} color={C.ink} strokeWidth={2.6} />
-                <PartnerText style={[T.button, { fontSize: px(16), color: C.ink, marginLeft: px(8) }]}>
-                  Back to Home
-                </PartnerText>
-              </Pressable>
-            </View>
-
-            <Pressable
-              onPress={() => navigation.popToTop()}
-              accessibilityRole="button"
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: px(14),
-              }}>
-              <PartnerText style={[T.link, { fontSize: px(14), color: C.grey }]}>View job details</PartnerText>
-              <ChevronRight
-                size={px(16)}
-                color={C.grey}
-                strokeWidth={2.6}
-                style={{ marginLeft: px(2) }}
-              />
-            </Pressable>
-          </View>
+        {/* Screen 4: Route Overview to Pickup */}
+        {effectiveScreen === 4 ? (
+          <RouteOverviewCards
+            pickupAddress={pickup || 'Saheed Nagar, Bhubaneswar'}
+            distanceKm={calculatedRoute?.distanceKm ?? (typeof legKm === 'number' ? Number(legKm.toFixed(1)) : 5.4)}
+            durationMinutes={calculatedRoute?.durationMinutes ?? legMeta?.durationMinutes ?? 18}
+            onStartNavigation={() => {
+              setNavMode('turn_by_turn');
+              if (job.status === 'DRIVER_ASSIGNED') {
+                void runStatusUpdate('DRIVER_EN_ROUTE');
+              }
+            }}
+            onRecenter={recenterMap}
+            onToggleCompass={() => setCompassHeadingUp(prev => !prev)}
+            compassHeadingUp={compassHeadingUp}
+            insetsTop={insets.top + px(54)}
+            insetsBottom={insets.bottom}
+          />
         ) : null}
-          </ScrollView>
-        </KeyboardAvoidingView>
-      )}
+
+        {/* Screen 5: Turn-by-Turn Navigation to Pickup */}
+        {effectiveScreen === 5 ? (
+          <>
+            <NavTurnBanner
+              currentStep={
+                calculatedRoute?.steps?.[currentStepIndex] || {
+                  id: 'step-pickup-1',
+                  instruction: 'Turn left onto NH-16',
+                  shortInstruction: 'Turn left',
+                  streetName: 'NH-16',
+                  distanceMeters: 650,
+                  durationSeconds: 90,
+                  maneuverType: 'turn_left',
+                  coordinate: { latitude: 20.2958, longitude: 85.8452 },
+                }
+              }
+              voiceMuted={voiceMuted}
+              onToggleVoice={() => setVoiceMuted(prev => !prev)}
+              compassHeadingUp={compassHeadingUp}
+              onToggleCompass={() => setCompassHeadingUp(prev => !prev)}
+              onRecenter={recenterMap}
+              insetsTop={insets.top}
+            />
+            <NavBottomBar
+              etaMinutes={calculatedRoute?.durationMinutes ?? 17}
+              distanceKm={calculatedRoute?.distanceKm ?? 5.4}
+              etaTimeFormatted={calculatedRoute?.etaTimeFormatted ?? '10:12 PM'}
+              onExitNav={() => setNavMode('overview')}
+              onArriveAction={() => void runStatusUpdate('DRIVER_ARRIVED')}
+              arriveActionLabel="Arrived"
+              insetsBottom={insets.bottom}
+            />
+          </>
+        ) : null}
+
+        {/* Screen 6: Arrived at Pickup */}
+        {effectiveScreen === 6 ? (
+          <ArrivedPickupCard
+            pickupAddress={pickup || 'Saheed Nagar, Bhubaneswar'}
+            customerName={job.customer?.name || 'Customer'}
+            customerMobile={job.customer?.mobileNumber || '+919876543210'}
+            onVerifyOtpPress={() => setOtpModalOpen(true)}
+            onUndoArrival={undoPickupArrival}
+            acting={acting}
+            insetsTop={insets.top}
+            insetsBottom={insets.bottom}
+          />
+        ) : null}
+
+        {/* Screen 7: Customer OTP Verification */}
+        {effectiveScreen === 7 || (otpModalOpen && step === 'verify_otp') ? (
+          <CustomerOtpModal
+            bookingNumber={job.bookingNumber || 'TOW-10048'}
+            tripOtp={tripOtp}
+            setTripOtp={setTripOtp}
+            otpError={otpError}
+            acting={acting}
+            onVerify={onPrimaryPress}
+            onBack={() => {
+              setOtpModalOpen(false);
+              setOtpError('');
+            }}
+            customerMobile={job.customer?.mobileNumber || '+919876543210'}
+            insetsTop={insets.top}
+            insetsBottom={insets.bottom}
+          />
+        ) : null}
+
+        {/* Screen 8: On Service (Turn-by-Turn to Drop) */}
+        {effectiveScreen === 8 ? (
+          <>
+            <NavTurnBanner
+              currentStep={
+                calculatedRoute?.steps?.[1] || {
+                  id: 'step-drop-1',
+                  instruction: 'Continue on NH-16',
+                  shortInstruction: 'Straight',
+                  streetName: 'NH-16',
+                  distanceMeters: 2100,
+                  durationSeconds: 180,
+                  maneuverType: 'straight',
+                  coordinate: { latitude: 20.3068, longitude: 85.8551 },
+                }
+              }
+              voiceMuted={voiceMuted}
+              onToggleVoice={() => setVoiceMuted(prev => !prev)}
+              compassHeadingUp={compassHeadingUp}
+              onToggleCompass={() => setCompassHeadingUp(prev => !prev)}
+              onRecenter={recenterMap}
+              insetsTop={insets.top}
+            />
+            <NavBottomBar
+              etaMinutes={calculatedRoute?.durationMinutes ?? 12}
+              distanceKm={calculatedRoute?.distanceKm ?? 2.1}
+              etaTimeFormatted={calculatedRoute?.etaTimeFormatted ?? '10:32 PM'}
+              onExitNav={() => setNavMode('overview')}
+              onArriveAction={() => void runStatusUpdate('COMPLETED')}
+              arriveActionLabel="End"
+              insetsBottom={insets.bottom}
+            />
+          </>
+        ) : null}
+
+        {/* Screen 9: Trip In Progress Live Tracking */}
+        {effectiveScreen === 9 ? (
+          <TripInProgressSheet
+            bookingNumber={job.bookingNumber || 'TOW-10048'}
+            dropAddress={dropoff || 'Mancheswar, Bhubaneswar'}
+            distanceKm={calculatedRoute?.distanceKm ?? 2.1}
+            durationMinutes={calculatedRoute?.durationMinutes ?? 12}
+            customerName={job.customer?.name || 'Customer'}
+            customerMobile={job.customer?.mobileNumber || '+919876543210'}
+            onCompletePress={onPrimaryPress}
+            acting={acting}
+            insetsTop={insets.top}
+            insetsBottom={insets.bottom}
+          />
+        ) : null}
+
+        {/* Screen 10: Job Completion Modal */}
+        <JobCompletedModal
+          visible={effectiveScreen === 10}
+          bookingNumber={job.bookingNumber || 'TOW-10048'}
+          totalEarnings={typeof job.finalFare === 'number' ? job.finalFare : (job.estimatedFare ?? 1650)}
+          pickupAddress={pickup || 'Saheed Nagar'}
+          dropAddress={dropoff || 'Mancheswar'}
+          pickupTimeFormatted="10:12 PM"
+          dropTimeFormatted="10:34 PM"
+          distanceKm={job.distanceKm ?? 5.4}
+          durationMinutes={22}
+          onBackToHome={() => {
+            navigation.popToTop();
+            navigation.getParent()?.navigate('PartnerHome' as never);
+          }}
+          onViewJobDetails={() => {
+            Alert.alert('Job Details', `Booking #${job.bookingNumber}\nService: ${serviceName}\nStatus: COMPLETED`);
+          }}
+          insetsTop={insets.top}
+          insetsBottom={insets.bottom}
+        />
+
+        {/* Screen 11: Off Route / Rerouting Banner */}
+        <OffRouteBanner
+          visible={isOffRoute || effectiveScreen === 11}
+          onDismiss={() => {
+            setIsOffRoute(false);
+            setPreviewScreen(null);
+          }}
+          insetsTop={insets.top}
+        />
+
+        {/* Screen 12: Poor GPS / Weak Signal Alert */}
+        <WeakGpsAlert
+          visible={weakGps || effectiveScreen === 12}
+          onRetryGps={() => {
+            setWeakGps(false);
+            setPreviewScreen(null);
+          }}
+          onDismissSheet={() => {
+            setWeakGps(false);
+            setPreviewScreen(null);
+          }}
+          insetsTop={insets.top}
+          insetsBottom={insets.bottom}
+        />
+      </View>
+
+      {/* Floating UI QA / Screen Switcher Pill */}
+      {(UI_PREVIEW_MODE || __DEV__) ? (
+        <View style={{ position: 'absolute', right: 14, bottom: insets.bottom + 12, zIndex: 100 }}>
+          <Pressable
+            onPress={() => setQaMenuOpen(prev => !prev)}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle UI QA Screen Switcher"
+            style={({ pressed }) => ({
+              backgroundColor: '#FEA701',
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 16,
+              flexDirection: 'row',
+              alignItems: 'center',
+              shadowColor: '#D97706',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+              elevation: 5,
+              opacity: pressed ? 0.8 : 1,
+            })}>
+            <PartnerText style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
+              ⚡ UI QA {previewScreen ? `(Screen ${previewScreen})` : ''}
+            </PartnerText>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* QA Switcher Modal */}
+      <Modal
+        visible={qaMenuOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setQaMenuOpen(false)}>
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+          onPress={() => setQaMenuOpen(false)}>
+          <Pressable
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              padding: 20,
+              paddingBottom: Math.max(insets.bottom + 16, 24),
+            }}
+            onPress={e => e.stopPropagation?.()}>
+            <PartnerText style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>
+              Navigation Blueprint Preview (Screens 4–12)
+            </PartnerText>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {[
+                { label: 'Screen 4: Route Overview', screen: 4 },
+                { label: 'Screen 5: Nav to Pickup', screen: 5 },
+                { label: 'Screen 6: Arrived Pickup', screen: 6 },
+                { label: 'Screen 7: Customer OTP', screen: 7 },
+                { label: 'Screen 8: Nav to Drop', screen: 8 },
+                { label: 'Screen 9: Trip In Progress', screen: 9 },
+                { label: 'Screen 10: Job Completed', screen: 10 },
+                { label: 'Screen 11: Off Route', screen: 11 },
+                { label: 'Screen 12: Weak GPS', screen: 12 },
+                { label: 'Live Backend Flow', screen: null },
+              ].map(item => (
+                <Pressable
+                  key={item.label}
+                  onPress={() => {
+                    setPreviewScreen(item.screen);
+                    if (item.screen === 7) setOtpModalOpen(true);
+                    else if (item.screen === 6) setOtpModalOpen(false);
+                    setQaMenuOpen(false);
+                  }}
+                  style={{
+                    backgroundColor: previewScreen === item.screen ? '#FEA701' : '#F1F5F9',
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    borderRadius: 12,
+                  }}>
+                  <PartnerText
+                    style={{
+                      fontSize: 12.5,
+                      fontWeight: '700',
+                      color: previewScreen === item.screen ? '#0F172A' : '#334155',
+                    }}>
+                    {item.label}
+                  </PartnerText>
+                </Pressable>
+              ))}
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {menuModal}
     </View>

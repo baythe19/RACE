@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, View } from 'react-native';
-import { ArrowLeft, MapPin, Phone, Truck, UserRound } from 'lucide-react-native';
+import { ArrowLeft, Phone, Radio } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
@@ -9,6 +9,7 @@ import { PartnerText } from '../../components/partner/PartnerText';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import { useVendorBookingTrackingQuery } from '../../services/vendor/useVendorBookingsQueries';
 import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
+import { legForJobStatus, legTitle } from '../../services/driver/tripNavigation';
 import { formatReadableAddress } from '../../utils/readableAddress';
 
 type Props = NativeStackScreenProps<PartnerJobsStackParamList, 'PartnerActiveJob'>;
@@ -16,7 +17,6 @@ const AMBER = '#F9A602';
 const INK = '#191919';
 const MUTED = '#6B7280';
 
-/** Ticks every second so the "updated N sec ago" line never looks frozen. */
 function useNow() {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -26,8 +26,12 @@ function useNow() {
   return now;
 }
 
-function labelStatus(status: string) {
-  return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, letter => letter.toUpperCase());
+function shortStatus(status: string) {
+  if (status === 'DRIVER_EN_ROUTE') return 'En route';
+  if (status === 'DRIVER_ARRIVED') return 'At pickup';
+  if (status === 'IN_PROGRESS') return 'On trip';
+  if (status === 'DRIVER_ASSIGNED') return 'Assigned';
+  return status.replace(/_/g, ' ').toLowerCase();
 }
 
 export default function VendorBookingTrackingScreen({ route, navigation }: Props) {
@@ -36,141 +40,191 @@ export default function VendorBookingTrackingScreen({ route, navigation }: Props
   const bookingId = route.params?.bookingId ?? '';
   const bookingType = route.params?.bookingType ?? 'towing';
   const { data, isLoading, isError, refetch } = useVendorBookingTrackingQuery(bookingId, bookingType);
-  const driverLocation = data?.isLocationFresh && data.driverLocation
-    ? { latitude: data.driverLocation.latitude, longitude: data.driverLocation.longitude, label: 'Driver' }
+
+  const driverLocation =
+    data?.isLocationFresh && data.driverLocation
+      ? {
+          latitude: data.driverLocation.latitude,
+          longitude: data.driverLocation.longitude,
+          label: 'Driver',
+        }
+      : null;
+  const pickup =
+    data?.pickup && typeof data.pickup.latitude === 'number' && typeof data.pickup.longitude === 'number'
+      ? { latitude: data.pickup.latitude, longitude: data.pickup.longitude, label: 'Pickup' }
+      : null;
+  const dropoff =
+    data?.dropoff && typeof data.dropoff.latitude === 'number' && typeof data.dropoff.longitude === 'number'
+      ? { latitude: data.dropoff.latitude, longitude: data.dropoff.longitude, label: 'Drop-off' }
+      : null;
+  const leg = data ? legForJobStatus(data.status) : 'idle';
+  const destination = leg === 'to_drop' ? dropoff : leg === 'to_pickup' ? pickup : dropoff ?? pickup;
+
+  const locationAgeSec =
+    data?.driverLocation?.updatedAt
+      ? Math.max(0, Math.round((now - new Date(data.driverLocation.updatedAt).getTime()) / 1000))
+      : null;
+  const locationStale = locationAgeSec != null && locationAgeSec > 45;
+
+  const latestHistory = data?.statusHistory?.length
+    ? data.statusHistory[data.statusHistory.length - 1]
     : null;
-  const pickup = data?.pickup && typeof data.pickup.latitude === 'number' && typeof data.pickup.longitude === 'number'
-    ? { latitude: data.pickup.latitude, longitude: data.pickup.longitude, label: 'Pickup' }
-    : null;
-  const dropoff = data?.dropoff && typeof data.dropoff.latitude === 'number' && typeof data.dropoff.longitude === 'number'
-    ? { latitude: data.dropoff.latitude, longitude: data.dropoff.longitude, label: 'Drop-off' }
-    : null;
-  const atPickup = ['DRIVER_ARRIVED', 'IN_PROGRESS'].includes(data?.status ?? '');
-  const destination = atPickup ? dropoff : pickup;
 
   return (
     <AppScreenLayout
       header={
-        <View style={[styles.header, { paddingHorizontal: px(16), paddingTop: px(12), paddingBottom: px(12), flexDirection: 'row', alignItems: 'center' }]}>
+        <View
+          style={[
+            styles.header,
+            {
+              paddingHorizontal: px(16),
+              paddingTop: px(12),
+              paddingBottom: px(10),
+              flexDirection: 'row',
+              alignItems: 'center',
+            },
+          ]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={12}
             onPress={() => navigation.goBack()}
-            style={{ marginRight: px(12), padding: px(4) }}>
+            style={{ marginRight: px(10), padding: px(4) }}>
             <ArrowLeft size={px(22)} color={INK} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <PartnerText style={{ color: INK, fontSize: px(18), fontWeight: '800' }}>Job tracking</PartnerText>
-            <PartnerText style={{ color: MUTED, fontSize: px(11.5), marginTop: px(2) }}>
-              {data ? '#' + data.bookingNumber : 'Vendor fleet assignment'}
+            <PartnerText style={{ color: INK, fontSize: px(17), fontWeight: '800' }}>Live map</PartnerText>
+            <PartnerText style={{ color: MUTED, fontSize: px(11.5), marginTop: px(1) }}>
+              {data ? `#${data.bookingNumber} · view only` : 'Fleet job'}
             </PartnerText>
           </View>
         </View>
       }
       refreshing={false}
-      onRefresh={() => { void refetch(); }}
-      contentStyle={{ paddingTop: px(12) }}>
+      onRefresh={() => {
+        void refetch();
+      }}
+      contentStyle={{ paddingTop: px(8), paddingHorizontal: px(14) }}>
       {isLoading ? (
-        <View style={{ paddingVertical: px(34) }}><ActivityIndicator color={AMBER} /></View>
+        <View style={{ paddingVertical: px(40) }}>
+          <ActivityIndicator color={AMBER} />
+        </View>
       ) : isError || !data ? (
-        <View style={[styles.card, { borderRadius: px(16), padding: px(18) }]}>
+        <View style={[styles.card, { borderRadius: px(14), padding: px(18) }]}>
           <PartnerText style={{ color: MUTED, textAlign: 'center', fontSize: px(13) }}>
             Tracking could not load. Pull down to retry.
           </PartnerText>
         </View>
       ) : (
         <>
-          <View style={[styles.card, { borderRadius: px(17), padding: px(14), marginBottom: px(12) }]}>
-            <View style={styles.row}>
-              <View style={[styles.icon, { width: px(42), height: px(42), borderRadius: px(13) }]}>
-                {bookingType === 'towing' ? <Truck size={px(21)} color={AMBER} /> : <UserRound size={px(21)} color={AMBER} />}
-              </View>
-              <View style={{ flex: 1 }}>
-                <PartnerText style={{ color: INK, fontSize: px(15), fontWeight: '800' }}>{data.serviceLabel}</PartnerText>
-                <PartnerText style={{ color: MUTED, fontSize: px(12), marginTop: px(3) }}>{labelStatus(data.status)}</PartnerText>
-              </View>
-            </View>
-            <View style={[styles.placeRow, { marginTop: px(13) }]}>
-              <MapPin size={px(15)} color="#2563EB" />
-              <PartnerText style={{ color: INK, fontSize: px(12), flex: 1 }}>
-                {formatReadableAddress(data.pickup?.address) || 'Pickup location'}
-              </PartnerText>
-            </View>
-            {data.dropoff?.address ? (
-              <View style={styles.placeRow}>
-                <MapPin size={px(15)} color="#F08A00" />
-                <PartnerText style={{ color: INK, fontSize: px(12), flex: 1 }}>
-                  {formatReadableAddress(data.dropoff.address)}
-                </PartnerText>
-              </View>
-            ) : null}
-            {data.assignedFleetVehicleLabel ? (
-              <PartnerText style={{ color: MUTED, fontSize: px(12), marginTop: px(10) }}>
-                Fleet vehicle: {data.assignedFleetVehicleLabel}
-              </PartnerText>
-            ) : null}
-            {data.driver ? (
-              <View style={[styles.driverRow, { marginTop: px(12), paddingTop: px(11) }]}>
-                <View style={{ flex: 1 }}>
-                  <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700' }}>{data.driver.name}</PartnerText>
-                  <PartnerText style={{ color: MUTED, fontSize: px(11), marginTop: px(2) }}>{data.driver.phone}</PartnerText>
-                </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={'Call ' + data.driver.name}
-                  onPress={() => { void Linking.openURL('tel:' + data.driver?.phone); }}
-                  style={[styles.callButton, { width: px(38), height: px(38), borderRadius: px(13) }]}>
-                  <Phone size={px(17)} color="#FFFFFF" />
-                </Pressable>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={[styles.mapWrap, { height: px(280), borderRadius: px(17), marginBottom: px(10) }]}>
+          <View style={[styles.mapShell, { height: px(360), borderRadius: px(18), marginBottom: px(12) }]}>
             <LiveTripMap
               pickup={pickup}
               dropoff={dropoff}
               driverLocation={driverLocation}
               activeDestination={destination}
               showsUserLocation={false}
-              routeApiEnabled={false}
+              routeApiEnabled
+              straightFallback
               style={StyleSheet.absoluteFill}
-              borderRadius={px(17)}
+              borderRadius={px(18)}
             />
-          </View>
-          <PartnerText
-            style={{
-              color: data.isLocationFresh
-                ? (data.driverLocation?.updatedAt && now - new Date(data.driverLocation.updatedAt).getTime() > 45_000
-                  ? '#B45309'
-                  : '#13834C')
-                : MUTED,
-              fontSize: px(11),
-              marginBottom: px(15),
-            }}>
-            {data.isLocationFresh && data.driverLocation?.updatedAt
-              ? now - new Date(data.driverLocation.updatedAt).getTime() > 45_000
-                ? 'Location is ' + Math.max(1, Math.round((now - new Date(data.driverLocation.updatedAt).getTime()) / 1000)) + ' sec old — checking for a newer fix…'
-                : 'Driver location updated ' + Math.max(0, Math.round((now - new Date(data.driverLocation.updatedAt).getTime()) / 1000)) + ' sec ago'
-              : 'Waiting for a fresh Driver location. The map hides old locations.'}
-          </PartnerText>
-
-          <View style={[styles.card, { borderRadius: px(17), padding: px(14) }]}>
-            <PartnerText style={{ color: INK, fontSize: px(15), fontWeight: '800', marginBottom: px(8) }}>Progress</PartnerText>
-            {data.statusHistory.slice(-5).reverse().map((entry, index) => (
-              <View key={entry.status + entry.timestamp + index} style={styles.timelineRow}>
-                <View style={[styles.timelineDot, { backgroundColor: index === 0 ? AMBER : '#D1D5DB' }]} />
-                <View style={{ flex: 1 }}>
-                  <PartnerText style={{ color: INK, fontSize: px(12), fontWeight: '700' }}>{labelStatus(entry.status)}</PartnerText>
-                  {entry.note ? <PartnerText style={{ color: MUTED, fontSize: px(10), marginTop: px(2) }}>{entry.note}</PartnerText> : null}
-                </View>
-                <PartnerText style={{ color: MUTED, fontSize: px(10) }}>
-                  {new Date(entry.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            <View style={[styles.mapOverlay, { top: px(10), left: px(10), right: px(10) }]}>
+              <View style={[styles.livePill, { paddingHorizontal: px(10), paddingVertical: px(6), borderRadius: px(20) }]}>
+                <Radio size={px(12)} color="#DC2626" strokeWidth={2.8} />
+                <PartnerText style={{ color: INK, fontSize: px(11.5), fontWeight: '700', marginLeft: px(5) }}>
+                  {shortStatus(data.status)}
+                  {leg !== 'idle' ? ` · ${legTitle(leg)}` : ''}
                 </PartnerText>
               </View>
-            ))}
+            </View>
+            <View style={[styles.mapOverlay, { bottom: px(10), left: px(10), right: px(10) }]}>
+              <PartnerText
+                style={{
+                  color: data.isLocationFresh && !locationStale ? '#166534' : '#92400E',
+                  fontSize: px(11),
+                  fontWeight: '600',
+                  backgroundColor: 'rgba(255,255,255,0.92)',
+                  paddingHorizontal: px(10),
+                  paddingVertical: px(6),
+                  borderRadius: px(10),
+                  alignSelf: 'flex-start',
+                }}>
+                {data.isLocationFresh && locationAgeSec != null
+                  ? locationStale
+                    ? `Location ${locationAgeSec}s old — refreshing…`
+                    : `Updated ${locationAgeSec}s ago`
+                  : 'Waiting for driver GPS…'}
+              </PartnerText>
+            </View>
           </View>
+
+          {data.driver ? (
+            <View style={[styles.card, styles.driverBar, { borderRadius: px(14), padding: px(12), marginBottom: px(10) }]}>
+              <View style={[styles.driverAvatar, { width: px(40), height: px(40), borderRadius: px(12) }]}>
+                <PartnerText style={{ color: INK, fontWeight: '800', fontSize: px(16) }}>
+                  {data.driver.name.charAt(0)}
+                </PartnerText>
+              </View>
+              <View style={{ flex: 1, marginLeft: px(10) }}>
+                <PartnerText style={{ color: INK, fontSize: px(14), fontWeight: '700' }}>{data.driver.name}</PartnerText>
+                <PartnerText style={{ color: MUTED, fontSize: px(11), marginTop: px(2) }}>{data.serviceLabel}</PartnerText>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`Call ${data.driver.name}`}
+                onPress={() => {
+                  void Linking.openURL(`tel:${data.driver?.phone ?? ''}`);
+                }}
+                style={[styles.callButton, { width: px(40), height: px(40), borderRadius: px(12) }]}>
+                <Phone size={px(18)} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          ) : null}
+
+          <View style={[styles.card, { borderRadius: px(14), padding: px(12), marginBottom: px(10) }]}>
+            <View style={styles.routeRow}>
+              <View style={[styles.routeDot, { backgroundColor: '#2563EB' }]} />
+              <View style={{ flex: 1 }}>
+                <PartnerText style={{ color: MUTED, fontSize: px(10), fontWeight: '600' }}>PICKUP</PartnerText>
+                <PartnerText style={{ color: INK, fontSize: px(12.5), marginTop: px(2) }} numberOfLines={2}>
+                  {formatReadableAddress(data.pickup?.address) || '—'}
+                </PartnerText>
+              </View>
+            </View>
+            <View style={[styles.routeLine, { marginLeft: px(5) }]} />
+            <View style={styles.routeRow}>
+              <View style={[styles.routeDot, { backgroundColor: '#F08A00' }]} />
+              <View style={{ flex: 1 }}>
+                <PartnerText style={{ color: MUTED, fontSize: px(10), fontWeight: '600' }}>DROP-OFF</PartnerText>
+                <PartnerText style={{ color: INK, fontSize: px(12.5), marginTop: px(2) }} numberOfLines={2}>
+                  {formatReadableAddress(data.dropoff?.address) || '—'}
+                </PartnerText>
+              </View>
+            </View>
+            {data.assignedFleetVehicleLabel ? (
+              <PartnerText style={{ color: MUTED, fontSize: px(11), marginTop: px(10) }} numberOfLines={1}>
+                {data.assignedFleetVehicleLabel}
+              </PartnerText>
+            ) : null}
+          </View>
+
+          {latestHistory ? (
+            <View style={[styles.card, { borderRadius: px(14), padding: px(12) }]}>
+              <PartnerText style={{ color: MUTED, fontSize: px(10), fontWeight: '600' }}>LATEST UPDATE</PartnerText>
+              <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700', marginTop: px(4) }}>
+                {latestHistory.note ?? shortStatus(latestHistory.status)}
+              </PartnerText>
+              <PartnerText style={{ color: MUTED, fontSize: px(10.5), marginTop: px(3) }}>
+                {new Date(latestHistory.timestamp).toLocaleString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  month: 'short',
+                  day: 'numeric',
+                })}
+              </PartnerText>
+            </View>
+          ) : null}
         </>
       )}
     </AppScreenLayout>
@@ -178,14 +232,33 @@ export default function VendorBookingTrackingScreen({ route, navigation }: Props
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: '#FFFFFF', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8E8E8' },
+  header: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8E8E8',
+  },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  icon: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF5DB' },
-  placeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 8 },
-  driverRow: { flexDirection: 'row', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#EEEEEE' },
+  mapShell: { overflow: 'hidden', backgroundColor: '#E5E7EB', position: 'relative' },
+  mapOverlay: { position: 'absolute' },
+  livePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.94)',
+    alignSelf: 'flex-start',
+  },
+  driverBar: { flexDirection: 'row', alignItems: 'center' },
+  driverAvatar: {
+    backgroundColor: '#FFF5DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   callButton: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#16A34A' },
-  mapWrap: { overflow: 'hidden', backgroundColor: '#E5E7EB' },
-  timelineRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 7 },
-  timelineDot: { width: 8, height: 8, borderRadius: 4 },
+  routeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  routeDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  routeLine: {
+    width: 2,
+    height: 14,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 2,
+  },
 });

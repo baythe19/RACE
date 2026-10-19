@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { notificationQueryKeys } from '../useNotificationQueries';
+
 import {
   getDriverVendorMembership,
   inviteVendorDriver,
@@ -64,6 +66,9 @@ export function useInviteVendorDriverMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor });
       void queryClient.invalidateQueries({ queryKey: ['vendor', 'search-drivers'] });
+      void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.invitations });
+      void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.driver });
+      void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
     },
   });
 }
@@ -75,6 +80,7 @@ export function useRevokeVendorDriverMembershipMutation() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor });
       void queryClient.invalidateQueries({ queryKey: ['vendor', 'search-drivers'] });
+      void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
     },
   });
 }
@@ -88,6 +94,8 @@ export function useRespondToVendorInvitationMutation() {
       void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor });
       void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.driver });
       void queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.invitations });
+      void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
+      void queryClient.invalidateQueries({ queryKey: ['vendor', 'bookings'] });
     },
   });
 }

@@ -1,6 +1,14 @@
+import * as SecureStore from 'expo-secure-store';
+
+import { TOKEN_KEYS } from '../config/env';
 import { api, unwrapApi } from './api';
 import { API_ENDPOINTS } from '../config/api';
 import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../constants/preview';
+import {
+  getPreviewDriverNotifications,
+  getPreviewVendorNotifications,
+  setPreviewNotificationsForRole,
+} from '../data/previewPartnerWorld';
 
 export type PartnerNotificationItem = {
   id: string;
@@ -21,68 +29,20 @@ export type NotificationPreferences = {
   serviceLaunches: boolean;
 };
 
-let mockNotificationsState: PartnerNotificationItem[] = [
-  {
-    id: 'notif-001',
-    type: 'JOB_OFFER',
-    title: 'New job request',
-    message: '#TOW-10052 • 6.2 km away\nStation Square, Bhubaneswar',
-    isRead: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    metadata: { bookingId: 'RACE-TOW-MOCK-004', bookingType: 'towing', bookingNumber: 'TOW-10052' },
-  },
-  {
-    id: 'notif-002',
-    type: 'BOOKING_UPDATE',
-    title: 'Job accepted',
-    message: 'You have accepted #TOW-10051',
-    isRead: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    metadata: { bookingId: 'RACE-TOW-MOCK-001', bookingType: 'towing' },
-  },
-  {
-    id: 'notif-003',
-    type: 'BOOKING_UPDATE',
-    title: 'Customer OTP',
-    message: 'Trip #TOW-10051 • OTP: 4829',
-    isRead: false,
-    createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    metadata: { bookingId: 'RACE-TOW-MOCK-001', otp: '4829' },
-  },
-  {
-    id: 'notif-004',
-    type: 'PAYMENT',
-    title: 'Trip completed',
-    message: 'You earned ₹1,650',
-    isRead: true,
-    createdAt: new Date(Date.now() - 1000 * 60 * 150).toISOString(),
-    metadata: { fare: '1650' },
-  },
-  {
-    id: 'notif-005',
-    type: 'ACCOUNT',
-    title: 'Verification approved',
-    message: 'Your document has been verified',
-    isRead: true,
-    createdAt: new Date(Date.now() - 86400000 * 1.1).toISOString(),
-  },
-  {
-    id: 'notif-006',
-    type: 'PAYMENT',
-    title: 'Payout initiated',
-    message: '₹3,200 has been processed',
-    isRead: false,
-    createdAt: new Date(Date.now() - 86400000 * 1.3).toISOString(),
-  },
-  {
-    id: 'notif-007',
-    type: 'ACCOUNT',
-    title: 'Document rejected',
-    message: 'Please re-upload RC document',
-    isRead: true,
-    createdAt: new Date(Date.now() - 86400000 * 1.6).toISOString(),
-  },
-];
+async function previewNotificationRole(): Promise<'vendor' | 'driver'> {
+  const token = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
+  return token?.includes('vendor') ? 'vendor' : 'driver';
+}
+
+async function readPreviewNotifications(): Promise<PartnerNotificationItem[]> {
+  const role = await previewNotificationRole();
+  return role === 'vendor' ? getPreviewVendorNotifications() : getPreviewDriverNotifications();
+}
+
+async function writePreviewNotifications(next: PartnerNotificationItem[]): Promise<void> {
+  const role = await previewNotificationRole();
+  setPreviewNotificationsForRole(role, next);
+}
 
 let mockNotificationPrefs: NotificationPreferences = {
   pushEnabled: true,
@@ -104,8 +64,9 @@ export async function getNotifications(): Promise<{
     return res;
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      const unreadCount = mockNotificationsState.filter(n => !n.isRead).length;
-      return { notifications: [...mockNotificationsState], unreadCount };
+      const notifications = await readPreviewNotifications();
+      const unreadCount = notifications.filter(n => !n.isRead).length;
+      return { notifications: [...notifications], unreadCount };
     }
     throw error;
   }
@@ -116,8 +77,9 @@ export async function markNotificationRead(id: string): Promise<void> {
     await unwrapApi(api.patch(`${API_ENDPOINTS.notifications}/${id}/read`));
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      mockNotificationsState = mockNotificationsState.map(n =>
-        n.id === id ? { ...n, isRead: true } : n,
+      const notifications = await readPreviewNotifications();
+      await writePreviewNotifications(
+        notifications.map(n => (n.id === id ? { ...n, isRead: true } : n)),
       );
       return;
     }
@@ -130,7 +92,8 @@ export async function markAllNotificationsRead(): Promise<void> {
     await unwrapApi(api.patch(`${API_ENDPOINTS.notifications}/read-all`));
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      mockNotificationsState = mockNotificationsState.map(n => ({ ...n, isRead: true }));
+      const notifications = await readPreviewNotifications();
+      await writePreviewNotifications(notifications.map(n => ({ ...n, isRead: true })));
       return;
     }
     throw error;
@@ -142,7 +105,7 @@ export async function deleteAllNotifications(): Promise<void> {
     await unwrapApi(api.delete(API_ENDPOINTS.notifications));
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      mockNotificationsState = [];
+      await writePreviewNotifications([]);
       return;
     }
     throw error;

@@ -38,7 +38,8 @@ import {
   partnerNavigationRef,
 } from '../../navigation/partnerNavigationRef';
 import { driverColors, driverRadius } from '../../theme/driverUi';
-import { setDriverVendorPreviewScenario } from '../../services/vendor/driverVendorPreview';
+import { resetPreviewPartnerWorld } from '../../data/previewPartnerWorld';
+import { notificationQueryKeys } from '../../services/useNotificationQueries';
 
 export default function UiTestNavigator() {
   const insets = useSafeAreaInsets();
@@ -213,8 +214,10 @@ export default function UiTestNavigator() {
                       onPress={() => {
                         setModalVisible(false);
                         void ensureDriverAndNavigate(() => {
-                          setDriverVendorPreviewScenario('request');
+                          resetPreviewPartnerWorld('invite_pending');
                           void queryClient.invalidateQueries({ queryKey: ['driver'] });
+                          void queryClient.invalidateQueries({ queryKey: ['vendor'] });
+                          void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
                           setTimeout(() => jumpToPartnerMainTab('PartnerVendor'), 250);
                         });
                       }}
@@ -225,8 +228,10 @@ export default function UiTestNavigator() {
                       onPress={() => {
                         setModalVisible(false);
                         void ensureDriverAndNavigate(() => {
-                          setDriverVendorPreviewScenario('connected');
+                          resetPreviewPartnerWorld('connected');
                           void queryClient.invalidateQueries({ queryKey: ['driver'] });
+                          void queryClient.invalidateQueries({ queryKey: ['vendor'] });
+                          void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
                           setTimeout(() => jumpToPartnerMainTab('PartnerVendor'), 250);
                         });
                       }}
@@ -237,8 +242,10 @@ export default function UiTestNavigator() {
                       onPress={() => {
                         setModalVisible(false);
                         void ensureDriverAndNavigate(() => {
-                          setDriverVendorPreviewScenario('assignment');
+                          resetPreviewPartnerWorld('assignment');
                           void queryClient.invalidateQueries({ queryKey: ['driver'] });
+                          void queryClient.invalidateQueries({ queryKey: ['vendor'] });
+                          void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
                           setTimeout(() => jumpToPartnerMainTab('PartnerVendor'), 250);
                         });
                       }}

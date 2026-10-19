@@ -84,6 +84,8 @@ export type PartnerJobsStackParamList = {
     pickupAddress?: string;
     dropoffAddress?: string;
     estimatedFare?: number;
+    /** Pre-select a connected fleet driver (from Drivers tab). */
+    preferredDriverId?: string;
   };
 };
 

@@ -8,6 +8,7 @@ import {
   Car,
   MapPin,
   Navigation,
+  MapPinned,
   Phone,
   Plus,
   Truck,
@@ -43,9 +44,29 @@ import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
 const SUCCESS_GREEN = '#22C55E';
 
 const ACTIVE_STATUSES = new Set(['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS']);
+const VENDOR_TRACKABLE_STATUSES = new Set([
+  'DRIVER_ASSIGNED',
+  'DRIVER_EN_ROUTE',
+  'DRIVER_ARRIVED',
+  'IN_PROGRESS',
+]);
 // P0-1 companion: a vendor-assigned job that the driver has not accepted yet
 // is visible as ASSIGNED, but live tracking starts only post-accept.
-const TRACKABLE_STATUSES = new Set([...ACTIVE_STATUSES]);
+const TRACKABLE_STATUSES = new Set([
+  'DRIVER_ASSIGNED',
+  'DRIVER_EN_ROUTE',
+  'DRIVER_ARRIVED',
+  'IN_PROGRESS',
+]);
+
+function vendorDriverStatusLine(status: string): string {
+  if (status === 'DRIVER_ASSIGNED') return 'Assigned — waiting for accept';
+  if (status === 'DRIVER_EN_ROUTE') return 'En route to pickup';
+  if (status === 'DRIVER_ARRIVED') return 'At pickup';
+  if (status === 'IN_PROGRESS') return 'Trip in progress toward drop-off';
+  if (status === 'COMPLETED' || status === 'RATED') return 'Completed this job';
+  return 'Assigned driver';
+}
 
 type JobTab = 'all' | 'new' | 'nearby' | 'assigned' | 'in_progress' | 'completed';
 
@@ -353,7 +374,8 @@ export default function PartnerJobsScreen() {
     const canAcceptOffer = isDriver && isOffer;
     const canRejectAssigned = isDriver && !isOffer && job.status === 'DRIVER_ASSIGNED';
     const isActive = isDriver && !isOffer && ACTIVE_STATUSES.has(job.status);
-    const canTrackVendorJob = isVendor && !isOffer && TRACKABLE_STATUSES.has(job.status);
+    const canTrackVendorJob =
+      isVendor && !isOffer && Boolean(job.driver) && TRACKABLE_STATUSES.has(job.status);
 
     return (
       <GlassCard
@@ -423,21 +445,50 @@ export default function PartnerJobsScreen() {
         {/* driver row with call icon */}
         {!isOffer && job.driver ? (
           <View style={styles.driverChipRow}>
-            <View style={styles.driverChipAvatar}>
-              <PartnerText style={styles.driverChipInitial}>{job.driver.name.charAt(0).toUpperCase()}</PartnerText>
-            </View>
-            <View style={styles.driverChipCopy}>
-              <PartnerText style={styles.driverChipName} numberOfLines={1}>
-                {job.driver.name}
-              </PartnerText>
-              <PartnerText style={styles.driverChipMeta}>
-                {ACTIVE_STATUSES.has(job.status)
-                  ? 'On the way to pickup'
-                  : job.status === 'COMPLETED' || job.status === 'RATED'
-                    ? 'Completed this job'
-                    : 'Assigned driver'}
-              </PartnerText>
-            </View>
+            <Pressable
+              disabled={!isVendor || !canTrackVendorJob}
+              onPress={() => {
+                if (!isVendor || !canTrackVendorJob) return;
+                navigation.navigate('PartnerActiveJob', {
+                  bookingId: job.id,
+                  bookingType: job.bookingType,
+                });
+              }}
+              style={({ pressed }) => [
+                styles.driverChipMain,
+                isVendor && canTrackVendorJob && pressed && { opacity: 0.88 },
+              ]}
+              accessibilityRole={isVendor && canTrackVendorJob ? 'button' : 'text'}
+              accessibilityLabel={
+                isVendor && canTrackVendorJob
+                  ? `Open live map for ${job.driver.name}`
+                  : `Driver ${job.driver.name}`
+              }>
+              <View style={styles.driverChipAvatar}>
+                <PartnerText style={styles.driverChipInitial}>
+                  {job.driver.name.charAt(0).toUpperCase()}
+                </PartnerText>
+              </View>
+              <View style={styles.driverChipCopy}>
+                <PartnerText style={styles.driverChipName} numberOfLines={1}>
+                  {job.driver.name}
+                </PartnerText>
+                <PartnerText style={styles.driverChipMeta}>
+                  {isVendor
+                    ? vendorDriverStatusLine(job.status)
+                    : ACTIVE_STATUSES.has(job.status)
+                      ? 'On the way to pickup'
+                      : job.status === 'COMPLETED' || job.status === 'RATED'
+                        ? 'Completed this job'
+                        : 'Assigned driver'}
+                </PartnerText>
+              </View>
+              {isVendor && canTrackVendorJob ? (
+                <View style={styles.trackMapIcon}>
+                  <MapPinned size={16} color="#1D4ED8" strokeWidth={2.4} />
+                </View>
+              ) : null}
+            </Pressable>
             {job.driver.phone ? (
               <Pressable
                 onPress={() => {
@@ -484,7 +535,16 @@ export default function PartnerJobsScreen() {
                 })
               }
               style={styles.assignBtn}>
-              <PartnerText style={styles.assignLabel}>{job.bookingType === 'towing' ? 'Assign Driver & Vehicle' : 'Assign Driver'}</PartnerText>
+              <View style={styles.assignBtnInner}>
+                {job.bookingType === 'towing' ? (
+                  <Truck size={17} color={colors.dark} strokeWidth={2.4} />
+                ) : (
+                  <UserPlus size={17} color={colors.dark} strokeWidth={2.4} />
+                )}
+                <PartnerText style={styles.assignLabel}>
+                  {job.bookingType === 'towing' ? 'Assign driver & vehicle' : 'Assign driver'}
+                </PartnerText>
+              </View>
             </Pressable>
           </View>
         ) : null}
@@ -523,7 +583,7 @@ export default function PartnerJobsScreen() {
           </View>
         ) : null}
 
-        {isActive || canTrackVendorJob ? (
+        {isActive && !isVendor ? (
           <Pressable
             onPress={() =>
               navigation.navigate('PartnerActiveJob', {
@@ -532,7 +592,7 @@ export default function PartnerJobsScreen() {
               })
             }
             style={styles.manageBtn}>
-            <PartnerText style={styles.manageLabel}>{isVendor ? 'Track assigned job →' : 'Manage active trip →'}</PartnerText>
+            <PartnerText style={styles.manageLabel}>Manage active trip →</PartnerText>
           </Pressable>
         ) : null}
       </GlassCard>
@@ -546,28 +606,6 @@ export default function PartnerJobsScreen() {
           <View style={styles.headerTop}>
             <PartnerHeaderLogo width={76} />
             <View style={styles.headerActions}>
-              {isVendor ? (
-                <>
-                  <Pressable
-                    testID="vendorJobsAddDriver"
-                    onPress={() => navigation.navigate('VendorDrivers')}
-                    style={({ pressed }) => [styles.addDriverBtn, pressed && styles.btnPressed]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add driver">
-                    <UserPlus size={13} color="#0284C7" strokeWidth={2.4} />
-                    <PartnerText style={styles.addDriverLabel}>+ Driver</PartnerText>
-                  </Pressable>
-                  <Pressable
-                    testID="vendorJobsAddVehicle"
-                    onPress={() => navigation.navigate('VendorVehicles')}
-                    style={({ pressed }) => [styles.addVehicleBtn, pressed && styles.btnPressed]}
-                    accessibilityRole="button"
-                    accessibilityLabel="Add vehicle">
-                    <Car size={13} color="#D97706" strokeWidth={2.4} />
-                    <PartnerText style={styles.addVehicleLabel}>+ Vehicle</PartnerText>
-                  </Pressable>
-                </>
-              ) : null}
               <Pressable
                 onPress={openPartnerNotifications}
                 hitSlop={10}
@@ -611,7 +649,7 @@ export default function PartnerJobsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="View assigned jobs in progress">
                 <View style={[styles.summaryTileIcon, { backgroundColor: colors.goldLight }]}>
-                  <Navigation size={15} color={colors.primaryDark} strokeWidth={2.2} />
+                  <Briefcase size={15} color={colors.primaryDark} strokeWidth={2.2} />
                 </View>
                 <View style={styles.summaryTileCopy}>
                   <PartnerText style={styles.summaryTileTitle}>In progress</PartnerText>
@@ -791,43 +829,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     lineHeight: 15,
     marginTop: -2,
-  },
-  addDriverBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#E0F2FE',
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    borderRadius: radius.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  addDriverLabel: {
-    color: '#0369A1',
-    fontWeight: typography.weights.bold,
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  addVehicleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    borderRadius: radius.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-  },
-  addVehicleLabel: {
-    color: '#92400E',
-    fontWeight: typography.weights.bold,
-    fontSize: 11,
-    lineHeight: 14,
-  },
-  btnPressed: {
-    opacity: 0.75,
   },
   summarySplitRow: {
     flexDirection: 'row',
@@ -1067,6 +1068,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  assignBtnInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  trackMapIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   assignLabel: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
@@ -1118,8 +1133,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     backgroundColor: colors.lightGrey,
     borderRadius: radius.lg,
-    paddingHorizontal: spacing.md,
+    paddingRight: spacing.md,
     paddingVertical: spacing.sm,
+  },
+  driverChipMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingLeft: spacing.md,
   },
   driverChipAvatar: {
     width: 32,
