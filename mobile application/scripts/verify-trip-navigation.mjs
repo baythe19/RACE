@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   distanceToPathMeters,
@@ -101,8 +102,9 @@ function verifyMath() {
 }
 
 function verifyScreen() {
-  const screen = readFileSync(join(process.cwd(), 'src/screens/partner/driver/DriverActiveJobScreen.tsx'), 'utf8');
-  const map = readFileSync(join(process.cwd(), 'src/components/booking/LiveTripMap.tsx'), 'utf8');
+  const root = fileURLToPath(new URL('..', import.meta.url));
+  const screen = readFileSync(join(root, 'src/screens/partner/driver/DriverActiveJobScreen.tsx'), 'utf8');
+  const map = readFileSync(join(root, 'src/components/booking/LiveTripMap.tsx'), 'utf8');
   const containsRedirect = source =>
     source.includes('Open Google Maps directions') || source.includes('google.com/maps/dir');
 

@@ -165,6 +165,19 @@ function mapOsrmManeuverType(type: string, modifier?: string): ManeuverType {
   return 'straight';
 }
 
+function mapGoogleManeuverType(maneuver?: string): ManeuverType {
+  const m = (maneuver || '').toUpperCase();
+  if (m.includes('LEFT')) return m.includes('SLIGHT') ? 'slight_left' : m.includes('SHARP') ? 'sharp_left' : 'turn_left';
+  if (m.includes('RIGHT')) return m.includes('SLIGHT') ? 'slight_right' : m.includes('SHARP') ? 'sharp_right' : 'turn_right';
+  if (m.includes('UTURN')) return 'u_turn';
+  if (m.includes('RAMP') || m.includes('FORK')) return 'ramp';
+  if (m.includes('MERGE')) return 'merge';
+  if (m.includes('ROUNDABOUT')) return 'roundabout';
+  if (m.includes('DEPART')) return 'depart';
+  if (m.includes('ARRIVE')) return 'arrive';
+  return 'straight';
+}
+
 /** Route memory cache so rapid re-renders do not refetch */
 const routeCache = new Map<string, { timestamp: number; result: RoadRouteResult }>();
 const CACHE_TTL_MS = 60_000;
@@ -212,6 +225,27 @@ export async function fetchRoadRoute(
           const distanceKm = Math.round((distanceMeters / 1000) * 10) / 10;
           const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
 
+          const rawGSteps: any[] = route.legs?.[0]?.steps || [];
+          const gSteps: RouteManeuverStep[] = rawGSteps.map((step, idx) => {
+            const mType = mapGoogleManeuverType(step.navigationInstruction?.maneuver);
+            const instruction = step.navigationInstruction?.instructions || (idx === 0 ? 'Depart' : 'Continue');
+            const stepDist = Number(step.distanceMeters) || 0;
+            const stepSec = parseInt(String(step.staticDuration || '').replace('s', ''), 10) || 30;
+            return {
+              id: `g-step-${idx}`,
+              instruction,
+              shortInstruction: instruction.split(' onto ')[0] || instruction,
+              streetName: instruction.split(' onto ')[1] || 'Road',
+              distanceMeters: stepDist,
+              durationSeconds: stepSec,
+              maneuverType: mType,
+              coordinate: {
+                latitude: step.startLocation?.latLng?.latitude || origin.latitude,
+                longitude: step.startLocation?.latLng?.longitude || origin.longitude,
+              },
+            };
+          });
+
           const result: RoadRouteResult = {
             coordinates: coords,
             distanceMeters,
@@ -219,7 +253,7 @@ export async function fetchRoadRoute(
             durationSeconds,
             durationMinutes,
             etaTimeFormatted: formatEta(durationSeconds),
-            steps: DEFAULT_STEPS,
+            steps: gSteps.length > 0 ? gSteps : DEFAULT_STEPS,
             source: 'google_routes',
             approximate: false,
           };
