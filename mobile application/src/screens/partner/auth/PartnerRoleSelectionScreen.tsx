@@ -132,16 +132,13 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
             paddingBottom: insets.bottom + px(16),
           },
         ]}>
-        {/* Welcome headlines */}
+        {/* Role selection headlines */}
         <View style={[styles.headingBlock, { marginTop: px(8), paddingHorizontal: px(20) }]}>
-          <PartnerText style={[styles.welcomeTitle, { fontSize: px(28), lineHeight: px(34) }]}>
-            Welcome to
+          <PartnerText style={[styles.brandPartner, { fontSize: px(26), lineHeight: px(32) }]}>
+            Choose Your Partner Role
           </PartnerText>
-          <PartnerText style={[styles.brandPartner, { fontSize: px(28), lineHeight: px(34) }]}>
-            RACE Partner
-          </PartnerText>
-          <PartnerText style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(6) }]}>
-            Choose how you work with RACE.
+          <PartnerText style={[styles.subtitle, { fontSize: px(14), marginTop: px(6) }]}>
+            Tell us who you are so we can set up the right tools for your work.
           </PartnerText>
         </View>
 
@@ -157,9 +154,11 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
 
         {/* Content Section with Screen Padding */}
         <View style={[styles.contentSection, { paddingHorizontal: px(20) }]}>
-          {/* "I'm joining as" Section */}
+          {/* Role Choice Section */}
           <View style={[styles.roleSection, { marginTop: px(16) }]}>
-            <PartnerText style={[styles.sectionTitle, { fontSize: px(17) }]}>I'm joining as</PartnerText>
+            <PartnerText style={[styles.sectionTitle, { fontSize: px(16) }]}>
+              Select your work profile
+            </PartnerText>
 
             {/* Option 1: Driver */}
             <Pressable
@@ -172,7 +171,7 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
               ]}
               accessibilityRole="radio"
               accessibilityState={{ selected: isDriver }}
-              accessibilityLabel="Driver: Accept Driver-Hire requests and vendor-assigned towing jobs">
+              accessibilityLabel="Driver: Drive full-time for a fleet or accept direct customer driver hire requests">
               {/* Tow Truck Icon Badge */}
               <View
                 style={[
@@ -194,8 +193,8 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
 
               <View style={styles.roleTextContainer}>
                 <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Driver</PartnerText>
-                <PartnerText style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
-                  Accept Driver-Hire requests and vendor-assigned towing jobs
+                <PartnerText style={[styles.roleSubtitle, { fontSize: px(13), marginTop: px(3) }]}>
+                  Drive full-time for a fleet or accept direct customer driver hire requests
                 </PartnerText>
               </View>
 
@@ -228,7 +227,7 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
               ]}
               accessibilityRole="radio"
               accessibilityState={{ selected: isVendor }}
-              accessibilityLabel="Towing Vendor: Manage towing vehicles, jobs and connected Drivers">
+              accessibilityLabel="Towing Vendor: Manage towing trucks, dispatch emergency jobs, and add fleet drivers">
               {/* Fleet Headquarters Building Badge */}
               <View
                 style={[
@@ -245,8 +244,8 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
 
               <View style={styles.roleTextContainer}>
                 <PartnerText style={[styles.roleTitle, { fontSize: px(16.5) }]}>Towing Vendor</PartnerText>
-                <PartnerText style={[styles.roleSubtitle, { fontSize: px(13.5), marginTop: px(3) }]}>
-                  Manage towing vehicles, jobs and connected Drivers
+                <PartnerText style={[styles.roleSubtitle, { fontSize: px(13), marginTop: px(3) }]}>
+                  Manage towing trucks, dispatch emergency jobs, and add fleet drivers
                 </PartnerText>
               </View>
 

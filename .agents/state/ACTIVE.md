@@ -5,6 +5,20 @@
 
 ---
 
+## Latest session — Partner Login & Role Selection Aesthetic Alignment (2026-10-19, branch changes-v6-partner-role-dispatch)
+
+- **Partner Login Screen (`PartnerLoginScreen.tsx`):**
+  - Replaced the plain, basic left-aligned "Partner Login" text with the same centered, balanced hero hierarchy used on the Role Selection screen.
+  - Centered RACE Partner branding: "Welcome to" (medium weight) + "RACE Partner" (bold) + "Sign in or register to join India's roadside partner network."
+  - Centered layout, structured mobile number input with active focus outline, Send OTP CTA, SMS security guarantee badge, and Terms & Privacy footer.
+- **Partner Role Selection Screen (`PartnerRoleSelectionScreen.tsx`):**
+  - Updated headline from the generic "Welcome to RACE Partner" to a role-focused, industry-standard title: **"Choose Your Partner Role"** with subtitle **"Tell us who you are so we can set up the right tools for your work."**
+  - Refined section title to **"Select your work profile"**.
+  - Polished Driver and Towing Vendor option cards with clear, descriptive industry subtitles (Driver: "Drive full-time for a fleet or accept direct customer driver hire requests" / Towing Vendor: "Manage towing trucks, dispatch emergency jobs, and add fleet drivers").
+- **Verification:**
+  - `mobile application/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+  - `backend/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+
 ## Latest session — Driver-Vendor Exclusivity & My Vendor Screen Redesign (2026-10-19, branch changes-v6-partner-role-dispatch)
 
 - **Driver-Vendor Exclusivity & Lock Invariants:**

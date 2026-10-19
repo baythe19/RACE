@@ -305,13 +305,16 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
                 paddingBottom: insets.bottom + px(18),
               },
             ]}>
-            {/* Title & Subtitle */}
-            <View style={[styles.titleSection, { marginTop: px(18) }]}>
-              <PartnerText style={[styles.titleText, { fontSize: px(28), lineHeight: px(34) }]}>
-                Partner Login
+            {/* Welcome Headlines — Perfectly aligned with Role Selection screen layout */}
+            <View style={[styles.headingBlock, { marginTop: px(16), paddingHorizontal: px(10) }]}>
+              <PartnerText style={[styles.welcomeTitle, { fontSize: px(28), lineHeight: px(34) }]}>
+                Welcome to
               </PartnerText>
-              <PartnerText style={[styles.subtitleText, { fontSize: px(14.5), marginTop: px(8) }]}>
-                Enter your phone number to sign in or register as a partner.
+              <PartnerText style={[styles.brandPartner, { fontSize: px(28), lineHeight: px(34) }]}>
+                RACE Partner
+              </PartnerText>
+              <PartnerText style={[styles.subtitle, { fontSize: px(14.5), marginTop: px(6) }]}>
+                Sign in or register to join India's roadside partner network.
               </PartnerText>
             </View>
 
@@ -471,16 +474,24 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  titleSection: {
-    alignItems: 'flex-start',
+  headingBlock: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  titleText: {
-    fontWeight: '800',
+  welcomeTitle: {
     color: '#111827',
+    textAlign: 'center',
+    fontWeight: '500',
   },
-  subtitleText: {
-    fontWeight: '400',
+  brandPartner: {
+    color: '#111827',
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  subtitle: {
     color: '#6B7280',
+    textAlign: 'center',
+    fontWeight: '400',
   },
   roleBadgeCard: {
     flexDirection: 'row',
