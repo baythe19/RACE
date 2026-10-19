@@ -5,6 +5,45 @@
 
 ---
 
+## Latest session — Rapido/Uber 12-Screen Navigation & Active Job Blueprint Overhaul (2026-10-19, branch changes-v6-partner-role-dispatch)
+
+- **Comprehensive 12-Screen Navigation & Active Job Overhaul:**
+  - **Eliminated Straight Line Fallbacks:**
+    - Completely replaced the basic grey straight-line dots (`4.5 km · straight line`) with a real road-following routing engine in `roadRoutingService.ts`.
+    - Integrated multi-tier routing: Google Routes API v2, public high-performance OSRM driving engine (`router.project-osrm.org`), and high-precision Bhubaneswar road networks (Janpath Rd, NH-16 Express corridor, Rasulgarh intersection).
+    - Extracts realistic turn-by-turn maneuvers (`turn_left`, `turn_right`, `slight_left`, `slight_right`, `merge`, `arrive`), street names, distances, and formatted ETAs.
+  - **Screen 4 — Route to Pickup (Map Overview):**
+    - `RouteOverviewCards.tsx`: Top floating card "Go to pickup location · 5.4 km · 18 mins", bottom card "Saheed Nagar · Pickup location · 5.4 km · 18 mins", and large gold "Start navigation" CTA.
+  - **Screen 5 — Turn-by-Turn Navigation to Pickup:**
+    - `NavTurnBanner.tsx`: Top dark green banner (`#064E3B`) with turn maneuver icon, distance (e.g. "650 m"), instruction ("Turn left onto NH-16"), mic indicator, and floating controls for voice mute/unmute, compass heading, and recenter.
+    - `NavBottomBar.tsx`: Close (X) button, bold ETA ("17 min", "5.4 km · 10:12 PM"), and "Arrived" action CTA.
+  - **Screen 6 — Arrived at Pickup:**
+    - `ArrivedPickupCard.tsx`: Top vibrant amber banner ("You have arrived · Saheed Nagar, Bhubaneswar"), bottom sheet ("You have reached pickup", "Confirm with customer and verify OTP to start service", "Verify OTP & start", "Call customer", "Not at pickup yet").
+  - **Screen 7 — Customer OTP Verification:**
+    - `CustomerOtpModal.tsx`: Header "Verify customer OTP #TOW-10048", orange shield badge, 4 large digit boxes `[ 1 ] [ 2 ] [ 5 ] [ 6 ]` with transparent text input for native number pad, error bubble, "Start service" button, and "Having issue? Call customer".
+  - **Screen 8 — On Service (To Drop Navigation):**
+    - Full turn-by-turn navigation toward drop destination ("Mancheswar") with `NavTurnBanner` ("Continue on NH-16 · 2.1 km") and `NavBottomBar` ("12 min · 2.1 km · 10:32 PM" with red "End" button).
+  - **Screen 9 — Trip in Progress (Live Tracking & Actions):**
+    - `TripInProgressSheet.tsx`: Top floating pill "Service in progress #TOW-10048" with pulsing green dot and live stopwatch timer (`● 00:18:26`), bottom sheet with drop location, distance/ETA, 3 circular action buttons ("Call customer", "Message", "Share location"), and large red "Complete job" CTA.
+  - **Screen 10 — Job Completion (Celebration Modal):**
+    - `JobCompletedModal.tsx`: Glowing green checkmark badge, "Job completed! #TOW-10048", "₹1,650 Total earnings", Route timeline breakdown (Pickup Saheed Nagar 10:12 PM → Drop Mancheswar 10:34 PM, Distance 5.4 km, Duration 22 mins), "Back to home" and "View job details".
+  - **Screen 11 — Rerouting / Off-Route Alert:**
+    - `OffRouteBanner`: Top dark red banner (`#7F1D1D`) with warning icon ("You are off route · Recalculating route..."), and "Finding best route..." bottom spinner.
+  - **Screen 12 — Poor GPS / Weak Signal Alert:**
+    - `WeakGpsAlert`: Top amber banner ("GPS signal weak · Trying to improve location accuracy... [Retry]"), and recovery bottom sheet ("Current location unavailable · Open settings · Continue anyway").
+  - **Full-Bleed Map Engine (`LiveTripMap.tsx`):**
+    - Full-screen interactive map with high-contrast road casing border (`#FFFFFF`, width 8) and active navigation road polyline (`#2563EB`, width 5).
+    - 3D vehicle marker with heading orientation (`rotation`), tow truck / car icon, and blue radar pulsing halo.
+  - **⚡ UI QA Screen Switcher:**
+    - Integrated a floating quick switcher allowing 1-tap testing of each screen (4 through 12) or running the real live backend flow.
+  - **Verification:**
+    - `mobile application`: `node scripts/verify-trip-navigation.mjs math && node scripts/verify-trip-navigation.mjs screen` -> **PASS (TRIP_MATH_OK, NO_EXTERNAL_MAPS_OK)**.
+    - `mobile application`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+    - `backend`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+    - `backend`: `npm run seed:fresh && npx tsx src/scripts/comprehensive-audit.ts` -> **41/41 CHECKS PASSED (100%)**.
+    - `backend`: `npx tsx src/scripts/verify-driver-ack-e2e.ts` -> **27/27 CHECKS PASSED (100%)**.
+    - `backend`: `npx tsx src/scripts/partner-v6-offer-routing-audit.ts` -> **PASS**.
+
 ## Latest session — Partner App Deep Review & Production-Readiness Audit (2026-10-19, branch changes-v6-partner-role-dispatch)
 
 - **Comprehensive End-to-End Review & Audit:**
