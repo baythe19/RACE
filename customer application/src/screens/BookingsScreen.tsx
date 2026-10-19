@@ -109,6 +109,7 @@ export default function BookingsScreen() {
   const isEmpty =
     !isLoading &&
     !isRefetching &&
+    !loadError && // UX fix: with a load error, show only the error card — the "No bookings yet" empty state must not appear alongside it.
     ongoingList.length === 0 &&
     historyList.length === 0 &&
     otherList.length === 0;
