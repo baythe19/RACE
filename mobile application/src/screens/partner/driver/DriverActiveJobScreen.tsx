@@ -712,7 +712,14 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           label: 'You',
         }
       : null;
-  const displayDriverLocation = freshDriverLocation ?? previewDriverLocation;
+  const displayDriverLocation =
+    step === 'in_progress' && !freshDriverLocation && hasPickupCoords && job?.pickup
+      ? {
+          latitude: job.pickup.latitude as number,
+          longitude: job.pickup.longitude as number,
+          label: 'You',
+        }
+      : (freshDriverLocation ?? previewDriverLocation);
   const tripLeg = legForJobStatus(job?.status ?? '');
   const straightLegKm =
     displayDriverLocation && activeDestinationPoint
@@ -1085,6 +1092,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             activeDestination={activeDestinationPoint}
             routeApiEnabled
             straightFallback
+            bottomCoverRatio={sheetCollapsed ? 0.42 : 0.7}
             onRouteMetaChange={onLegMeta}
             recenterTrigger={recenterTrigger}
           />

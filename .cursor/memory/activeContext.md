@@ -4,7 +4,7 @@ Updated: 2026-10-19
 
 ## Current focus
 
-**Active job navigation — 2026-10-19.** In-app two-leg route: driver to pickup, OTP, then to drop. Google Maps redirect removed. Distance sits on the map. Directions API when a key exists; otherwise a labeled straight line. Gates G1 and G2 met.
+**Active job navigation — 2026-10-19.** Peach retest on sim a2: map shows You, Pickup, and Drop on the Bhubaneswar tiles. First leg “To pickup · 1.6 km · straight line”, then OTP, then “To drop · 4.5 km” with the dotted leg from pickup to drop. No Google Maps redirect. Full `tsc` was killed (SIGTERM) before it finished. Gates G1 and G2 still met.
 
 
 

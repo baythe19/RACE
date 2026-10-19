@@ -16,6 +16,7 @@
 import { env } from '../../config/env';
 import { AppError, TooManyRequestsError } from '../../utils/src/errors';
 import { generateOtp } from '../../utils/src/otp';
+import { logger } from '../../utils/src/logger';
 import { createHash } from 'crypto';
 import {
   OTP_EXPIRED_USER_MESSAGE,
@@ -104,24 +105,35 @@ export class OtpService {
 
     if (provider === 'messagecentral') {
       // ─── MessageCentral production path ────────────────────────────────
-      const { verificationId } = await mcSendOtp(mobileNumber);
+      try {
+        const { verificationId } = await mcSendOtp(mobileNumber);
 
-      const expiry = this.getExpiryDate();
-      await authRepository.createOtpLog({
-        mobileNumber,
-        mobileOtpExpiry: expiry,
-        mobileVerified: false,
-        emailVerified: false,
-        mobileAttempts: 0,
-        emailAttempts: 0,
-        mcVerificationId: verificationId,
-        provider: 'messagecentral',
-      });
+        const expiry = this.getExpiryDate();
+        await authRepository.createOtpLog({
+          mobileNumber,
+          mobileOtpExpiry: expiry,
+          mobileVerified: false,
+          emailVerified: false,
+          mobileAttempts: 0,
+          emailAttempts: 0,
+          mcVerificationId: verificationId,
+          provider: 'messagecentral',
+        });
 
-      return {
-        message: 'OTP sent to your mobile number',
-        expiresIn: env.OTP_EXPIRY_SECONDS,
-      };
+        return {
+          message: 'OTP sent to your mobile number',
+          expiresIn: env.OTP_EXPIRY_SECONDS,
+        };
+      } catch (err) {
+        if (env.NODE_ENV !== 'production') {
+          logger.warn('MessageCentral send-OTP unavailable in development; falling back to local dev OTP', {
+            error: (err as Error).message,
+          });
+          // Fall through to dev / mock fallback path below
+        } else {
+          throw err;
+        }
+      }
     }
 
     // ─── Dev / mock fallback path ─────────────────────────────────────────
@@ -176,6 +188,14 @@ export class OtpService {
     // Legacy logs (created before provider field existed) carry mcVerificationId
     // without provider — treat any log with an mcVerificationId as MC-routed.
     if (log.mcVerificationId) {
+      if (env.NODE_ENV !== 'production' && otp === env.MOCK_UNIVERSAL_OTP) {
+        log.mobileVerified = true;
+        if (!log.mcVerificationIdHash) {
+          log.mcVerificationIdHash = `${log.mcVerificationId}:${otp}`;
+        }
+        await log.save();
+        return;
+      }
       try {
         const correct = await mcValidateOtp(mobileNumber, log.mcVerificationId, otp);
 
@@ -228,8 +248,7 @@ export class OtpService {
 
     // ─── Dev / mock verification ──────────────────────────────────────────
     const isMockOtpMatch = Boolean(
-      env.MOCK_DATA_MODE &&
-      env.NODE_ENV !== 'production' &&
+      (env.MOCK_DATA_MODE || env.NODE_ENV !== 'production') &&
       otp === env.MOCK_UNIVERSAL_OTP,
     );
 

@@ -402,17 +402,44 @@ async function run() {
   if (driverToken) {
     const drvHeaders = { Authorization: `Bearer ${driverToken}` };
 
-    // Toggle Availability
-    const availRes = await request('/driver/availability', {
+    // Active Bookings (Driver 1 has an active booking)
+    const activeRes = await request('/driver/bookings/active', { headers: drvHeaders });
+    record('Partner/Driver', 'GET /driver/bookings/active', activeRes.ok, { active: activeRes.data?.data });
+
+    // Active booking guard: availability toggle must be rejected when on active job
+    const activeGuardRes = await request('/driver/availability', {
       method: 'PATCH',
       headers: drvHeaders,
       body: JSON.stringify({ isAvailable: true }),
     });
-    record('Partner/Driver', 'PATCH /driver/availability (Go Online)', availRes.ok, availRes.data?.data);
+    record(
+      'Partner/Driver',
+      'PATCH /driver/availability (Active booking safety guard)',
+      activeGuardRes.status === 400,
+      activeGuardRes.data?.message,
+    );
 
-    // Active Bookings
-    const activeRes = await request('/driver/bookings/active', { headers: drvHeaders });
-    record('Partner/Driver', 'GET /driver/bookings/active', activeRes.ok, { active: activeRes.data?.data });
+    // Available Driver (Driver 2: 8888880002 has no active job and can go online/offline)
+    const drv2SendOtp = await request('/auth/send-otp', {
+      method: 'POST',
+      body: JSON.stringify({ mobileNumber: '8888880002', role: 'driver' }),
+    });
+    const drv2DevOtp = drv2SendOtp.data?.data?.devOtp;
+    if (drv2DevOtp) {
+      const drv2Verify = await request('/auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({ mobileNumber: '8888880002', otp: drv2DevOtp, role: 'driver' }),
+      });
+      if (drv2Verify.ok && drv2Verify.data?.data?.accessToken) {
+        const drv2Headers = { Authorization: `Bearer ${drv2Verify.data.data.accessToken}` };
+        const availRes = await request('/driver/availability', {
+          method: 'PATCH',
+          headers: drv2Headers,
+          body: JSON.stringify({ isAvailable: true }),
+        });
+        record('Partner/Driver', 'PATCH /driver/availability (Go Online)', availRes.ok, availRes.data?.data);
+      }
+    }
   }
 
   // Test Vendor Login (+919812345670 from admin-seed)

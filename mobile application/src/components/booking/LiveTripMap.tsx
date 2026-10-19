@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import MapView, {
   Marker,
   Polyline,
@@ -47,6 +47,11 @@ type Props = {
   routeApiEnabled?: boolean;
   /** Draw a labeled straight line when the road route is unavailable. */
   straightFallback?: boolean;
+  /**
+   * Fraction of the map covered by a sheet at the bottom. The camera shifts so
+   * driver, pickup, and drop stay in the visible strip above that sheet.
+   */
+  bottomCoverRatio?: number;
   onRouteMetaChange?: (meta: RouteMeta | null) => void;
 };
 
@@ -59,16 +64,20 @@ function isValidPoint(point?: MapPoint | null): point is MapPoint {
   );
 }
 
-function regionForPoints(points: MapPoint[]): Region {
+function regionForPoints(points: MapPoint[], bottomCover = 0): Region {
+  const cover = Math.min(Math.max(bottomCover, 0), 0.75);
+  const visible = Math.max(0.22, 1 - cover);
   if (points.length === 0) {
     return { ...BHUBANESWAR_DEFAULT };
   }
   if (points.length === 1) {
+    const span = 0.02;
+    const latitudeDelta = span / visible;
     return {
-      latitude: points[0].latitude,
+      latitude: points[0].latitude - (latitudeDelta - span) / 2,
       longitude: points[0].longitude,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
+      latitudeDelta,
+      longitudeDelta: span,
     };
   }
 
@@ -78,15 +87,44 @@ function regionForPoints(points: MapPoint[]): Region {
   const maxLat = Math.max(...lats);
   const minLng = Math.min(...lngs);
   const maxLng = Math.max(...lngs);
-  const latPad = Math.max((maxLat - minLat) * 0.35, 0.012);
-  const lngPad = Math.max((maxLng - minLng) * 0.35, 0.012);
+  const latSpan = Math.max(maxLat - minLat, 0.008);
+  const lngSpan = Math.max(maxLng - minLng, 0.008);
+  const latPad = Math.max(latSpan * 0.22, 0.003);
+  const lngPad = Math.max(lngSpan * 0.22, 0.003);
+  const latitudeDelta = (latSpan + latPad * 2) / visible;
+  // Push the camera south so the pins sit above a bottom sheet.
+  const extraSouth = latitudeDelta * cover;
 
   return {
-    latitude: (minLat + maxLat) / 2,
+    latitude: (minLat + maxLat) / 2 - extraSouth / 2,
     longitude: (minLng + maxLng) / 2,
-    latitudeDelta: maxLat - minLat + latPad,
-    longitudeDelta: maxLng - minLng + lngPad,
+    latitudeDelta,
+    longitudeDelta: lngSpan + lngPad * 2,
   };
+}
+
+/** Points the map can place itself. A native polyline is not drawn in Peach. */
+function routeSamples(coords: MapPoint[], maxPoints = 16): MapPoint[] {
+  if (coords.length < 2) return [];
+  if (coords.length === 2) {
+    const [start, end] = coords;
+    const samples: MapPoint[] = [];
+    for (let index = 0; index < maxPoints; index += 1) {
+      const t = index / (maxPoints - 1);
+      samples.push({
+        latitude: start.latitude + (end.latitude - start.latitude) * t,
+        longitude: start.longitude + (end.longitude - start.longitude) * t,
+      });
+    }
+    return samples;
+  }
+  if (coords.length <= maxPoints) return coords;
+  const samples: MapPoint[] = [];
+  const step = (coords.length - 1) / (maxPoints - 1);
+  for (let index = 0; index < maxPoints; index += 1) {
+    samples.push(coords[Math.round(index * step)]);
+  }
+  return samples;
 }
 
 function decodeGooglePolyline(encoded: string): MapPoint[] {
@@ -146,6 +184,7 @@ export default function LiveTripMap({
   previewMap = false,
   routeApiEnabled = false,
   straightFallback = false,
+  bottomCoverRatio = 0,
   onRouteMetaChange,
 }: Props) {
   const mapRef = useRef<MapView>(null);
@@ -174,6 +213,15 @@ export default function LiveTripMap({
     [activeDestination, dropoff],
   );
 
+  const pointKey = [
+    isValidPoint(driverLocation) ? `${driverLocation.latitude},${driverLocation.longitude}` : '',
+    isValidPoint(pickup) ? `${pickup.latitude},${pickup.longitude}` : '',
+    isValidPoint(dropoff) ? `${dropoff.latitude},${dropoff.longitude}` : '',
+    isValidPoint(routeOrigin) ? `${routeOrigin.latitude},${routeOrigin.longitude}` : '',
+    isValidPoint(routeDestination) ? `${routeDestination.latitude},${routeDestination.longitude}` : '',
+    bottomCoverRatio,
+  ].join('|');
+
   const points = useMemo(() => {
     const list: MapPoint[] = [];
     if (isValidPoint(driverLocation)) list.push(driverLocation);
@@ -184,9 +232,20 @@ export default function LiveTripMap({
       if (routeDestination) list.push(routeDestination);
     }
     return list;
-  }, [driverLocation, dropoff, pickup, routeDestination, routeOrigin]);
+    // pointKey is the coordinate identity. Object props are new every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointKey]);
 
-  const region = useMemo(() => regionForPoints(points), [points]);
+  const region = useMemo(
+    () => regionForPoints(points, bottomCoverRatio),
+    [bottomCoverRatio, points],
+  );
+  const [holdFrame, setHoldFrame] = useState(true);
+  const frameKey = `${region.latitude.toFixed(5)}:${region.longitude.toFixed(5)}:${region.latitudeDelta.toFixed(5)}:${region.longitudeDelta.toFixed(5)}:${recenterTrigger ?? 0}`;
+
+  useEffect(() => {
+    setHoldFrame(true);
+  }, [frameKey]);
 
   const originKey = routeOrigin
     ? `${routeOrigin.latitude.toFixed(4)},${routeOrigin.longitude.toFixed(4)}`
@@ -313,7 +372,7 @@ export default function LiveTripMap({
     };
   }, [destinationKey, originKey, previewMap, routeApiEnabled, straightFallback]);
 
-  // Do not draw a straight-line approximation as if it were a navigable road.
+  // Native polylines do not paint in Peach, so the active leg is also dotted markers.
   const displayRouteCoords = roadRoute.length >= 2 ? roadRoute : [];
 
   const preview = previewMap ? (
@@ -326,30 +385,7 @@ export default function LiveTripMap({
     />
   ) : null;
 
-  useEffect(() => {
-    if (points.length === 0) return;
-    mapRef.current?.animateToRegion(regionForPoints(points), 450);
-  }, [points]);
-
-  useEffect(() => {
-    if (recenterTrigger == null || points.length === 0) return;
-    if (roadRoute.length >= 2) {
-      mapRef.current?.fitToCoordinates(roadRoute, {
-        edgePadding: { top: 34, right: 28, bottom: 112, left: 28 },
-        animated: true,
-      });
-      return;
-    }
-    mapRef.current?.animateToRegion(region, 350);
-  }, [points.length, recenterTrigger, region, roadRoute]);
-
-  useEffect(() => {
-    if (roadRoute.length < 2) return;
-    mapRef.current?.fitToCoordinates(roadRoute, {
-      edgePadding: { top: 34, right: 28, bottom: 112, left: 28 },
-      animated: true,
-    });
-  }, [roadRoute]);
+  const routeDots = routeSamples(displayRouteCoords).filter((_, index, all) => index > 0 && index < all.length - 1);
 
   return (
     <View style={[styles.wrap, { borderRadius }, style]}>
@@ -361,6 +397,10 @@ export default function LiveTripMap({
           style={StyleSheet.absoluteFill}
           provider={MAP_PROVIDER}
           initialRegion={region}
+          region={holdFrame ? region : undefined}
+          onRegionChangeComplete={(_next, details) => {
+            if (details?.isGesture) setHoldFrame(false);
+          }}
           mapType="standard"
           loadingEnabled
           loadingBackgroundColor="#E8EEF0"
@@ -384,27 +424,57 @@ export default function LiveTripMap({
             <Marker
               coordinate={{ latitude: driverLocation.latitude, longitude: driverLocation.longitude }}
               title={driverLocation.label || 'You'}
-              pinColor="#2563EB"
-            />
+              anchor={{ x: 0.5, y: 1 }}
+              pinColor="#2563EB">
+              <MapPin color="#2563EB" label={driverLocation.label || 'You'} />
+            </Marker>
           ) : null}
 
           {isValidPoint(pickup) ? (
             <Marker
               coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }}
               title={pickup.label || 'Pickup'}
-              pinColor={pickupColor}
-            />
+              anchor={{ x: 0.5, y: 1 }}
+              pinColor={pickupColor}>
+              <MapPin color={pickupColor} label={pickup.label || 'Pickup'} />
+            </Marker>
           ) : null}
 
           {isValidPoint(dropoff) ? (
             <Marker
               coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }}
               title={dropoff.label || 'Drop'}
-              pinColor={dropoffColor}
-            />
+              anchor={{ x: 0.5, y: 1 }}
+              pinColor={dropoffColor}>
+              <MapPin color={dropoffColor} label={dropoff.label || 'Drop'} />
+            </Marker>
           ) : null}
+          {routeDots.map((point, index) => (
+            <Marker
+              key={`route-${index}-${point.latitude.toFixed(5)}`}
+              coordinate={{ latitude: point.latitude, longitude: point.longitude }}
+              anchor={{ x: 0.5, y: 0.5 }}>
+              <View
+                style={[
+                  styles.routeDot,
+                  { backgroundColor: routeApproximate ? '#64748B' : routeColor },
+                ]}
+              />
+            </Marker>
+          ))}
         </MapView>
       )}
+    </View>
+  );
+}
+
+function MapPin({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.pin} pointerEvents="none">
+      <View style={[styles.pinLabel, { backgroundColor: color }]}>
+        <Text style={styles.pinText}>{label}</Text>
+      </View>
+      <View style={[styles.pinStem, { backgroundColor: color }]} />
     </View>
   );
 }
@@ -510,5 +580,31 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: colors.lightGrey,
     minHeight: 200,
+  },
+  pin: {
+    alignItems: 'center',
+  },
+  pinLabel: {
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  pinText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pinStem: {
+    width: 2,
+    height: 8,
+  },
+  routeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
 });
