@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Modal,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Bell,
@@ -14,14 +16,10 @@ import {
   Check,
   ChevronRight,
   Clock3,
-  HelpCircle,
   Inbox,
   Info,
-  MapPin,
-  RefreshCw,
   ShieldCheck,
   Truck,
-  User,
   X,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -37,6 +35,13 @@ import {
 } from '../../../services/vendor/useVendorMembershipQueries';
 import { useNotificationsQuery } from '../../../services/useNotificationQueries';
 import { openPartnerNotifications } from '../../../navigation/partnerNavigationRef';
+import { UI_PREVIEW_MODE } from '../../../constants/preview';
+import {
+  getDriverVendorPreviewScenario,
+  setDriverVendorPreviewScenario,
+  subscribeDriverVendorPreview,
+  type DriverVendorPreviewScenario,
+} from '../../../services/vendor/driverVendorPreview';
 import {
   driverColors as C,
   driverRadius as R,
@@ -44,9 +49,30 @@ import {
   getPressableFeedback,
 } from '../../../theme/driverUi';
 
+function formatDay(iso?: string): string {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const PREVIEW_SCENARIOS: { id: DriverVendorPreviewScenario; label: string }[] = [
+  { id: 'request', label: 'Request' },
+  { id: 'connected', label: 'Connected' },
+  { id: 'assignment', label: 'New job' },
+  { id: 'none', label: 'No vendor' },
+];
+
 export default function DriverMyVendorScreen() {
   const px = useScreenPx();
   const navigation = useNavigation<any>();
+  const queryClient = useQueryClient();
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const [previewScenario, setPreviewScenario] = useState(getDriverVendorPreviewScenario());
+
+  useEffect(() => subscribeDriverVendorPreview(() => {
+    setPreviewScenario(getDriverVendorPreviewScenario());
+  }), []);
 
   const membership = useDriverVendorMembershipQuery();
   const vendor = membership.data?.vendor;
@@ -67,6 +93,14 @@ export default function DriverMyVendorScreen() {
     )
     .slice(0, 5);
 
+  const vendorHistory = driverJobs
+    .filter(
+      job =>
+        job.vendorId === vendor?.id &&
+        ['COMPLETED', 'RATED', 'PAID'].includes(job.status),
+    )
+    .slice(0, 6);
+
   const address = [
     vendor?.address?.line1,
     vendor?.address?.line2,
@@ -76,10 +110,33 @@ export default function DriverMyVendorScreen() {
     .filter(Boolean)
     .join(', ');
 
+  const refreshVendorPreview = () => {
+    void queryClient.invalidateQueries({ queryKey: ['driver'] });
+  };
+
+  const applyPreviewScenario = (next: DriverVendorPreviewScenario) => {
+    if (next === 'none') {
+      navigation.navigate('PartnerHome');
+      setTimeout(() => {
+        setDriverVendorPreviewScenario('none');
+        refreshVendorPreview();
+      }, 80);
+      return;
+    }
+    setDriverVendorPreviewScenario(next);
+    refreshVendorPreview();
+  };
+
   const answer = (id: string, decision: 'accept' | 'decline') => {
+    const pendingCount = invitations.data?.length ?? 0;
     respond.mutate(
       { id, decision },
       {
+        onSuccess: () => {
+          if (decision === 'decline' && pendingCount <= 1) {
+            navigation.navigate('PartnerHome');
+          }
+        },
         onError: error =>
           Alert.alert(
             'Could not update invitation',
@@ -136,14 +193,35 @@ export default function DriverMyVendorScreen() {
               ) : (
                 <>
                   <PartnerText style={[styles.headerTitle, { fontSize: px(20) }]}>
-                    My Vendor
+                    {(invitations.data?.length ?? 0) > 0 ? 'Fleet request' : 'My Vendor'}
                   </PartnerText>
                   <PartnerText style={[styles.headerSubtitle, { fontSize: px(12.5) }]}>
-                    Fleet connection and invitations
+                    {(invitations.data?.length ?? 0) > 0
+                      ? 'A towing vendor invited you to their fleet'
+                      : 'Fleet connection and invitations'}
                   </PartnerText>
                 </>
               )}
             </View>
+
+            {vendor ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Fleet connection rules"
+                onPress={() => setRulesOpen(true)}
+                style={({ pressed }) => [
+                  styles.bellButton,
+                  {
+                    width: px(38),
+                    height: px(38),
+                    borderRadius: px(19),
+                    marginRight: px(8),
+                    opacity: pressed ? 0.75 : 1,
+                  },
+                ]}>
+                <Info size={px(18)} color={C.ink} />
+              </Pressable>
+            ) : null}
 
             {/* Notification Bell */}
             <Pressable
@@ -189,6 +267,27 @@ export default function DriverMyVendorScreen() {
         }
       }}
       contentStyle={{ paddingTop: px(12), paddingBottom: px(40) }}>
+      {UI_PREVIEW_MODE ? (
+        <View style={[styles.previewRow, { marginBottom: px(12), gap: px(6) }]}>
+          {PREVIEW_SCENARIOS.map(item => {
+            const selected = previewScenario === item.id;
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => applyPreviewScenario(item.id)}
+                style={[
+                  styles.previewChip,
+                  selected && styles.previewChipOn,
+                  { paddingHorizontal: px(8), paddingVertical: px(5), borderRadius: px(8) },
+                ]}>
+                <PartnerText style={[styles.previewChipText, selected && styles.previewChipTextOn, { fontSize: px(11) }]}>
+                  {item.label}
+                </PartnerText>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
       {membership.isLoading ? (
         <View style={{ paddingVertical: px(36), alignItems: 'center' }}>
           <ActivityIndicator color={C.amber} size="large" />
@@ -198,68 +297,6 @@ export default function DriverMyVendorScreen() {
         </View>
       ) : vendor ? (
         <>
-          {/* Connected Vendor Card */}
-          <View
-            style={[
-              styles.card,
-              driverShadow,
-              { borderRadius: px(R.card), padding: px(16), marginBottom: px(14) },
-            ]}>
-            <View style={styles.cardHeaderRow}>
-              <View
-                style={[
-                  styles.vendorIconCircle,
-                  { width: px(48), height: px(48), borderRadius: px(14) },
-                ]}>
-                <Building2 size={px(24)} color={C.amberText} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PartnerText style={[styles.vendorName, { fontSize: px(16) }]}>
-                  {vendor.name}
-                </PartnerText>
-                <View style={styles.verifiedRow}>
-                  <ShieldCheck size={px(13)} color={C.green} />
-                  <PartnerText style={styles.verifiedText}>
-                    Verified Towing Fleet
-                  </PartnerText>
-                </View>
-              </View>
-            </View>
-
-            {vendor.ownerName ? (
-              <View style={[styles.infoRow, { marginTop: px(12) }]}>
-                <User size={px(14)} color={C.greySoft} />
-                <PartnerText style={[styles.infoText, { fontSize: px(12.5) }]}>
-                  Fleet Manager: {vendor.ownerName}
-                </PartnerText>
-              </View>
-            ) : null}
-
-            {address ? (
-              <View style={[styles.infoRow, { marginTop: px(6) }]}>
-                <MapPin size={px(14)} color={C.greySoft} />
-                <PartnerText
-                  numberOfLines={2}
-                  style={[styles.infoText, { fontSize: px(12.5) }]}>
-                  {address}
-                </PartnerText>
-              </View>
-            ) : null}
-
-            {/* Info Notice */}
-            <View
-              style={[
-                styles.noticeBox,
-                { marginTop: px(14), padding: px(12), borderRadius: px(R.innerCard) },
-              ]}>
-              <Info size={px(16)} color={C.blue} />
-              <PartnerText style={[styles.noticeText, { fontSize: px(12) }]}>
-                Assigned towing vehicles and emergency dispatch jobs come directly
-                from this fleet partner.
-              </PartnerText>
-            </View>
-          </View>
-
           {/* Vendor Assignments Section */}
           <View style={{ marginBottom: px(14) }}>
             <View style={styles.sectionHeader}>
@@ -396,57 +433,49 @@ export default function DriverMyVendorScreen() {
             )}
           </View>
 
-          {/* Fleet Invariants & Rules Card */}
-          <View
-            style={[
-              styles.card,
-              driverShadow,
-              { borderRadius: px(R.card), padding: px(15), marginBottom: px(20) },
-            ]}>
-            <PartnerText
-              style={[
-                styles.policyHeading,
-                { fontSize: px(13.5), marginBottom: px(10) },
-              ]}>
-              Fleet Connection Rules
+          <View style={{ marginBottom: px(20) }}>
+            <PartnerText style={[styles.sectionTitle, { fontSize: px(15), marginBottom: px(8) }]}>
+              History
             </PartnerText>
-
-            <View style={styles.policyRow}>
-              <View style={[styles.policyIconCircle, { backgroundColor: C.greenTile }]}>
-                <ShieldCheck size={px(16)} color={C.green} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PartnerText style={[styles.policyTitle, { fontSize: px(12.5) }]}>
-                  Single Fleet Exclusivity
+            <View style={[styles.card, { borderRadius: px(R.innerCard), paddingHorizontal: px(12) }]}>
+              {membership.data?.acceptedAt ? (
+                <View style={[styles.historyRow, { paddingVertical: px(10) }]}>
+                  <ShieldCheck size={px(15)} color={C.green} />
+                  <View style={{ flex: 1 }}>
+                    <PartnerText style={[styles.historyTitle, { fontSize: px(13) }]}>Joined this fleet</PartnerText>
+                    <PartnerText style={[styles.historyMeta, { fontSize: px(11.5) }]}>
+                      {formatDay(membership.data.acceptedAt)}
+                    </PartnerText>
+                  </View>
+                </View>
+              ) : null}
+              {vendorHistory.length ? (
+                vendorHistory.map(job => (
+                  <View key={job.id} style={[styles.historyRow, { paddingVertical: px(10) }]}>
+                    <Check size={px(15)} color={C.grey} />
+                    <View style={{ flex: 1 }}>
+                      <PartnerText style={[styles.historyTitle, { fontSize: px(13) }]}>
+                        #{job.bookingNumber} · {job.serviceLabel ?? 'Towing'}
+                      </PartnerText>
+                      <PartnerText style={[styles.historyMeta, { fontSize: px(11.5) }]}>
+                        Completed{job.createdAt ? ` · ${formatDay(job.createdAt)}` : ''}
+                        {job.estimatedFare ? ` · ₹${job.estimatedFare}` : ''}
+                      </PartnerText>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <PartnerText style={[styles.historyMeta, { fontSize: px(12), paddingVertical: px(12) }]}>
+                  Completed jobs from this vendor will show here.
                 </PartnerText>
-                <PartnerText style={[styles.policyDesc, { fontSize: px(11) }]}>
-                  You are permanently connected to this fleet. Other vendors cannot
-                  send you invitations while you are active.
-                </PartnerText>
-              </View>
-            </View>
-
-            <View style={[styles.policyDivider, { marginVertical: px(10) }]} />
-
-            <View style={styles.policyRow}>
-              <View style={[styles.policyIconCircle, { backgroundColor: '#FFF7ED' }]}>
-                <AlertCircle size={px(16)} color={C.amberText} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <PartnerText style={[styles.policyTitle, { fontSize: px(12.5) }]}>
-                  Fleet Removal Policy
-                </PartnerText>
-                <PartnerText style={[styles.policyDesc, { fontSize: px(11) }]}>
-                  Driver connections are managed by the Towing Vendor. Only your
-                  vendor can remove or release you from the fleet.
-                </PartnerText>
-              </View>
+              )}
             </View>
           </View>
         </>
       ) : (
         /* Not Connected State */
         <>
+          {invitations.data?.length ? null : (
           <View
             style={[
               styles.card,
@@ -482,6 +511,7 @@ export default function DriverMyVendorScreen() {
               consumer driver bookings, or join a Towing Vendor fleet when invited.
             </PartnerText>
           </View>
+          )}
 
           {/* Invitations Section (Only shown when driver is NOT in a fleet) */}
           {invitations.isLoading ? (
@@ -495,7 +525,7 @@ export default function DriverMyVendorScreen() {
                   styles.sectionTitle,
                   { fontSize: px(16), marginBottom: px(10) },
                 ]}>
-                Invitations ({invitations.data.length})
+                Join this fleet
               </PartnerText>
 
               {invitations.data.map(invitation => (
@@ -528,8 +558,12 @@ export default function DriverMyVendorScreen() {
                       <PartnerText
                         style={[styles.infoText, { fontSize: px(12), marginTop: px(2) }]}>
                         {invitation.vendor.ownerName
-                          ? `Contact: ${invitation.vendor.ownerName}`
-                          : 'Towing Vendor fleet invitation'}
+                          ? `Managed by ${invitation.vendor.ownerName}`
+                          : 'Towing vendor'}
+                        {invitation.invitedAt ? ` · ${formatDay(invitation.invitedAt)}` : ''}
+                      </PartnerText>
+                      <PartnerText style={[styles.historyMeta, { fontSize: px(11.5), marginTop: px(4) }]}>
+                        Accept to take this vendor's tow jobs. One fleet at a time.
                       </PartnerText>
                     </View>
                   </View>
@@ -615,11 +649,100 @@ export default function DriverMyVendorScreen() {
           Could not sync vendor fleet data. Pull down to retry.
         </PartnerText>
       ) : null}
+
+      <Modal visible={rulesOpen} transparent animationType="fade" onRequestClose={() => setRulesOpen(false)}>
+        <Pressable style={styles.rulesBackdrop} onPress={() => setRulesOpen(false)}>
+          <Pressable style={[styles.rulesSheet, { borderRadius: px(16), padding: px(16) }]} onPress={event => event.stopPropagation()}>
+            <View style={styles.rulesHeader}>
+              <PartnerText style={[styles.policyHeading, { fontSize: px(16) }]}>Fleet rules</PartnerText>
+              <Pressable hitSlop={10} onPress={() => setRulesOpen(false)}>
+                <X size={px(18)} color={C.ink} />
+              </Pressable>
+            </View>
+            {vendor?.ownerName ? (
+              <PartnerText style={[styles.historyMeta, { fontSize: px(12.5), marginTop: px(8) }]}>
+                Managed by {vendor.ownerName}
+              </PartnerText>
+            ) : null}
+            {address ? (
+              <PartnerText style={[styles.historyMeta, { fontSize: px(12.5), marginTop: px(4) }]}>
+                {address}
+              </PartnerText>
+            ) : null}
+            <View style={[styles.policyRow, { marginTop: px(14) }]}>
+              <ShieldCheck size={px(16)} color={C.green} />
+              <View style={{ flex: 1 }}>
+                <PartnerText style={[styles.policyTitle, { fontSize: px(13) }]}>One fleet at a time</PartnerText>
+                <PartnerText style={[styles.policyDesc, { fontSize: px(12) }]}>
+                  While you are connected, other vendors cannot send you a fleet request.
+                </PartnerText>
+              </View>
+            </View>
+            <View style={[styles.policyRow, { marginTop: px(12) }]}>
+              <AlertCircle size={px(16)} color={C.amberText} />
+              <View style={{ flex: 1 }}>
+                <PartnerText style={[styles.policyTitle, { fontSize: px(13) }]}>Vendor controls the connection</PartnerText>
+                <PartnerText style={[styles.policyDesc, { fontSize: px(12) }]}>
+                  Only this towing vendor can remove you from the fleet. Tow jobs they assign show up here.
+                </PartnerText>
+              </View>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
+  previewRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  previewChip: {
+    backgroundColor: C.white,
+    borderWidth: 1,
+    borderColor: C.hairline,
+  },
+  previewChipOn: {
+    backgroundColor: '#111827',
+    borderColor: '#111827',
+  },
+  previewChipText: {
+    color: C.grey,
+    fontWeight: '600',
+  },
+  previewChipTextOn: {
+    color: C.white,
+  },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.hairline,
+  },
+  historyTitle: {
+    color: C.ink,
+    fontWeight: '700',
+  },
+  historyMeta: {
+    color: C.grey,
+    marginTop: 2,
+  },
+  rulesBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(17, 24, 39, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  rulesSheet: {
+    backgroundColor: C.white,
+  },
+  rulesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   header: {
     backgroundColor: C.white,
     borderBottomWidth: StyleSheet.hairlineWidth,

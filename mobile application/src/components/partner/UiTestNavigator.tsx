@@ -12,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import {
@@ -37,10 +38,12 @@ import {
   partnerNavigationRef,
 } from '../../navigation/partnerNavigationRef';
 import { driverColors, driverRadius } from '../../theme/driverUi';
+import { setDriverVendorPreviewScenario } from '../../services/vendor/driverVendorPreview';
 
 export default function UiTestNavigator() {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
+  const queryClient = useQueryClient();
   const user = useAppSelector(state => state.auth.user);
   const isDriver = user?.role === 'driver';
   const isVendor = user?.role === 'vendor';
@@ -204,6 +207,42 @@ export default function UiTestNavigator() {
                 />
                 {qaRole === 'driver' ? (
                   <>
+                    <JumpRow
+                      label="My Vendor: first request"
+                      sub="Accept or decline a fleet invite"
+                      onPress={() => {
+                        setModalVisible(false);
+                        void ensureDriverAndNavigate(() => {
+                          setDriverVendorPreviewScenario('request');
+                          void queryClient.invalidateQueries({ queryKey: ['driver'] });
+                          setTimeout(() => jumpToPartnerMainTab('PartnerVendor'), 250);
+                        });
+                      }}
+                    />
+                    <JumpRow
+                      label="My Vendor: connected"
+                      sub="Assignments and job history"
+                      onPress={() => {
+                        setModalVisible(false);
+                        void ensureDriverAndNavigate(() => {
+                          setDriverVendorPreviewScenario('connected');
+                          void queryClient.invalidateQueries({ queryKey: ['driver'] });
+                          setTimeout(() => jumpToPartnerMainTab('PartnerVendor'), 250);
+                        });
+                      }}
+                    />
+                    <JumpRow
+                      label="My Vendor: new job"
+                      sub="Connected, plus a job that needs you"
+                      onPress={() => {
+                        setModalVisible(false);
+                        void ensureDriverAndNavigate(() => {
+                          setDriverVendorPreviewScenario('assignment');
+                          void queryClient.invalidateQueries({ queryKey: ['driver'] });
+                          setTimeout(() => jumpToPartnerMainTab('PartnerVendor'), 250);
+                        });
+                      }}
+                    />
                     <JumpRow
                       label="2. Driver Registration: Personal Info"
                       sub="Step 1: Name, DOB, City, Address"
@@ -440,11 +479,13 @@ export default function UiTestNavigator() {
                   }}
                 />
                 <JumpRow
-                  label="Trip History"
-                  sub="All, completed & cancelled trips"
+                  label="Trip history (Jobs → Done)"
+                  sub="Completed and cancelled jobs on the Jobs tab"
                   onPress={() => {
                     setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerTripHistory');
+                    ensureDriverAndNavigate(() =>
+                      jumpToPartnerJobsScreen('PartnerJobsList', { initialSegment: 'done' }),
+                    );
                   }}
                 />
               </View>

@@ -51,6 +51,11 @@ export function openDriverJobs(): void {
   jumpToPartnerJobsScreen('PartnerJobsList');
 }
 
+/** Opens Jobs with the Done segment (completed + cancelled) — canonical trip history. */
+export function openDriverJobsDone(): void {
+  jumpToPartnerJobsScreen('PartnerJobsList', { initialSegment: 'done' });
+}
+
 /** Opens the canonical Notifications screen in the Account stack. */
 export function openPartnerNotifications(): void {
   jumpToPartnerAccountScreen('PartnerNotifications');
@@ -58,7 +63,13 @@ export function openPartnerNotifications(): void {
 
 /** Opens any tab in PartnerMain. */
 export function jumpToPartnerMainTab(
-  tab: 'PartnerHome' | 'PartnerJobs' | 'PartnerVehicles' | 'PartnerDrivers' | 'PartnerAccount',
+  tab:
+    | 'PartnerHome'
+    | 'PartnerJobs'
+    | 'PartnerVehicles'
+    | 'PartnerDrivers'
+    | 'PartnerVendor'
+    | 'PartnerAccount',
 ): void {
   if (!partnerNavigationRef.isReady()) return;
   if (tab === 'PartnerAccount') {

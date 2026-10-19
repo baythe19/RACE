@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -16,6 +16,11 @@ import {
   useDriverVendorInvitationsQuery,
   useDriverVendorMembershipQuery,
 } from '../services/vendor/useVendorMembershipQueries';
+import { UI_PREVIEW_MODE } from '../constants/preview';
+import {
+  getDriverVendorPreviewScenario,
+  subscribeDriverVendorPreview,
+} from '../services/vendor/driverVendorPreview';
 import PartnerJobsScreen from '../screens/partner/PartnerJobsScreen';
 import VendorBookingTrackingScreen from '../screens/partner/VendorBookingTrackingScreen';
 import PartnerAccountScreen from '../screens/partner/PartnerAccountScreen';
@@ -32,7 +37,6 @@ import PartnerNotificationsScreen from '../screens/partner/account/PartnerNotifi
 import PartnerSettingsScreen from '../screens/partner/account/PartnerSettingsScreen';
 import PartnerHelpSupportScreen from '../screens/partner/account/PartnerHelpSupportScreen';
 import PartnerBankDetailsScreen from '../screens/partner/account/PartnerBankDetailsScreen';
-import PartnerTripHistoryScreen from '../screens/partner/account/PartnerTripHistoryScreen';
 import type {
   PartnerAccountStackParamList,
   PartnerDriversStackParamList,
@@ -201,11 +205,6 @@ function PartnerAccountStackNavigator() {
         options={{ headerShown: false }}
       />
       <AccountStack.Screen
-        name="PartnerTripHistory"
-        component={PartnerTripHistoryScreen}
-        options={{ headerShown: false }}
-      />
-      <AccountStack.Screen
         name="VendorDrivers"
         component={VendorDriverMembershipsScreen}
         options={{ headerShown: false }}
@@ -236,7 +235,13 @@ export default function PartnerNavigator() {
 
   const { data: driverMembership } = useDriverVendorMembershipQuery(isDriver);
   const { data: driverInvitations = [] } = useDriverVendorInvitationsQuery(isDriver && !driverMembership);
-  const showVendorTab = isDriver && Boolean(driverMembership || driverInvitations.length > 0);
+  const [previewScenario, setPreviewScenario] = useState(getDriverVendorPreviewScenario);
+  useEffect(() => subscribeDriverVendorPreview(() => {
+    setPreviewScenario(getDriverVendorPreviewScenario());
+  }), []);
+  const previewKeepsVendorTab = UI_PREVIEW_MODE && isDriver && previewScenario !== 'none';
+  const showVendorTab =
+    previewKeepsVendorTab || (isDriver && Boolean(driverMembership || driverInvitations.length > 0));
 
   return (
     /* The incoming-request alert wraps the navigator so it can pop over any tab

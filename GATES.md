@@ -1,23 +1,17 @@
-# Gates: vendor vehicles screen pixel-match (board 02)
+# Gates: in-app driver trip navigation
 
-OWNS: "mobile application/src/screens/partner/VendorVehiclesScreen.tsx", "mobile application/src/navigation/PartnerNavigator.tsx", "mobile application/src/components/navigation/StackBackButton.tsx", GATES.md
+OWNS: mobile application/src/services/driver/tripNavigation.ts, mobile application/scripts/verify-trip-navigation.mjs, mobile application/src/components/booking/LiveTripMap.tsx, mobile application/src/screens/partner/driver/DriverActiveJobScreen.tsx
 
-Scope: Match the Vendor Vehicles screen to the second reference board — truck image artwork in cards + stats icons, compact stat tiles (no gap), stacked header (back + centered title + Add vehicle), no outline box around back arrow, tighter card layout — with typecheck + lint + sim verification.
+Scope: Driver active job stays inside the app, routes driver to pickup, then after OTP routes pickup to drop, and never opens Google Maps.
 
-- [x] G1: Partner mobile TypeScript compiles after the screen changes.
-  CHECK: (cd "/workspaces/RACE/mobile application" && npx tsc --noEmit) && echo VEHICLES_TSC_PASS
-  EXPECT: VEHICLES_TSC_PASS
-  EVIDENCE: manual — ran 2026-10-17 via Shell: `npx tsc --noEmit` exit 0, output `VEHICLES_TSC_PASS` (no errors). Verified alongside G2/G3 in one run; not run through gate-check.mjs (no approvals in this env), command + output recorded here verbatim.
+- [x] G1: Trip leg math matches the two-leg ride-hailing flow
+  CHECK: npx tsx scripts/verify-trip-navigation.mjs math
+  EXPECT: TRIP_MATH_OK
+  CWD: mobile application
+  EVIDENCE: automatic-evidence=v1; definition-sha256=94ce57485db72d67741fb28196207ddb43d81fedfa2f84073002961bbc5b5a93; exit=0; EXPECT=matched; output-sha256=42e947e939fdd2fe61a5e71c86d30eba1b7cb7cf1c159d43f7dbb6950cada68e; output-bytes=13; shell=/bin/sh; cwd=/workspaces/RACE/mobile application; path=2b7281c7f1d9/43 entries
 
-- [x] G2: Header renders the stacked pattern on the Vehicles stack entry: back arrow without an outline button box, centered "Vendor vehicles" title, amber "+ Add vehicle" pill — visible in the running sim describe.
-  CHECK: export PATH="$HOME/.local/bin:$PATH"; export DISPLAY=:99; peach describe --sim b1 | grep -E 'label="Go back"|Vendor vehicles|Add vehicle' | head -5 && echo VEHICLES_HEADER_OK
-  EXPECT: VEHICLES_HEADER_OK
-  EVIDENCE: manual — ran 2026-10-17 via Shell; describe emitted `label="Go back" @(22,62) 43x45` (bare hit area, no box node), `<view> label="Vendor vehicles"`, `<text> "Add vehicle" @(301,190)`; output ended `VEHICLES_HEADER_OK`. Screenshot `/tmp/shots/vehicles-new.png` reviewed visually — header matches the reference stack.
-
-- [x] G3: Stat tiles render compactly with truck/check/wrench icons loaded from the same artwork used on Home leads (VehicleTypeArtwork), and vehicle cards show the truck artwork thumbnail instead of the plain icon tile.
-  CHECK: export PATH="$HOME/.local/bin:$PATH"; export DISPLAY=:99; (peach describe --sim b1 | grep -E 'svgroot' | head -4) && echo VEHICLES_ART_OK
-  EXPECT: VEHICLES_ART_OK
-  EVIDENCE: manual — ran 2026-10-17 via Shell; stat tiles show svg artwork nodes (`22x15` car artwork in Total tile, 17x17 check/wrench), first vehicle card thumbnail is `56x39` VehicleTypeArtwork svg inside a 64x52 `#FFF7E6` tile; output ended `VEHICLES_ART_OK`. Visual check via screenshot: 3 compact tiles (110px) with no dead gap, cards match board 02 layout.
-
-- [x] G4: The three reference stat tiles show Total/Available/In service semantics with no horizontal gap overflow: screenshot reviewed by agent and supplied to user.
-  EVIDENCE: manual — describe shows exactly three tiles at x=21/139/257 (width 110, spacing 8 — total 367 < 402 viewport, no overflow), labels "Total" / "Available" / "In service". Full-window screenshot `/tmp/shots/vehicles-new.png` reviewed by agent; user receives the screenshot in chat for confirmation.
+- [x] G2: Active job screen has no external Google Maps redirect
+  CHECK: npx tsx scripts/verify-trip-navigation.mjs screen
+  EXPECT: NO_EXTERNAL_MAPS_OK
+  CWD: mobile application
+  EVIDENCE: automatic-evidence=v1; definition-sha256=3667106fe9d202a8a428f20d55285fa16b38f18e30e5c41b04b5e2e12401a865; exit=0; EXPECT=matched; output-sha256=ac5234caf238d9a596b1eddaf71020a15688c0c467e71299db451904a23845c3; output-bytes=20; shell=/bin/sh; cwd=/workspaces/RACE/mobile application; path=2b7281c7f1d9/43 entries

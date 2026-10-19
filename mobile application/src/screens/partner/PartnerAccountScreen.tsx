@@ -42,6 +42,7 @@ import PartnerLocationSheet from '../../components/partner/dialogs/PartnerLocati
 import PartnerNotificationPreferencesModal from '../../components/partner/dialogs/PartnerNotificationPreferencesModal';
 import { useNotificationsQuery } from '../../services/useNotificationQueries';
 import { openLocationSettings } from '../../hooks/useDriverLocationReporting';
+import { openDriverJobsDone } from '../../navigation/partnerNavigationRef';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerAccountMain'>;
 
@@ -305,8 +306,23 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                   <DollarSign size={18} color="#D97706" strokeWidth={2.2} />
                 </View>
                 <View style={styles.menuTextCol}>
-                  <PartnerText style={styles.menuTitle}>Earnings & History</PartnerText>
-                  <PartnerText style={styles.menuSubtitle}>Track earnings and payouts</PartnerText>
+                  <PartnerText style={styles.menuTitle}>Earnings & payouts</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Weekly earnings and payout status</PartnerText>
+                </View>
+                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
+              </Pressable>
+
+              <View style={styles.divider} />
+
+              <Pressable
+                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
+                onPress={() => openDriverJobsDone()}>
+                <View style={[styles.menuIconCircle, { backgroundColor: '#F0F9FF' }]}>
+                  <Truck size={18} color="#0284C7" strokeWidth={2.2} />
+                </View>
+                <View style={styles.menuTextCol}>
+                  <PartnerText style={styles.menuTitle}>Trip history</PartnerText>
+                  <PartnerText style={styles.menuSubtitle}>Completed and cancelled jobs</PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>

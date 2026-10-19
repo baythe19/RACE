@@ -22,6 +22,8 @@ interface PartnerScreenLayoutProps {
   showBackButton?: boolean;
   /** Extra top spacing inside the scroll area (default: comfortable offset below header). */
   contentTopSpacing?: number;
+  /** Tighter padding under the sticky header (e.g. filter chips + list screens). */
+  denseHeader?: boolean;
   /** Floating top toast notification rendered at the screen root outside the scroll area. */
   toast?: ReactNode;
 }
@@ -39,6 +41,7 @@ export default function PartnerScreenLayout({
   scrollContentStyle,
   showBackButton = true,
   contentTopSpacing = spacing.xxxl,
+  denseHeader = false,
   toast,
 }: PartnerScreenLayoutProps) {
   const insets = useSafeAreaInsets();
@@ -49,6 +52,7 @@ export default function PartnerScreenLayout({
       <View
         style={[
           styles.stickyHeader,
+          denseHeader && styles.stickyHeaderDense,
           {
             paddingTop: insets.top + spacing.xs,
             paddingHorizontal: layout.screenPadding,
@@ -86,7 +90,9 @@ export default function PartnerScreenLayout({
           )}
         </View>
 
-        {headerExtra ? <View style={styles.headerExtra}>{headerExtra}</View> : null}
+        {headerExtra ? (
+          <View style={[styles.headerExtra, denseHeader && styles.headerExtraDense]}>{headerExtra}</View>
+        ) : null}
       </View>
 
       <ScrollView
@@ -170,6 +176,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E8ECF0',
     paddingBottom: spacing.lg,
   },
+  stickyHeaderDense: {
+    paddingBottom: spacing.sm,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -218,6 +227,9 @@ const styles = StyleSheet.create({
   },
   headerExtra: {
     marginTop: spacing.md,
+  },
+  headerExtraDense: {
+    marginTop: spacing.sm,
   },
   scroll: {
     flex: 1,

@@ -246,6 +246,7 @@ export const MOCK_DRIVER_JOBS: DriverJobBooking[] = [
     estimatedFare: 1400,
     distanceKm: 8.5,
     createdAt: new Date(now.getTime() - 86400000 * 3).toISOString(),
+    vendorId: 'mock-vendor-001',
     vendorApproved: true,
   },
   {
@@ -269,6 +270,7 @@ export const MOCK_DRIVER_JOBS: DriverJobBooking[] = [
     estimatedFare: 1200,
     distanceKm: 6.2,
     createdAt: new Date(now.getTime() - 86400000 * 2).toISOString(),
+    vendorId: 'mock-vendor-001',
     vendorApproved: true,
   },
 ];

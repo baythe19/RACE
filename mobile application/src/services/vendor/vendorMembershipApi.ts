@@ -2,6 +2,10 @@ import { api } from '../api';
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/preview';
+import {
+  getDriverVendorPreviewScenario,
+  setDriverVendorPreviewScenario,
+} from './driverVendorPreview';
 
 export type VendorMembership = {
   id: string;
@@ -307,12 +311,7 @@ export async function listDriverVendorInvitations(): Promise<DriverVendorInvitat
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      // Invariant: If a driver is actively connected to a vendor fleet,
-      // they cannot have pending invitations.
-      const activeMembership = previewDriverMembership.current ?? MOCK_DRIVER_MEMBERSHIP;
-      if (activeMembership) {
-        return [];
-      }
+      if (getDriverVendorPreviewScenario() !== 'request') return [];
       return previewInvitations;
     }
     throw error;
@@ -326,7 +325,13 @@ export async function getDriverVendorMembership(): Promise<DriverVendorMembershi
     );
     return data.data ?? null;
   } catch (error) {
-    if (UI_PREVIEW_MODE) return previewDriverMembership.current ?? MOCK_DRIVER_MEMBERSHIP;
+    if (UI_PREVIEW_MODE) {
+      const previewScenario = getDriverVendorPreviewScenario();
+      if (previewScenario === 'connected' || previewScenario === 'assignment') {
+        return previewDriverMembership.current ?? MOCK_DRIVER_MEMBERSHIP;
+      }
+      return null;
+    }
     throw error;
   }
 }
@@ -349,6 +354,10 @@ export async function respondToVendorInvitation(
           ...MOCK_DRIVER_MEMBERSHIP,
           acceptedAt: new Date().toISOString(),
         };
+        setDriverVendorPreviewScenario('connected');
+      } else if (previewInvitations.length === 0) {
+        previewDriverMembership.current = null;
+        setDriverVendorPreviewScenario('none');
       }
       return {
         id,

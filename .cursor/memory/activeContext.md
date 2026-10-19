@@ -4,7 +4,7 @@ Updated: 2026-10-19
 
 ## Current focus
 
-**Driver registration — 2026-10-19.** Emergency contact is inline on step 1 (name + mobile), no bottom sheet. Review sections open independently with label/value rows. Address asks location once; licence field lifts above the keyboard.
+**Active job navigation — 2026-10-19.** In-app two-leg route: driver to pickup, OTP, then to drop. Google Maps redirect removed. Distance sits on the map. Directions API when a key exists; otherwise a labeled straight line. Gates G1 and G2 met.
 
 
 

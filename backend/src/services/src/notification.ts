@@ -75,6 +75,11 @@ export class NotificationService {
     return { updated };
   }
 
+  async deleteAllForUser(userId: string): Promise<{ deleted: number }> {
+    const deleted = await notificationRepository.deleteAllForUser(userId);
+    return { deleted };
+  }
+
   async getUnreadCount(userId: string): Promise<number> {
     return notificationRepository.countUnread(userId);
   }

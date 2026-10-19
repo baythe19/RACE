@@ -52,6 +52,11 @@ export function canTransition(
     return !['COMPLETED', 'RATED', 'CANCELLED'].includes(currentStatus);
   }
 
+  // Driver tapped "arrived" by mistake — revert to en route before OTP starts the trip.
+  if (currentStatus === 'DRIVER_ARRIVED' && nextStatus === 'DRIVER_EN_ROUTE') {
+    return true;
+  }
+
   const currentIndex = BOOKING_STATUS_FLOW.indexOf(currentStatus);
   const nextIndex = BOOKING_STATUS_FLOW.indexOf(nextStatus);
 

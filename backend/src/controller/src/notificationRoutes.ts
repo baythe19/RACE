@@ -11,6 +11,7 @@ router.use(authMiddleware);
 
 router.get('/', notificationController.list);
 router.patch('/read-all', notificationController.markAllRead);
+router.delete('/', notificationController.deleteAll);
 router.get('/preferences', notificationController.getPrefs);
 router.patch('/preferences', validate(updateNotificationPrefsSchema), notificationController.updatePrefs);
 

@@ -19,6 +19,12 @@ export class NotificationController {
     return sendSuccess(res, result);
   });
 
+  deleteAll = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await notificationService.deleteAllForUser(user.id);
+    return sendSuccess(res, result);
+  });
+
   getPrefs = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const prefs = await notificationService.getPrefs(user.id);

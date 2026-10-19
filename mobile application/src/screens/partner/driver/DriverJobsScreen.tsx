@@ -35,7 +35,8 @@ import {
   Truck,
   User,
 } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -76,6 +77,8 @@ type Segment = 'available' | 'active' | 'done';
 type Props = {
   navigation: NativeStackNavigationProp<PartnerJobsStackParamList, 'PartnerJobsList'>;
 };
+
+type JobsListRoute = RouteProp<PartnerJobsStackParamList, 'PartnerJobsList'>;
 
 function addressOf(input?: string | null) {
   const formatted = formatReadableAddress(input);
@@ -1073,6 +1076,7 @@ function JobsCount({
 }
 
 export default function DriverJobsScreen({ navigation }: Props) {
+  const route = useRoute<JobsListRoute>();
   const px = useScreenPx();
   useRefreshDriverDataOnFocus(true);
   const insets = useSafeAreaInsets();
@@ -1102,6 +1106,12 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const unreadNotifCount = notifData?.unreadCount ?? 0;
 
   const [segment, setSegment] = useState<Segment>('available');
+  useEffect(() => {
+    const initial = route.params?.initialSegment;
+    if (initial) {
+      setSegment(initial);
+    }
+  }, [route.params?.initialSegment]);
   const [pendingAcceptId, setPendingAcceptId] = useState<string | null>(null);
   const [pendingDeclineId, setPendingDeclineId] = useState<string | null>(null);
   const [expandedDoneId, setExpandedDoneId] = useState<string | null>(null);

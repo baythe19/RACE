@@ -62,8 +62,13 @@ export type PartnerTabParamList = {
   PartnerAccount: NavigatorScreenParams<PartnerAccountStackParamList> | undefined;
 };
 
+export type PartnerJobsListParams = {
+  /** Deep-link from Account / notifications into the Done segment. */
+  initialSegment?: 'available' | 'active' | 'done';
+};
+
 export type PartnerJobsStackParamList = {
-  PartnerJobsList: undefined;
+  PartnerJobsList: PartnerJobsListParams | undefined;
   PartnerActiveJob: {
     bookingId?: string;
     bookingType?: 'towing' | 'driver';
@@ -92,7 +97,6 @@ export type PartnerAccountStackParamList = {
   PartnerSettings: undefined;
   PartnerHelpSupport: undefined;
   PartnerBankDetails: undefined;
-  PartnerTripHistory: undefined;
   VendorVerificationStatus: undefined;
   VendorDrivers: { fullScreen?: boolean } | undefined;
   VendorVehicles: undefined;

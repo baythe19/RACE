@@ -137,6 +137,18 @@ export async function markAllNotificationsRead(): Promise<void> {
   }
 }
 
+export async function deleteAllNotifications(): Promise<void> {
+  try {
+    await unwrapApi(api.delete(API_ENDPOINTS.notifications));
+  } catch (error) {
+    if (UI_PREVIEW_MODE) {
+      mockNotificationsState = [];
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
   try {
     return await unwrapApi<NotificationPreferences>(

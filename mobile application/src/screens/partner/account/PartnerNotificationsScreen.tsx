@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Truck,
@@ -12,11 +12,14 @@ import {
   Bell,
 } from 'lucide-react-native';
 
+import { spacing } from '../../../theme';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
+import { openDriverJobsDone } from '../../../navigation/partnerNavigationRef';
 import {
+  useDeleteAllNotificationsMutation,
   useNotificationsQuery,
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
@@ -31,6 +34,7 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
   const { data, isLoading, isError, refetch } = useNotificationsQuery();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
+  const deleteAllMutation = useDeleteAllNotificationsMutation();
   const markReadMutation = useMarkNotificationReadMutation();
 
   const notifications = data?.notifications ?? [];
@@ -83,12 +87,28 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
     return { todayItems: today, yesterdayItems: yesterday };
   }, [filteredNotifications]);
 
+  const confirmDeleteAll = () => {
+    if (notifications.length === 0) return;
+    Alert.alert(
+      'Delete all notifications?',
+      'This removes every notification from your inbox. You cannot undo this.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete all',
+          style: 'destructive',
+          onPress: () => deleteAllMutation.mutate(),
+        },
+      ],
+    );
+  };
+
   const handleItemPress = (item: PartnerNotificationItem) => {
     if (!item.isRead) {
       markReadMutation.mutate(item.id);
     }
     if (item.type === 'JOB_OFFER' || item.type === 'BOOKING_UPDATE') {
-      navigation.navigate('PartnerTripHistory');
+      openDriverJobsDone();
     } else if (item.type === 'ACCOUNT') {
       navigation.navigate('PartnerDocuments');
     } else if (item.type === 'PAYMENT') {
@@ -163,47 +183,62 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
     );
   };
 
+  const filterChips = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      bounces={false}
+      keyboardShouldPersistTaps="handled"
+      contentContainerStyle={styles.filterRowContent}>
+      {(['All', 'Job Updates', 'Drivers & Vehicles', 'Account', 'Earnings'] as CategoryFilter[]).map(cat => {
+        const isSelected = activeFilter === cat;
+        return (
+          <Pressable
+            key={cat}
+            style={[styles.filterChip, isSelected && styles.filterChipActive]}
+            onPress={() => setActiveFilter(cat)}>
+            <PartnerText
+              style={[
+                styles.filterChipText,
+                isSelected && styles.filterChipTextActive,
+              ]}>
+              {cat}
+            </PartnerText>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
   return (
     <PartnerScreenLayout
       title={unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications'}
       onBack={() => navigation.goBack()}
+      denseHeader
+      contentTopSpacing={spacing.xs}
+      headerExtra={filterChips}
       headerRight={
-        <Pressable
-          hitSlop={10}
-          style={({ pressed }) => ({
-            paddingVertical: 4,
-            paddingHorizontal: 6,
-            borderRadius: 6,
-            backgroundColor: pressed ? '#FEF3C7' : 'transparent',
-            flexShrink: 0,
-          })}
-          onPress={() => markAllReadMutation.mutate()}>
-          <PartnerText style={styles.markReadText} numberOfLines={1}>
-            Mark all read
-          </PartnerText>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            hitSlop={8}
+            style={({ pressed }) => [styles.headerActionBtn, pressed && styles.headerActionPressed]}
+            onPress={() => markAllReadMutation.mutate()}
+            disabled={notifications.length === 0 || markAllReadMutation.isPending}>
+            <PartnerText style={styles.markReadText} numberOfLines={1}>
+              Mark all read
+            </PartnerText>
+          </Pressable>
+          <Pressable
+            hitSlop={8}
+            style={({ pressed }) => [styles.headerActionBtn, pressed && styles.headerActionPressed]}
+            onPress={confirmDeleteAll}
+            disabled={notifications.length === 0 || deleteAllMutation.isPending}>
+            <PartnerText style={styles.deleteAllText} numberOfLines={1}>
+              Delete all
+            </PartnerText>
+          </Pressable>
+        </View>
       }>
-      {/* Category Filter Chips */}
-      <View style={styles.filterRow}>
-        {(['All', 'Job Updates', 'Drivers & Vehicles', 'Account', 'Earnings'] as CategoryFilter[]).map(cat => {
-          const isSelected = activeFilter === cat;
-          return (
-            <Pressable
-              key={cat}
-              style={[styles.filterChip, isSelected && styles.filterChipActive]}
-              onPress={() => setActiveFilter(cat)}>
-              <PartnerText
-                style={[
-                  styles.filterChipText,
-                  isSelected && styles.filterChipTextActive,
-                ]}>
-                {cat}
-              </PartnerText>
-            </Pressable>
-          );
-        })}
-      </View>
-
       {isLoading && !data ? (
         <DriverDataSkeleton variant="notifications" />
       ) : isError && !data ? (
@@ -246,18 +281,40 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    alignItems: 'flex-end',
+    gap: 2,
+    maxWidth: 108,
+  },
+  headerActionBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 6,
+  },
+  headerActionPressed: {
+    backgroundColor: '#FEF3C7',
+  },
   markReadText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
     color: driverColors.amberText,
     flexShrink: 0,
   },
-  filterRow: {
+  deleteAllText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#DC2626',
+    flexShrink: 0,
+  },
+  filterRowContent: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 8,
-    marginBottom: 16,
+    paddingVertical: 2,
+    paddingRight: 4,
   },
   filterChip: {
+    flexShrink: 0,
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: driverRadius.pill,
@@ -300,16 +357,16 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   listContainer: {
-    gap: 20,
+    gap: 16,
   },
   sectionBlock: {
-    gap: 10,
+    gap: 8,
   },
   sectionHeader: {
     fontSize: 14,
     fontWeight: '800',
     color: driverColors.ink,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   itemsWrapper: {
     gap: 8,

@@ -14,6 +14,7 @@ import {
   rejectMockDriverJob,
   updateMockActiveJobStatus,
 } from '../../data/mockPartnerData';
+import { getDriverVendorPreviewScenario } from '../vendor/driverVendorPreview';
 
 export type DriverJobBooking = {
   bookingType: 'towing' | 'driver';
@@ -83,6 +84,34 @@ export async function setDriverAvailability(isAvailable: boolean): Promise<{
   }
 }
 
+const PREVIEW_FLEET_ASSIGNMENT: DriverJobBooking = {
+  bookingType: 'towing',
+  id: 'RACE-TOW-FLEET-ASSIGN-1',
+  bookingNumber: 'TOW-10048',
+  status: 'DRIVER_ASSIGNED',
+  serviceLabel: 'Instant Towing',
+  pickup: {
+    label: 'Saheed Nagar',
+    address: 'Janpath Road, Saheed Nagar, Bhubaneswar',
+  },
+  dropoff: {
+    label: 'Mancheswar',
+    address: 'Sector B, Mancheswar, Bhubaneswar',
+  },
+  estimatedFare: 1650,
+  distanceKm: 12.5,
+  createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+  vendorId: 'mock-vendor-001',
+  assignedFleetVehicleLabel: 'OD 02 TOW 1001 · Flatbed',
+  vendorApproved: true,
+};
+
+function withPreviewFleetAssignment(jobs: DriverJobBooking[], completedOnly: boolean): DriverJobBooking[] {
+  if (completedOnly || getDriverVendorPreviewScenario() !== 'assignment') return jobs;
+  if (jobs.some(job => job.id === PREVIEW_FLEET_ASSIGNMENT.id)) return jobs;
+  return [PREVIEW_FLEET_ASSIGNMENT, ...jobs];
+}
+
 export async function listDriverJobs(params?: {
   status?: string;
   type?: 'towing' | 'driver';
@@ -98,17 +127,23 @@ export async function listDriverJobs(params?: {
       if (params?.status === 'COMPLETED') {
         const completedActive =
           mockActiveJobState?.status === 'COMPLETED' ? [mockActiveJobState] : [];
-        return [
-          ...completedActive,
-          ...MOCK_DRIVER_JOBS.filter(
-            job => job.status === 'COMPLETED' && job.id !== mockActiveJobState?.id,
-          ),
-        ];
+        return withPreviewFleetAssignment(
+          [
+            ...completedActive,
+            ...MOCK_DRIVER_JOBS.filter(
+              job => job.status === 'COMPLETED' && job.id !== mockActiveJobState?.id,
+            ),
+          ],
+          true,
+        );
       }
       const active = mockActiveJobState;
-      return active
-        ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
-        : MOCK_DRIVER_JOBS;
+      return withPreviewFleetAssignment(
+        active
+          ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
+          : MOCK_DRIVER_JOBS,
+        false,
+      );
     }
     throw error;
   }
