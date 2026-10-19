@@ -5,6 +5,37 @@
 
 ---
 
+## Latest session — Driver-Vendor Exclusivity & My Vendor Screen Redesign (2026-10-19, branch changes-v6-partner-role-dispatch)
+
+- **Driver-Vendor Exclusivity & Lock Invariants:**
+  - **Strict 1-to-1 Connection Exclusivity:**
+    - A Driver can only be actively connected to ONE Towing Vendor at a time (`status === 'ACTIVE'`).
+    - While connected, other vendors cannot invite or connect with this driver.
+    - Second vendor searches return `IN_ANOTHER_FLEET`, preventing invitations from being sent.
+    - Backend `invite` rejects attempts to invite any driver who is already `ACTIVE` in another fleet.
+  - **Automatic Stale Invitation Invalidation & Suppression:**
+    - When a driver accepts a vendor invitation (`respond(..., 'accept')`), any outstanding pending invitations for that driver are automatically expired (`status: 'EXPIRED'`, `$unset: { driverLockKey: 1 }`).
+    - Backend `listDriverInvitations` returns `[]` if the driver already has an `ACTIVE` membership.
+    - Resolved the screenshot bug where a connected driver was seeing an invitation from the same vendor below their connected card.
+  - **Driver Cannot Self-Disconnect:**
+    - Only the Towing Vendor can release/remove the driver from their fleet (`DELETE /api/v1/vendor/drivers/memberships/:id`). No self-disconnect CTA is given to the driver, preserving fleet dispatch stability.
+- **My Vendor Screen UI Redesign (`DriverMyVendorScreen.tsx`):**
+  - **Dynamic Vendor Header:**
+    - When connected: Displays green `CONNECTED FLEET` badge, the Vendor's business name (`vendor.name`), owner subtitle, and a notification bell with live unread badge.
+    - When independent: Displays clean `My Vendor` title, fleet connection subtitle, and notification bell.
+  - **Zero Invitations When Connected:**
+    - Invitations section is completely suppressed when `vendor` exists.
+  - **Polished Fleet Cards & Consistency:**
+    - Styled to match `DriverDashboardScreen`, `DriverJobsScreen`, and `PartnerAccountScreen`:
+      - Connected Vendor Overview Card: Business name, verified badge (`Verified Towing Fleet`), owner contact, depot address with `MapPin`, and blue info callout.
+      - Vendor Assignments Section: Interactive job cards with booking number, service label, assigned fleet vehicle badge, action-needed amber badge (`DRIVER_ASSIGNED`), and 1-tap navigation to active job.
+      - Fleet Connection Rules Card: Explains Single Fleet Exclusivity and Fleet Removal Policy with clean icons and card elevation.
+      - Independent Driver State: Polished empty state explaining independent driver jobs vs fleet membership.
+- **Verification:**
+  - `mobile application/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+  - `backend/`: `npm run lint` (`tsc --noEmit`) -> **Exit code 0 (0 errors)**.
+  - `backend/`: `npx tsx src/scripts/verify-driver-ack-e2e.ts` -> **Exit code 0 (`ALL 21 E2E CHECKS PASSED`)**.
+
 ## Latest session — Partner Login & Role Selection Simplification (2026-10-19, branch changes-v6-partner-role-dispatch)
 
 - **Partner Entry & Role Selection Streamlining:**

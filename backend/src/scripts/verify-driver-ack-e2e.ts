@@ -324,7 +324,7 @@ async function main() {
     check('9a. Full-Time driver found in vendor search', foundFt);
     check('9b. Part-Time driver strictly excluded from vendor search', !foundPt);
 
-    // ── 10. Invitation lifecycle: Invite -> Pending -> Accept -> Active ──
+    // ── 10. Invitation lifecycle & exclusivity: Invite -> Accept -> Exclusive Fleet ──
     await driverVendorMembershipService.invite(vendorId.toString(), ftPhone);
     const invitations = await driverVendorMembershipService.listDriverInvitations(ftDriverId.toString());
     const inv = invitations.find((i) => i.vendor.id === vendorId.toString());
@@ -334,6 +334,43 @@ async function main() {
       await driverVendorMembershipService.respond(ftDriverId.toString(), inv.id, 'accept');
       const activeMembership = await driverVendorMembershipService.getDriverMembership(ftDriverId.toString());
       check('10b. driver accepts -> active membership created', activeMembership?.vendor?.id === vendorId.toString());
+
+      // Invariant: Once connected, driver invitations list MUST be empty (never show pending invites)
+      const postAcceptInvitations = await driverVendorMembershipService.listDriverInvitations(ftDriverId.toString());
+      check('10c. driver listDriverInvitations returns empty after accepting', postAcceptInvitations.length === 0);
+
+      // Create a second vendor to test exclusivity
+      const secondVendorId = new Types.ObjectId();
+      await UserModel.create({
+        _id: secondVendorId,
+        fullName: 'Second E2E Vendor',
+        mobileNumber: `+9199100${suffix}`,
+        email: `second-vendor-${suffix}@test.local`,
+        role: 'vendor',
+        isVerified: true,
+        vendorProfile: {
+          businessName: 'Apex Roadside',
+          ownerName: 'Second Vendor',
+          vendorType: 'towing_company',
+          status: 'approved',
+          address: 'Second Depot',
+        },
+      } as never);
+
+      // Second vendor searches for the driver: must show IN_ANOTHER_FLEET
+      const secondSearch = await driverVendorMembershipService.searchDrivers(secondVendorId.toString(), `Candidate ${suffix}`);
+      const ftInSecondSearch = secondSearch.find((d) => d.id === ftDriverId.toString());
+      check('10d. second vendor sees driver marked as IN_ANOTHER_FLEET', ftInSecondSearch?.membershipStatus === 'IN_ANOTHER_FLEET');
+
+      // Second vendor tries to invite connected driver: must be rejected / prevented
+      await driverVendorMembershipService.invite(secondVendorId.toString(), ftPhone);
+      const secondVendorInvites = await DriverVendorMembershipModel.find({
+        vendorUserId: secondVendorId,
+        driverUserId: ftDriverId,
+      }).exec();
+      check('10e. second vendor cannot invite driver who is active in another fleet', secondVendorInvites.length === 0);
+
+      await UserModel.deleteOne({ _id: secondVendorId });
     }
 
     console.log(failures === 0 ? '\nALL E2E CHECKS PASSED' : `\n${failures} CHECK(S) FAILED`);

@@ -1389,7 +1389,7 @@ export default function DriverDashboardScreen() {
       </View>
 
       {/* vendor fleet invitation card ------------------------------------ */}
-      {vendorInvitations.length > 0 ? (
+      {!driverMembership && vendorInvitations.length > 0 ? (
         <View
           style={{
             marginTop: px(10),

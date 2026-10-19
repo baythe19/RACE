@@ -307,9 +307,13 @@ export async function listDriverVendorInvitations(): Promise<DriverVendorInvitat
     return data.data ?? [];
   } catch (error) {
     if (UI_PREVIEW_MODE) {
-      // Once the driver accepts in preview, the invitation disappears —
-      // matching the real lifecycle.
-      return previewDriverMembership.current ? [] : previewInvitations;
+      // Invariant: If a driver is actively connected to a vendor fleet,
+      // they cannot have pending invitations.
+      const activeMembership = previewDriverMembership.current ?? MOCK_DRIVER_MEMBERSHIP;
+      if (activeMembership) {
+        return [];
+      }
+      return previewInvitations;
     }
     throw error;
   }

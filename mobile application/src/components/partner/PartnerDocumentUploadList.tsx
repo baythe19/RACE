@@ -135,11 +135,28 @@ export default function PartnerDocumentUploadList({
                 <Icon size={18} color={variant === 'card' ? uploaded ? SUCCESS_GREEN : colors.primary : colors.partnerRed} strokeWidth={2.2} />
               </View>
               <View style={variant === 'card' ? styles.cardCopy : styles.copy}>
-                <PartnerText style={variant === 'card' ? [styles.cardTitle, compact && styles.compactCardTitle] : styles.docTitle}>
+                <PartnerText
+                  numberOfLines={variant === 'card' && compact ? 2 : undefined}
+                  ellipsizeMode="tail"
+                  style={variant === 'card' ? [styles.cardTitle, compact && styles.compactCardTitle] : styles.docTitle}>
                   {doc.label}{variant === 'card' && doc.required && !compact ? <PartnerText style={styles.required}> *</PartnerText> : null}
                 </PartnerText>
-                {doc.hint ? <PartnerText style={styles.docHint}>{doc.hint}</PartnerText> : null}
-                {variant === 'card' || selectedFiles !== undefined ? (
+                {variant === 'card' && compact ? (
+                  <PartnerText
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    style={[
+                      styles.compactCardMeta,
+                      state?.status === 'error' && { color: colors.error },
+                    ]}>
+                    {state?.status === 'error'
+                      ? 'Upload failed. Tap Upload to try again.'
+                      : doc.hint || (doc.required ? 'Required for verification.' : 'Optional document.')}
+                  </PartnerText>
+                ) : doc.hint ? (
+                  <PartnerText style={styles.docHint}>{doc.hint}</PartnerText>
+                ) : null}
+                {variant === 'card' && compact ? null : variant === 'card' || selectedFiles !== undefined ? (
                   <PartnerText style={[styles.compactDocStatus, state?.status === 'error' && { color: colors.error }]}>{statusText}</PartnerText>
                 ) : (
                   <View style={[styles.badge, doc.required ? styles.badgeRequired : styles.badgeOptional]}>
@@ -346,11 +363,30 @@ const styles = StyleSheet.create({
   cardList: {
     gap: spacing.sm,
   },
-  compactCardRow: { gap: 7, paddingHorizontal: 8, paddingVertical: 6, minHeight: 58, borderRadius: 10 },
+  compactCardRow: { gap: 7, paddingHorizontal: 8, paddingVertical: 8, minHeight: 58, borderRadius: 10 },
   compactIconWrap: { width: 30, height: 30, borderRadius: 8 },
   compactCardTitle: { fontSize: 11, lineHeight: 14 },
+  compactCardMeta: {
+    fontSize: 9,
+    lineHeight: 13,
+    color: colors.grey,
+    marginTop: 3,
+    minHeight: 26,
+    maxHeight: 26,
+  },
   compactDocStatus: { fontSize: 9, color: colors.grey, marginTop: 3 },
-  compactUploadPill: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  compactUploadPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    minWidth: 76,
+    height: 32,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    borderRadius: 8,
+    gap: 4,
+  },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',

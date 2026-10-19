@@ -51,6 +51,16 @@ export class DriverVendorMembershipService {
     }
 
     const driverId = driver.id;
+
+    // A driver already connected to a fleet cannot receive invitations.
+    const activeExisting = await DriverVendorMembershipModel.exists({
+      driverUserId: driver._id,
+      status: 'ACTIVE',
+    });
+    if (activeExisting) {
+      return GENERIC_INVITE_RESULT;
+    }
+
     // P1: an expired stale invite must not block a fresh invitation.
     await DriverVendorMembershipModel.updateMany(
       {
@@ -139,6 +149,14 @@ export class DriverVendorMembershipService {
   }
 
   async listDriverInvitations(driverUserId: string) {
+    const hasActiveMembership = await DriverVendorMembershipModel.exists({
+      driverUserId: new Types.ObjectId(driverUserId),
+      status: 'ACTIVE',
+    });
+    if (hasActiveMembership) {
+      return [];
+    }
+
     // P1: hide + lazily expire invitations past their TTL.
     await DriverVendorMembershipModel.updateMany(
       {
@@ -235,6 +253,16 @@ export class DriverVendorMembershipService {
       throw new ConflictError('This Driver is already connected to another Towing Vendor');
     }
 
+    if (decision === 'accept') {
+      const activeExisting = await DriverVendorMembershipModel.findOne({
+        driverUserId: driver._id,
+        status: 'ACTIVE',
+      }).exec();
+      if (activeExisting && activeExisting._id.toString() !== membership._id.toString()) {
+        throw new ConflictError('You are already connected to another Towing Vendor fleet');
+      }
+    }
+
     // Retire vendor-issued credentials when the Driver explicitly answers.
     // If the state update races, the invitation remains pending and can be retried.
     if (legacyVendorId === vendor._id.toString()) {
@@ -266,6 +294,21 @@ export class DriverVendorMembershipService {
       { new: true, runValidators: true },
     ).exec();
     if (!updated) throw new ConflictError('Invitation state changed; refresh and try again');
+
+    if (decision === 'accept') {
+      // Invalidate and expire all other pending invitations for this driver
+      await DriverVendorMembershipModel.updateMany(
+        {
+          driverUserId: driver._id,
+          _id: { $ne: membership._id },
+          status: 'PENDING',
+        },
+        {
+          $set: { status: 'EXPIRED' },
+          $unset: { driverLockKey: 1 },
+        },
+      ).exec();
+    }
 
     try {
       await createNotification({
@@ -395,6 +438,7 @@ export class DriverVendorMembershipService {
       const activeForVendor = relevant.find((m) => m.vendorUserId.toString() === vendorIdStr && m.status === 'ACTIVE');
       const pendingForVendor = relevant.find((m) => m.vendorUserId.toString() === vendorIdStr && m.status === 'PENDING');
       const activeForOther = relevant.find((m) => m.vendorUserId.toString() !== vendorIdStr && m.status === 'ACTIVE');
+      const pendingForOther = relevant.find((m) => m.vendorUserId.toString() !== vendorIdStr && m.status === 'PENDING');
 
       let membershipStatus: 'AVAILABLE_FOR_INVITE' | 'INVITED_PENDING' | 'ALREADY_IN_FLEET' | 'IN_ANOTHER_FLEET' = 'AVAILABLE_FOR_INVITE';
       let invitationId: string | undefined;
@@ -405,7 +449,7 @@ export class DriverVendorMembershipService {
       } else if (pendingForVendor) {
         membershipStatus = 'INVITED_PENDING';
         invitationId = pendingForVendor._id.toString();
-      } else if (activeForOther) {
+      } else if (activeForOther || pendingForOther) {
         membershipStatus = 'IN_ANOTHER_FLEET';
       }
 
