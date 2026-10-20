@@ -69,7 +69,78 @@ export async function updateVendor(
   }
 }
 
+function previewPartnerRole(): 'vendor' | 'driver' {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const role = require('../../redux/store').store?.getState()?.auth?.user?.role;
+    return role === 'vendor' ? 'vendor' : 'driver';
+  } catch {
+    return 'driver';
+  }
+}
+
+function previewEarnings(): VendorEarnings {
+  const vendor = previewPartnerRole() === 'vendor';
+  const amounts = vendor
+    ? [3200, 4100, 2800, 5600, 1900, 2450, 4250]
+    : [1400, 980, 2100, 1650, 1250, 820, 1650];
+  const dailyEarnings = amounts.map((amount, index) => {
+    const day = new Date();
+    day.setDate(day.getDate() - (6 - index));
+    return { date: day.toISOString().slice(0, 10), amount };
+  });
+  const week = dailyEarnings.reduce((sum, day) => sum + day.amount, 0);
+  return {
+    currency: 'INR',
+    totals: {
+      today: amounts[6],
+      week,
+      month: vendor ? 48200 : 24600,
+      allTime: vendor ? 186400 : 96400,
+    },
+    payouts: [
+      {
+        id: 'preview-payout-1',
+        amount: vendor ? 12400 : 4200,
+        status: 'COMPLETED',
+        paidAt: new Date(Date.now() - 86400000).toISOString(),
+        description: 'Weekly settlement',
+      },
+      {
+        id: 'preview-payout-2',
+        amount: vendor ? 9800 : 3100,
+        status: 'COMPLETED',
+        paidAt: new Date(Date.now() - 86400000 * 8).toISOString(),
+        description: 'Weekly settlement',
+      },
+      {
+        id: 'preview-payout-3',
+        amount: vendor ? 15200 : 5400,
+        status: 'COMPLETED',
+        paidAt: new Date(Date.now() - 86400000 * 15).toISOString(),
+        description: 'Weekly settlement',
+      },
+    ],
+    dailyEarnings,
+  };
+}
+
+function previewPayoutAccount(): PayoutAccount {
+  const vendor = previewPartnerRole() === 'vendor';
+  return {
+    payoutMethod: 'bank',
+    accountHolderName: vendor ? 'Kalinga Towing & Logistics Services' : 'Abhishek Sharma',
+    accountNumberMasked: vendor ? '************7890' : '************4412',
+    ifsc: 'SBIN0001234',
+    bankName: 'State Bank of India',
+    isVerified: true,
+    verifiedAt: new Date(Date.now() - 86400000 * 12).toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export async function getVendorProfile(): Promise<VendorProfileResponse> {
+  if (UI_PREVIEW_MODE) return MOCK_VENDOR_STATUS;
   try {
     const { data } = await apiClient.get<ApiSuccessResponse<VendorProfileResponse>>(
       API_ENDPOINTS.vendorProfile,
@@ -84,6 +155,7 @@ export async function getVendorProfile(): Promise<VendorProfileResponse> {
 }
 
 export async function getVendorStatus(): Promise<VendorProfileResponse> {
+  if (UI_PREVIEW_MODE) return MOCK_VENDOR_STATUS;
   try {
     const { data } = await apiClient.get<ApiSuccessResponse<VendorProfileResponse>>(
       API_ENDPOINTS.vendorStatus,
@@ -97,7 +169,7 @@ export async function getVendorStatus(): Promise<VendorProfileResponse> {
   }
 }
 
-/* ── Payout account & earnings (real backend, no mock defaults) ── */
+/* ── Payout account & earnings. Preview mode fills the chart and a verified account. ── */
 
 export interface PayoutAccount {
   payoutMethod: 'bank' | 'upi';
@@ -132,6 +204,7 @@ export interface VendorEarnings {
  * screen functional when the real API is unreachable.
  */
 export async function getPayoutAccount(): Promise<PayoutAccount> {
+  if (UI_PREVIEW_MODE) return previewPayoutAccount();
   try {
     const { data } = await apiClient.get<ApiSuccessResponse<PayoutAccount>>(
       API_ENDPOINTS.vendorPayoutAccount,
@@ -192,29 +265,14 @@ export async function savePayoutAccount(payload: SavePayoutAccountRequest): Prom
 }
 
 export async function getVendorEarnings(): Promise<VendorEarnings> {
+  if (UI_PREVIEW_MODE) return previewEarnings();
   try {
     const { data } = await apiClient.get<ApiSuccessResponse<VendorEarnings>>(
       API_ENDPOINTS.vendorEarnings,
     );
     return data.data;
   } catch (error) {
-    if (UI_PREVIEW_MODE && axios.isAxiosError(error)) {
-      const status = error.response?.status;
-      if (status === 404 || status === 401 || status === 403) {
-        // Demo vendor: honest zero-state instead of a dead Retry screen.
-        const dashes = Array.from({ length: 7 }, (_, i) => {
-          const day = new Date();
-          day.setDate(day.getDate() - (6 - i));
-          return { date: day.toISOString().slice(0, 10), amount: 0 };
-        });
-        return {
-          currency: 'INR',
-          totals: { today: 0, week: 0, month: 0, allTime: 0 },
-          payouts: [],
-          dailyEarnings: dashes,
-        };
-      }
-    }
+    if (UI_PREVIEW_MODE) return previewEarnings();
     throw error;
   }
 }
@@ -226,6 +284,7 @@ export interface VendorDashboardStats {
 }
 
 export async function getVendorDashboard(): Promise<VendorDashboardStats> {
+  if (UI_PREVIEW_MODE) return MOCK_VENDOR_DASHBOARD;
   try {
     const { data } = await apiClient.get<ApiSuccessResponse<VendorDashboardStats>>(
       API_ENDPOINTS.vendorDashboard,

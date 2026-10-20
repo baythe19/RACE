@@ -268,24 +268,35 @@ export default function DriverMyVendorScreen() {
       }}
       contentStyle={{ paddingTop: px(12), paddingBottom: px(40) }}>
       {UI_PREVIEW_MODE ? (
-        <View style={[styles.previewRow, { marginBottom: px(12), gap: px(6) }]}>
-          {PREVIEW_SCENARIOS.map(item => {
-            const selected = previewScenario === item.id;
-            return (
-              <Pressable
-                key={item.id}
-                onPress={() => applyPreviewScenario(item.id)}
-                style={[
-                  styles.previewChip,
-                  selected && styles.previewChipOn,
-                  { paddingHorizontal: px(8), paddingVertical: px(5), borderRadius: px(8) },
-                ]}>
-                <PartnerText style={[styles.previewChipText, selected && styles.previewChipTextOn, { fontSize: px(11) }]}>
-                  {item.label}
-                </PartnerText>
-              </Pressable>
-            );
-          })}
+        <View style={{ marginBottom: px(12), gap: px(6) }}>
+          <PartnerText
+            style={{
+              fontSize: px(10),
+              fontWeight: '800',
+              letterSpacing: 0.6,
+              color: '#B45309',
+            }}>
+            UI TEST · SCENARIOS
+          </PartnerText>
+          <View style={[styles.previewRow, { gap: px(6) }]}>
+            {PREVIEW_SCENARIOS.map(item => {
+              const selected = previewScenario === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => applyPreviewScenario(item.id)}
+                  style={[
+                    styles.previewChip,
+                    selected && styles.previewChipOn,
+                    { paddingHorizontal: px(8), paddingVertical: px(5), borderRadius: px(8) },
+                  ]}>
+                  <PartnerText style={[styles.previewChipText, selected && styles.previewChipTextOn, { fontSize: px(11) }]}>
+                    {item.label}
+                  </PartnerText>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
       ) : null}
       {membership.isLoading ? (
@@ -652,8 +663,8 @@ export default function DriverMyVendorScreen() {
 
       <Modal visible={rulesOpen} transparent animationType="fade" onRequestClose={() => setRulesOpen(false)}>
         <Pressable style={styles.rulesBackdrop} onPress={() => setRulesOpen(false)}>
-          <Pressable style={[styles.rulesSheet, { borderRadius: px(16), padding: px(16) }]} onPress={event => event.stopPropagation()}>
-            <View style={styles.rulesHeader}>
+          <Pressable style={[styles.rulesSheet, { borderRadius: px(16), padding: px(16), shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 12 }]} onPress={event => event.stopPropagation()}>
+            <View style={[styles.rulesHeader, { paddingBottom: px(10), borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.hairline }]}>
               <PartnerText style={[styles.policyHeading, { fontSize: px(16) }]}>Fleet rules</PartnerText>
               <Pressable hitSlop={10} onPress={() => setRulesOpen(false)}>
                 <X size={px(18)} color={C.ink} />
@@ -687,6 +698,19 @@ export default function DriverMyVendorScreen() {
                 </PartnerText>
               </View>
             </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setRulesOpen(false)}
+              style={({ pressed }) => ({
+                marginTop: px(16),
+                height: px(44),
+                borderRadius: px(12),
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: pressed ? '#E8EAEE' : '#F2F4F7',
+              })}>
+              <PartnerText style={{ color: C.ink, fontSize: px(14), fontWeight: '700' }}>OK</PartnerText>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -705,15 +729,15 @@ const styles = StyleSheet.create({
     borderColor: C.hairline,
   },
   previewChipOn: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
   },
   previewChipText: {
     color: C.grey,
     fontWeight: '600',
   },
   previewChipTextOn: {
-    color: C.white,
+    color: '#92400E',
   },
   historyRow: {
     flexDirection: 'row',
@@ -733,10 +757,14 @@ const styles = StyleSheet.create({
   rulesBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(17, 24, 39, 0.45)',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
   },
   rulesSheet: {
     backgroundColor: C.white,
+    width: '100%',
+    maxWidth: 320,
   },
   rulesHeader: {
     flexDirection: 'row',

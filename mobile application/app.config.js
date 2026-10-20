@@ -3,14 +3,16 @@ const googleMapsApiKey =
   process.env.GOOGLE_MAPS_API_KEY ??
   '';
 
+const isMockApk = process.env.EXPO_PUBLIC_UI_PREVIEW_RELEASE === 'true';
+
 module.exports = {
   expo: {
-    name: 'RACE Partner',
+    name: isMockApk ? 'RACE Partner Mock' : 'RACE Partner',
     slug: 'race-partners',
-    owner: 'race-service',
+    owner: 'webstarts',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './src/assets/images/logo.png',
+    icon: './src/assets/images/icon-1024.png',
     userInterfaceStyle: 'light',
     splash: {
       image: './src/assets/images/logo.png',
@@ -30,7 +32,7 @@ module.exports = {
       versionCode: 2,
       softwareKeyboardLayoutMode: 'resize',
       adaptiveIcon: {
-        foregroundImage: './src/assets/images/logo.png',
+        foregroundImage: './src/assets/images/icon-1024.png',
         backgroundColor: '#232323',
       },
       config: {
@@ -82,6 +84,9 @@ module.exports = {
     extra: {
       apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'https://race-api-w361.onrender.com',
       googleMapsApiKey,
+      eas: {
+        projectId: '7ec95498-c8a2-44c4-a013-f7a44f95c367',
+      },
     },
   },
 };

@@ -21,6 +21,10 @@ export const OFF_ROUTE_METERS = 60;
 export const REROUTE_MOVE_METERS = 80;
 export const REROUTE_MIN_INTERVAL_MS = 20_000;
 export const NEAR_PICKUP_METERS = 150;
+/** Within this distance the Arrived button is emphasised (never auto-tapped). */
+export const ARRIVAL_PROMPT_METERS = 60;
+/** A fix this far off the route is treated as off route immediately. */
+export const OFF_ROUTE_HARD_METERS = 120;
 
 const EARTH_METERS = 6_371_000;
 
@@ -113,4 +117,201 @@ export function shouldRefreshRoute(input: {
 export function formatKm(km: number): string {
   if (km < 1) return `${Math.max(1, Math.round(km * 1000))} m`;
   return `${km.toFixed(km < 10 ? 1 : 0)} km`;
+}
+
+/** Bearing in degrees (0 = north, clockwise) from `a` to `b`. */
+export function bearingDegrees(a: LatLng, b: LatLng): number {
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const y = Math.sin(dLng) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+  const deg = (Math.atan2(y, x) * 180) / Math.PI;
+  return (deg + 360) % 360;
+}
+
+/* ------------------------------------------------------------------ *
+ * Route progress (snap-to-route) — the maths behind turn-by-turn.     *
+ * ------------------------------------------------------------------ */
+
+export type PathProgress = {
+  /** Index of the path segment start the driver is on. */
+  index: number;
+  /** Driver position projected onto the route. */
+  snapped: LatLng;
+  /** How far the raw GPS fix is from the route. */
+  offMeters: number;
+  /** Metres travelled along the route up to the snapped point. */
+  alongMeters: number;
+  totalMeters: number;
+  remainingMeters: number;
+};
+
+const cumulativeCache = new WeakMap<LatLng[], number[]>();
+
+/** Cumulative metres at every vertex of the path (memoised per path array). */
+export function pathCumulativeMeters(path: LatLng[]): number[] {
+  const cached = cumulativeCache.get(path);
+  if (cached) return cached;
+  const cumulative: number[] = [0];
+  for (let i = 1; i < path.length; i += 1) {
+    cumulative.push(cumulative[i - 1] + haversineMeters(path[i - 1], path[i]));
+  }
+  cumulativeCache.set(path, cumulative);
+  return cumulative;
+}
+
+/** Projects `point` onto the nearest segment of `path`. */
+export function progressAlongPath(point: LatLng, path: LatLng[]): PathProgress | null {
+  if (path.length === 0) return null;
+  const cumulative = pathCumulativeMeters(path);
+  const totalMeters = cumulative[cumulative.length - 1];
+  if (path.length === 1) {
+    return {
+      index: 0,
+      snapped: path[0],
+      offMeters: haversineMeters(point, path[0]),
+      alongMeters: 0,
+      totalMeters: 0,
+      remainingMeters: 0,
+    };
+  }
+
+  const lat0 = toRad(point.latitude);
+  const mPerDegLat = 111_320;
+  const mPerDegLng = 111_320 * Math.cos(lat0);
+  let best = Number.POSITIVE_INFINITY;
+  let bestIndex = 0;
+  let bestT = 0;
+
+  for (let i = 1; i < path.length; i += 1) {
+    const a = path[i - 1];
+    const b = path[i];
+    const ax = (a.longitude - point.longitude) * mPerDegLng;
+    const ay = (a.latitude - point.latitude) * mPerDegLat;
+    const bx = (b.longitude - point.longitude) * mPerDegLng;
+    const by = (b.latitude - point.latitude) * mPerDegLat;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, (-ax * dx + -ay * dy) / len2));
+    const dist = Math.hypot(ax + t * dx, ay + t * dy);
+    if (dist < best) {
+      best = dist;
+      bestIndex = i - 1;
+      bestT = t;
+    }
+  }
+
+  const a = path[bestIndex];
+  const b = path[bestIndex + 1];
+  const snapped = {
+    latitude: a.latitude + (b.latitude - a.latitude) * bestT,
+    longitude: a.longitude + (b.longitude - a.longitude) * bestT,
+  };
+  const alongMeters = cumulative[bestIndex] + (cumulative[bestIndex + 1] - cumulative[bestIndex]) * bestT;
+  return {
+    index: bestIndex,
+    snapped,
+    offMeters: best,
+    alongMeters,
+    totalMeters,
+    remainingMeters: Math.max(0, totalMeters - alongMeters),
+  };
+}
+
+/** Point `meters` along the path plus the heading of the segment it sits on. */
+export function pointAlongPath(
+  path: LatLng[],
+  meters: number,
+): { point: LatLng; heading: number; index: number } | null {
+  if (path.length === 0) return null;
+  if (path.length === 1) return { point: path[0], heading: 0, index: 0 };
+  const cumulative = pathCumulativeMeters(path);
+  const total = cumulative[cumulative.length - 1];
+  const target = Math.max(0, Math.min(total, meters));
+  let i = 1;
+  while (i < path.length - 1 && cumulative[i] < target) i += 1;
+  const a = path[i - 1];
+  const b = path[i];
+  const span = cumulative[i] - cumulative[i - 1];
+  const t = span === 0 ? 0 : (target - cumulative[i - 1]) / span;
+  return {
+    point: {
+      latitude: a.latitude + (b.latitude - a.latitude) * t,
+      longitude: a.longitude + (b.longitude - a.longitude) * t,
+    },
+    heading: bearingDegrees(a, b),
+    index: i - 1,
+  };
+}
+
+/** Moves `from` by `meters` along `bearing` (degrees, 0 = north). */
+export function offsetPoint(from: LatLng, bearing: number, meters: number): LatLng {
+  const rad = toRad(bearing);
+  const dLat = (meters * Math.cos(rad)) / 111_320;
+  const dLng = (meters * Math.sin(rad)) / (111_320 * Math.cos(toRad(from.latitude)));
+  return { latitude: from.latitude + dLat, longitude: from.longitude + dLng };
+}
+
+type StepLike = { coordinate: LatLng };
+const stepAlongCache = new WeakMap<object, number[]>();
+
+/** Metres along `path` at which each manoeuvre begins (memoised per steps array). */
+export function stepStartMeters(steps: StepLike[], path: LatLng[]): number[] {
+  const cached = stepAlongCache.get(steps);
+  if (cached) return cached;
+  let floor = 0;
+  const result = steps.map(step => {
+    // Steps run in order along the route; never let a snap jump backwards.
+    const along = progressAlongPath(step.coordinate, path)?.alongMeters ?? floor;
+    floor = Math.max(floor, along);
+    return floor;
+  });
+  stepAlongCache.set(steps, result);
+  return result;
+}
+
+/**
+ * The manoeuvre the driver is approaching.
+ *
+ * Both Google Routes and OSRM describe step *i* with the manoeuvre that happens
+ * at the START of that step ("Turn left onto X" begins where X begins). So while
+ * driving step *i*, the banner must show step *i + 1*'s instruction, counted
+ * down to where step *i + 1* starts. Distance is measured along the route from
+ * the live GPS fix, never a frozen number from route calculation.
+ */
+export function resolveUpcomingManeuver<T extends StepLike>(
+  steps: T[],
+  path: LatLng[],
+  alongMeters: number,
+): { step: T; next: T | null; index: number; distanceMeters: number } | null {
+  if (steps.length === 0) return null;
+  if (steps.length === 1) {
+    return { step: steps[0], next: null, index: 0, distanceMeters: 0 };
+  }
+  const starts = stepStartMeters(steps, path);
+  // Step 0 is "depart"; the first real manoeuvre is step 1.
+  let index = steps.length - 1;
+  for (let i = 1; i < steps.length; i += 1) {
+    if (starts[i] - alongMeters > 12) {
+      index = i;
+      break;
+    }
+  }
+  return {
+    step: steps[index],
+    next: steps[index + 1] ?? null,
+    index,
+    distanceMeters: Math.max(0, Math.round(starts[index] - alongMeters)),
+  };
+}
+
+/** Compact distance for turn banners: 40 m, 350 m, 1.2 km. */
+export function formatManeuverDistance(meters: number): string {
+  if (meters < 1000) {
+    const rounded = meters < 100 ? Math.round(meters / 10) * 10 : Math.round(meters / 50) * 50;
+    return `${Math.max(rounded, 10)} m`;
+  }
+  return `${(meters / 1000).toFixed(meters < 10_000 ? 1 : 0)} km`;
 }

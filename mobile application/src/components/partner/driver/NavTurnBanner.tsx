@@ -1,142 +1,102 @@
 import React from 'react';
 import { StyleSheet, View, Text, Pressable } from 'react-native';
-import {
-  CornerUpLeft,
-  CornerUpRight,
-  ArrowUpLeft,
-  ArrowUpRight,
-  ArrowUp,
-  RotateCcw,
-  Navigation,
-  MapPin,
-  Mic,
-  Volume2,
-  VolumeX,
-  Compass,
-  LocateFixed,
-} from 'lucide-react-native';
-import type { RouteManeuverStep, ManeuverType } from '../../../services/driver/roadRoutingService';
+import { Volume2, VolumeX, Compass, LocateFixed } from 'lucide-react-native';
+import type { RouteManeuverStep } from '../../../services/driver/roadRoutingService';
+import { formatManeuverDistance } from '../../../services/driver/tripNavigation';
+import ManeuverIcon from './ManeuverIcon';
 
 interface Props {
+  /** The manoeuvre being approached (already the *upcoming* one, see resolveUpcomingManeuver). */
   currentStep?: RouteManeuverStep | null;
-  voiceMuted: boolean;
-  onToggleVoice: () => void;
+  /** Live metres to that manoeuvre, measured along the route from the GPS fix. */
+  distanceMeters?: number;
+  /** The manoeuvre after this one, shown as "Then …". */
+  nextStep?: RouteManeuverStep | null;
+  /** Optional: only rendered when voice guidance is actually available. */
+  voiceMuted?: boolean;
+  onToggleVoice?: () => void;
   compassHeadingUp: boolean;
   onToggleCompass: () => void;
   onRecenter: () => void;
+  /** Show the re-centre button only after the driver panned the map away. */
+  showRecenter?: boolean;
   insetsTop?: number;
-}
-
-function renderManeuverIcon(type?: ManeuverType) {
-  const size = 26;
-  const color = '#FFFFFF';
-  const strokeWidth = 2.8;
-
-  switch (type) {
-    case 'turn_left':
-      return <CornerUpLeft size={size} color={color} strokeWidth={strokeWidth} />;
-    case 'turn_right':
-      return <CornerUpRight size={size} color={color} strokeWidth={strokeWidth} />;
-    case 'slight_left':
-      return <ArrowUpLeft size={size} color={color} strokeWidth={strokeWidth} />;
-    case 'slight_right':
-      return <ArrowUpRight size={size} color={color} strokeWidth={strokeWidth} />;
-    case 'u_turn':
-      return <RotateCcw size={size} color={color} strokeWidth={strokeWidth} />;
-    case 'arrive':
-      return <MapPin size={size} color={color} strokeWidth={strokeWidth} />;
-    case 'straight':
-    default:
-      return <ArrowUp size={size} color={color} strokeWidth={strokeWidth} />;
-  }
 }
 
 export default function NavTurnBanner({
   currentStep,
-  voiceMuted,
+  distanceMeters,
+  nextStep,
+  voiceMuted = false,
   onToggleVoice,
   compassHeadingUp,
   onToggleCompass,
   onRecenter,
+  showRecenter = true,
   insetsTop = 0,
 }: Props) {
-  const distanceLabel = currentStep
-    ? currentStep.distanceMeters < 1000
-      ? `${currentStep.distanceMeters} m`
-      : `${(currentStep.distanceMeters / 1000).toFixed(1)} km`
-    : '650 m';
-
-  const instructionLabel =
-    currentStep?.instruction || 'Turn left onto NH-16';
+  const meters = distanceMeters ?? currentStep?.distanceMeters ?? 0;
+  const arriving = currentStep?.maneuverType === 'arrive';
+  const distanceLabel = !currentStep ? '—' : arriving && meters < 15 ? 'Now' : formatManeuverDistance(meters);
+  const instructionLabel = currentStep?.instruction || 'Finding best route…';
+  const nextLabel =
+    nextStep && nextStep.maneuverType !== 'arrive'
+      ? nextStep.shortInstruction || nextStep.instruction
+      : null;
 
   return (
     <View style={[styles.root, { top: insetsTop + 8 }]} pointerEvents="box-none">
-      {/* Top Turn Navigation Card */}
       <View style={styles.bannerContainer}>
-        {/* Left: Maneuver Icon */}
-        <View style={styles.iconCircle}>
-          {renderManeuverIcon(currentStep?.maneuverType)}
-        </View>
-
-        {/* Center: Distance & Turn Instruction */}
+        <View style={styles.iconCircle}><ManeuverIcon type={currentStep?.maneuverType} size={28} /></View>
         <View style={styles.textColumn}>
           <Text style={styles.distanceText}>{distanceLabel}</Text>
           <Text style={styles.instructionText} numberOfLines={2}>
             {instructionLabel}
           </Text>
         </View>
-
-        {/* Right: Mic Audio Indicator */}
-        <View style={styles.micContainer}>
-          <Mic size={18} color="#A7F3D0" strokeWidth={2.4} />
-        </View>
       </View>
+      {nextLabel ? (
+        <View style={styles.thenPill}>
+          <Text style={styles.thenLabel}>Then</Text>
+          <View style={styles.thenIcon}><ManeuverIcon type={nextStep?.maneuverType} size={14} /></View>
+          <Text style={styles.thenText} numberOfLines={1}>
+            {nextLabel}
+          </Text>
+        </View>
+      ) : null}
 
-      {/* Floating Right Navigation Controls (Mute, Compass, Recenter) */}
       <View style={styles.controlsColumn} pointerEvents="auto">
-        {/* Voice Guidance Toggle */}
-        <Pressable
-          onPress={onToggleVoice}
-          accessibilityRole="button"
-          accessibilityLabel={voiceMuted ? 'Unmute voice navigation' : 'Mute voice navigation'}
-          style={({ pressed }) => [
-            styles.circleButton,
-            pressed && styles.circleButtonPressed,
-          ]}>
-          {voiceMuted ? (
-            <VolumeX size={19} color="#64748B" strokeWidth={2.4} />
-          ) : (
-            <Volume2 size={19} color="#0F172A" strokeWidth={2.4} />
-          )}
-        </Pressable>
+        {onToggleVoice ? (
+          <Pressable
+            onPress={onToggleVoice}
+            accessibilityRole="button"
+            accessibilityLabel={voiceMuted ? 'Unmute voice navigation' : 'Mute voice navigation'}
+            style={({ pressed }) => [styles.circleButton, pressed && styles.circleButtonPressed]}>
+            {voiceMuted ? (
+              <VolumeX size={19} color="#64748B" strokeWidth={2.4} />
+            ) : (
+              <Volume2 size={19} color="#0F172A" strokeWidth={2.4} />
+            )}
+          </Pressable>
+        ) : null}
 
-        {/* Compass / Heading Mode */}
         <Pressable
           onPress={onToggleCompass}
           accessibilityRole="button"
-          accessibilityLabel="Toggle compass view"
-          style={({ pressed }) => [
-            styles.circleButton,
-            pressed && styles.circleButtonPressed,
-          ]}>
-          <Compass
-            size={19}
-            color={compassHeadingUp ? '#2563EB' : '#0F172A'}
-            strokeWidth={2.4}
-          />
+          accessibilityLabel={compassHeadingUp ? 'Switch to north-up map' : 'Switch to heading-up map'}
+          style={({ pressed }) => [styles.circleButton, pressed && styles.circleButtonPressed]}>
+          <Compass size={19} color={compassHeadingUp ? '#2563EB' : '#0F172A'} strokeWidth={2.4} />
         </Pressable>
 
-        {/* Recenter Map */}
-        <Pressable
-          onPress={onRecenter}
-          accessibilityRole="button"
-          accessibilityLabel="Recenter location"
-          style={({ pressed }) => [
-            styles.circleButton,
-            pressed && styles.circleButtonPressed,
-          ]}>
-          <LocateFixed size={19} color="#0F172A" strokeWidth={2.4} />
-        </Pressable>
+        {showRecenter ? (
+          <Pressable
+            onPress={onRecenter}
+            accessibilityRole="button"
+            accessibilityLabel="Recenter location"
+            style={({ pressed }) => [styles.circleButton, pressed && styles.circleButtonPressed]}>
+            <LocateFixed size={19} color="#2563EB" strokeWidth={2.4} />
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
@@ -189,19 +149,39 @@ const styles = StyleSheet.create({
     marginTop: 2,
     lineHeight: 18,
   },
-  micContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  thenPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 10,
+    maxWidth: '80%',
+    marginTop: 6,
+    marginLeft: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    backgroundColor: '#065F46',
+    borderWidth: 1,
+    borderColor: '#047857',
+  },
+  thenLabel: {
+    color: '#A7F3D0',
+    fontSize: 11.5,
+    fontWeight: '700',
+    marginRight: 6,
+  },
+  thenIcon: {
+    marginRight: 6,
+  },
+  thenText: {
+    flexShrink: 1,
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '600',
   },
   controlsColumn: {
     position: 'absolute',
     right: 0,
-    top: 86,
+    top: 118,
     gap: 10,
   },
   circleButton: {

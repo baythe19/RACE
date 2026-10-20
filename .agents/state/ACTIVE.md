@@ -1,11 +1,24 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-19
+> **Updated:** 2026-10-20
 > **Read this first in every new session.**
 
 ---
 
-## Latest session — Rapido/Uber 12-Screen Navigation & Active Job Blueprint Overhaul (2026-10-19, branch changes-v6-partner-role-dispatch)
+## Latest session — Handoff, in-app driver navigation (2026-10-20, branch changes-v6-partner-role-dispatch)
+
+Session stopped so the same work can continue on another machine. Pull this branch. Reconnect Cursor plugins from `docs/ops/CURSOR_MCP_SETUP.md`. No API keys are stored in the repo.
+
+Navigation that is in the tree and was seen in Peach:
+
+- Mock trip is Bhopal: Mandideep pickup, MP Nagar drop, random nearby driver start. Preview driver moves along the fetched road route.
+- Turn-by-turn stays in the app for both legs. No external maps link.
+- Arrived sheet has one OTP entry. After OTP the drop leg starts.
+- At-drop sheet keeps Call customer only. Message and Share location are removed.
+
+Still open: Complete job → Job completed summary, wrong-turn off-route retest, weak GPS sheet. Peach does not render the route polyline.
+
+## Previous session — Rapido/Uber 12-Screen Navigation & Active Job Blueprint Overhaul (2026-10-19, branch changes-v6-partner-role-dispatch)
 
 - **Comprehensive 12-Screen Navigation & Active Job Overhaul:**
   - **Eliminated Straight Line Fallbacks:**

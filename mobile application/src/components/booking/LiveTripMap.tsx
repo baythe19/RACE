@@ -11,7 +11,7 @@ import Svg, { Circle, Path, Rect, G } from 'react-native-svg';
 
 import { BHUBANESWAR_DEFAULT } from '../../utils/googleMaps';
 import { colors } from '../../theme';
-import { haversineKm, type LatLng } from '../../services/driver/tripNavigation';
+import { haversineKm, offsetPoint, type LatLng } from '../../services/driver/tripNavigation';
 import {
   fetchRoadRoute,
   type RoadRouteResult,
@@ -32,6 +32,12 @@ export type RouteMeta = {
   approximate?: boolean;
 };
 
+/** How navigation mode should drive the camera. */
+export type NavigationCamera = {
+  follow: boolean;
+  headingUp: boolean;
+};
+
 type Props = {
   pickup?: MapPoint | null;
   dropoff?: MapPoint | null;
@@ -45,6 +51,8 @@ type Props = {
   pickupColor?: string;
   dropoffColor?: string;
   recenterTrigger?: number;
+  /** Bump to discard the cached route and re-request guidance ("Refresh route"). */
+  routeRefreshKey?: number;
   /** Render the deterministic board-style map used by the driver preview. */
   previewMap?: boolean;
   /** Fetch a road-following route when both coordinates and a Maps key exist. */
@@ -61,8 +69,18 @@ type Props = {
   vehicleHeading?: number;
   vehicleType?: 'tow_truck' | 'car';
   isOffRoute?: boolean;
+  /** Long-press on the map turns follow off so the driver can look ahead. */
+  onUserPan?: () => void;
   onRouteCalculated?: (route: RoadRouteResult) => void;
   onRouteMetaChange?: (meta: RouteMeta | null) => void;
+  /** Follow/re-centre + 3D heading-up behaviour while navigating. */
+  navigationCamera?: NavigationCamera;
+  /**
+   * Route geometry owned by the caller (e.g. `useDriverRoute`). When provided the
+   * map draws exactly this path and never calls the routing API itself, so a
+   * moving vehicle does not trigger a request per GPS tick.
+   */
+  routePathOverride?: LatLng[] | null;
 };
 
 function isValidPoint(point?: MapPoint | null): point is MapPoint {
@@ -124,6 +142,7 @@ export default function LiveTripMap({
   pickupColor = '#16A34A',
   dropoffColor = colors.error,
   recenterTrigger,
+  routeRefreshKey = 0,
   previewMap = false,
   routeApiEnabled = true,
   straightFallback = false,
@@ -132,9 +151,13 @@ export default function LiveTripMap({
   vehicleHeading = 0,
   vehicleType = 'tow_truck',
   isOffRoute = false,
+  onUserPan,
   onRouteCalculated,
   onRouteMetaChange,
+  navigationCamera,
+  routePathOverride,
 }: Props) {
+  const externalRoute = routePathOverride !== undefined;
   const mapRef = useRef<MapView>(null);
   const [roadRoute, setRoadRoute] = useState<MapPoint[]>([]);
   const [routeApproximate, setRouteApproximate] = useState(false);
@@ -161,6 +184,22 @@ export default function LiveTripMap({
           : null,
     [activeDestination, dropoff],
   );
+  /**
+   * Single source of truth for the drawn geometry: the road route we fetched,
+   * or a straight guide when we have none. Nav screens, tracking, and the
+   * off-route check all read this — nothing else invents a polyline.
+   */
+  const guideCoordinates = useMemo(
+    () =>
+      externalRoute
+        ? (routePathOverride ?? [])
+        : roadRoute.length >= 2
+        ? roadRoute
+        : isValidPoint(routeOrigin) && isValidPoint(routeDestination)
+          ? [routeOrigin as MapPoint, routeDestination as MapPoint]
+          : [],
+    [externalRoute, roadRoute, routeDestination, routeOrigin, routePathOverride],
+  );
 
   const pointKey = [
     isValidPoint(driverLocation) ? `${driverLocation.latitude},${driverLocation.longitude}` : '',
@@ -174,6 +213,11 @@ export default function LiveTripMap({
 
   const points = useMemo(() => {
     const list: MapPoint[] = [];
+    if (isValidPoint(driverLocation) && isValidPoint(activeDestination)) {
+      // Active-trip overview frames the leg being driven; the other pin stays on
+      // the map but must not zoom the camera out across the whole city.
+      return [driverLocation, activeDestination];
+    }
     if (isValidPoint(driverLocation)) list.push(driverLocation);
     if (isValidPoint(pickup)) list.push(pickup);
     if (isValidPoint(dropoff)) list.push(dropoff);
@@ -207,6 +251,7 @@ export default function LiveTripMap({
   useEffect(() => {
     const origin = routeOrigin;
     const destination = routeDestination;
+    if (externalRoute) return undefined;
     if (previewMap || !origin || !destination) {
       setRoadRoute([]);
       setRouteApproximate(false);
@@ -251,28 +296,51 @@ export default function LiveTripMap({
     return () => {
       cancelled = true;
     };
-  }, [destinationKey, originKey, previewMap, routeApiEnabled, straightFallback]);
+  }, [destinationKey, externalRoute, originKey, previewMap, routeApiEnabled, straightFallback, routeRefreshKey]);
 
-  // Turn-by-turn navigation camera tracking
+  /**
+   * Navigation camera (Google/Uber-style): while the driver moves, follow the
+   * fix in 3D, pitched and heading-up (or north-up when the driver toggles
+   * compass mode). Coordinates are rounded to ~5 m so the camera animates on
+   * real movement instead of every jittery GPS tick.
+   */
+  const follow = navigationCamera?.follow ?? navigationMode;
+  const headingUp = navigationCamera?.headingUp ?? true;
+  const cameraKey = isValidPoint(driverLocation)
+    ? `${driverLocation.latitude.toFixed(5)}:${driverLocation.longitude.toFixed(5)}:${Math.round(
+        vehicleHeading,
+      )}:${follow}:${headingUp}`
+    : 'none';
   useEffect(() => {
-    if (navigationMode && isValidPoint(driverLocation) && mapRef.current) {
-      mapRef.current.animateCamera(
-        {
-          center: {
-            latitude: driverLocation.latitude,
-            longitude: driverLocation.longitude,
-          },
-          pitch: 42,
-          heading: vehicleHeading || 0,
-          altitude: 400,
-          zoom: 17,
-        },
-        { duration: 600 },
-      );
-    }
-  }, [driverLocation, navigationMode, vehicleHeading]);
+    if (!follow || !isValidPoint(driverLocation) || !mapRef.current) return;
+    // Keep the vehicle in the lower third of the screen like Google Maps, so the
+    // road ahead (and the turn banner's subject) is what fills the view.
+    const center = headingUp
+      ? offsetPoint(driverLocation, vehicleHeading || 0, 70)
+      : driverLocation;
+    mapRef.current.animateCamera(
+      {
+        center,
+        pitch: headingUp ? 50 : 0,
+        heading: headingUp ? vehicleHeading || 0 : 0,
+        altitude: 380,
+        zoom: 17.2,
+      },
+      { duration: 480 },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraKey, follow, headingUp]);
 
-  const displayRouteCoords = roadRoute.length >= 2 ? roadRoute : [];
+  // Overview mode: keep the whole active leg (driver + destination) framed.
+  useEffect(() => {
+    // While navigating but panned away, the driver owns the camera.
+    if (follow || navigationMode || !mapRef.current) return;
+    mapRef.current.animateToRegion(region, 450);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [frameKey, follow]);
+
+  const displayRouteCoords = guideCoordinates;
+  const lineIsApproximate = externalRoute ? guideCoordinates.length <= 2 : routeApproximate;
 
   const preview = previewMap ? (
     <PreviewMap
@@ -296,7 +364,10 @@ export default function LiveTripMap({
           initialRegion={region}
           region={holdFrame && !navigationMode ? region : undefined}
           onRegionChangeComplete={(_next, details) => {
-            if (details?.isGesture) setHoldFrame(false);
+            if (details?.isGesture) {
+              setHoldFrame(false);
+              if (navigationMode) onUserPan?.();
+            }
           }}
           mapType="standard"
           loadingEnabled
@@ -307,7 +378,8 @@ export default function LiveTripMap({
           showsCompass={false}
           toolbarEnabled={false}
           pitchEnabled={navigationMode}
-          rotateEnabled={navigationMode}>
+          rotateEnabled={navigationMode}
+          showsBuildings={navigationMode}>
           {/* Outer white casing border for high-contrast road visibility */}
           {displayRouteCoords.length >= 2 ? (
             <Polyline
@@ -323,11 +395,11 @@ export default function LiveTripMap({
           {displayRouteCoords.length >= 2 ? (
             <Polyline
               coordinates={displayRouteCoords}
-              strokeColor={isOffRoute ? '#DC2626' : routeApproximate ? '#64748B' : routeColor}
+              strokeColor={isOffRoute ? '#DC2626' : lineIsApproximate ? '#64748B' : routeColor}
               strokeWidth={5}
               lineCap="round"
               lineJoin="round"
-              lineDashPattern={isOffRoute ? [8, 6] : routeApproximate ? [8, 6] : undefined}
+              lineDashPattern={isOffRoute ? [8, 6] : lineIsApproximate ? [8, 6] : undefined}
             />
           ) : null}
 

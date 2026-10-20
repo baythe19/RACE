@@ -24,6 +24,10 @@ export interface DriverCoordinates {
   latitude: number;
   longitude: number;
   updatedAt: number;
+  /** Direction of travel in degrees (0 = north), when known. */
+  heading?: number | null;
+  /** GPS accuracy radius in metres, when the device reports it. */
+  accuracy?: number | null;
 }
 
 interface DriverPresenceState {
@@ -36,12 +40,18 @@ interface DriverPresenceState {
   driverLocation: DriverCoordinates | null;
   /** True while a location report is in flight. */
   isReporting: boolean;
+  /**
+   * Preview builds drive the vehicle along the route instead of reading the
+   * device GPS. While true, the real reporter must not overwrite the position.
+   */
+  simulationActive: boolean;
+  setSimulationActive: (active: boolean) => void;
   setOnline: (isOnline: boolean) => void;
   setLocationHealth: (
     health: DriverLocationHealth,
     options?: { lastLocationAt?: number | null; isReporting?: boolean },
   ) => void;
-  setDriverLocation: (location: DriverCoordinates) => void;
+  setDriverLocation: (location: DriverCoordinates | null) => void;
 }
 
 export const useDriverPresenceStore = create<DriverPresenceState>((set) => ({
@@ -50,6 +60,8 @@ export const useDriverPresenceStore = create<DriverPresenceState>((set) => ({
   lastLocationAt: null,
   driverLocation: null,
   isReporting: false,
+  simulationActive: false,
+  setSimulationActive: (simulationActive) => set({ simulationActive }),
   setOnline: (isOnline) => set({ isOnline }),
   setLocationHealth: (locationHealth, options) =>
     set((state) => ({

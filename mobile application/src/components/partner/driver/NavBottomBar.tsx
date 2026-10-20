@@ -4,8 +4,11 @@ import { X, Check } from 'lucide-react-native';
 
 interface Props {
   etaMinutes: number;
-  distanceKm: number;
+  /** Already formatted remaining distance, e.g. "850 m" or "12 km". */
+  distanceLabel: string;
   etaTimeFormatted: string;
+  /** Driver is within arrival range: the action button turns green. */
+  arriveEmphasis?: boolean;
   onExitNav: () => void;
   onArriveAction?: () => void;
   arriveActionLabel?: string;
@@ -14,8 +17,9 @@ interface Props {
 
 export default function NavBottomBar({
   etaMinutes,
-  distanceKm,
+  distanceLabel,
   etaTimeFormatted,
+  arriveEmphasis = false,
   onExitNav,
   onArriveAction,
   arriveActionLabel = 'Arrived',
@@ -40,7 +44,7 @@ export default function NavBottomBar({
         <View style={styles.etaInfo}>
           <Text style={styles.etaMinutesText}>{etaMinutes} min</Text>
           <Text style={styles.etaSubText}>
-            {distanceKm} km · {etaTimeFormatted}
+            {distanceLabel} · {etaTimeFormatted}
           </Text>
         </View>
 
@@ -52,10 +56,18 @@ export default function NavBottomBar({
             accessibilityLabel={arriveActionLabel}
             style={({ pressed }) => [
               styles.actionButton,
+              arriveEmphasis && styles.actionButtonReady,
               pressed && styles.actionButtonPressed,
             ]}>
-            <Check size={16} color="#FFFFFF" strokeWidth={2.6} style={{ marginRight: 4 }} />
-            <Text style={styles.actionButtonText}>{arriveActionLabel}</Text>
+            <Check
+              size={16}
+              color={arriveEmphasis ? '#FFFFFF' : '#0F172A'}
+              strokeWidth={2.6}
+              style={{ marginRight: 4 }}
+            />
+            <Text style={[styles.actionButtonText, arriveEmphasis && { color: '#FFFFFF' }]}>
+              {arriveActionLabel}
+            </Text>
           </Pressable>
         ) : (
           <Pressable
@@ -160,6 +172,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
+  },
+  actionButtonReady: {
+    backgroundColor: '#16A34A',
+    shadowColor: '#15803D',
   },
   actionButtonPressed: {
     backgroundColor: '#F59E0B',

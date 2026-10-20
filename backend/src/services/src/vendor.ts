@@ -14,6 +14,7 @@ import { vendorRepository } from './vendorRepository';
 import type { IVendor } from '../../models/src/vendor';
 import {
   REQUIRED_DOCUMENTS,
+  VENDOR_EXEMPT_DOCUMENT_CHECK_TYPES,
   type RegisterVendorDto,
   type ReviewDocumentDto,
   type ReviewVendorDto,
@@ -107,7 +108,28 @@ function assertEditable(vendor: IVendor): void {
   }
 }
 
+const VENDOR_IDENTITY_TYPES = ['aadhaar', 'pan', 'driving_license', 'voter_id'];
+const VENDOR_BUSINESS_TYPES = [
+  'shop_license',
+  'gst',
+  'msme',
+  'commercial_licence',
+  'commercial_permit',
+];
+
 function validateRequiredDocuments(vendorType: string, documentTypes: string[]): void {
+  if (VENDOR_EXEMPT_DOCUMENT_CHECK_TYPES.has(vendorType)) {
+    // One identity proof + one business identity proof; any type in each bucket.
+    const hasIdentity = documentTypes.some((type) => VENDOR_IDENTITY_TYPES.includes(type));
+    const hasBusiness = documentTypes.some((type) => VENDOR_BUSINESS_TYPES.includes(type));
+    if (!hasIdentity) {
+      throw new AppError('Add at least one identity proof document', 400);
+    }
+    if (!hasBusiness) {
+      throw new AppError('Add at least one business identity proof document', 400);
+    }
+    return;
+  }
   const required = REQUIRED_DOCUMENTS[vendorType] ?? [];
   const missing = required.filter((type) => !documentTypes.includes(type));
   if (missing.length > 0) {

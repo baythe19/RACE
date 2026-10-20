@@ -46,7 +46,7 @@ export function getMockActiveJobState(): DriverJobBooking | null {
 }
 
 /** @deprecated Use getMockActiveJobState() — kept for legacy imports */
-export let mockActiveJobState: DriverJobBooking | null = getPreviewMockActiveJob();
+export let mockActiveJobState: DriverJobBooking | null = null;
 
 export function syncMockActiveJobExport(): void {
   mockActiveJobState = getPreviewMockActiveJob();

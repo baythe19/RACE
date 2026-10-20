@@ -1,10 +1,24 @@
 # Active context
 
-Updated: 2026-10-19
+Updated: 2026-10-20
 
 ## Current focus
 
-**Active job navigation — 2026-10-19.** Peach retest on sim a2: map shows You, Pickup, and Drop on the Bhubaneswar tiles. First leg “To pickup · 1.6 km · straight line”, then OTP, then “To drop · 4.5 km” with the dotted leg from pickup to drop. No Google Maps redirect. Full `tsc` was killed (SIGTERM) before it finished. Gates G1 and G2 still met.
+**Handoff — 2026-10-20, branch `changes-v6-partner-role-dispatch`.** This Codespace session is stopping. Next machine: pull this branch, then reconnect tools from `docs/ops/CURSOR_MCP_SETUP.md`. Partner lock is clear.
+
+**In-app driver navigation (not finished).** Stays inside the app (no maps `Linking`). Bhopal mock: Mandideep pickup → MP Nagar drop, random start (Misrod and nearby). Peach-checked: overview, turn-by-turn both legs, green Arrived near the pin, one OTP sheet (`1234`), OTP then drop nav, at-drop sheet with timer. Drop sheet actions are **Call customer only** (Message and Share location removed). `tsc --noEmit` in `mobile application/` passed after that edit.
+
+**Still open on navigation:** (1) Complete job confirm → Job completed summary (alert opened; the confirm button was not tapped because two controls share the label). (2) Real wrong-turn / off-route retest after the pickup start-gap fix. (3) Weak GPS sheet. Peach does not draw MapView polylines. Voice guidance is not wired.
+
+## Previous focus
+
+**Partner mock APK readiness — 2026-10-20: NOT READY to `eas build`.** Packages/SDK are fine (`expo-doctor` 20/21, `tsc` clean, Expo 57 / RN 0.86.3). Blockers: no EAS project (`owner: race-service`, no `extra.eas.projectId`; `@webstarts/race-partners` does not exist); `eas.json` `preview` has no mock env; `UI_PREVIEW_MODE` is forced off when `__DEV__===false` so a release APK cannot ship mock data. Partner surface still claimed by `cursor-driver-nav`. Do not start EAS until those are fixed.
+
+**Partner mock walkthrough — 2026-10-20.** Preview mode now fills driver and vendor screens immediately (jobs, notifications, earnings, fleet, bank). Confirmed on Peach: vendor home shows TOW-10055 and TOW-10051 plus ₹4,250; driver dashboard shows Abhishek, ₹1,650, and active trip TOW-10048.
+
+**Deepened mock world — 2026-10-20 (2nd pass).** Notification ink sadte categories: vendor = BOOKING_UPDATE, ACCOUNT, PAYMENT, PAYMENT_SUCCESS, VEHICLE_ACTIVITY, DRIVER_ACTIVITY, SERVICE_RATING, FLEET_UPDATE; driver iname JOB_OFFER, BOOKING_CONFIRMED, BOOKING_COMPLETED bhi. Category filters (All / Job Updates / Drivers & Vehicles / Account / Earnings) sab non-empty. Driver history me CANCELLED TOW-10018 (Fuel Delivery) + vendor bookings me CANCELLED TOW-10036. Peach full E2E pass (sim a4): vendor home→jobs(All/New/In progress/Completed)→vehicles(2)→drivers(2, Abhishek busy + Sanjay free)→notifications(sab filters); Driver Mode switch→dashboard→jobs(Available 2/Active 1/Done 5)→My Vendor connected (assignments+history)→Documents (6 approved + 2 optional)→Bank (verified ****4412)→Earnings chart→Notifications filters; active trip poora chala: Arrived→OTP 1234→Start service→End→"Job completed ₹1,650"→Back to home (earnings ₹3,300/2 jobs stayke update). Zero console errors, tsc clean. Ek transient Peach-HMR "MERGED is not defined" tha sirf reload ke dauran — full reload se gayab, source me aisa koi symbol nahi. sim a3 dead, a4 primary.
+
+**UI polish round — 2026-10-20 (pass 3).** (1) Vendor job card: poora card ab Pressable hai — tap → vendor live tracking screen; driver row me naya "Live" pill (Radar icon + blue bg). Trackable pe card border blue. Key Pressable pe shift — duplicate-key warning fix. (2) Vendor Drivers page: header me amber "Invite by number" button; subtitle chhoti ("Search drivers to build your fleet."); card title "Search drivers" — paragraph + verified-line hat Gayi. Phone-invite card ab hidden rehta hai, sirf button tap pe khulta hai, X se cancel (phone clear). (3) Driver My Vendor: preview chips ab amber (UI TEST · SCENARIOS label), black nahi; fleet-rules popup ab center modal (modern, OK button, divider header) — bottom-sheet nahi. Peach-verified sab.
 
 
 

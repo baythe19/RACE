@@ -41,6 +41,7 @@ export type CreateVendorDriverInput = {
 };
 
 export async function listVendorDrivers(): Promise<VendorDriver[]> {
+  if (UI_PREVIEW_MODE) return MOCK_VENDOR_DRIVERS;
   try {
     const { data } = await api.get<ApiSuccessResponse<VendorDriver[]>>(API_ENDPOINTS.vendorDrivers);
     return data.data ?? [];

@@ -21,10 +21,13 @@ export interface RouteManeuverStep {
   instruction: string;
   shortInstruction: string;
   streetName: string;
+  /** Distance the driver still has to cover before this manoeuvre starts. */
   distanceMeters: number;
   durationSeconds: number;
   maneuverType: ManeuverType;
   coordinate: LatLng;
+  /** Where the turn actually happens (start of the *next* leg); fallback = coordinate. */
+  endCoordinate?: LatLng;
 }
 
 export interface RoadRouteResult {
@@ -35,76 +38,119 @@ export interface RoadRouteResult {
   durationMinutes: number;
   etaTimeFormatted: string;
   steps: RouteManeuverStep[];
-  source: 'google_routes' | 'osrm' | 'high_precision_road_network';
+  source: 'google_routes' | 'osrm' | 'straight_fallback';
   approximate: boolean;
 }
 
+/**
+ * Provider steps are sanitised before the UI sees them:
+ * - the final "arrive" step always exists and sits on the destination;
+ * - absurd step distances fall back to the whole leg;
+ * - instruction text never shows raw provider codes.
+ */
+export function normalizeRouteSteps(
+  steps: RouteManeuverStep[],
+  region: { origin: LatLng; destination: LatLng; destinationName?: string; distanceMeters: number; durationSeconds: number },
+): RouteManeuverStep[] {
+  const cleaned = steps
+    .filter(step => step && Number.isFinite(step.coordinate.latitude))
+    .map(step => {
+      const distance = Number.isFinite(step.distanceMeters) ? step.distanceMeters : 0;
+      return {
+        ...step,
+        distanceMeters:
+          distance > MAX_STEP_DISTANCE_METERS ? region.distanceMeters : Math.max(0, Math.round(distance)),
+        durationSeconds:
+          Number.isFinite(step.durationSeconds) && step.durationSeconds > 0
+            ? step.durationSeconds
+            : Math.max(20, Math.round(distance / 8)),
+      };
+    });
+
+  const hasArrive = cleaned[cleaned.length - 1]?.maneuverType === 'arrive';
+  const withArrive: RouteManeuverStep[] = hasArrive
+    ? cleaned
+    : [
+        ...cleaned,
+        {
+          id: 'arrive-final',
+          instruction: `You have arrived${region.destinationName ? ` at ${region.destinationName}` : ''}`,
+          shortInstruction: 'Arrive',
+          streetName: region.destinationName || 'Destination',
+          distanceMeters: 0,
+          durationSeconds: 0,
+          maneuverType: 'arrive',
+          coordinate: region.destination,
+        },
+      ];
+
+  // Short "turn left" strings read better on the banner than full sentences.
+  return withArrive.map((step, index) => {
+    const next = withArrive[index + 1];
+    return {
+      ...step,
+      // Google's *following* step starts where this manoeuvre happens.
+      endCoordinate: step.endCoordinate ?? next?.coordinate ?? step.coordinate,
+      shortInstruction: step.shortInstruction || step.instruction,
+      instruction:
+        step.instruction?.trim() ||
+        (step.maneuverType === 'arrive'
+          ? `You have arrived${region.destinationName ? ` at ${region.destinationName}` : ''}`
+          : step.streetName
+            ? `Continue on ${step.streetName}`
+            : 'Continue straight'),
+    };
+  });
+}
+
 /* ------------------------------------------------------------------ *
- * High-Precision Bhubaneswar Road Geometry (Real road curves)        *
- * Used when offline or during zero-latency local development so the  *
- * route always follows the actual street grid (Janpath & NH-16).     *
+ * Offline / no-provider fallback.                                     *
+ * There is no fabricated road geometry here: if the provider fails we  *
+ * build a clearly-labelled straight guide (approximate: true) from the  *
+ * real origin/destination — never a hard-coded city street.             *
  * ------------------------------------------------------------------ */
-const BHUBANESWAR_SAHEED_TO_MANCHESWAR_ROAD: LatLng[] = [
-  { latitude: 20.2891, longitude: 85.8412 }, // Saheed Nagar start
-  { latitude: 20.2898, longitude: 85.8415 },
-  { latitude: 20.2912, longitude: 85.8421 }, // Janpath turn
-  { latitude: 20.2934, longitude: 85.8436 },
-  { latitude: 20.2958, longitude: 85.8452 }, // Vani Vihar Square
-  { latitude: 20.2975, longitude: 85.8468 },
-  { latitude: 20.2995, longitude: 85.8485 }, // NH-16 Flyover Ramp
-  { latitude: 20.3025, longitude: 85.8512 },
-  { latitude: 20.3068, longitude: 85.8551 }, // NH-16 Express corridor
-  { latitude: 20.3112, longitude: 85.8592 },
-  { latitude: 20.3155, longitude: 85.8632 }, // Rasulgarh intersection
-  { latitude: 20.3182, longitude: 85.8655 },
-  { latitude: 20.3195, longitude: 85.8668 }, // Mancheswar Industrial exit
-  { latitude: 20.3204, longitude: 85.8678 }, // Destination
-];
+function buildStraightFallback(origin: LatLng, destination: LatLng): RoadRouteResult {
+  const meters = haversineMeters(origin, destination);
+  const seconds = Math.max(60, Math.round((meters / 1000) * 130));
+  return {
+    coordinates: [origin, destination],
+    distanceMeters: Math.round(meters),
+    distanceKm: Math.round((meters / 1000) * 10) / 10,
+    durationSeconds: seconds,
+    durationMinutes: Math.max(1, Math.round(seconds / 60)),
+    etaTimeFormatted: formatEta(seconds),
+    steps: [
+      {
+        id: 'fallback-depart',
+        instruction: 'Head toward the destination',
+        shortInstruction: 'Head',
+        streetName: 'Straight line',
+        distanceMeters: Math.round(meters),
+        durationSeconds: seconds,
+        maneuverType: 'depart',
+        coordinate: origin,
+        endCoordinate: destination,
+      },
+      {
+        id: 'fallback-arrive',
+        instruction: 'You have arrived',
+        shortInstruction: 'Arrive',
+        streetName: 'Destination',
+        distanceMeters: 0,
+        durationSeconds: 0,
+        maneuverType: 'arrive',
+        coordinate: destination,
+      },
+    ],
+    source: 'straight_fallback',
+    approximate: true,
+  };
+}
 
-const DEFAULT_STEPS: RouteManeuverStep[] = [
-  {
-    id: 'step-1',
-    instruction: 'Head north on Janpath toward Vani Vihar',
-    shortInstruction: 'Head north',
-    streetName: 'Janpath Rd',
-    distanceMeters: 650,
-    durationSeconds: 90,
-    maneuverType: 'depart',
-    coordinate: { latitude: 20.2891, longitude: 85.8412 },
-  },
-  {
-    id: 'step-2',
-    instruction: 'Turn left onto NH-16 toward Cuttack',
-    shortInstruction: 'Turn left',
-    streetName: 'NH-16',
-    distanceMeters: 3200,
-    durationSeconds: 260,
-    maneuverType: 'turn_left',
-    coordinate: { latitude: 20.2958, longitude: 85.8452 },
-  },
-  {
-    id: 'step-3',
-    instruction: 'Take the exit toward Mancheswar Industrial Estate',
-    shortInstruction: 'Take exit',
-    streetName: 'Sector B Rd',
-    distanceMeters: 850,
-    durationSeconds: 110,
-    maneuverType: 'slight_right',
-    coordinate: { latitude: 20.3182, longitude: 85.8655 },
-  },
-  {
-    id: 'step-4',
-    instruction: 'You have arrived at your destination',
-    shortInstruction: 'Arrive',
-    streetName: 'Mancheswar',
-    distanceMeters: 0,
-    durationSeconds: 0,
-    maneuverType: 'arrive',
-    coordinate: { latitude: 20.3204, longitude: 85.8678 },
-  },
-];
+/** Longest manoeuvre leg that the navigation UI is allowed to trust. */
+const MAX_STEP_DISTANCE_METERS = 20_000;
 
-function formatEta(durationSeconds: number): string {
+export function formatEta(durationSeconds: number): string {
   const arrival = new Date(Date.now() + durationSeconds * 1000);
   let hours = arrival.getHours();
   const minutes = arrival.getMinutes().toString().padStart(2, '0');
@@ -178,6 +224,46 @@ function mapGoogleManeuverType(maneuver?: string): ManeuverType {
   return 'straight';
 }
 
+
+/** Turn OSRM's (type, modifier) pair into the sentence a driver expects to read. */
+function osrmInstruction(
+  type: string | undefined,
+  modifier: string | undefined,
+  road: string,
+  isFirst: boolean,
+  exit?: number,
+): string {
+  const mod = (modifier || '').toLowerCase();
+  const onto = road ? ` onto ${road}` : '';
+  const side = mod.replace('slight ', '').replace('sharp ', '');
+  if (isFirst) {
+    return road ? `Head ${side || 'ahead'} on ${road}` : `Head ${side || 'ahead'}`;
+  }
+  switch ((type || '').toLowerCase()) {
+    case 'turn':
+      if (mod.startsWith('slight')) return `Bear ${side}${onto}`;
+      if (mod.startsWith('sharp')) return `Take a sharp ${side}${onto}`;
+      if (mod === 'uturn' || mod === 'u-turn') return 'Make a U-turn';
+      return `Turn ${side || 'ahead'}${onto}`;
+    case 'end of road':
+      return `Turn ${side || 'ahead'} at the end of the road${onto}`;
+    case 'fork':
+      return `Keep ${side || 'ahead'} at the fork${onto}`;
+    case 'merge':
+      return `Merge${onto}`;
+    case 'on ramp':
+    case 'off ramp':
+      return `Take the ramp${onto}`;
+    case 'roundabout':
+    case 'rotary':
+      return `At the roundabout, take ${exit ? `exit ${exit}` : 'the exit'}${onto}`;
+    case 'new name':
+    case 'continue':
+    default:
+      return road ? `Continue on ${road}` : 'Continue straight';
+  }
+}
+
 /** Route memory cache so rapid re-renders do not refetch */
 const routeCache = new Map<string, { timestamp: number; result: RoadRouteResult }>();
 const CACHE_TTL_MS = 60_000;
@@ -212,6 +298,9 @@ export async function fetchRoadRoute(
             destination: { location: { latLng: { latitude: destination.latitude, longitude: destination.longitude } } },
             travelMode: 'DRIVE',
             routingPreference: 'TRAFFIC_AWARE',
+            languageCode: 'en-IN',
+            regionCode: 'IN',
+            units: 'METRIC',
           }),
         },
       );
@@ -224,7 +313,8 @@ export async function fetchRoadRoute(
           const durationSeconds = parseInt(String(route.duration).replace('s', ''), 10) || Math.round((distanceMeters / 1000) * 120);
           const distanceKm = Math.round((distanceMeters / 1000) * 10) / 10;
           const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
-
+          // Google labels the *following* step with where this leg begins:
+          // the step's own arrival point is the next step's start.
           const rawGSteps: any[] = route.legs?.[0]?.steps || [];
           const gSteps: RouteManeuverStep[] = rawGSteps.map((step, idx) => {
             const mType = mapGoogleManeuverType(step.navigationInstruction?.maneuver);
@@ -253,7 +343,13 @@ export async function fetchRoadRoute(
             durationSeconds,
             durationMinutes,
             etaTimeFormatted: formatEta(durationSeconds),
-            steps: gSteps.length > 0 ? gSteps : DEFAULT_STEPS,
+            steps: normalizeRouteSteps(gSteps, {
+              origin,
+              destination,
+              destinationName,
+              distanceMeters,
+              durationSeconds,
+            }),
             source: 'google_routes',
             approximate: false,
           };
@@ -280,41 +376,53 @@ export async function fetchRoadRoute(
         const distanceKm = Math.round((distanceMeters / 1000) * 10) / 10;
         const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
 
-        const rawSteps: any[] = route.legs?.[0]?.steps || [];
-        const steps: RouteManeuverStep[] = rawSteps.map((step, idx) => {
-          const mType = mapOsrmManeuverType(step.maneuver?.type, step.maneuver?.modifier);
-          const street = step.name || (idx === 0 ? 'Current Road' : idx === rawSteps.length - 1 ? destinationName || 'Destination' : 'NH-16');
-          const modifier = step.maneuver?.modifier ? `${step.maneuver.modifier} ` : '';
-          const instruction =
-            idx === rawSteps.length - 1
-              ? `You have arrived at ${destinationName || 'destination'}`
-              : idx === 0
-              ? `Head ${modifier}on ${street}`
-              : `${step.maneuver?.type || 'Turn'} ${modifier}onto ${street}`;
+          const rawSteps: any[] = route.legs?.[0]?.steps || [];
+          const steps: RouteManeuverStep[] = rawSteps.map((step, idx) => {
+            const mType = mapOsrmManeuverType(step.maneuver?.type, step.maneuver?.modifier);
+            const road = step.name || step.ref || '';
+            const street =
+              road ||
+              (idx === rawSteps.length - 1 ? destinationName || 'Destination' : 'the road ahead');
+            const instruction =
+              idx === rawSteps.length - 1
+                ? `You have arrived at ${destinationName || 'destination'}`
+                : osrmInstruction(
+                    step.maneuver?.type,
+                    step.maneuver?.modifier,
+                    road,
+                    idx === 0,
+                    step.maneuver?.exit,
+                  );
 
-          return {
-            id: `osrm-step-${idx}`,
-            instruction,
-            shortInstruction: idx === 0 ? 'Depart' : idx === rawSteps.length - 1 ? 'Arrive' : `${modifier.trim() || 'Continue'}`,
-            streetName: street,
-            distanceMeters: Math.round(step.distance),
-            durationSeconds: Math.round(step.duration),
-            maneuverType: mType,
-            coordinate: {
-              latitude: step.maneuver?.location?.[1] || origin.latitude,
-              longitude: step.maneuver?.location?.[0] || origin.longitude,
-            },
-          };
-        });
+            return {
+              id: `osrm-step-${idx}`,
+              instruction,
+              shortInstruction: instruction.split(' onto ')[0].split(' on ')[0],
+              streetName: street,
+              distanceMeters: Math.round(step.distance),
+              durationSeconds: Math.round(step.duration),
+              maneuverType: mType,
+              coordinate: {
+                latitude: step.maneuver?.location?.[1] ?? origin.latitude,
+                longitude: step.maneuver?.location?.[0] ?? origin.longitude,
+              },
+            };
+          });
 
         const result: RoadRouteResult = {
-          coordinates: coords.length >= 2 ? coords : BHUBANESWAR_SAHEED_TO_MANCHESWAR_ROAD,
+          coordinates: coords.length >= 2 ? coords : [origin, destination],
           distanceMeters,
           distanceKm,
           durationSeconds,
           durationMinutes,
           etaTimeFormatted: formatEta(durationSeconds),
-          steps: steps.length > 0 ? steps : DEFAULT_STEPS,
+          steps: normalizeRouteSteps(steps, {
+            origin,
+            destination,
+            destinationName,
+            distanceMeters,
+            durationSeconds,
+          }),
           source: 'osrm',
           approximate: false,
         };
@@ -326,22 +434,8 @@ export async function fetchRoadRoute(
     // Offline / Network failover
   }
 
-  // 3. High-Precision Road Network Fallback (Realistic road curves, never straight line!)
-  const km = haversineKm(origin, destination);
-  const distanceMeters = Math.round(km * 1000);
-  const durationSeconds = Math.round(km * 130);
-  const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
-
-  const result: RoadRouteResult = {
-    coordinates: BHUBANESWAR_SAHEED_TO_MANCHESWAR_ROAD,
-    distanceMeters,
-    distanceKm: km,
-    durationSeconds,
-    durationMinutes,
-    etaTimeFormatted: formatEta(durationSeconds),
-    steps: DEFAULT_STEPS,
-    source: 'high_precision_road_network',
-    approximate: false,
-  };
+  // 3. No provider available: an honest straight guide, clearly labelled.
+  const result = buildStraightFallback(origin, destination);
+  routeCache.set(cacheKey, { timestamp: Date.now(), result });
   return result;
 }

@@ -49,6 +49,7 @@ export type CreateFleetVehicleInput = {
 };
 
 export async function listVendorVehicles(): Promise<FleetVehicle[]> {
+  if (UI_PREVIEW_MODE) return MOCK_VENDOR_VEHICLES;
   try {
     const { data } = await api.get<ApiSuccessResponse<FleetVehicle[]>>(
       API_ENDPOINTS.vendorVehicles,

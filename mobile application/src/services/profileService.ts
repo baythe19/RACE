@@ -19,6 +19,7 @@ function getMockProfileForActiveUser(): Profile {
 }
 
 export async function getProfile(): Promise<Profile> {
+  if (UI_PREVIEW_MODE) return getMockProfileForActiveUser();
   try {
     return await unwrapApi(api.get('/api/v1/profile'));
   } catch (error) {

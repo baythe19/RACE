@@ -88,10 +88,28 @@ export async function setDriverAvailability(isAvailable: boolean): Promise<{
   }
 }
 
+function previewDriverJobs(params?: {
+  status?: string;
+  type?: 'towing' | 'driver';
+}): DriverJobBooking[] {
+  const active = getPreviewMockActiveJob();
+  if (params?.status === 'COMPLETED') {
+    const completedActive = active?.status === 'COMPLETED' ? [active] : [];
+    return [
+      ...completedActive,
+      ...MOCK_DRIVER_JOBS.filter(job => job.status === 'COMPLETED' && job.id !== active?.id),
+    ];
+  }
+  return active
+    ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
+    : MOCK_DRIVER_JOBS;
+}
+
 export async function listDriverJobs(params?: {
   status?: string;
   type?: 'towing' | 'driver';
 }): Promise<DriverJobBooking[]> {
+  if (UI_PREVIEW_MODE) return previewDriverJobs(params);
   try {
     const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
       API_ENDPOINTS.driverMyBookings,
@@ -99,43 +117,39 @@ export async function listDriverJobs(params?: {
     );
     return data.data ?? [];
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
-      const active = getPreviewMockActiveJob();
-      if (params?.status === 'COMPLETED') {
-        const completedActive = active?.status === 'COMPLETED' ? [active] : [];
-        return [
-          ...completedActive,
-          ...MOCK_DRIVER_JOBS.filter(
-            job => job.status === 'COMPLETED' && job.id !== active?.id,
-          ),
-        ];
-      }
-      return active
-        ? [active, ...MOCK_DRIVER_JOBS.filter(job => job.id !== active.id)]
-        : MOCK_DRIVER_JOBS;
-    }
+    if (UI_PREVIEW_MODE) return previewDriverJobs(params);
     throw error;
   }
 }
 
 export async function listDriverJobOffers(): Promise<DriverJobBooking[]> {
+  if (UI_PREVIEW_MODE) {
+    if (getDriverVendorPreviewScenario() === 'assignment') {
+      ensurePreviewAssignmentOffer();
+    }
+    return getMockDriverJobOffers();
+  }
   try {
     const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
       API_ENDPOINTS.driverBookingOffers,
     );
     return data.data ?? [];
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
-      if (getDriverVendorPreviewScenario() === 'assignment') {
-        ensurePreviewAssignmentOffer();
-      }
-      return getMockDriverJobOffers();
-    }
+    if (UI_PREVIEW_MODE) return getMockDriverJobOffers();
     throw error;
   }
 }
 
+function previewActiveJob(): DriverJobBooking | null {
+  const active = getPreviewMockActiveJob();
+  if (!active || ['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(active.status)) {
+    return null;
+  }
+  return active;
+}
+
 export async function getDriverActiveJob(): Promise<DriverJobBooking | null> {
+  if (UI_PREVIEW_MODE) return previewActiveJob();
   try {
     const { data } = await api.get<
       ApiSuccessResponse<{ active: boolean; booking?: DriverJobBooking } | DriverJobBooking | null>
@@ -147,13 +161,7 @@ export async function getDriverActiveJob(): Promise<DriverJobBooking | null> {
     }
     return payload as DriverJobBooking;
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
-      const active = getPreviewMockActiveJob();
-      if (!active || ['COMPLETED', 'RATED', 'PAID', 'CANCELLED'].includes(active.status)) {
-        return null;
-      }
-      return active;
-    }
+    if (UI_PREVIEW_MODE) return previewActiveJob();
     throw error;
   }
 }
@@ -175,6 +183,9 @@ export async function updateDriverLocation(
   }
 }
 
+/** Code the mock backend accepts when preview mutations are on (shown as a hint in the UI). */
+export const PREVIEW_TRIP_OTP = '1234';
+
 export async function updateDriverBookingStatus(
   bookingId: string,
   bookingType: 'towing' | 'driver',
@@ -190,7 +201,7 @@ export async function updateDriverBookingStatus(
     return data.data;
   } catch (error) {
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
-      if (status === 'IN_PROGRESS' && !isUiTestPermissiveMode() && tripOtp && tripOtp !== '1234' && tripOtp.length !== 4) {
+      if (status === 'IN_PROGRESS' && !isUiTestPermissiveMode() && tripOtp !== PREVIEW_TRIP_OTP) {
         throw new Error('Incorrect trip OTP. Check the customer app and try again.');
       }
       const updatedJob = updateMockActiveJobStatus(status);

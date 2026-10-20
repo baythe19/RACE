@@ -17,11 +17,13 @@ import {
 
 interface OffRouteProps {
   visible: boolean;
+  /** A new route is being fetched right now. */
+  rerouting?: boolean;
   onDismiss?: () => void;
   insetsTop?: number;
 }
 
-export function OffRouteBanner({ visible, onDismiss, insetsTop = 0 }: OffRouteProps) {
+export function OffRouteBanner({ visible, rerouting = true, insetsTop = 0 }: OffRouteProps) {
   if (!visible) return null;
 
   return (
@@ -34,7 +36,9 @@ export function OffRouteBanner({ visible, onDismiss, insetsTop = 0 }: OffRoutePr
           </View>
           <View style={styles.textCol}>
             <Text style={styles.offRouteTitle}>You are off route</Text>
-            <Text style={styles.offRouteSubtitle}>Recalculating route...</Text>
+            <Text style={styles.offRouteSubtitle}>
+              {rerouting ? 'Recalculating route…' : 'Looking for a better route…'}
+            </Text>
           </View>
         </View>
       </View>
@@ -43,7 +47,7 @@ export function OffRouteBanner({ visible, onDismiss, insetsTop = 0 }: OffRoutePr
       <View style={styles.bottomFindingRoute} pointerEvents="box-none">
         <View style={styles.findingCard}>
           <ActivityIndicator size="small" color="#2563EB" style={{ marginRight: 10 }} />
-          <Text style={styles.findingText}>Finding best route...</Text>
+          <Text style={styles.findingText}>Finding best route…</Text>
         </View>
       </View>
     </>

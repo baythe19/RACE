@@ -78,6 +78,7 @@ export type DriverSearchResult = {
 /* Preview: linked Bikram ↔ Abhishek world in `previewPartnerWorld.ts`. */
 
 export async function listVendorMemberships(): Promise<VendorMembership[]> {
+  if (UI_PREVIEW_MODE) return getPreviewMemberships();
   try {
     const { data } = await api.get<ApiSuccessResponse<VendorMembership[]>>(
       API_ENDPOINTS.vendorDriverMemberships,
@@ -92,6 +93,15 @@ export async function listVendorMemberships(): Promise<VendorMembership[]> {
 export async function searchVendorDrivers(query: string): Promise<DriverSearchResult[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
+  if (UI_PREVIEW_MODE) {
+    const q = trimmed.toLowerCase();
+    const digits = trimmed.replace(/\D/g, '');
+    return getPreviewSearchableDrivers().filter(d =>
+      d.name.toLowerCase().includes(q) ||
+      (d.driverCode && d.driverCode.toLowerCase().includes(q)) ||
+      (digits.length >= 2 && d.rawPhone.includes(digits)),
+    );
+  }
   try {
     const { data } = await api.get<ApiSuccessResponse<DriverSearchResult[]>>(
       API_ENDPOINTS.vendorDriverSearch,
@@ -141,6 +151,10 @@ export async function revokeVendorDriverMembership(id: string): Promise<void> {
 }
 
 export async function listDriverVendorInvitations(): Promise<DriverVendorInvitation[]> {
+  if (UI_PREVIEW_MODE) {
+    if (getDriverVendorPreviewScenario() !== 'request') return [];
+    return getPreviewDriverInvitations();
+  }
   try {
     const { data } = await api.get<ApiSuccessResponse<DriverVendorInvitation[]>>(
       API_ENDPOINTS.vendorDriverInvitations,
@@ -156,6 +170,13 @@ export async function listDriverVendorInvitations(): Promise<DriverVendorInvitat
 }
 
 export async function getDriverVendorMembership(): Promise<DriverVendorMembership | null> {
+  if (UI_PREVIEW_MODE) {
+    const previewScenario = getDriverVendorPreviewScenario();
+    if (previewScenario === 'connected' || previewScenario === 'assignment') {
+      return getPreviewDriverVendorMembership();
+    }
+    return null;
+  }
   try {
     const { data } = await api.get<ApiSuccessResponse<DriverVendorMembership | null>>(
       API_ENDPOINTS.driverVendorMembership,

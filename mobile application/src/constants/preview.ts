@@ -5,8 +5,15 @@
  * to prevent circular require cycles.
  */
 
-/** Preview fixtures are opt-in for local/demo builds and are always disabled in release builds. */
-const isReleaseBuild = __DEV__ === false;
+/**
+ * Preview fixtures stay off in real release APKs.
+ * A dedicated mock/SIP APK may keep them on only when
+ * EXPO_PUBLIC_UI_PREVIEW_RELEASE=true is baked into that EAS profile.
+ */
+const allowMockReleaseApk =
+  process.env.EXPO_PUBLIC_UI_PREVIEW_RELEASE === 'true' &&
+  process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true';
+const isReleaseBuild = __DEV__ === false && !allowMockReleaseApk;
 
 export const UI_PREVIEW_MODE =
   !isReleaseBuild && process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true';
@@ -17,13 +24,13 @@ export const UI_PREVIEW_MUTATIONS_ENABLED =
   UI_PREVIEW_MODE &&
   process.env.EXPO_PUBLIC_UI_PREVIEW_MUTATIONS === 'true';
 
-if (isReleaseBuild && process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true') {
+if (__DEV__ === false && process.env.EXPO_PUBLIC_UI_PREVIEW_MODE === 'true' && !allowMockReleaseApk) {
   console.warn(
     '[RACE] UI preview was requested in a release build; mock data fallbacks are disabled.',
   );
 } else if (UI_PREVIEW_MODE) {
   console.warn(
-    '[RACE] UI preview is enabled; failed API reads may show demo fixtures instead of live data.',
+    '[RACE] UI preview is enabled; screens load demo fixtures immediately so each page can be tested.',
   );
 }
 

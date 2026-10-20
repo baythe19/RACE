@@ -15,7 +15,6 @@ import {
   Info,
   Phone,
   Search,
-  ShieldCheck,
   Star,
   UserCheck,
   ClipboardList,
@@ -330,25 +329,50 @@ export default function VendorDriverMembershipsScreen() {
   const activeMembers = members.filter(m => m.status === 'ACTIVE');
   const pendingMembers = members.filter(m => m.status === 'PENDING');
 
+  const switchToPhoneInvite = () => {
+    setShowManualPhone(true);
+    setSearchQuery('');
+  };
+
   return (
     <AppScreenLayout
       header={
         <View style={[styles.header, { paddingHorizontal: px(18), paddingTop: px(14), paddingBottom: px(12) }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <PartnerText style={[styles.title, { fontSize: px(22) }]}>Drivers</PartnerText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <PartnerText style={[styles.title, { fontSize: px(22) }]}>Drivers</PartnerText>
+              <Pressable
+                onPress={() =>
+                  Alert.alert('Search vs phone invite', DRIVERS_HELP_MESSAGE, [{ text: 'OK' }])
+                }
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="How search and phone invite work"
+                style={{ marginLeft: px(8), padding: px(2) }}>
+                <Info size={px(20)} color={MUTED} strokeWidth={2.3} />
+              </Pressable>
+            </View>
             <Pressable
-              onPress={() =>
-                Alert.alert('Search vs phone invite', DRIVERS_HELP_MESSAGE, [{ text: 'OK' }])
-              }
-              hitSlop={10}
               accessibilityRole="button"
-              accessibilityLabel="How search and phone invite work"
-              style={{ marginLeft: px(8), padding: px(2) }}>
-              <Info size={px(20)} color={MUTED} strokeWidth={2.3} />
+              accessibilityLabel="Invite by number"
+              onPress={switchToPhoneInvite}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: px(5),
+                height: px(36),
+                paddingHorizontal: px(12),
+                borderRadius: px(18),
+                backgroundColor: pressed ? '#F59E0B' : AMBER,
+              })}>
+              <Phone size={px(14)} color="#FFFFFF" strokeWidth={2.4} />
+              <PartnerText style={{ color: '#FFFFFF', fontSize: px(12.5), fontWeight: '700' }}>
+                Invite by number
+              </PartnerText>
             </Pressable>
           </View>
           <PartnerText style={[styles.subtitle, { fontSize: px(13) }]}>
-            Search & invite verified Full-Time drivers to your fleet.
+            Search drivers to build your fleet.
           </PartnerText>
         </View>
       }
@@ -364,10 +388,7 @@ export default function VendorDriverMembershipsScreen() {
             <Search size={px(19)} color="#2563EB" />
           </View>
           <View style={styles.grow}>
-            <PartnerText style={{ color: INK, fontWeight: '700', fontSize: px(15) }}>Search Full-Time Drivers</PartnerText>
-            <PartnerText style={{ color: MUTED, fontSize: px(11.5), marginTop: px(2) }}>
-              Search registered drivers by name, phone, or code.
-            </PartnerText>
+            <PartnerText style={{ color: INK, fontWeight: '700', fontSize: px(15) }}>Search drivers</PartnerText>
           </View>
         </View>
 
@@ -395,13 +416,6 @@ export default function VendorDriverMembershipsScreen() {
               <X size={px(16)} color={MUTED} />
             </Pressable>
           ) : null}
-        </View>
-
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(8), gap: px(5) }}>
-          <ShieldCheck size={px(13)} color="#059669" />
-          <PartnerText style={{ color: '#059669', fontSize: px(11), fontWeight: '600' }}>
-            Only verified Full-Time drivers can join vendor fleets
-          </PartnerText>
         </View>
 
         {/* Live Search Results */}
@@ -466,7 +480,6 @@ export default function VendorDriverMembershipsScreen() {
             {showManualPhone ? 'Hide' : 'Enter'}
           </PartnerText>
         </Pressable>
-
         {showManualPhone ? (
           <View style={{ marginTop: px(12) }}>
             <View style={[styles.phoneInputRow, { borderRadius: px(12), height: px(46) }]}>
@@ -481,6 +494,7 @@ export default function VendorDriverMembershipsScreen() {
                 placeholderTextColor="#9CA3AF"
                 style={[styles.input, { fontSize: px(14) }]}
                 accessibilityLabel="Driver verified mobile number"
+                autoFocus
               />
             </View>
             <Pressable

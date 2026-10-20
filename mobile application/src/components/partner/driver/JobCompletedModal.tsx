@@ -25,8 +25,9 @@ interface Props {
   dropAddress: string;
   pickupTimeFormatted?: string;
   dropTimeFormatted?: string;
-  distanceKm: number;
-  durationMinutes: number;
+  /** Real values only — null renders as an em dash instead of an invented figure. */
+  distanceKm: number | null;
+  durationMinutes: number | null;
   onBackToHome: () => void;
   onViewJobDetails?: () => void;
   insetsTop?: number;
@@ -39,8 +40,8 @@ export default function JobCompletedModal({
   totalEarnings,
   pickupAddress,
   dropAddress,
-  pickupTimeFormatted = '10:12 PM',
-  dropTimeFormatted = '10:34 PM',
+  pickupTimeFormatted,
+  dropTimeFormatted,
   distanceKm,
   durationMinutes,
   onBackToHome,
@@ -92,7 +93,7 @@ export default function JobCompletedModal({
                 {pickupAddress}
               </Text>
             </View>
-            <Text style={styles.timeText}>{pickupTimeFormatted}</Text>
+            {pickupTimeFormatted ? <Text style={styles.timeText}>{pickupTimeFormatted}</Text> : null}
           </View>
 
           {/* Drop Step */}
@@ -106,7 +107,7 @@ export default function JobCompletedModal({
                 {dropAddress}
               </Text>
             </View>
-            <Text style={styles.timeText}>{dropTimeFormatted}</Text>
+            {dropTimeFormatted ? <Text style={styles.timeText}>{dropTimeFormatted}</Text> : null}
           </View>
 
           {/* Divider */}
@@ -118,7 +119,7 @@ export default function JobCompletedModal({
               <Route size={16} color="#64748B" strokeWidth={2.2} />
               <View style={{ marginLeft: 6 }}>
                 <Text style={styles.statLabel}>Distance</Text>
-                <Text style={styles.statValue}>{distanceKm} km</Text>
+                <Text style={styles.statValue}>{distanceKm != null ? `${distanceKm} km` : '—'}</Text>
               </View>
             </View>
             <View style={styles.statDivider} />
@@ -126,7 +127,7 @@ export default function JobCompletedModal({
               <Clock size={16} color="#64748B" strokeWidth={2.2} />
               <View style={{ marginLeft: 6 }}>
                 <Text style={styles.statLabel}>Duration</Text>
-                <Text style={styles.statValue}>{durationMinutes} mins</Text>
+                <Text style={styles.statValue}>{durationMinutes != null ? `${durationMinutes} min` : '—'}</Text>
               </View>
             </View>
           </View>

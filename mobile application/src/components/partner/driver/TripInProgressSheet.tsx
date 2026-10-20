@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View, Text, Pressable, Linking } from 'react-native';
-import { MapPin, Phone, MessageSquare, Share2, FileText, ChevronUp, ChevronDown } from 'lucide-react-native';
+import { MapPin, Phone, FileText, Navigation } from 'lucide-react-native';
 
 interface Props {
   bookingNumber: string;
   dropAddress: string;
-  distanceKm: number;
-  durationMinutes: number;
-  customerName?: string;
+  /** Formatted remaining distance to the drop, or null when unknown. */
+  distanceLabel: string | null;
+  durationMinutes: number | null;
+  /** Driver is at the drop: lead with Complete job instead of Resume navigation. */
+  atDrop?: boolean;
+  /** ISO time the trip started (status IN_PROGRESS); drives the real timer. */
+  startedAt?: string;
+  onResumeNavigation: () => void;
   customerMobile?: string;
   onCompletePress: () => void;
   acting?: boolean;
@@ -26,24 +31,30 @@ function formatStopwatch(seconds: number): string {
 export default function TripInProgressSheet({
   bookingNumber,
   dropAddress,
-  distanceKm,
+  distanceLabel,
   durationMinutes,
-  customerName = 'Customer',
+  atDrop = false,
+  startedAt,
+  onResumeNavigation,
   customerMobile,
   onCompletePress,
   acting = false,
   insetsTop = 0,
   insetsBottom = 0,
 }: Props) {
-  const [elapsed, setElapsed] = useState(1106); // ~18 mins initial for demo
+  const startMs = startedAt ? +new Date(startedAt) : NaN;
+  const secondsSince = () =>
+    Number.isFinite(startMs) ? Math.max(0, Math.floor((Date.now() - startMs) / 1000)) : 0;
+  const [elapsed, setElapsed] = useState(secondsSince);
   const [collapsed, setCollapsed] = useState(false);
 
+  // Real stopwatch: counts from when the backend moved the job to IN_PROGRESS.
   useEffect(() => {
-    const timer = setInterval(() => {
-      setElapsed(prev => prev + 1);
-    }, 1000);
+    setElapsed(secondsSince());
+    const timer = setInterval(() => setElapsed(secondsSince()), 1000);
     return () => clearInterval(timer);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startMs]);
 
   return (
     <>
@@ -54,7 +65,7 @@ export default function TripInProgressSheet({
             <FileText size={16} color="#2563EB" strokeWidth={2.4} />
           </View>
           <View style={{ flex: 1, marginLeft: 8 }}>
-            <Text style={styles.pillTitle}>Service in progress</Text>
+            <Text style={styles.pillTitle}>{atDrop ? 'At drop location' : 'Service in progress'}</Text>
             <Text style={styles.pillSubtitle}>#{bookingNumber}</Text>
           </View>
           <View style={styles.timerBadge}>
@@ -66,9 +77,9 @@ export default function TripInProgressSheet({
 
       {/* Bottom Sheet Card */}
       <View
-        style={[styles.bottomSheet, { paddingBottom: Math.max(insetsBottom + 10, 18) }]}
+        style={styles.bottomSheet}
         pointerEvents="box-none">
-        <View style={styles.sheetSurface}>
+        <View style={[styles.sheetSurface, { paddingBottom: Math.max(insetsBottom, 12) + 12 }]}>
           {/* Collapsible Drag Handle */}
           <Pressable
             onPress={() => setCollapsed(prev => !prev)}
@@ -88,17 +99,17 @@ export default function TripInProgressSheet({
               </Text>
               <Text style={styles.destSubtitle}>Drop location</Text>
             </View>
-            <View style={styles.distanceEtaCol}>
-              <Text style={styles.distanceText}>{distanceKm} km</Text>
-              <Text style={styles.etaText}>{durationMinutes} mins</Text>
-            </View>
+            {distanceLabel && durationMinutes != null ? (
+              <View style={styles.distanceEtaCol}>
+                <Text style={styles.distanceText}>{distanceLabel}</Text>
+                <Text style={styles.etaText}>{durationMinutes} min</Text>
+              </View>
+            ) : null}
           </View>
 
           {!collapsed ? (
             <>
-              {/* 3 Circular Action Icons (Call customer, Message, Share location) */}
               <View style={styles.actionsRow}>
-                {/* 1. Call customer */}
                 <Pressable
                   onPress={() =>
                     customerMobile ? void Linking.openURL(`tel:${customerMobile}`) : undefined
@@ -114,45 +125,21 @@ export default function TripInProgressSheet({
                   </View>
                   <Text style={styles.actionLabel}>Call customer</Text>
                 </Pressable>
-
-                {/* 2. Message */}
-                <Pressable
-                  onPress={() =>
-                    customerMobile ? void Linking.openURL(`sms:${customerMobile}`) : undefined
-                  }
-                  accessibilityRole="button"
-                  accessibilityLabel="Message customer"
-                  style={({ pressed }) => [
-                    styles.actionCircle,
-                    pressed && styles.actionCirclePressed,
-                  ]}>
-                  <View style={styles.iconBg}>
-                    <MessageSquare size={20} color="#2563EB" strokeWidth={2.4} />
-                  </View>
-                  <Text style={styles.actionLabel}>Message</Text>
-                </Pressable>
-
-                {/* 3. Share location */}
-                <Pressable
-                  onPress={() => {
-                    void Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(dropAddress)}`);
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel="Share location"
-                  style={({ pressed }) => [
-                    styles.actionCircle,
-                    pressed && styles.actionCirclePressed,
-                  ]}>
-                  <View style={styles.iconBg}>
-                    <Share2 size={20} color="#2563EB" strokeWidth={2.4} />
-                  </View>
-                  <Text style={styles.actionLabel}>Share location</Text>
-                </Pressable>
               </View>
             </>
           ) : null}
 
-          {/* Primary Action Button: Complete job (Red/Orange CTA from design) */}
+          {!atDrop ? (
+            <Pressable
+              onPress={onResumeNavigation}
+              accessibilityRole="button"
+              accessibilityLabel="Resume navigation to drop"
+              style={({ pressed }) => [styles.resumeBtn, pressed && styles.resumeBtnPressed]}>
+              <Navigation size={18} color="#0F172A" strokeWidth={2.5} style={{ marginRight: 8 }} />
+              <Text style={styles.resumeBtnText}>Resume navigation</Text>
+            </Pressable>
+          ) : null}
+
           <Pressable
             onPress={onCompletePress}
             disabled={acting}
@@ -160,9 +147,12 @@ export default function TripInProgressSheet({
             accessibilityLabel="Complete job"
             style={({ pressed }) => [
               styles.completeBtn,
+              !atDrop && styles.completeBtnSecondary,
               pressed && styles.completeBtnPressed,
             ]}>
-            <Text style={styles.completeBtnText}>Complete job</Text>
+            <Text style={[styles.completeBtnText, !atDrop && styles.completeBtnSecondaryText]}>
+              Complete job
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -251,8 +241,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 10,
     elevation: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   handleContainer: {
     alignItems: 'center',
@@ -309,9 +297,8 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'flex-start',
     marginBottom: 18,
-    paddingHorizontal: 10,
   },
   actionCircle: {
     alignItems: 'center',
@@ -334,6 +321,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#334155',
+  },
+  resumeBtn: {
+    backgroundColor: '#FEA701',
+    height: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  resumeBtnPressed: {
+    backgroundColor: '#F59E0B',
+    transform: [{ scale: 0.98 }],
+  },
+  resumeBtnText: {
+    color: '#0F172A',
+    fontSize: 16.5,
+    fontWeight: '800',
+  },
+  completeBtnSecondary: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  completeBtnSecondaryText: {
+    color: '#DC2626',
   },
   completeBtn: {
     backgroundColor: '#EF4444', // Red CTA from Screen 9 design

@@ -8,9 +8,9 @@ import {
   Car,
   MapPin,
   Navigation,
-  MapPinned,
   Phone,
   Plus,
+  Radar,
   Truck,
   UserPlus,
 } from 'lucide-react-native';
@@ -378,10 +378,29 @@ export default function PartnerJobsScreen() {
       isVendor && !isOffer && Boolean(job.driver) && TRACKABLE_STATUSES.has(job.status);
 
     return (
+      <Pressable
+        disabled={!canTrackVendorJob}
+        onPress={() => {
+          if (!canTrackVendorJob) return;
+          navigation.navigate('PartnerActiveJob', {
+            bookingId: job.id,
+            bookingType: job.bookingType,
+          });
+        }}
+        accessibilityRole={canTrackVendorJob ? 'button' : 'none'}
+        accessibilityLabel={
+          canTrackVendorJob
+            ? `Open live map for job ${job.bookingNumber}`
+            : undefined
+        }>
       <GlassCard
         key={`${isOffer ? 'o' : 'm'}-${job.bookingType}-${job.id}`}
         flat
-        style={[styles.jobCard, isOffer && isDriver && styles.driverOfferCard]}>
+        style={[
+          styles.jobCard,
+          isOffer && isDriver && styles.driverOfferCard,
+          canTrackVendorJob && styles.trackableCard,
+        ]}>
         {/* status badge + booking ref */}
         <View style={styles.cardHeadRow}>
           <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
@@ -484,8 +503,9 @@ export default function PartnerJobsScreen() {
                 </PartnerText>
               </View>
               {isVendor && canTrackVendorJob ? (
-                <View style={styles.trackMapIcon}>
-                  <MapPinned size={16} color="#1D4ED8" strokeWidth={2.4} />
+                <View style={[styles.trackMapIcon, styles.trackMapIconLive]}>
+                  <Radar size={15} color="#1D4ED8" strokeWidth={2.6} />
+                  <PartnerText style={styles.trackMapLabel}>Live</PartnerText>
                 </View>
               ) : null}
             </Pressable>
@@ -596,6 +616,7 @@ export default function PartnerJobsScreen() {
           </Pressable>
         ) : null}
       </GlassCard>
+      </Pressable>
     );
   };
 
@@ -1074,13 +1095,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  trackableCard: {
+    borderColor: '#BFDBFE',
+  },
   trackMapIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#EFF6FF',
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
+    height: 28,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+  },
+  trackMapIconLive: {
+    backgroundColor: '#DBEAFE',
+  },
+  trackMapLabel: {
+    color: '#1D4ED8',
+    fontSize: 11,
+    fontWeight: '800',
   },
   assignLabel: {
     color: colors.dark,

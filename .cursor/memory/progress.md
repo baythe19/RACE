@@ -1,5 +1,21 @@
 # Progress
 
+## Handoff (in-app driver navigation — 2026-10-20)
+
+- [x] Bhopal mock route, in-app turn-by-turn, single OTP, drop navigation, call-only trip sheet
+- [x] MCP reconnect notes: `docs/ops/CURSOR_MCP_SETUP.md`
+- [ ] Job completed summary after Complete job confirm
+- [ ] Off-route wrong-turn retest
+- [ ] Weak GPS sheet
+
+## Done (partner mock APK audit — 2026-10-20)
+
+- [x] Read-only EAS/Expo check: SDK/packages OK; mock SIP APK **not** ready (no EAS project, `__DEV__` kills preview, `eas.json` missing mock env). Build not started.
+
+## Done (partner preview data — 2026-10-20)
+
+- [x] Driver and vendor preview screens load fixtures immediately: jobs, notifications, earnings, payouts, fleet, bank
+
 ## In progress (customer UI redesign — 2026-10-07)
 
 - [x] Design skill loaded: `.agents/uiux/SKILL.md`, `MOBILE_APP_PATTERNS.md`, `AGENT_QUICK_RULES.md`

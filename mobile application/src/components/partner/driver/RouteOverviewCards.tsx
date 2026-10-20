@@ -1,17 +1,28 @@
-import React from 'react';
-import { StyleSheet, View, Text, Pressable } from 'react-native';
-import {
-  FileText,
-  MapPin,
-  Compass,
-  LocateFixed,
-  Navigation,
-} from 'lucide-react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ChevronDown, ChevronUp, Compass, ListOrdered, LocateFixed, MapPin, Navigation } from 'lucide-react-native';
+
+import type { RouteManeuverStep } from '../../../services/driver/roadRoutingService';
+import DirectionsList from './DirectionsList';
+import ManeuverIcon from './ManeuverIcon';
 
 interface Props {
-  pickupAddress: string;
-  distanceKm: number;
-  durationMinutes: number;
+  /** "Go to pickup location" */
+  title: string;
+  destinationAddress: string;
+  /** "Pickup location" / "Drop location" */
+  destinationCaption: string;
+  /** Formatted leg distance, or null while GPS / route is not ready. */
+  distanceLabel: string | null;
+  durationMinutes: number | null;
+  /** All manoeuvres of the leg (first one previews the route in the top card). */
+  steps: RouteManeuverStep[];
+  loading?: boolean;
+  /** Straight guide only — no road geometry is available. */
+  approximate?: boolean;
+  /** Driver GPS is not available yet. */
+  waitingForGps?: boolean;
+  startLabel?: string;
   onStartNavigation: () => void;
   onRecenter?: () => void;
   onToggleCompass?: () => void;
@@ -21,107 +32,138 @@ interface Props {
 }
 
 export default function RouteOverviewCards({
-  pickupAddress,
-  distanceKm,
+  title,
+  destinationAddress,
+  destinationCaption,
+  distanceLabel,
   durationMinutes,
+  steps,
+  loading = false,
+  approximate = false,
+  waitingForGps = false,
+  startLabel = 'Start navigation',
   onStartNavigation,
   onRecenter,
   onToggleCompass,
-  compassHeadingUp = false,
+  compassHeadingUp = true,
   insetsTop = 0,
   insetsBottom = 0,
 }: Props) {
+  const [stepsOpen, setStepsOpen] = useState(false);
+  const firstStep = steps.find(step => step.maneuverType !== 'arrive') ?? steps[0];
+  const ready = distanceLabel != null && durationMinutes != null;
+  const summary = waitingForGps
+    ? 'Waiting for GPS…'
+    : loading && !ready
+      ? 'Finding best route…'
+      : ready
+        ? `${distanceLabel} · ${durationMinutes} min${approximate ? ' · straight line' : ''}`
+        : 'Route unavailable';
+  const turnSteps = steps.length > 1 ? steps : [];
+
   return (
     <>
-      {/* Top Floating Card: Go to pickup location (Screen 4) */}
+      {/* Top card: where we are going + the first instruction, like Google's route preview. */}
       <View style={[styles.topCardWrapper, { top: insetsTop + 8 }]} pointerEvents="box-none">
         <View style={styles.topCard}>
           <View style={styles.blueIconCircle}>
-            <FileText size={18} color="#2563EB" strokeWidth={2.4} />
+            {firstStep && ready ? (
+              <ManeuverIcon type={firstStep.maneuverType} size={20} color="#2563EB" />
+            ) : (
+              <Navigation size={18} color="#2563EB" strokeWidth={2.4} />
+            )}
           </View>
           <View style={styles.topCardTextCol}>
-            <Text style={styles.topCardTitle}>Go to pickup location</Text>
-            <Text style={styles.topCardSubtitle}>
-              {distanceKm} km · {durationMinutes} mins
+            <Text style={styles.topCardTitle} numberOfLines={1}>
+              {title}
+            </Text>
+            <Text style={styles.topCardSubtitle} numberOfLines={1}>
+              {summary}
             </Text>
           </View>
+          {loading || waitingForGps ? <ActivityIndicator size="small" color="#2563EB" /> : null}
         </View>
       </View>
 
-      {/* Floating Right Map Controls (Compass & Recenter) */}
-      <View style={[styles.floatingControls, { top: insetsTop + 84 }]} pointerEvents="auto">
+      <View style={[styles.floatingControls, { top: insetsTop + 78 }]} pointerEvents="auto">
         {onToggleCompass ? (
           <Pressable
             onPress={onToggleCompass}
             accessibilityRole="button"
             accessibilityLabel="Toggle compass view"
-            style={({ pressed }) => [
-              styles.circleButton,
-              pressed && styles.circleButtonPressed,
-            ]}>
-            <Compass
-              size={19}
-              color={compassHeadingUp ? '#2563EB' : '#0F172A'}
-              strokeWidth={2.4}
-            />
+            style={({ pressed }) => [styles.circleButton, pressed && styles.circleButtonPressed]}>
+            <Compass size={19} color={compassHeadingUp ? '#2563EB' : '#0F172A'} strokeWidth={2.4} />
           </Pressable>
         ) : null}
-
         {onRecenter ? (
           <Pressable
             onPress={onRecenter}
             accessibilityRole="button"
             accessibilityLabel="Recenter location"
-            style={({ pressed }) => [
-              styles.circleButton,
-              pressed && styles.circleButtonPressed,
-            ]}>
+            style={({ pressed }) => [styles.circleButton, pressed && styles.circleButtonPressed]}>
             <LocateFixed size={19} color="#0F172A" strokeWidth={2.4} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* Bottom Sheet Card: Saheed Nagar - Pickup location & Start Navigation */}
-      <View
-        style={[styles.bottomCardWrapper, { paddingBottom: Math.max(insetsBottom + 12, 18) }]}
-        pointerEvents="box-none">
-        <View style={styles.bottomCardSurface}>
-          {/* Handle */}
+      {/* Bottom sheet — padding lives INSIDE the surface so no map shows beneath it. */}
+      <View style={styles.bottomCardWrapper} pointerEvents="box-none">
+        <View style={[styles.bottomCardSurface, { paddingBottom: Math.max(insetsBottom, 12) + 12 }]}>
           <View style={styles.handle} />
 
-          {/* Location row with distance & duration */}
           <View style={styles.pickupRow}>
             <View style={styles.pinCircle}>
               <MapPin size={20} color="#EF4444" strokeWidth={2.5} />
             </View>
             <View style={styles.pickupInfoCol}>
-              <Text style={styles.pickupTitle} numberOfLines={1}>
-                {pickupAddress}
+              <Text style={styles.pickupTitle} numberOfLines={2}>
+                {destinationAddress}
               </Text>
-              <Text style={styles.pickupSubtitle}>Pickup location</Text>
+              <Text style={styles.pickupSubtitle}>{destinationCaption}</Text>
             </View>
-            <View style={styles.statsCol}>
-              <Text style={styles.statsDistance}>{distanceKm} km</Text>
-              <Text style={styles.statsDuration}>{durationMinutes} mins</Text>
-            </View>
+            {ready ? (
+              <View style={styles.statsCol}>
+                <Text style={styles.statsDistance}>{distanceLabel}</Text>
+                <Text style={styles.statsDuration}>{durationMinutes} min</Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Large Gold Action Button: Start navigation */}
+          {turnSteps.length > 0 ? (
+            <>
+              <Pressable
+                onPress={() => setStepsOpen(open => !open)}
+                accessibilityRole="button"
+                accessibilityLabel={stepsOpen ? 'Hide directions' : 'Show directions'}
+                style={styles.stepsToggle}>
+                <ListOrdered size={16} color="#2563EB" strokeWidth={2.4} />
+                <Text style={styles.stepsToggleText}>
+                  Directions · {turnSteps.length} steps
+                </Text>
+                {stepsOpen ? (
+                  <ChevronDown size={18} color="#2563EB" />
+                ) : (
+                  <ChevronUp size={18} color="#2563EB" />
+                )}
+              </Pressable>
+              {stepsOpen ? (
+                <ScrollView
+                  style={styles.stepsScroll}
+                  nestedScrollEnabled
+                  showsVerticalScrollIndicator={false}>
+                  <DirectionsList steps={turnSteps} />
+                </ScrollView>
+              ) : null}
+            </>
+          ) : null}
+
           <Pressable
             onPress={onStartNavigation}
             accessibilityRole="button"
-            accessibilityLabel="Start navigation"
-            style={({ pressed }) => [
-              styles.startNavBtn,
-              pressed && styles.startNavBtnPressed,
-            ]}>
-            <Navigation
-              size={18}
-              color="#0F172A"
-              strokeWidth={2.5}
-              style={{ marginRight: 8 }}
-            />
-            <Text style={styles.startNavText}>Start navigation</Text>
+            accessibilityLabel={startLabel}
+            style={({ pressed }) => [styles.startNavBtn, pressed && styles.startNavBtnPressed]}>
+            <Navigation size={18} color="#0F172A" strokeWidth={2.5} style={{ marginRight: 8 }} />
+            <Text style={styles.startNavText}>{startLabel}</Text>
           </Pressable>
         </View>
       </View>
@@ -141,8 +183,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
@@ -215,8 +257,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.14,
     shadowRadius: 10,
     elevation: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
   },
   handle: {
     alignSelf: 'center',
@@ -229,7 +269,7 @@ const styles = StyleSheet.create({
   pickupRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   pinCircle: {
     width: 40,
@@ -244,7 +284,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pickupTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
   },
@@ -256,6 +296,7 @@ const styles = StyleSheet.create({
   },
   statsCol: {
     alignItems: 'flex-end',
+    marginLeft: 8,
   },
   statsDistance: {
     fontSize: 16,
@@ -267,6 +308,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     marginTop: 2,
+  },
+  stepsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    marginBottom: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E2E8F0',
+  },
+  stepsToggleText: {
+    flex: 1,
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  stepsScroll: {
+    maxHeight: 190,
+    marginBottom: 10,
   },
   startNavBtn: {
     backgroundColor: '#FEA701',

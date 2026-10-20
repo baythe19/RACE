@@ -6,8 +6,8 @@ import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../../constants/p
 import {
   PREVIEW_DRIVER,
   PREVIEW_VENDOR,
-  getPreviewDriverJobOffers,
   getPreviewVendorBookings,
+  getPreviewVendorOpenLeads,
   getPreviewVendorBookingTracking,
   previewApproveVendorBooking,
 } from '../../data/previewPartnerWorld';
@@ -110,6 +110,11 @@ export async function getVendorBookingTracking(input: {
   bookingId: string;
   bookingType: 'towing' | 'driver';
 }): Promise<VendorBookingTracking> {
+  if (UI_PREVIEW_MODE) {
+    const linked = getPreviewVendorBookingTracking(input.bookingId, input.bookingType);
+    if (linked) return linked;
+    return buildMockTracking(input.bookingId, input.bookingType);
+  }
   try {
     const { data } = await api.get<ApiSuccessResponse<VendorBookingTracking>>(
       API_ENDPOINTS.vendorBookingTracking(input.bookingId),
@@ -129,6 +134,7 @@ export async function getVendorBookingTracking(input: {
 }
 
 export async function listVendorBookings(): Promise<VendorBookingItem[]> {
+  if (UI_PREVIEW_MODE) return getPreviewVendorBookings();
   try {
     const { data } = await api.get<ApiSuccessResponse<VendorBookingItem[]>>(
       API_ENDPOINTS.vendorBookings,
@@ -149,15 +155,14 @@ export type VendorAssignResult = VendorApproveResult & {
 };
 
 export async function listVendorBookingOffers(): Promise<DriverJobBooking[]> {
+  if (UI_PREVIEW_MODE) return getPreviewVendorOpenLeads();
   try {
     const { data } = await api.get<ApiSuccessResponse<DriverJobBooking[]>>(
       API_ENDPOINTS.vendorBookingOffers,
     );
     return data.data ?? [];
   } catch (error) {
-    if (UI_PREVIEW_MODE) {
-      return getPreviewDriverJobOffers();
-    }
+    if (UI_PREVIEW_MODE) return getPreviewVendorOpenLeads();
     throw error;
   }
 }

@@ -1,68 +1,53 @@
-import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
+import { PartnerText } from '../../../components/partner/PartnerText';
 /**
- * RACE Partner — Driver active job (boards 02–05).
+ * RACE Partner — Driver active job.
  *
- * One focused screen that walks the driver through the whole job lifecycle:
- *   EN ROUTE TO PICKUP  →  VERIFY CUSTOMER OTP  →  SERVICE IN PROGRESS  →  JOB COMPLETED
+ * One screen walks the driver through the whole job lifecycle, fully in-app
+ * (no hand-off to an external maps app):
  *
- * [GOAL] Finish the current job with as little thinking as possible.
- * [PRIMARY_ACTION] Exactly one per step — Arrived at pickup → Verify & start service
- *                  → Complete job → Back to Home.
+ *   4  Route overview to pickup (directions list, Start navigation)
+ *   5  Turn-by-turn to pickup        → "Arrived"
+ *   6  Reached pickup + customer OTP (ONE sheet; also "Not at pickup yet")
+ *   8  Turn-by-turn to drop          (starts automatically after OTP)  → "Arrived"
+ *   9  At / on the way to drop       → "Complete job" (confirmed)
+ *  10  Job completed summary         → Back to Home
+ *  11  Off route  /  12 Weak GPS     (overlays driven by real signals)
+ *
  * [BEHAVIOR]
  *   - Status transitions come from the backend and are never assumed locally;
  *     the UI re-reads the active booking after every mutation.
- *   - Duplicate taps are blocked while a mutation is in flight.
- *   - The 4-digit trip OTP is verified by the API. A rejected code keeps the
- *     driver on the same step with an inline error, so it can be re-entered.
+ *   - Arrival is never automatic (city GPS error > a driveway). The Arrived
+ *     button turns green when the driver is within range; tapping it from far
+ *     away asks for confirmation.
+ *   - The route is fetched once per leg and again only when the driver leaves
+ *     it (useDriverRoute). Remaining distance, ETA and the next manoeuvre all
+ *     come from the live GPS fix snapped onto that route.
+ *   - Preview builds feed the same pipeline from useTripSimulation instead of
+ *     the device GPS, so the mock flow exercises production code.
  *   - If arrival was tapped by mistake, "Not at pickup yet" reverts to en route
  *     (status DRIVER_EN_ROUTE) and hides the OTP step until arrival is confirmed again.
- *   - The tab bar is hidden here (see PartnerTabBar) so map + action stay focused.
- * [DATA] Only API-provided values. No invented ETA, duration, trip distance or
- *        final fare — the boards mark those as illustrative.
- * [STATES] loading · no-job · en-route · verify-otp · in-progress · completed
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   AppState,
   BackHandler,
-  Image,
   Keyboard,
-  KeyboardAvoidingView,
   Linking,
   Modal,
-  Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
 import {
   ArrowLeft,
-  CalendarDays,
-  Car,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Clock3,
-  House,
-  Info,
-  LocateFixed,
-  MapPin,
   MoreVertical,
   Navigation,
   Phone,
   RefreshCw,
-  Route,
-  ShieldCheck,
   TriangleAlert,
-  Truck,
-  User,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -72,29 +57,29 @@ import RouteOverviewCards from '../../../components/partner/driver/RouteOverview
 import NavTurnBanner from '../../../components/partner/driver/NavTurnBanner';
 import NavBottomBar from '../../../components/partner/driver/NavBottomBar';
 import ArrivedPickupCard from '../../../components/partner/driver/ArrivedPickupCard';
-import CustomerOtpModal from '../../../components/partner/driver/CustomerOtpModal';
 import TripInProgressSheet from '../../../components/partner/driver/TripInProgressSheet';
 import JobCompletedModal from '../../../components/partner/driver/JobCompletedModal';
 import { OffRouteBanner, WeakGpsAlert } from '../../../components/partner/driver/NavigationAlertBanners';
-import type { RoadRouteResult, RouteManeuverStep } from '../../../services/driver/roadRoutingService';
-import { images } from '../../../assets';
 import {
   isUiTestPermissiveMode,
   UI_PREVIEW_MODE,
   UI_PREVIEW_MUTATIONS_ENABLED,
 } from '../../../constants/preview';
 import {
+  ARRIVAL_PROMPT_METERS,
   formatKm,
-  haversineKm,
   haversineMeters,
   legForJobStatus,
-  legTitle,
-  NEAR_PICKUP_METERS,
 } from '../../../services/driver/tripNavigation';
+import { formatEta } from '../../../services/driver/roadRoutingService';
 import { updateMockActiveJobStatus } from '../../../data/mockPartnerData';
+import { getPreviewDriverStart } from '../../../data/previewPartnerWorld';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
-import { useDriverLocationReporting } from '../../../hooks/useDriverLocationReporting';
+import { retryDriverLocationReport, useDriverLocationReporting } from '../../../hooks/useDriverLocationReporting';
+import { useNavigationGps, useTravelHeading } from '../../../hooks/useNavigationGps';
+import { useDriverRoute } from '../../../hooks/useDriverRoute';
+import { useTripSimulation } from '../../../hooks/useTripSimulation';
 import {
   useDriverActiveJobQuery,
   useUpdateDriverBookingStatusMutation,
@@ -102,7 +87,7 @@ import {
   useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
-import type { DriverJobBooking } from '../../../services/driver/driverApi';
+import { PREVIEW_TRIP_OTP, type DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
 import { useDriverPresenceStore } from '../../../store/driverPresenceStore';
@@ -116,10 +101,15 @@ import {
 
 const SUPPORT_NUMBER = 'tel:18001234567';
 const OTP_LENGTH = 4;
+/** Confirm "Arrived" / "Complete" taps made this far from the destination. */
+const FAR_FROM_DESTINATION_METERS = 400;
+/** GPS older than this (or less accurate than ACCURACY) is treated as weak. */
+const GPS_STALE_MS = 20_000;
+const GPS_POOR_ACCURACY_METERS = 80;
 
 type Props = NativeStackScreenProps<PartnerJobsStackParamList, 'PartnerActiveJob'>;
 
-/** Lifecycle steps this screen renders (see the flow doc in the design handoff). */
+/** Lifecycle steps this screen renders. */
 type Step = 'en_route' | 'verify_otp' | 'in_progress' | 'completed';
 
 function stepForStatus(status: string): Step {
@@ -134,60 +124,26 @@ function addressOf(input?: string | null) {
   return formatted === '—' ? '' : formatted;
 }
 
-function formatInr(amount: number) {
-  return `₹${Math.round(amount).toLocaleString('en-IN')}`;
+function historyEntry(job: DriverJobBooking | null | undefined, status: string) {
+  return [...(job?.statusHistory ?? [])].reverse().find(entry => entry.status === status);
 }
 
-/** Real trip duration, derived from the backend status timeline. */
-function tripDurationLabel(
-  history?: Array<{ status: string; timestamp: string }>,
-): string | null {
-  if (!history?.length) return null;
-  const start = history.find(entry =>
-    ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE'].includes(entry.status),
-  );
-  const end = [...history].reverse().find(entry => entry.status === 'COMPLETED');
-  if (!start || !end) return null;
-  const ms = +new Date(end.timestamp) - +new Date(start.timestamp);
-  if (!Number.isFinite(ms) || ms <= 0) return null;
-  const minutes = Math.max(1, Math.round(ms / 60_000));
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} h ${rest} min` : `${hours} h`;
-}
-
-function formatWhen(iso?: string) {
-  if (!iso) return '';
+function clockLabel(iso?: string) {
+  if (!iso) return undefined;
   const date = new Date(iso);
-  if (Number.isNaN(+date)) return '';
-  const day = new Date();
-  day.setHours(0, 0, 0, 0);
-  const target = new Date(date);
-  target.setHours(0, 0, 0, 0);
-  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-  if (+target === +day) return `Today, ${time}`;
-  return date.toLocaleString([], {
-    day: 'numeric',
-    month: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  if (Number.isNaN(+date)) return undefined;
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function completedAt(job?: DriverJobBooking | null) {
-  const entry = [...(job?.statusHistory ?? [])]
-    .reverse()
-    .find(item => item.status === 'COMPLETED');
-  return entry ? formatWhen(entry.timestamp) : '';
+function minutesBetween(startIso?: string, endIso?: string): number | null {
+  if (!startIso || !endIso) return null;
+  const ms = +new Date(endIso) - +new Date(startIso);
+  return Number.isFinite(ms) && ms > 0 ? Math.max(1, Math.round(ms / 60_000)) : null;
 }
 
 function finalFareFromResponse(result: unknown): number | undefined {
   if (!result || typeof result !== 'object') return undefined;
-  const response = result as {
-    finalFare?: unknown;
-    data?: { finalFare?: unknown };
-  };
+  const response = result as { finalFare?: unknown; data?: { finalFare?: unknown } };
   const fare = response.finalFare ?? response.data?.finalFare;
   return typeof fare === 'number' ? fare : undefined;
 }
@@ -197,10 +153,7 @@ function statusHistoryFromResponse(
   fallback: Array<{ status: string; timestamp: string }>,
 ) {
   if (!result || typeof result !== 'object') return fallback;
-  const response = result as {
-    statusHistory?: unknown;
-    data?: { statusHistory?: unknown };
-  };
+  const response = result as { statusHistory?: unknown; data?: { statusHistory?: unknown } };
   const history = response.statusHistory ?? response.data?.statusHistory;
   if (!Array.isArray(history)) return fallback;
   const normalized = history.filter(
@@ -213,200 +166,6 @@ function statusHistoryFromResponse(
       ),
   );
   return normalized.length > 0 ? normalized : fallback;
-}
-
-/* ------------------------------------------------------------ small pieces */
-
-function RouteDot({
-  tone,
-  last,
-  px,
-  outlined = false,
-  endColor = C.red,
-}: {
-  tone: 'start' | 'end';
-  last?: boolean;
-  px: (value: number) => number;
-  outlined?: boolean;
-  endColor?: string;
-}) {
-  if (outlined) {
-    return (
-      <View style={{ width: px(18), alignItems: 'center', paddingTop: px(2) }}>
-        <MapPin
-          size={px(16)}
-          color={tone === 'end' ? endColor : C.blue}
-          strokeWidth={2.4}
-        />
-        {last
-          ? null
-          : [0, 1, 2].map(index => (
-              <View
-                key={index}
-                style={{
-                  width: px(1.5),
-                  height: px(3),
-                  marginTop: px(2),
-                  borderRadius: px(1),
-                  backgroundColor: '#C9CBD3',
-                }}
-              />
-            ))}
-      </View>
-    );
-  }
-
-  return (
-    <View style={{ width: px(18), alignItems: 'center', paddingTop: px(2) }}>
-      {tone === 'end' ? (
-        <MapPin size={px(16)} color={endColor} strokeWidth={2.4} fill={endColor} />
-      ) : (
-        <View
-          style={{
-            width: px(12),
-            height: px(12),
-            borderRadius: px(6),
-            backgroundColor: C.blue,
-          }}
-        />
-      )}
-      {last
-        ? null
-        : [0, 1, 2].map(index => (
-            <View
-              key={index}
-              style={{
-                width: px(1.5),
-                height: px(3),
-                marginTop: px(2),
-                borderRadius: px(1),
-                backgroundColor: '#C9CBD3',
-              }}
-            />
-          ))}
-    </View>
-  );
-}
-
-function StatusChip({
-  label,
-  tone,
-  dot,
-  px,
-}: {
-  label: string;
-  tone: 'green' | 'info' | 'white';
-  dot?: boolean;
-  px: (value: number) => number;
-}) {
-  const bg = tone === 'green' ? C.green : tone === 'info' ? C.bluePill : C.white;
-  const fg = tone === 'green' ? C.white : tone === 'info' ? C.blue : C.green;
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        height: px(22),
-        paddingHorizontal: px(8),
-        borderRadius: px(R.pill),
-        backgroundColor: bg,
-        ...driverShadow,
-      }}>
-      {dot ? (
-        <View
-          style={{
-            width: px(5),
-            height: px(5),
-            borderRadius: px(2.5),
-            backgroundColor: C.green,
-            marginRight: px(4),
-          }}
-        />
-      ) : null}
-      <PartnerText
-        style={{
-          fontSize: px(9.5),
-          lineHeight: px(12),
-          fontWeight: '700',
-          letterSpacing: 0.3,
-          color: fg,
-        }}>
-        {label}
-      </PartnerText>
-    </View>
-  );
-}
-
-function MapCallout({
-  title,
-  detail,
-  px,
-}: {
-  title: string;
-  detail?: string;
-  px: (value: number) => number;
-}) {
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        bottom: px(28),
-        left: px(12),
-        minWidth: px(112),
-        maxWidth: px(170),
-        paddingHorizontal: px(12),
-        paddingVertical: px(8),
-        borderRadius: px(12),
-        backgroundColor: C.white,
-        borderWidth: 1,
-        borderColor: C.hairline,
-        ...driverShadow,
-      }}>
-      <PartnerText style={[T.small, { fontSize: px(11), lineHeight: px(14), color: C.greySoft }]}>
-        {title}
-      </PartnerText>
-      {detail ? (
-        <PartnerText
-          numberOfLines={1}
-          style={[T.jobTitle, { fontSize: px(12.5), lineHeight: px(16), color: C.ink, marginTop: px(1) }]}>
-          {detail}
-        </PartnerText>
-      ) : null}
-    </View>
-  );
-}
-
-function DestinationRoute({
-  dropoff,
-  distanceKm,
-  px,
-}: {
-  dropoff: string;
-  distanceKm?: number;
-  px: (value: number) => number;
-}) {
-  return (
-    <View style={{ marginTop: px(14), flexDirection: 'row', alignItems: 'flex-start' }}>
-      <View style={{ width: px(18), alignItems: 'center' }}>
-        <RouteDot tone="end" last px={px} />
-      </View>
-      <View style={{ flex: 1, marginLeft: px(10) }}>
-        <PartnerText style={[T.small, { fontSize: px(12), lineHeight: px(16), color: C.greySoft }]}>
-          Drop
-        </PartnerText>
-        <PartnerText
-          numberOfLines={2}
-          style={[T.jobTitle, { fontSize: px(14.5), lineHeight: px(19), color: C.ink, marginTop: px(1) }]}>
-          {dropoff || 'Drop location'}
-        </PartnerText>
-        {distanceKm != null ? (
-          <PartnerText style={[T.meta, { fontSize: px(12), lineHeight: px(16), color: C.greySoft, marginTop: px(2) }]}>
-            {distanceKm} km trip
-          </PartnerText>
-        ) : null}
-      </View>
-    </View>
-  );
 }
 
 /* -------------------------------------------------------------------- screen */
@@ -427,33 +186,16 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const [otpError, setOtpError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
-  const [sheetCollapsed, setSheetCollapsed] = useState(false);
-  const [legMeta, setLegMeta] = useState<{ distanceKm: number; durationMinutes?: number; approximate?: boolean } | null>(null);
-  const onLegMeta = useCallback(
-    (meta: { distanceKm: number; durationMinutes?: number; approximate?: boolean } | null) => {
-      setLegMeta(meta);
-    },
-    [],
-  );
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const otpInputRef = useRef<TextInput>(null);
-  const driverLocation = useDriverPresenceStore(state => state.driverLocation);
-
   const [navMode, setNavMode] = useState<'overview' | 'turn_by_turn'>('overview');
-  const [voiceMuted, setVoiceMuted] = useState(false);
-  const [compassHeadingUp, setCompassHeadingUp] = useState(false);
-  const [isOffRoute, setIsOffRoute] = useState(false);
-  const [weakGps, setWeakGps] = useState(false);
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [compassHeadingUp, setCompassHeadingUp] = useState(true);
+  const [followUser, setFollowUser] = useState(true);
+  const [arrivedAtDrop, setArrivedAtDrop] = useState(false);
   const [previewScreen, setPreviewScreen] = useState<number | null>(null);
-  const [calculatedRoute, setCalculatedRoute] = useState<RoadRouteResult | null>(null);
-  const [vehicleHeading, setVehicleHeading] = useState(25);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [qaMenuOpen, setQaMenuOpen] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
+  const [weakDismissedAt, setWeakDismissedAt] = useState(0);
 
-  const toggleSheet = useCallback(() => {
-    setSheetCollapsed(prev => !prev);
-  }, []);
+  const driverLocation = useDriverPresenceStore(state => state.driverLocation);
 
   /**
    * Coming back from the background (or a cold relaunch) must re-sync the real
@@ -477,44 +219,124 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         ? activeJob
         : null;
   const step: Step = job ? stepForStatus(job.status) : 'en_route';
+  const jobStatus = job?.status ?? '';
 
-  // Hide the map while the number pad is open so OTP and its action stay visible.
-  useEffect(() => {
-    const show = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true),
-    );
-    const hide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false),
-    );
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-
-  /**
-   * Android Hardware Back Button:
-   * 1. If options menu is open -> close it.
-   * 2. If trip details bottom sheet is expanded -> collapse to compact navigation view.
-   * 3. Otherwise -> default back behavior.
-   */
   const reportingEnabled = Boolean(
     job && ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(job.status),
   );
+  const simulate = UI_PREVIEW_MODE && reportingEnabled;
   useDriverLocationReporting(reportingEnabled);
+  useNavigationGps(reportingEnabled && !simulate);
 
   const pickup = addressOf(job?.pickup?.address || job?.pickup?.label);
   const dropoff = addressOf(job?.dropoff?.address || job?.dropoff?.label);
-  const hasPickupCoords = job?.pickup?.latitude != null && job?.pickup?.longitude != null;
-  const hasDropCoords = job?.dropoff?.latitude != null && job?.dropoff?.longitude != null;
+  const pickupPoint = useMemo(
+    () =>
+      job?.pickup?.latitude != null && job.pickup.longitude != null
+        ? { latitude: job.pickup.latitude, longitude: job.pickup.longitude, label: 'Pickup' }
+        : null,
+    [job?.pickup?.latitude, job?.pickup?.longitude],
+  );
+  const dropPoint = useMemo(
+    () =>
+      job?.dropoff?.latitude != null && job.dropoff.longitude != null
+        ? { latitude: job.dropoff.latitude, longitude: job.dropoff.longitude, label: 'Drop' }
+        : null,
+    [job?.dropoff?.latitude, job?.dropoff?.longitude],
+  );
 
-  const serviceName = useMemo(() => {
-    const label = (job?.serviceLabel ?? '').trim();
-    if (label) return label;
-    return job?.bookingType === 'towing' ? 'Towing service' : 'Driver service';
-  }, [job?.bookingType, job?.serviceLabel]);
+  const tripLeg = legForJobStatus(jobStatus);
+  const toDrop = tripLeg === 'to_drop';
+  const destinationPoint = toDrop ? dropPoint : pickupPoint;
+  const destinationAddress = toDrop ? dropoff : pickup;
+
+  const gpsFresh = driverLocation != null && clock - driverLocation.updatedAt < 60_000;
+  const driverFix = useMemo(
+    () =>
+      driverLocation && gpsFresh
+        ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude, label: 'You' }
+        : null,
+    [driverLocation, gpsFresh],
+  );
+  const vehicleHeading = useTravelHeading(driverLocation);
+
+  const routeEnabled = reportingEnabled && step !== 'verify_otp' && step !== 'completed';
+  const routeState = useDriverRoute({
+    origin: driverFix,
+    destination: routeEnabled ? destinationPoint : null,
+    destinationName: destinationAddress || undefined,
+    enabled: routeEnabled,
+  });
+  const { route: roadRoute } = routeState;
+
+  const straightToDestination =
+    driverFix && destinationPoint ? haversineMeters(driverFix, destinationPoint) : null;
+  const remainingMeters =
+    routeState.remainingMeters != null && !routeState.offRoute
+      ? routeState.remainingMeters
+      : straightToDestination;
+  const nearDestination = remainingMeters != null && remainingMeters <= ARRIVAL_PROMPT_METERS;
+  const farFromDestination =
+    straightToDestination != null && straightToDestination > FAR_FROM_DESTINATION_METERS;
+  const remainingMinutes =
+    routeState.remainingSeconds != null && !routeState.offRoute
+      ? Math.max(1, Math.ceil(routeState.remainingSeconds / 60))
+      : roadRoute
+        ? roadRoute.durationMinutes
+        : null;
+  const distanceLabel = remainingMeters != null ? formatKm(remainingMeters / 1000) : null;
+  const etaClock = formatEta((remainingMinutes ?? 0) * 60);
+
+  /* Demo driver: moves along the real route, same pipeline as production GPS. */
+  const previewStart = useMemo(() => (UI_PREVIEW_MODE ? getPreviewDriverStart() : null), [job?.id]);
+  const navigating = navMode === 'turn_by_turn' && (step === 'en_route' || step === 'in_progress');
+  const sim = useTripSimulation({
+    enabled: simulate,
+    jobId: job?.id,
+    status: job?.status,
+    start: previewStart,
+    pickup: pickupPoint,
+    path: roadRoute?.coordinates ?? null,
+    pathDistanceMeters: roadRoute?.distanceMeters,
+    moving: navigating && !nearDestination,
+    hold: routeState.offRoute || routeState.rerouting,
+  });
+
+  /* GPS health for the weak-signal sheet (real devices only). */
+  useEffect(() => {
+    if (!reportingEnabled) return undefined;
+    const timer = setInterval(() => setClock(Date.now()), 5_000);
+    return () => clearInterval(timer);
+  }, [reportingEnabled]);
+  const gpsAge = driverLocation ? clock - driverLocation.updatedAt : null;
+  const gpsWeak =
+    reportingEnabled &&
+    !simulate &&
+    (driverLocation == null
+      ? navigating
+      : (gpsAge ?? 0) > GPS_STALE_MS ||
+        (driverLocation.accuracy != null && driverLocation.accuracy > GPS_POOR_ACCURACY_METERS)) &&
+    clock - weakDismissedAt > 60_000;
+
+  /* Stage changes drive the navigation mode (so OTP success lands on drop nav). */
+  const prevStep = useRef<Step>(step);
+  useEffect(() => {
+    const previous = prevStep.current;
+    if (previous === step) return;
+    prevStep.current = step;
+    setPreviewScreen(null);
+    setArrivedAtDrop(false);
+    if (step === 'in_progress') {
+      setNavMode('turn_by_turn');
+      setFollowUser(true);
+    } else if (step === 'verify_otp' || step === 'en_route') {
+      setNavMode('overview');
+    }
+  }, [step]);
+
+  useEffect(() => {
+    setPreviewScreen(null);
+  }, [jobStatus]);
 
   const runStatusUpdate = useCallback(
     async (status: string, otp?: string, otpStep = false) => {
@@ -543,25 +365,6 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         setOtpError('');
         setTripOtp('');
       } catch (error) {
-        if (UI_PREVIEW_MUTATIONS_ENABLED) {
-          updateMockActiveJobStatus(status);
-          if (status === 'COMPLETED') {
-            const fallbackHistory = [
-              ...(job.statusHistory ?? []),
-              { status: 'COMPLETED', timestamp: new Date().toISOString() },
-            ];
-            setCompletedJob({
-              ...job,
-              status: 'COMPLETED',
-              finalFare: job.finalFare ?? job.estimatedFare,
-              statusHistory: fallbackHistory,
-            });
-          }
-          await refetch();
-          setOtpError('');
-          setTripOtp('');
-          return;
-        }
         const message = getApiErrorMessage(error, 'Could not update job status');
         if (otpStep) {
           // A rejected code keeps the driver on the same step so it can be re-entered.
@@ -603,59 +406,96 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         setMenuOpen(false);
         return true;
       }
+      if (qaMenuOpen) {
+        setQaMenuOpen(false);
+        return true;
+      }
       if (step === 'verify_otp') {
         confirmUndoPickupArrival();
         return true;
       }
-      if (!sheetCollapsed && (step === 'en_route' || step === 'in_progress')) {
-        setSheetCollapsed(true);
+      if (navMode === 'turn_by_turn') {
+        // Back leaves turn-by-turn first (overview), then the screen.
+        setNavMode('overview');
         return true;
       }
       return false;
     };
-
     const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => sub.remove();
-  }, [confirmUndoPickupArrival, menuOpen, sheetCollapsed, step]);
+  }, [confirmUndoPickupArrival, menuOpen, navMode, qaMenuOpen, step]);
 
-  const onPrimaryPress = useCallback(() => {
-    if (acting || !job) return;
-    if (job.status === 'DRIVER_ASSIGNED') {
-      void runStatusUpdate('DRIVER_EN_ROUTE');
-      return;
-    }
-    if (step === 'en_route') {
-      void runStatusUpdate('DRIVER_ARRIVED');
-      return;
-    }
-    if (step === 'verify_otp') {
-      const code = tripOtp.trim();
-      const isPermissive = isUiTestPermissiveMode() || UI_PREVIEW_MUTATIONS_ENABLED;
-      if (!isPermissive && !/^\d{4}$/.test(code)) {
-        setOtpError('Enter the 4-digit code shown in the customer app.');
+  /** "Start navigation": the driver is now moving. First tap also moves ASSIGNED → EN_ROUTE. */
+  const startNavigation = useCallback(() => {
+    if (acting) return;
+    setFollowUser(true);
+    setNavMode('turn_by_turn');
+    if (job?.status === 'DRIVER_ASSIGNED') void runStatusUpdate('DRIVER_EN_ROUTE');
+  }, [acting, job?.status, runStatusUpdate]);
+
+  const confirmFarAction = useCallback(
+    (title: string, message: string, confirmLabel: string, onConfirm: () => void) => {
+      if (!farFromDestination) {
+        onConfirm();
         return;
       }
-      setOtpError('');
-      const finalCode = code.length === 4 ? code : (code || '1234');
-      void runStatusUpdate('IN_PROGRESS', finalCode, true);
+      Alert.alert(title, message, [
+        { text: 'Not yet', style: 'cancel' },
+        { text: confirmLabel, onPress: onConfirm },
+      ]);
+    },
+    [farFromDestination],
+  );
+
+  const arrivedAtPickup = useCallback(() => {
+    if (acting) return;
+    confirmFarAction(
+      'Arrived at pickup?',
+      `You are about ${formatKm((straightToDestination ?? 0) / 1000)} from the pickup point.`,
+      'Mark arrived',
+      () => void runStatusUpdate('DRIVER_ARRIVED'),
+    );
+  }, [acting, confirmFarAction, runStatusUpdate, straightToDestination]);
+
+  const arrivedAtDropoff = useCallback(() => {
+    confirmFarAction(
+      'Arrived at drop?',
+      `You are about ${formatKm((straightToDestination ?? 0) / 1000)} from the drop point.`,
+      'Mark arrived',
+      () => {
+        setArrivedAtDrop(true);
+        setNavMode('overview');
+      },
+    );
+  }, [confirmFarAction, straightToDestination]);
+
+  const verifyOtp = useCallback(() => {
+    if (acting || !job || step !== 'verify_otp') return;
+    const code = tripOtp.trim();
+    if (code.length !== OTP_LENGTH || /\D/.test(code)) {
+      setOtpError('Enter the 4-digit code shown in the customer app.');
       return;
     }
-    if (step === 'in_progress') {
-      Alert.alert(
-        'Complete job?',
-        'Confirm that the service is finished at the destination.',
-        [
-          { text: 'Keep working', style: 'cancel' },
-          { text: 'Complete job', onPress: () => void runStatusUpdate('COMPLETED') },
-        ],
-      );
-      return;
-    }
-    // Clear the focused job route so returning to Jobs shows the list instead
-    // of reopening the just-completed board from the nested stack.
+    Keyboard.dismiss();
+    setOtpError('');
+    void runStatusUpdate('IN_PROGRESS', code, true);
+  }, [acting, job, runStatusUpdate, step, tripOtp]);
+
+  const completeJob = useCallback(() => {
+    if (acting || !job || step !== 'in_progress') return;
+    const farNote = farFromDestination
+      ? ` You are still about ${formatKm((straightToDestination ?? 0) / 1000)} from the drop point.`
+      : '';
+    Alert.alert('Complete job?', `Confirm that the service is finished at the destination.${farNote}`, [
+      { text: 'Keep working', style: 'cancel' },
+      { text: 'Complete job', onPress: () => void runStatusUpdate('COMPLETED') },
+    ]);
+  }, [acting, farFromDestination, job, runStatusUpdate, step, straightToDestination]);
+
+  const goHome = useCallback(() => {
     navigation.popToTop();
     navigation.getParent()?.navigate('PartnerHome' as never);
-  }, [acting, job, navigation, runStatusUpdate, step, tripOtp]);
+  }, [navigation]);
 
   const onDeclineAssignment = useCallback(() => {
     if (acting || !job) return;
@@ -675,13 +515,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
                 bookingType: job.bookingType,
               });
               Alert.alert('Assignment declined', 'The vendor has been notified.', [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    navigation.popToTop();
-                    navigation.getParent()?.navigate('PartnerHome' as never);
-                  },
-                },
+                { text: 'OK', onPress: goHome },
               ]);
             } catch (error) {
               Alert.alert('Could not decline', getApiErrorMessage(error, 'Failed to decline assignment.'));
@@ -692,79 +526,57 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         },
       ],
     );
-  }, [acting, job, navigation, rejectMutation]);
-
-  const primaryLabel =
-    job?.status === 'DRIVER_ASSIGNED'
-      ? 'Accept Job & Start Route'
-      : step === 'en_route'
-        ? 'Arrived at pickup'
-        : step === 'verify_otp'
-          ? 'Verify & start service'
-          : step === 'in_progress'
-            ? 'Complete job'
-            : 'Back to Home';
-
-  /** The backend confirms the amount at completion; only then is it final. */
-  const backendConfirmedFare = typeof job?.finalFare === 'number';
-  const fareAmount = job
-    ? (job.finalFare ?? job.estimatedFare ?? null)
-    : null;
-  const tripDuration = tripDurationLabel(job?.statusHistory);
-  const mapDistanceKm = job?.distanceKm;
-  const activeDestination = step === 'in_progress' ? job?.dropoff : job?.pickup;
-  const activeDestinationPoint =
-    activeDestination?.latitude != null && activeDestination?.longitude != null
-      ? {
-          latitude: activeDestination.latitude,
-          longitude: activeDestination.longitude,
-          label: step === 'in_progress' ? 'Drop-off' : 'Pickup',
-        }
-      : null;
-  const freshDriverLocation =
-    driverLocation && Date.now() - driverLocation.updatedAt < 60_000
-      ? { latitude: driverLocation.latitude, longitude: driverLocation.longitude, label: 'You' }
-      : null;
-  const previewDriverLocation =
-    UI_PREVIEW_MODE && !freshDriverLocation && hasPickupCoords && job?.pickup
-      ? {
-          latitude: (job.pickup.latitude as number) - 0.012,
-          longitude: (job.pickup.longitude as number) - 0.008,
-          label: 'You',
-        }
-      : null;
-  const displayDriverLocation =
-    step === 'in_progress' && !freshDriverLocation && hasPickupCoords && job?.pickup
-      ? {
-          latitude: job.pickup.latitude as number,
-          longitude: job.pickup.longitude as number,
-          label: 'You',
-        }
-      : (freshDriverLocation ?? previewDriverLocation);
-  const tripLeg = legForJobStatus(job?.status ?? '');
-  const straightLegKm =
-    displayDriverLocation && activeDestinationPoint
-      ? haversineKm(displayDriverLocation, activeDestinationPoint)
-      : null;
-  const legKm = legMeta?.distanceKm ?? straightLegKm;
-  const nearPickup =
-    tripLeg === 'to_pickup' &&
-    displayDriverLocation &&
-    activeDestinationPoint &&
-    haversineMeters(displayDriverLocation, activeDestinationPoint) <= NEAR_PICKUP_METERS;
-  const legDistanceLabel = !displayDriverLocation
-    ? 'Turn on location to see how far you are'
-    : nearPickup
-      ? 'You are near the pickup'
-      : legKm == null
-        ? 'Route unavailable'
-        : `${formatKm(legKm)}${legMeta?.durationMinutes && !legMeta.approximate ? ` · ${legMeta.durationMinutes} min` : ''}${legMeta?.approximate || !legMeta ? ' · straight line' : ''}`;
+  }, [acting, goHome, job, rejectMutation]);
 
   const recenterMap = useCallback(() => {
+    setFollowUser(true);
     setRecenterTrigger(current => current + 1);
   }, []);
 
-  /* ------------------------------------------------------------- renderers */
+  /* ----------------------------------------------------------- QA switcher */
+
+  const qaJump = useCallback(
+    async (screen: number | null) => {
+      setQaMenuOpen(false);
+      if (screen == null) {
+        setPreviewScreen(null);
+        return;
+      }
+      if (screen === 11) {
+        setNavMode('turn_by_turn');
+        setPreviewScreen(null);
+        sim.deviate();
+        return;
+      }
+      if (screen === 12) {
+        setPreviewScreen(12);
+        return;
+      }
+      // With mock mutations on, jump by moving the real mock job so every screen
+      // is driven by the same state it would have in production.
+      const statusFor: Record<number, string> = {
+        4: 'DRIVER_EN_ROUTE',
+        5: 'DRIVER_EN_ROUTE',
+        6: 'DRIVER_ARRIVED',
+        8: 'IN_PROGRESS',
+        9: 'IN_PROGRESS',
+      };
+      if (UI_PREVIEW_MUTATIONS_ENABLED && job && screen === 10) {
+        void runStatusUpdate('COMPLETED');
+        return;
+      }
+      if (UI_PREVIEW_MUTATIONS_ENABLED && job && statusFor[screen]) {
+        setCompletedJob(null);
+        updateMockActiveJobStatus(statusFor[screen]);
+        setNavMode(screen === 5 || screen === 8 ? 'turn_by_turn' : 'overview');
+        setFollowUser(true);
+        await refetch();
+        return;
+      }
+      setPreviewScreen(screen);
+    },
+    [job, refetch, runStatusUpdate, sim],
+  );
 
   const header = (
     <View
@@ -901,73 +713,32 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               Call support
             </PartnerText>
           </Pressable>
+          {job?.status === 'DRIVER_ASSIGNED' ? (
+            <>
+              <View style={{ height: 1, backgroundColor: C.hairline, marginHorizontal: px(8) }} />
+              <Pressable
+                onPress={() => {
+                  setMenuOpen(false);
+                  onDeclineAssignment();
+                }}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: px(10),
+                  paddingHorizontal: px(10),
+                  borderRadius: px(8),
+                  backgroundColor: pressed ? C.light : C.card,
+                })}>
+                <TriangleAlert size={px(15)} color={C.red} strokeWidth={2.2} />
+                <PartnerText style={[T.cardTitle, { fontSize: px(13), color: C.red, marginLeft: px(8) }]}>
+                  Decline assignment
+                </PartnerText>
+              </Pressable>
+            </>
+          ) : null}
         </Pressable>
       </Pressable>
     </Modal>
-  );
-
-  const mapHeight = sheetCollapsed
-    ? Math.max(px(380), screenHeight - insets.top - px(200))
-    : px(270);
-
-  const mapBlock = (
-    <View
-      style={{
-        position: 'relative',
-        ...(step === 'verify_otp'
-          ? { flex: 1, minHeight: px(120) }
-          : { height: mapHeight }),
-      }}>
-      <LiveTripMap
-        style={StyleSheet.absoluteFill}
-        borderRadius={0}
-        showsUserLocation
-        driverLocation={displayDriverLocation}
-        pickup={
-          hasPickupCoords && job?.pickup
-            ? { latitude: job.pickup.latitude as number, longitude: job.pickup.longitude as number, label: 'Pickup' }
-            : null
-        }
-        dropoff={
-          hasDropCoords && job?.dropoff
-            ? { latitude: job.dropoff.latitude as number, longitude: job.dropoff.longitude as number, label: 'Drop' }
-            : null
-        }
-        activeDestination={activeDestinationPoint}
-        routeApiEnabled
-        straightFallback
-        onRouteMetaChange={onLegMeta}
-        recenterTrigger={recenterTrigger}
-      />
-      <Pressable
-        onPress={recenterMap}
-        accessibilityRole="button"
-        accessibilityLabel="Recenter map"
-        hitSlop={8}
-        style={({ pressed }) => ({
-          position: 'absolute',
-          right: px(16),
-          top: px(14),
-          width: px(42),
-          height: px(42),
-          borderRadius: px(21),
-          backgroundColor: pressed ? '#F1F5F9' : C.white,
-          alignItems: 'center',
-          justifyContent: 'center',
-          elevation: 3,
-        })}>
-        <LocateFixed size={px(19)} color={C.ink} strokeWidth={2.3} />
-      </Pressable>
-      {step === 'verify_otp' ? (
-        <View
-          pointerEvents="none"
-          style={{
-            ...StyleSheet.absoluteFill,
-            backgroundColor: 'rgba(12, 16, 24, 0.34)',
-          }}
-        />
-      ) : null}
-    </View>
   );
 
   if (isLoading && !job) {
@@ -1088,233 +859,181 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     );
   }
 
-  // Effective Screen Number (computed from real step / navMode, or previewScreen override)
-  const effectiveScreen = useMemo(() => {
-    if (previewScreen != null) return previewScreen;
-    if (step === 'completed') return 10;
-    if (step === 'verify_otp') return otpModalOpen ? 7 : 6;
-    if (step === 'en_route') return navMode === 'turn_by_turn' ? 5 : 4;
-    if (step === 'in_progress') return navMode === 'turn_by_turn' ? 8 : 9;
-    return 4;
-  }, [navMode, otpModalOpen, previewScreen, step]);
-
+  const effectiveScreen =
+    previewScreen ??
+    (step === 'completed'
+      ? 10
+      : step === 'verify_otp'
+        ? 6
+        : step === 'en_route'
+          ? navMode === 'turn_by_turn'
+            ? 5
+            : 4
+          : navMode === 'turn_by_turn'
+            ? 8
+            : 9);
   const isNavigating = effectiveScreen === 5 || effectiveScreen === 8;
-  const legLabel = legTitle(tripLeg);
+  const maneuver = routeState.maneuver;
+  const startedAt = historyEntry(job, 'IN_PROGRESS')?.timestamp;
+  const completedAtIso = historyEntry(job, 'COMPLETED')?.timestamp;
+  const demoOtpHint =
+    UI_PREVIEW_MUTATIONS_ENABLED && !isUiTestPermissiveMode()
+      ? `Demo code: ${PREVIEW_TRIP_OTP}`
+      : undefined;
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg, position: 'relative' }}>
-      {/* Top Header Bar (Shown during overview and when not full navigation mode) */}
-      {!isNavigating && effectiveScreen !== 10 && !otpModalOpen && effectiveScreen !== 7 ? header : null}
+      {!isNavigating && effectiveScreen !== 10 ? header : null}
 
-      {/* Full-bleed Interactive Navigation Map in background */}
-      <View style={{ flex: 1, position: 'relative' }} accessibilityLabel={legLabel}>
+      <View style={{ flex: 1, position: 'relative' }} accessibilityLabel={toDrop ? 'To drop' : 'To pickup'}>
         <LiveTripMap
           style={StyleSheet.absoluteFill}
           borderRadius={0}
-          showsUserLocation
-          driverLocation={displayDriverLocation}
-          pickup={
-            hasPickupCoords && job.pickup
-              ? { latitude: job.pickup.latitude as number, longitude: job.pickup.longitude as number, label: 'Pickup' }
-              : null
-          }
-          dropoff={
-            hasDropCoords && job.dropoff
-              ? { latitude: job.dropoff.latitude as number, longitude: job.dropoff.longitude as number, label: 'Drop' }
-              : null
-          }
-          activeDestination={activeDestinationPoint}
+          showsUserLocation={!driverFix && !simulate}
+          driverLocation={driverFix}
+          pickup={pickupPoint}
+          dropoff={dropPoint}
+          activeDestination={destinationPoint}
           routeApiEnabled
-          straightFallback={false}
+          routePathOverride={routeState.route ? routeState.remainingPath : []}
           navigationMode={isNavigating}
+          navigationCamera={{ follow: isNavigating && followUser, headingUp: compassHeadingUp }}
           vehicleHeading={vehicleHeading}
           vehicleType={job.bookingType === 'driver' ? 'car' : 'tow_truck'}
-          isOffRoute={isOffRoute || effectiveScreen === 11}
-          onRouteCalculated={setCalculatedRoute}
-          onRouteMetaChange={onLegMeta}
+          isOffRoute={routeState.offRoute && isNavigating}
+          bottomCoverRatio={isNavigating ? 0 : effectiveScreen === 6 ? 0.5 : 0.42}
+          onUserPan={() => setFollowUser(false)}
           recenterTrigger={recenterTrigger}
         />
 
-        {/* Screen 4: Route Overview to Pickup */}
+        {/* 4 — Route overview to pickup */}
         {effectiveScreen === 4 ? (
           <RouteOverviewCards
-            pickupAddress={pickup || 'Saheed Nagar, Bhubaneswar'}
-            distanceKm={calculatedRoute?.distanceKm ?? (typeof legKm === 'number' ? Number(legKm.toFixed(1)) : 5.4)}
-            durationMinutes={calculatedRoute?.durationMinutes ?? legMeta?.durationMinutes ?? 18}
-            onStartNavigation={() => {
-              setNavMode('turn_by_turn');
-              if (job.status === 'DRIVER_ASSIGNED') {
-                void runStatusUpdate('DRIVER_EN_ROUTE');
-              }
-            }}
+            title={toDrop ? 'Go to drop location' : 'Go to pickup location'}
+            destinationAddress={destinationAddress || (toDrop ? 'Drop location' : 'Pickup location')}
+            destinationCaption={toDrop ? 'Drop location' : 'Pickup location'}
+            distanceLabel={distanceLabel}
+            durationMinutes={remainingMinutes}
+            steps={roadRoute?.steps ?? []}
+            loading={routeState.loading || routeState.rerouting}
+            approximate={roadRoute?.approximate}
+            waitingForGps={!driverFix}
+            onStartNavigation={startNavigation}
             onRecenter={recenterMap}
             onToggleCompass={() => setCompassHeadingUp(prev => !prev)}
             compassHeadingUp={compassHeadingUp}
-            insetsTop={insets.top + px(54)}
+            insetsTop={px(8)}
             insetsBottom={insets.bottom}
           />
         ) : null}
 
-        {/* Screen 5: Turn-by-Turn Navigation to Pickup */}
-        {effectiveScreen === 5 ? (
+        {/* 5 / 8 — Turn-by-turn (to pickup / to drop) */}
+        {isNavigating ? (
           <>
             <NavTurnBanner
-              currentStep={
-                calculatedRoute?.steps?.[currentStepIndex] || {
-                  id: 'step-pickup-1',
-                  instruction: 'Turn left onto NH-16',
-                  shortInstruction: 'Turn left',
-                  streetName: 'NH-16',
-                  distanceMeters: 650,
-                  durationSeconds: 90,
-                  maneuverType: 'turn_left',
-                  coordinate: { latitude: 20.2958, longitude: 85.8452 },
-                }
-              }
-              voiceMuted={voiceMuted}
-              onToggleVoice={() => setVoiceMuted(prev => !prev)}
+              currentStep={maneuver?.step ?? null}
+              distanceMeters={maneuver?.distanceMeters}
+              nextStep={maneuver?.next ?? null}
               compassHeadingUp={compassHeadingUp}
               onToggleCompass={() => setCompassHeadingUp(prev => !prev)}
               onRecenter={recenterMap}
+              showRecenter={!followUser}
               insetsTop={insets.top}
             />
             <NavBottomBar
-              etaMinutes={calculatedRoute?.durationMinutes ?? 17}
-              distanceKm={calculatedRoute?.distanceKm ?? 5.4}
-              etaTimeFormatted={calculatedRoute?.etaTimeFormatted ?? '10:12 PM'}
+              etaMinutes={remainingMinutes ?? 0}
+              distanceLabel={distanceLabel ?? '—'}
+              etaTimeFormatted={remainingMinutes != null ? etaClock : '—'}
+              arriveEmphasis={nearDestination}
               onExitNav={() => setNavMode('overview')}
-              onArriveAction={() => void runStatusUpdate('DRIVER_ARRIVED')}
+              onArriveAction={effectiveScreen === 5 ? arrivedAtPickup : arrivedAtDropoff}
               arriveActionLabel="Arrived"
               insetsBottom={insets.bottom}
             />
           </>
         ) : null}
 
-        {/* Screen 6: Arrived at Pickup */}
+        {/* 6 — Pickup reached + the single OTP entry */}
         {effectiveScreen === 6 ? (
           <ArrivedPickupCard
-            pickupAddress={pickup || 'Saheed Nagar, Bhubaneswar'}
+            pickupAddress={pickup || 'Pickup location'}
             customerName={job.customer?.name || 'Customer'}
-            customerMobile={job.customer?.mobileNumber || '+919876543210'}
-            onVerifyOtpPress={() => setOtpModalOpen(true)}
-            onUndoArrival={undoPickupArrival}
-            acting={acting}
-            insetsTop={insets.top}
-            insetsBottom={insets.bottom}
-          />
-        ) : null}
-
-        {/* Screen 7: Customer OTP Verification */}
-        {effectiveScreen === 7 || (otpModalOpen && step === 'verify_otp') ? (
-          <CustomerOtpModal
-            bookingNumber={job.bookingNumber || 'TOW-10048'}
+            customerMobile={job.customer?.mobileNumber}
             tripOtp={tripOtp}
-            setTripOtp={setTripOtp}
-            otpError={otpError}
-            acting={acting}
-            onVerify={onPrimaryPress}
-            onBack={() => {
-              setOtpModalOpen(false);
-              setOtpError('');
+            setTripOtp={value => {
+              setTripOtp(value);
+              if (otpError) setOtpError('');
             }}
-            customerMobile={job.customer?.mobileNumber || '+919876543210'}
-            insetsTop={insets.top}
+            otpError={otpError}
+            onVerify={verifyOtp}
+            onUndoArrival={confirmUndoPickupArrival}
+            acting={acting}
+            previewHint={demoOtpHint}
+            insetsTop={px(8)}
             insetsBottom={insets.bottom}
           />
         ) : null}
 
-        {/* Screen 8: On Service (Turn-by-Turn to Drop) */}
-        {effectiveScreen === 8 ? (
-          <>
-            <NavTurnBanner
-              currentStep={
-                calculatedRoute?.steps?.[1] || {
-                  id: 'step-drop-1',
-                  instruction: 'Continue on NH-16',
-                  shortInstruction: 'Straight',
-                  streetName: 'NH-16',
-                  distanceMeters: 2100,
-                  durationSeconds: 180,
-                  maneuverType: 'straight',
-                  coordinate: { latitude: 20.3068, longitude: 85.8551 },
-                }
-              }
-              voiceMuted={voiceMuted}
-              onToggleVoice={() => setVoiceMuted(prev => !prev)}
-              compassHeadingUp={compassHeadingUp}
-              onToggleCompass={() => setCompassHeadingUp(prev => !prev)}
-              onRecenter={recenterMap}
-              insetsTop={insets.top}
-            />
-            <NavBottomBar
-              etaMinutes={calculatedRoute?.durationMinutes ?? 12}
-              distanceKm={calculatedRoute?.distanceKm ?? 2.1}
-              etaTimeFormatted={calculatedRoute?.etaTimeFormatted ?? '10:32 PM'}
-              onExitNav={() => setNavMode('overview')}
-              onArriveAction={() => void runStatusUpdate('COMPLETED')}
-              arriveActionLabel="End"
-              insetsBottom={insets.bottom}
-            />
-          </>
-        ) : null}
-
-        {/* Screen 9: Trip In Progress Live Tracking */}
+        {/* 9 — On the way to / at the drop */}
         {effectiveScreen === 9 ? (
           <TripInProgressSheet
-            bookingNumber={job.bookingNumber || 'TOW-10048'}
-            dropAddress={dropoff || 'Mancheswar, Bhubaneswar'}
-            distanceKm={calculatedRoute?.distanceKm ?? 2.1}
-            durationMinutes={calculatedRoute?.durationMinutes ?? 12}
-            customerName={job.customer?.name || 'Customer'}
-            customerMobile={job.customer?.mobileNumber || '+919876543210'}
-            onCompletePress={onPrimaryPress}
+            bookingNumber={job.bookingNumber}
+            dropAddress={dropoff || 'Drop location'}
+            distanceLabel={distanceLabel}
+            durationMinutes={remainingMinutes}
+            atDrop={arrivedAtDrop || nearDestination}
+            startedAt={startedAt}
+            onResumeNavigation={() => {
+              setArrivedAtDrop(false);
+              setFollowUser(true);
+              setNavMode('turn_by_turn');
+            }}
+            customerMobile={job.customer?.mobileNumber}
+            onCompletePress={completeJob}
             acting={acting}
-            insetsTop={insets.top}
+            insetsTop={px(8)}
             insetsBottom={insets.bottom}
           />
         ) : null}
 
-        {/* Screen 10: Job Completion Modal */}
+        {/* 10 — Job completed summary (never skipped) */}
         <JobCompletedModal
           visible={effectiveScreen === 10}
-          bookingNumber={job.bookingNumber || 'TOW-10048'}
-          totalEarnings={typeof job.finalFare === 'number' ? job.finalFare : (job.estimatedFare ?? 1650)}
-          pickupAddress={pickup || 'Saheed Nagar'}
-          dropAddress={dropoff || 'Mancheswar'}
-          pickupTimeFormatted="10:12 PM"
-          dropTimeFormatted="10:34 PM"
-          distanceKm={job.distanceKm ?? 5.4}
-          durationMinutes={22}
-          onBackToHome={() => {
-            navigation.popToTop();
-            navigation.getParent()?.navigate('PartnerHome' as never);
-          }}
+          bookingNumber={job.bookingNumber}
+          totalEarnings={typeof job.finalFare === 'number' ? job.finalFare : (job.estimatedFare ?? 0)}
+          pickupAddress={pickup || 'Pickup'}
+          dropAddress={dropoff || 'Drop'}
+          pickupTimeFormatted={clockLabel(startedAt)}
+          dropTimeFormatted={clockLabel(completedAtIso)}
+          distanceKm={typeof job.distanceKm === 'number' ? job.distanceKm : null}
+          durationMinutes={minutesBetween(startedAt, completedAtIso)}
+          onBackToHome={goHome}
           onViewJobDetails={() => {
-            Alert.alert('Job Details', `Booking #${job.bookingNumber}\nService: ${serviceName}\nStatus: COMPLETED`);
+            Alert.alert(
+              'Job Details',
+              `Booking #${job.bookingNumber}\nStatus: COMPLETED`,
+            );
           }}
           insetsTop={insets.top}
           insetsBottom={insets.bottom}
         />
 
-        {/* Screen 11: Off Route / Rerouting Banner */}
+        {/* 11 — Off route: driven by the real snap-to-route distance */}
         <OffRouteBanner
-          visible={isOffRoute || effectiveScreen === 11}
-          onDismiss={() => {
-            setIsOffRoute(false);
-            setPreviewScreen(null);
-          }}
+          visible={routeState.offRoute && isNavigating}
+          rerouting={routeState.rerouting}
           insetsTop={insets.top}
         />
 
-        {/* Screen 12: Poor GPS / Weak Signal Alert */}
+        {/* 12 — Weak GPS */}
         <WeakGpsAlert
-          visible={weakGps || effectiveScreen === 12}
+          visible={gpsWeak || previewScreen === 12}
           onRetryGps={() => {
-            setWeakGps(false);
-            setPreviewScreen(null);
+            setClock(Date.now());
+            retryDriverLocationReport();
           }}
           onDismissSheet={() => {
-            setWeakGps(false);
+            setWeakDismissedAt(Date.now());
             setPreviewScreen(null);
           }}
           insetsTop={insets.top}
@@ -1322,35 +1041,28 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         />
       </View>
 
-      {/* Floating UI QA / Screen Switcher Pill */}
-      {(UI_PREVIEW_MODE || __DEV__) ? (
-        <View style={{ position: 'absolute', right: 14, bottom: insets.bottom + 12, zIndex: 100 }}>
+      {/* UI QA switcher: docked to the right edge so it never covers a sheet's actions. */}
+      {UI_PREVIEW_MODE || __DEV__ ? (
+        <View style={{ position: 'absolute', right: 6, top: screenHeight * 0.4, zIndex: 100 }}>
           <Pressable
             onPress={() => setQaMenuOpen(prev => !prev)}
             accessibilityRole="button"
-            accessibilityLabel="Toggle UI QA Screen Switcher"
+            accessibilityLabel="Toggle UI QA screen switcher"
             style={({ pressed }) => ({
               backgroundColor: '#FEA701',
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-              borderRadius: 16,
-              flexDirection: 'row',
-              alignItems: 'center',
-              shadowColor: '#D97706',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
+              paddingHorizontal: 8,
+              paddingVertical: 5,
+              borderRadius: 12,
+              opacity: pressed ? 0.8 : 0.92,
               elevation: 5,
-              opacity: pressed ? 0.8 : 1,
             })}>
-            <PartnerText style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
-              ⚡ UI QA {previewScreen ? `(Screen ${previewScreen})` : ''}
+            <PartnerText style={{ fontSize: 10.5, fontWeight: '800', color: '#0F172A' }}>
+              QA{previewScreen ? ` ${previewScreen}` : ''}
             </PartnerText>
           </Pressable>
         </View>
       ) : null}
 
-      {/* QA Switcher Modal */}
       <Modal
         visible={qaMenuOpen}
         transparent
@@ -1368,47 +1080,75 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               paddingBottom: Math.max(insets.bottom + 16, 24),
             }}
             onPress={e => e.stopPropagation?.()}>
-            <PartnerText style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 12 }}>
-              Navigation Blueprint Preview (Screens 4–12)
+            <PartnerText style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>
+              Navigation flow QA
+            </PartnerText>
+            <PartnerText style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+              {simulate
+                ? `Simulated driver from ${previewStart?.name ?? 'Bhopal'} · speed ×${sim.speedMultiplier}`
+                : 'Live GPS'}
             </PartnerText>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {[
-                { label: 'Screen 4: Route Overview', screen: 4 },
-                { label: 'Screen 5: Nav to Pickup', screen: 5 },
-                { label: 'Screen 6: Arrived Pickup', screen: 6 },
-                { label: 'Screen 7: Customer OTP', screen: 7 },
-                { label: 'Screen 8: Nav to Drop', screen: 8 },
-                { label: 'Screen 9: Trip In Progress', screen: 9 },
-                { label: 'Screen 10: Job Completed', screen: 10 },
-                { label: 'Screen 11: Off Route', screen: 11 },
-                { label: 'Screen 12: Weak GPS', screen: 12 },
-                { label: 'Live Backend Flow', screen: null },
+                { label: '4 · Route overview', screen: 4 },
+                { label: '5 · Nav to pickup', screen: 5 },
+                { label: '6 · Arrived + OTP', screen: 6 },
+                { label: '8 · Nav to drop', screen: 8 },
+                { label: '9 · At drop', screen: 9 },
+                { label: '10 · Job completed', screen: 10 },
+                { label: '11 · Wrong turn (off route)', screen: 11 },
+                { label: '12 · Weak GPS', screen: 12 },
+                { label: 'Live flow', screen: null },
               ].map(item => (
                 <Pressable
                   key={item.label}
-                  onPress={() => {
-                    setPreviewScreen(item.screen);
-                    if (item.screen === 7) setOtpModalOpen(true);
-                    else if (item.screen === 6) setOtpModalOpen(false);
-                    setQaMenuOpen(false);
-                  }}
+                  onPress={() => void qaJump(item.screen)}
                   style={{
                     backgroundColor: previewScreen === item.screen ? '#FEA701' : '#F1F5F9',
                     paddingHorizontal: 12,
                     paddingVertical: 8,
                     borderRadius: 12,
                   }}>
-                  <PartnerText
-                    style={{
-                      fontSize: 12.5,
-                      fontWeight: '700',
-                      color: previewScreen === item.screen ? '#0F172A' : '#334155',
-                    }}>
+                  <PartnerText style={{ fontSize: 12.5, fontWeight: '700', color: '#334155' }}>
                     {item.label}
                   </PartnerText>
                 </Pressable>
               ))}
             </View>
+            {simulate ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                {[1, 3, 8].map(speed => (
+                  <Pressable
+                    key={speed}
+                    onPress={() => sim.setSpeedMultiplier(speed)}
+                    style={{
+                      backgroundColor: sim.speedMultiplier === speed ? '#0F172A' : '#F1F5F9',
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 12,
+                    }}>
+                    <PartnerText
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '700',
+                        color: sim.speedMultiplier === speed ? '#FFFFFF' : '#334155',
+                      }}>
+                      Speed ×{speed}
+                    </PartnerText>
+                  </Pressable>
+                ))}
+                <Pressable
+                  onPress={() => {
+                    setQaMenuOpen(false);
+                    sim.skipToArrival();
+                  }}
+                  style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 }}>
+                  <PartnerText style={{ fontSize: 12.5, fontWeight: '700', color: '#334155' }}>
+                    Skip to arrival
+                  </PartnerText>
+                </Pressable>
+              </View>
+            ) : null}
           </Pressable>
         </Pressable>
       </Modal>

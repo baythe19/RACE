@@ -83,9 +83,11 @@ export default function PartnerRegistrationNavigator({ route }: Props) {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#F8F9FA' },
-        animation: 'slide_from_right',
-        animationDuration: 280,
-        gestureEnabled: true,
+        // Registration keeps one shell (header, stepper, footer) per step —
+        // a slide transition would move the fixed chrome with the content.
+        animation: 'fade',
+        animationDuration: 160,
+        gestureEnabled: false,
       }}>
       <Stack.Screen
         name="DriverPersonalInfo"

@@ -57,6 +57,11 @@ export async function getNotifications(): Promise<{
   notifications: PartnerNotificationItem[];
   unreadCount: number;
 }> {
+  if (UI_PREVIEW_MODE) {
+    const notifications = await readPreviewNotifications();
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    return { notifications: [...notifications], unreadCount };
+  }
   try {
     const res = await unwrapApi<{ notifications: PartnerNotificationItem[]; unreadCount: number }>(
       api.get(API_ENDPOINTS.notifications),
@@ -113,6 +118,7 @@ export async function deleteAllNotifications(): Promise<void> {
 }
 
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
+  if (UI_PREVIEW_MODE) return { ...mockNotificationPrefs };
   try {
     return await unwrapApi<NotificationPreferences>(
       api.get(`${API_ENDPOINTS.notifications}/preferences`),

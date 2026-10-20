@@ -16,7 +16,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DriverRegistrationLayout from '../../../../components/partner/DriverRegistrationLayout';
 import { PartnerText } from '../../../../components/partner/PartnerText';
 import { VENDOR_REGISTRATION_STEPS } from '../../../../constants/partnerRegistration';
-import { VENDOR_DOCUMENTS } from '../../../../constants/partnerRegistrationDocuments';
+import { getVendorDocumentTypeLabel } from '../../../../constants/partnerRegistrationDocuments';
 import {
   getMissingRequiredDocuments,
   mapVendorTypeFromBusinessLabel,
@@ -113,9 +113,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   const handleBack = () => partnerRegistrationGoBack(navigation, 'VendorReview', route.params);
-  const uploadedDocs = VENDOR_DOCUMENTS.filter((doc) =>
-    vendorDocuments.some((uploaded) => uploaded.id === doc.id),
-  );
+  const uploadedDocs = vendorDocuments;
   const missingRequiredDocs = getMissingRequiredDocuments(
     mapVendorTypeFromBusinessLabel(vendorBusiness.businessType || 'towing company'),
     vendorDocuments.map((doc) => doc.id),
@@ -130,7 +128,10 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
   const submit = async () => {
     if (!termsAccepted || submitting) return;
     if (missingRequiredDocs.length > 0) {
-      Alert.alert('Documents required', 'Return to Documents and upload all required files before submitting.');
+      Alert.alert(
+        'Documents required',
+        `Return to Documents and add ${missingRequiredDocs.join(' and ')} before submitting.`,
+      );
       return;
     }
     setSubmitting(true);
@@ -230,7 +231,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
   const addressSummary = [vendorAddress.city, vendorAddress.state].filter(Boolean).join(', ') || 'Business location';
   const documentSummary = missingRequiredDocs.length === 0
     ? uploadedDocs.length + ' file' + (uploadedDocs.length === 1 ? '' : 's') + ' uploaded'
-    : missingRequiredDocs.length + ' required document' + (missingRequiredDocs.length === 1 ? '' : 's') + ' missing';
+    : 'Missing: ' + missingRequiredDocs.join(', ');
 
   return (
     <DriverRegistrationLayout
@@ -296,20 +297,21 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
           expanded={expandedSection === 'documents'}
           onToggle={() => toggleSection('documents')}
           onEdit={() => navigation.navigate('VendorDocuments', route.params)}>
-          {VENDOR_DOCUMENTS.map((doc) => {
-            const uploaded = vendorDocuments.some((item) => item.id === doc.id);
-            return (
+          {uploadedDocs.length === 0 ? (
+            <PartnerText style={styles.documentName}>No documents added yet.</PartnerText>
+          ) : (
+            uploadedDocs.map((doc) => (
               <View key={doc.id} style={styles.documentRow}>
-                <View style={[styles.documentStatus, uploaded && styles.documentStatusUploaded]}>
-                  {uploaded ? <Check size={10} color="#15803D" strokeWidth={3} /> : null}
+                <View style={[styles.documentStatus, styles.documentStatusUploaded]}>
+                  <Check size={10} color="#15803D" strokeWidth={3} />
                 </View>
-                <PartnerText style={styles.documentName}>{doc.label}</PartnerText>
-                <PartnerText style={[styles.documentState, uploaded && styles.documentStateUploaded]}>
-                  {uploaded ? 'Uploaded' : doc.required ? 'Required' : 'Optional'}
+                <PartnerText style={styles.documentName}>{getVendorDocumentTypeLabel(doc.id)}</PartnerText>
+                <PartnerText style={[styles.documentState, styles.documentStateUploaded]}>
+                  Uploaded
                 </PartnerText>
               </View>
-            );
-          })}
+            ))
+          )}
         </ReviewSection>
 
         {vendorBusiness.accountNumber ? (

@@ -78,6 +78,7 @@ export default function UiTestNavigator() {
     if (!isDriver) {
       await loginAsMockDriver(dispatch);
     }
+    void queryClient.invalidateQueries();
     setTimeout(() => {
       action();
     }, 120);
@@ -88,9 +89,15 @@ export default function UiTestNavigator() {
     if (!isVendor) {
       await loginAsMockVendor(dispatch);
     }
+    void queryClient.invalidateQueries();
     setTimeout(() => {
       action();
     }, 120);
+  };
+
+  const openForRole = (action: () => void) => {
+    if (qaRole === 'vendor') void ensureVendorAndNavigate(action);
+    else void ensureDriverAndNavigate(action);
   };
 
   return (
@@ -170,6 +177,7 @@ export default function UiTestNavigator() {
                     if (!isDriver) {
                       await loginAsMockDriver(dispatch);
                     }
+                    void queryClient.invalidateQueries();
                   }}>
                   <Truck size={14} color={qaRole === 'driver' ? '#000000' : driverColors.grey} />
                   <PartnerText
@@ -185,6 +193,7 @@ export default function UiTestNavigator() {
                     if (!isVendor) {
                       await loginAsMockVendor(dispatch);
                     }
+                    void queryClient.invalidateQueries();
                   }}>
                   <Users size={14} color={qaRole === 'vendor' ? '#000000' : driverColors.grey} />
                   <PartnerText
@@ -416,74 +425,47 @@ export default function UiTestNavigator() {
                 <JumpRow
                   label="Account Hub"
                   sub="Profile metrics & quick navigation"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerMainTab('PartnerAccount');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerMainTab('PartnerAccount'))}
                 />
                 <JumpRow
                   label="Edit Profile"
                   sub="Avatar upload, personal details"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerEditProfile');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerEditProfile'))}
                 />
                 <JumpRow
                   label="Vehicle Info"
                   sub="Vehicle artwork, plate & RC"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerVehicleInfo');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerVehicleInfo'))}
                 />
                 <JumpRow
                   label="Documents Hub"
                   sub="Required vs Optional documents"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerDocuments');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerDocuments'))}
                 />
                 <JumpRow
                   label="Earnings & Payouts"
                   sub="Weekly chart, trips & payouts"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerEarnings');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerEarnings'))}
                 />
                 <JumpRow
                   label="Notifications"
                   sub="Canonical inbox with category filters"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerNotifications');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerNotifications'))}
                 />
                 <JumpRow
                   label="Settings"
                   sub="Language, preferences & legal"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerSettings');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerSettings'))}
                 />
                 <JumpRow
                   label="Help & Support"
                   sub="FAQs, 24x7 call & WhatsApp"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerHelpSupport');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerHelpSupport'))}
                 />
                 <JumpRow
                   label="Bank Details"
                   sub="Masked account & automated payouts"
-                  onPress={() => {
-                    setModalVisible(false);
-                    jumpToPartnerAccountScreen('PartnerBankDetails');
-                  }}
+                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerBankDetails'))}
                 />
                 <JumpRow
                   label="Trip history (Jobs → Done)"

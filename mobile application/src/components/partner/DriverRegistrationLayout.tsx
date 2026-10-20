@@ -331,6 +331,9 @@ export default function DriverRegistrationLayout({
                   .replace(/→/g, '')
                   .replace(/->/g, '')
                   .trim();
+                // Fixed footer height keeps both action buttons in one place on
+                // every step, even when the CTA label changes.
+                const CTA_MAX_LABEL = 'Submit application';
                 return (
                   <Pressable
                     onPress={onContinue}
@@ -348,7 +351,7 @@ export default function DriverRegistrationLayout({
                       ellipsizeMode="tail"
                       style={[
                         styles.continueLabel,
-                        { fontSize: px(cleanLabel.length > 15 ? 13.5 : 14.5) },
+                        { fontSize: px(CTA_MAX_LABEL.length > 15 ? 13.5 : 14.5) },
                         continueDisabled && styles.continueLabelDisabled,
                       ]}>
                       {continueLoading ? 'Please wait…' : cleanLabel}

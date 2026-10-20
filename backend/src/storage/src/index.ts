@@ -40,6 +40,7 @@ const DOCUMENT_FOLDER: Record<string, string> = {
   commercial_permit: 'documents/permits',
   selfie: 'verification/selfies',
   vehicle_photo: 'documents/vehicle',
+  voter_id: 'documents/voter-id',
   other: 'documents/other',
 };
 

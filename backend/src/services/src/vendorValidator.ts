@@ -25,6 +25,7 @@ export const documentTypeSchema = z.enum([
   'commercial_permit',
   'selfie',
   'vehicle_photo',
+  'voter_id',
   'other',
 ]);
 
@@ -280,9 +281,17 @@ export interface VendorResponseDto {
   updatedAt: string;
 }
 
+/**
+ * Vendor document policy: the partner picks one identity proof and one
+ * business identity proof (any of the listed types). Bank proof is collected
+ * with the bank/verification flow, not the registration document step.
+ */
+export const VENDOR_EXEMPT_DOCUMENT_CHECK_TYPES = new Set(['towing_company', 'mechanic']);
+
 /** Required documents per vendor type for submission validation */
 export const REQUIRED_DOCUMENTS: Record<string, string[]> = {
-  towing_company: ['aadhaar', 'pan', 'cancelled_cheque', 'selfie'],
+  towing_company: [],
+  mechanic: [],
   tow_truck_driver: [
     'aadhaar',
     'pan',
@@ -303,5 +312,4 @@ export const REQUIRED_DOCUMENTS: Record<string, string[]> = {
     'medical_certificate',
   ],
   part_time_driver: ['aadhaar', 'pan', 'driving_license', 'selfie'],
-  mechanic: ['aadhaar', 'pan', 'selfie'],
 };

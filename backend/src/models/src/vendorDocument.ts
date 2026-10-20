@@ -17,6 +17,7 @@ export type VendorDocumentType =
   | 'commercial_permit'
   | 'selfie'
   | 'vehicle_photo'
+  | 'voter_id'
   | 'other';
 
 export type DocumentVerificationStatus =
@@ -59,6 +60,7 @@ const VendorDocumentSchema = new Schema<IVendorDocument>(
         'commercial_permit',
         'selfie',
         'vehicle_photo',
+        'voter_id',
         'other',
       ],
       required: true,
