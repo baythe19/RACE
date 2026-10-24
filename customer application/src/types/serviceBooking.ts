@@ -52,6 +52,11 @@ export interface ServiceBooking {
     rating: number;
     experience?: string;
   };
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }
 
 export interface CreateTowingBookingRequest {
@@ -141,6 +146,11 @@ export interface ServiceBookingTracking {
   dropoff?: BookingLocation;
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }
 
 export interface CancellationPolicy {

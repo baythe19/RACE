@@ -69,6 +69,10 @@ export type DriverJobBooking = {
   vendorId?: string;
   assignedFleetVehicleLabel?: string;
   vendorApproved?: boolean;
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
 };
 
 export async function setDriverAvailability(isAvailable: boolean): Promise<{
@@ -254,6 +258,45 @@ export async function rejectDriverJob(
     if (UI_PREVIEW_MUTATIONS_ENABLED) {
       rejectMockDriverJob(bookingId);
       return { success: true, message: 'Job rejected' };
+    }
+    throw error;
+  }
+}
+
+export async function driverArrivedAtDropoff(
+  bookingId: string,
+  bookingType: 'towing' | 'driver',
+): Promise<unknown> {
+  try {
+    const { data } = await api.post(API_ENDPOINTS.driverArrivedDropoff(bookingId), { bookingType });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      return { success: true, message: 'Driver arrived at dropoff location' };
+    }
+    throw error;
+  }
+}
+
+export async function driverCompleteBooking(
+  bookingId: string,
+  bookingType: 'towing' | 'driver',
+  completionOtp: string,
+): Promise<unknown> {
+  try {
+    const { data } = await api.post(API_ENDPOINTS.driverCompleteBooking(bookingId), {
+      bookingType,
+      completionOtp,
+    });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      const updatedJob = updateMockActiveJobStatus('COMPLETED');
+      return {
+        success: true,
+        status: 'COMPLETED',
+        finalFare: updatedJob?.finalFare ?? 1250,
+      };
     }
     throw error;
   }

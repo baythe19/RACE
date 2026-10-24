@@ -85,6 +85,8 @@ import {
   useDriverActiveJobQuery,
   useUpdateDriverBookingStatusMutation,
   useRejectDriverJobMutation,
+  useDriverArrivedAtDropoffMutation,
+  useDriverCompleteBookingMutation,
   useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
@@ -179,12 +181,18 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const { data: activeJob, isLoading, isError, refetch } = useDriverActiveJobQuery(true);
   const statusMutation = useUpdateDriverBookingStatusMutation();
   const rejectMutation = useRejectDriverJobMutation();
+  const dropoffArrivalMutation = useDriverArrivedAtDropoffMutation();
+  const completeBookingMutation = useDriverCompleteBookingMutation();
   useRefreshDriverDataOnFocus(true);
 
   const [acting, setActing] = useState(false);
   const [completedJob, setCompletedJob] = useState<DriverJobBooking | null>(null);
   const [tripOtp, setTripOtp] = useState('');
   const [otpError, setOtpError] = useState('');
+  const [completionOtp, setCompletionOtp] = useState('');
+  const [completionOtpError, setCompletionOtpError] = useState('');
+  const [customerPaymentConfirmed, setCustomerPaymentConfirmed] = useState(false);
+  const [customerPaymentMode, setCustomerPaymentMode] = useState<'CASH' | 'UPI' | 'ONLINE' | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [recenterTrigger, setRecenterTrigger] = useState(0);
   const [navMode, setNavMode] = useState<'overview' | 'turn_by_turn'>('overview');
@@ -463,12 +471,25 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       'Arrived at drop?',
       `You are about ${formatKm((straightToDestination ?? 0) / 1000)} from the drop point.`,
       'Mark arrived',
-      () => {
-        setArrivedAtDrop(true);
-        setNavMode('overview');
+      async () => {
+        setActing(true);
+        try {
+          if (job) {
+            await dropoffArrivalMutation.mutateAsync({
+              bookingId: job.id,
+              bookingType: job.bookingType,
+            });
+          }
+          setArrivedAtDrop(true);
+          setNavMode('overview');
+        } catch (err) {
+          Alert.alert('Arrival notice', getApiErrorMessage(err, 'Failed to update drop arrival.'));
+        } finally {
+          setActing(false);
+        }
       },
     );
-  }, [confirmFarAction, straightToDestination]);
+  }, [confirmFarAction, dropoffArrivalMutation, job, straightToDestination]);
 
   const verifyOtp = useCallback(() => {
     if (acting || !job || step !== 'verify_otp') return;
@@ -482,16 +503,44 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     void runStatusUpdate('IN_PROGRESS', code, true);
   }, [acting, job, runStatusUpdate, step, tripOtp]);
 
+  const verifyAndCompleteJob = useCallback(async () => {
+    if (acting || !job) return;
+    const code = completionOtp.trim();
+    if (code.length !== OTP_LENGTH || /\D/.test(code)) {
+      setCompletionOtpError('Enter the 4-digit completion code provided by the customer.');
+      return;
+    }
+    setActing(true);
+    setCompletionOtpError('');
+    try {
+      const result = await completeBookingMutation.mutateAsync({
+        bookingId: job.id,
+        bookingType: job.bookingType,
+        completionOtp: code,
+      });
+      const fallbackHistory = [
+        ...(job.statusHistory ?? []),
+        { status: 'COMPLETED', timestamp: new Date().toISOString() },
+      ];
+      setCompletedJob({
+        ...job,
+        status: 'COMPLETED',
+        finalFare: finalFareFromResponse(result) ?? job.finalFare ?? job.estimatedFare,
+        statusHistory: statusHistoryFromResponse(result, fallbackHistory),
+      });
+      await refetch();
+    } catch (err) {
+      const message = getApiErrorMessage(err, 'Invalid completion OTP. Please verify with customer.');
+      setCompletionOtpError(message);
+    } finally {
+      setActing(false);
+    }
+  }, [acting, completeBookingMutation, completionOtp, job, refetch]);
+
   const completeJob = useCallback(() => {
     if (acting || !job || step !== 'in_progress') return;
-    const farNote = farFromDestination
-      ? ` You are still about ${formatKm((straightToDestination ?? 0) / 1000)} from the drop point.`
-      : '';
-    Alert.alert('Complete job?', `Confirm that the service is finished at the destination.${farNote}`, [
-      { text: 'Keep working', style: 'cancel' },
-      { text: 'Complete job', onPress: () => void runStatusUpdate('COMPLETED') },
-    ]);
-  }, [acting, farFromDestination, job, runStatusUpdate, step, straightToDestination]);
+    arrivedAtDropoff();
+  }, [acting, arrivedAtDropoff, job, step]);
 
   const goHome = useCallback(() => {
     navigation.popToTop();
@@ -948,7 +997,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
               arriveEmphasis={nearDestination}
               onExitNav={() => setNavMode('overview')}
               onArriveAction={effectiveScreen === 5 ? arrivedAtPickup : arrivedAtDropoff}
-              arriveActionLabel="Arrived"
+              arriveActionLabel={effectiveScreen === 5 ? 'Arrive at Pickup' : 'Arrive at Drop Location'}
               insetsBottom={insets.bottom}
             />
           </>
@@ -994,6 +1043,16 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             acting={acting}
             insetsTop={px(8)}
             insetsBottom={insets.bottom}
+            customerPaymentMode={job.paymentCollectionMode || customerPaymentMode}
+            customerPaymentConfirmed={Boolean(job.paymentConfirmedByCustomer || customerPaymentConfirmed)}
+            fareAmount={job.finalFare ?? job.estimatedFare}
+            completionOtp={completionOtp}
+            setCompletionOtp={val => {
+              setCompletionOtp(val);
+              if (completionOtpError) setCompletionOtpError('');
+            }}
+            otpError={completionOtpError}
+            onVerifyAndComplete={verifyAndCompleteJob}
           />
         ) : null}
 

@@ -17,6 +17,13 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
     { latitude: number; longitude: number; driverName?: string; driverPhone?: string } | undefined
   >();
   const [tripStartOtp, setTripStartOtp] = useState<string | undefined>();
+  const [arrivedAtDropoffAt, setArrivedAtDropoffAt] = useState<string | undefined>();
+  const [completionOtp, setCompletionOtp] = useState<string | undefined>();
+  const [paymentCollectionMode, setPaymentCollectionMode] = useState<
+    'CASH' | 'UPI' | 'ONLINE' | undefined
+  >();
+  const [paymentConfirmedByCustomer, setPaymentConfirmedByCustomer] = useState<boolean>(false);
+  const [fare, setFare] = useState<number | undefined>();
 
   useEffect(() => {
     setStatus('PENDING');
@@ -24,6 +31,11 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
     setDriver(undefined);
     setDriverLocation(undefined);
     setTripStartOtp(undefined);
+    setArrivedAtDropoffAt(undefined);
+    setCompletionOtp(undefined);
+    setPaymentCollectionMode(undefined);
+    setPaymentConfirmedByCustomer(false);
+    setFare(undefined);
     if (!bookingId) return undefined;
 
     const unsubscribe = trackingService.subscribe(bookingId, (update) => {
@@ -31,6 +43,21 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
       if (update.etaMinutes != null) setEtaMinutes(update.etaMinutes);
       if (update.tripStartOtp) {
         setTripStartOtp(update.tripStartOtp);
+      }
+      if (update.arrivedAtDropoffAt) {
+        setArrivedAtDropoffAt(update.arrivedAtDropoffAt);
+      }
+      if (update.completionOtp) {
+        setCompletionOtp(update.completionOtp);
+      }
+      if (update.paymentCollectionMode) {
+        setPaymentCollectionMode(update.paymentCollectionMode);
+      }
+      if (update.paymentConfirmedByCustomer != null) {
+        setPaymentConfirmedByCustomer(update.paymentConfirmedByCustomer);
+      }
+      if (update.fare != null) {
+        setFare(update.fare);
       }
       if (update.driver) {
         setDriver(update.driver);
@@ -61,5 +88,10 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
     driverRating: driver?.rating,
     driverLocation,
     tripStartOtp,
+    arrivedAtDropoffAt,
+    completionOtp,
+    paymentCollectionMode,
+    paymentConfirmedByCustomer,
+    fare,
   };
 }

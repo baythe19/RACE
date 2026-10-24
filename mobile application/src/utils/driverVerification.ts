@@ -63,7 +63,6 @@ export interface DriverVerificationSummary {
     driverType?: string;
     licenseNo?: string;
     city?: string;
-    vehicleRegistration?: string;
     fleetSource?: 'vendor' | 'admin';
     backgroundCheck: DriverDocumentStatus;
     documents: DriverApplicationDocument[];
@@ -269,8 +268,6 @@ export function buildDriverVerification(
       driverType: driver?.driverType ?? fallback?.driverVehicle?.vehicleType ?? 'Tow Driver',
       licenseNo: driver?.licenseNo ?? fallback?.driverVehicle?.licenseNumber ?? 'OD-0220190012345',
       city: driver?.city ?? fallback?.driverPersonal?.city ?? 'Bhubaneswar',
-      vehicleRegistration:
-        driver?.vehicleRegistration ?? fallback?.driverVehicle?.vehicleNumber ?? 'OD 02 AB 1234',
       fleetSource: driver?.fleetSource,
       backgroundCheck: driver?.policeVerificationStatus ?? 'PENDING',
       documents:

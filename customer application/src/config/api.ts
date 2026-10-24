@@ -76,4 +76,5 @@ export const API_ENDPOINTS = {
   vendorDriver: (id: string) => `/api/v1/vendor/drivers/${id}`,
   vendorDriverUploadDocument: (id: string) => `/api/v1/vendor/drivers/${id}/upload-document`,
   driverRegister: '/api/v1/driver/register',
+  confirmPaymentMode: (id: string) => `/api/v1/bookings/${id}/confirm-payment-mode`,
 } as const;

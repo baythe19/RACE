@@ -1,6 +1,29 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, Pressable, Linking } from 'react-native';
-import { MapPin, Phone, FileText, Navigation } from 'lucide-react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  StyleSheet,
+  View,
+  Text,
+  Pressable,
+  Linking,
+  Keyboard,
+  Platform,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  MapPin,
+  Phone,
+  FileText,
+  Navigation,
+  CheckCircle2,
+  ShieldCheck,
+  AlertCircle,
+  CreditCard,
+  Banknote,
+  Smartphone,
+} from 'lucide-react-native';
+
+const OTP_LENGTH = 4;
 
 interface Props {
   bookingNumber: string;
@@ -18,6 +41,13 @@ interface Props {
   acting?: boolean;
   insetsTop?: number;
   insetsBottom?: number;
+  customerPaymentMode?: 'CASH' | 'UPI' | 'ONLINE' | null;
+  customerPaymentConfirmed?: boolean;
+  fareAmount?: number;
+  completionOtp?: string;
+  setCompletionOtp?: (otp: string) => void;
+  otpError?: string;
+  onVerifyAndComplete?: () => void;
 }
 
 function formatStopwatch(seconds: number): string {
@@ -41,12 +71,35 @@ export default function TripInProgressSheet({
   acting = false,
   insetsTop = 0,
   insetsBottom = 0,
+  customerPaymentMode,
+  customerPaymentConfirmed = false,
+  fareAmount,
+  completionOtp = '',
+  setCompletionOtp,
+  otpError,
+  onVerifyAndComplete,
 }: Props) {
   const startMs = startedAt ? +new Date(startedAt) : NaN;
   const secondsSince = () =>
     Number.isFinite(startMs) ? Math.max(0, Math.floor((Date.now() - startMs) / 1000)) : 0;
   const [elapsed, setElapsed] = useState(secondsSince);
   const [collapsed, setCollapsed] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, event => {
+      const { height } = event.endCoordinates;
+      setKeyboardHeight(height);
+    });
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   // Real stopwatch: counts from when the backend moved the job to IN_PROGRESS.
   useEffect(() => {
@@ -56,9 +109,11 @@ export default function TripInProgressSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startMs]);
 
+  const canCompleteWithOtp = completionOtp.length === OTP_LENGTH && !acting;
+
   return (
     <>
-      {/* Top Floating Service in Progress Pill (Screen 9 design) */}
+      {/* Top Floating Service in Progress Pill */}
       <View style={[styles.topPillContainer, { top: insetsTop + 8 }]} pointerEvents="box-none">
         <View style={styles.pillSurface}>
           <View style={styles.fileIcon}>
@@ -76,9 +131,7 @@ export default function TripInProgressSheet({
       </View>
 
       {/* Bottom Sheet Card */}
-      <View
-        style={styles.bottomSheet}
-        pointerEvents="box-none">
+      <View style={[styles.bottomSheet, { bottom: keyboardHeight }]} pointerEvents="box-none">
         <View style={[styles.sheetSurface, { paddingBottom: Math.max(insetsBottom, 12) + 12 }]}>
           {/* Collapsible Drag Handle */}
           <Pressable
@@ -107,53 +160,172 @@ export default function TripInProgressSheet({
             ) : null}
           </View>
 
-          {!collapsed ? (
-            <>
-              <View style={styles.actionsRow}>
+          {atDrop ? (
+            /* AT DROP SETTLEMENT CARD */
+            <View style={styles.settlementSection}>
+              {/* Payment Status Banner */}
+              <View
+                style={[
+                  styles.paymentBanner,
+                  customerPaymentConfirmed
+                    ? styles.paymentBannerConfirmed
+                    : styles.paymentBannerPending,
+                ]}>
+                {customerPaymentConfirmed ? (
+                  <CheckCircle2 size={18} color="#15803D" strokeWidth={2.4} />
+                ) : (
+                  <AlertCircle size={18} color="#D97706" strokeWidth={2.4} />
+                )}
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text
+                    style={[
+                      styles.paymentBannerTitle,
+                      { color: customerPaymentConfirmed ? '#15803D' : '#92400E' },
+                    ]}>
+                    {customerPaymentConfirmed
+                      ? `Payment confirmed: ${
+                          customerPaymentMode === 'CASH'
+                            ? 'CASH TO DRIVER'
+                            : customerPaymentMode === 'UPI'
+                              ? 'UPI TRANSFER'
+                              : 'IN-APP PAYMENT'
+                        }`
+                      : 'Waiting for customer payment confirmation'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.paymentBannerSub,
+                      { color: customerPaymentConfirmed ? '#166534' : '#B45309' },
+                    ]}>
+                    {customerPaymentConfirmed
+                      ? `Amount: ₹${fareAmount ?? '—'} · Ask customer for completion OTP.`
+                      : `Fare: ₹${fareAmount ?? '—'} · Customer is selecting payment mode.`}
+                  </Text>
+                </View>
+              </View>
+
+              {/* 4-digit Completion OTP input */}
+              <View style={styles.otpCard}>
+                <View style={styles.otpHeader}>
+                  <ShieldCheck size={18} color="#2563EB" strokeWidth={2.4} />
+                  <Text style={styles.otpHeaderTitle}>Customer Completion OTP</Text>
+                </View>
+                <Text style={styles.otpSubtitle}>
+                  Enter the 4-digit code provided by the customer to finish the job.
+                </Text>
+
                 <Pressable
-                  onPress={() =>
-                    customerMobile ? void Linking.openURL(`tel:${customerMobile}`) : undefined
-                  }
+                  onPress={() => inputRef.current?.focus()}
+                  style={styles.boxesRow}
                   accessibilityRole="button"
-                  accessibilityLabel="Call customer"
+                  accessibilityLabel="Tap to enter customer completion OTP">
+                  {Array.from({ length: OTP_LENGTH }, (_, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.box,
+                        completionOtp.length === idx && styles.boxFocused,
+                        Boolean(otpError) && styles.boxError,
+                      ]}>
+                      <Text style={styles.boxChar}>{completionOtp[idx] ?? ''}</Text>
+                    </View>
+                  ))}
+                  <TextInput
+                    ref={inputRef}
+                    value={completionOtp}
+                    onChangeText={text =>
+                      setCompletionOtp?.(text.replace(/\D/g, '').slice(0, OTP_LENGTH))
+                    }
+                    keyboardType="number-pad"
+                    maxLength={OTP_LENGTH}
+                    style={styles.hiddenInput}
+                    returnKeyType="done"
+                    onSubmitEditing={() => canCompleteWithOtp && onVerifyAndComplete?.()}
+                  />
+                </Pressable>
+
+                {otpError ? <Text style={styles.otpErrorText}>{otpError}</Text> : null}
+              </View>
+
+              {/* Actions row: Call customer & Verify & Complete Job */}
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                {customerMobile ? (
+                  <Pressable
+                    onPress={() => void Linking.openURL(`tel:${customerMobile}`)}
+                    style={({ pressed }) => [
+                      styles.callCustomerBtn,
+                      pressed && { opacity: 0.8 },
+                    ]}>
+                    <Phone size={18} color="#2563EB" strokeWidth={2.4} />
+                  </Pressable>
+                ) : null}
+
+                <Pressable
+                  onPress={onVerifyAndComplete ?? onCompletePress}
+                  disabled={!canCompleteWithOtp || acting}
                   style={({ pressed }) => [
-                    styles.actionCircle,
-                    pressed && styles.actionCirclePressed,
+                    styles.verifyCompleteBtn,
+                    !canCompleteWithOtp && styles.verifyCompleteBtnDisabled,
+                    pressed && { opacity: 0.9 },
                   ]}>
-                  <View style={styles.iconBg}>
-                    <Phone size={20} color="#2563EB" strokeWidth={2.4} />
-                  </View>
-                  <Text style={styles.actionLabel}>Call customer</Text>
+                  {acting ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.verifyCompleteBtnText}>
+                      {canCompleteWithOtp ? 'Verify OTP & Complete Job' : 'Enter 4-Digit OTP'}
+                    </Text>
+                  )}
                 </Pressable>
               </View>
+            </View>
+          ) : (
+            /* EN ROUTE TO DROP ACTIONS */
+            <>
+              {!collapsed ? (
+                <View style={styles.actionsRow}>
+                  <Pressable
+                    onPress={() =>
+                      customerMobile ? void Linking.openURL(`tel:${customerMobile}`) : undefined
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel="Call customer"
+                    style={({ pressed }) => [
+                      styles.actionCircle,
+                      pressed && styles.actionCirclePressed,
+                    ]}>
+                    <View style={styles.iconBg}>
+                      <Phone size={20} color="#2563EB" strokeWidth={2.4} />
+                    </View>
+                    <Text style={styles.actionLabel}>Call customer</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              <Pressable
+                onPress={onResumeNavigation}
+                accessibilityRole="button"
+                accessibilityLabel="Resume navigation to drop"
+                style={({ pressed }) => [styles.resumeBtn, pressed && styles.resumeBtnPressed]}>
+                <Navigation size={18} color="#0F172A" strokeWidth={2.5} style={{ marginRight: 8 }} />
+                <Text style={styles.resumeBtnText}>Resume navigation</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={onCompletePress}
+                disabled={acting}
+                accessibilityRole="button"
+                accessibilityLabel="Arrive at Drop Location"
+                style={({ pressed }) => [
+                  styles.completeBtn,
+                  styles.completeBtnSecondary,
+                  pressed && styles.completeBtnPressed,
+                ]}>
+                <Text style={[styles.completeBtnText, styles.completeBtnSecondaryText]}>
+                  Arrive at Drop Location
+                </Text>
+              </Pressable>
             </>
-          ) : null}
-
-          {!atDrop ? (
-            <Pressable
-              onPress={onResumeNavigation}
-              accessibilityRole="button"
-              accessibilityLabel="Resume navigation to drop"
-              style={({ pressed }) => [styles.resumeBtn, pressed && styles.resumeBtnPressed]}>
-              <Navigation size={18} color="#0F172A" strokeWidth={2.5} style={{ marginRight: 8 }} />
-              <Text style={styles.resumeBtnText}>Resume navigation</Text>
-            </Pressable>
-          ) : null}
-
-          <Pressable
-            onPress={onCompletePress}
-            disabled={acting}
-            accessibilityRole="button"
-            accessibilityLabel="Complete job"
-            style={({ pressed }) => [
-              styles.completeBtn,
-              !atDrop && styles.completeBtnSecondary,
-              pressed && styles.completeBtnPressed,
-            ]}>
-            <Text style={[styles.completeBtnText, !atDrop && styles.completeBtnSecondaryText]}>
-              Complete job
-            </Text>
-          </Pressable>
+          )}
         </View>
       </View>
     </>
@@ -369,6 +541,127 @@ const styles = StyleSheet.create({
   completeBtnText: {
     color: '#FFFFFF',
     fontSize: 16.5,
+    fontWeight: '800',
+  },
+  settlementSection: {
+    marginTop: 4,
+  },
+  paymentBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  paymentBannerConfirmed: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#86EFAC',
+  },
+  paymentBannerPending: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  paymentBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  paymentBannerSub: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  otpCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+  },
+  otpHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  otpHeaderTitle: {
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  otpSubtitle: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 3,
+    marginBottom: 12,
+  },
+  boxesRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 12,
+    position: 'relative',
+  },
+  box: {
+    width: 52,
+    height: 56,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  boxFocused: {
+    borderColor: '#2563EB',
+    backgroundColor: '#EFF6FF',
+  },
+  boxError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  boxChar: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0,
+  },
+  otpErrorText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#DC2626',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  callCustomerBtn: {
+    width: 48,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyCompleteBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#16A34A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyCompleteBtnDisabled: {
+    backgroundColor: '#94A3B8',
+  },
+  verifyCompleteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
     fontWeight: '800',
   },
 });

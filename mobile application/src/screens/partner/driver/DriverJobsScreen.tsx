@@ -1081,25 +1081,32 @@ export default function DriverJobsScreen({ navigation }: Props) {
   useRefreshDriverDataOnFocus(true);
   const insets = useSafeAreaInsets();
   const { data: profile, isLoading: profileLoading } = useDriverProfileQuery(true);
-  const isApproved = buildDriverVerification(profile).isApproved;
+  const verification = useMemo(() => buildDriverVerification(profile), [profile]);
+  const isApproved = verification.isApproved;
+  const isOperational =
+    profile?.operationalStatus !== 'SUSPENDED' &&
+    profile?.operationalStatus !== 'DISABLED' &&
+    profile?.reviewStatus !== 'REJECTED' &&
+    verification.state !== 'rejected' &&
+    verification.state !== 'suspended';
   const {
     data: jobs = [],
     isLoading: jobsLoading,
     isError: jobsError,
     refetch: refetchJobs,
-  } = useDriverJobsQuery(isApproved);
+  } = useDriverJobsQuery(isOperational);
   const {
     data: offers = [],
     isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
-  } = useDriverJobOffersQuery(isApproved);
+  } = useDriverJobOffersQuery(isOperational);
   const {
     data: activeJob,
     isLoading: activeLoading,
     isError: activeError,
     refetch: refetchActive,
-  } = useDriverActiveJobQuery(isApproved);
+  } = useDriverActiveJobQuery(isOperational);
   const acceptMutation = useAcceptDriverJobMutation();
   const rejectMutation = useRejectDriverJobMutation();
   const { data: notifData } = useNotificationsQuery();

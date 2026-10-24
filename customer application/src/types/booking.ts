@@ -77,6 +77,15 @@ export interface Booking {
   advancePaid?: boolean;
   remainingPaid?: boolean;
   paymentStatus?: string;
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE' | null;
+  paymentConfirmedByCustomer?: boolean;
+  estimatedFare?: number;
+  fareBreakdown?: {
+    totalFare?: number;
+    baseFare?: number;
+  };
 }
 
 export interface CreateBookingRequest {

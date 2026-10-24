@@ -29,7 +29,7 @@ import {
   isDriverVisibleToCustomer,
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
-import { customerTripOtp } from './tripOtp';
+import { customerTripOtp, customerCompletionOtp } from './tripOtp';
 
 function mapDriverBooking(
   booking: IDriverBooking,
@@ -60,6 +60,11 @@ function mapDriverBooking(
     driverId: booking.driverId?.toString(),
     driver,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
+    tripStartOtp: customerTripOtp(booking),
+    completionOtp: customerCompletionOtp(booking),
+    arrivedAtDropoffAt: booking.arrivedAtDropoffAt?.toISOString(),
+    paymentCollectionMode: booking.paymentCollectionMode,
+    paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     scheduledAt: booking.scheduledAt?.toISOString(),
     statusHistory: booking.statusHistory.map((entry) => ({
       status: entry.status,
@@ -269,6 +274,12 @@ export class DriverBookingService {
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
       tripStartOtp:
         requestingUser.role === 'customer' ? customerTripOtp(booking) : undefined,
+      completionOtp:
+        requestingUser.role === 'customer' ? customerCompletionOtp(booking) : undefined,
+      arrivedAtDropoffAt: booking.arrivedAtDropoffAt?.toISOString(),
+      paymentCollectionMode: booking.paymentCollectionMode,
+      paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
+      fare: booking.finalFare ?? booking.estimatedFare,
     };
   }
 

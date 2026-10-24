@@ -295,20 +295,6 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
               <View style={styles.divider} />
 
-              <Pressable
-                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-                onPress={() => openDriverJobsDone()}>
-                <View style={[styles.menuIconCircle, { backgroundColor: '#F0F9FF' }]}>
-                  <Truck size={18} color="#0284C7" strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTextCol}>
-                  <PartnerText style={styles.menuTitle}>Trip history</PartnerText>
-                  <PartnerText style={styles.menuSubtitle}>Completed and cancelled jobs</PartnerText>
-                </View>
-                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
-
-              <View style={styles.divider} />
 
               <Pressable
                 style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}

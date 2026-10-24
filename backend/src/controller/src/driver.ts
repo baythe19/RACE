@@ -92,6 +92,29 @@ export class DriverController {
     return sendSuccess(res, result);
   });
 
+  arrivedAtDropoff = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverService.arrivedAtDropoff(
+      user.id,
+      user.role,
+      getParamId(req.params.id),
+      req.body.bookingType,
+    );
+    return sendSuccess(res, result);
+  });
+
+  completeBooking = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverService.completeBooking(
+      user.id,
+      user.role,
+      getParamId(req.params.id),
+      req.body.bookingType,
+      req.body.completionOtp,
+    );
+    return sendSuccess(res, result);
+  });
+
   registerSelf = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await driverSelfService.register(user.id, req.body);

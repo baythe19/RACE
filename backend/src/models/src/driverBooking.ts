@@ -55,6 +55,15 @@ export interface IDriverBooking extends Document {
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
   tripStartOtpVerified?: boolean;
+  /** Timestamp when partner marks arrival at dropoff */
+  arrivedAtDropoffAt?: Date;
+  /** 4-digit code customer shares with partner to complete trip after payment confirmation */
+  completionOtp?: string;
+  completionOtpVerified?: boolean;
+  /** Mode selected by customer: CASH, UPI, or ONLINE */
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  paymentCollectedAt?: Date;
   scheduledAt?: Date;
   statusHistory: IDriverStatusHistoryEntry[];
   cancelledAt?: Date;
@@ -132,6 +141,12 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     assignedFleetVehicleLabel: { type: String, trim: true },
     tripStartOtp: { type: String, trim: true },
     tripStartOtpVerified: { type: Boolean, default: false },
+    arrivedAtDropoffAt: { type: Date },
+    completionOtp: { type: String, trim: true },
+    completionOtpVerified: { type: Boolean, default: false },
+    paymentCollectionMode: { type: String, enum: ['CASH', 'UPI', 'ONLINE'] },
+    paymentConfirmedByCustomer: { type: Boolean, default: false },
+    paymentCollectedAt: { type: Date },
     driverServiceType: {
       type: String,
       enum: ['part_time', 'full_time', 'outstation', 'night'],

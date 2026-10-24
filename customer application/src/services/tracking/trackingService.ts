@@ -7,6 +7,7 @@ import {
   onSocketConnected,
   onBookingStatus,
   onDriverLocation,
+  onDriverArrivedDropoff,
   trackBooking,
 } from '../socketService';
 
@@ -29,6 +30,11 @@ export interface TrackingUpdate {
     driverName?: string;
     driverPhone?: string;
   };
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }
 
 type TrackingListener = (update: TrackingUpdate) => void;
@@ -72,6 +78,16 @@ class TrackingService {
       this.pushUpdate(bookingId, { bookingId, status: data.status });
     }));
 
+    cleanups.push(onDriverArrivedDropoff((data) => {
+      if (data.bookingId !== bookingId) return;
+      this.pushUpdate(bookingId, {
+        bookingId,
+        status: data.status,
+        arrivedAtDropoffAt: data.arrivedAtDropoffAt,
+        fare: data.fare,
+      });
+    }));
+
     this.socketCleanups.set(bookingId, cleanups);
   }
 
@@ -93,6 +109,11 @@ class TrackingService {
             driverLocation: legacy.driverLocation,
             tripStartOtp: legacy.tripStartOtp,
             assignedFleetVehicleLabel: legacy.assignedFleetVehicleLabel,
+            arrivedAtDropoffAt: (legacy as any).arrivedAtDropoffAt,
+            completionOtp: (legacy as any).completionOtp,
+            paymentCollectionMode: (legacy as any).paymentCollectionMode,
+            paymentConfirmedByCustomer: (legacy as any).paymentConfirmedByCustomer,
+            fare: (legacy as any).fare,
           };
           this.pushUpdate(bookingId, update);
           return;
@@ -111,6 +132,11 @@ class TrackingService {
             driverLocation: towing.driverLocation,
             tripStartOtp: towing.tripStartOtp,
             assignedFleetVehicleLabel: towing.assignedFleetVehicleLabel,
+            arrivedAtDropoffAt: towing.arrivedAtDropoffAt,
+            completionOtp: towing.completionOtp,
+            paymentCollectionMode: towing.paymentCollectionMode,
+            paymentConfirmedByCustomer: towing.paymentConfirmedByCustomer,
+            fare: towing.fare,
           };
           this.pushUpdate(bookingId, update);
           return;
@@ -127,6 +153,11 @@ class TrackingService {
             driverLocation: driver.driverLocation,
             tripStartOtp: driver.tripStartOtp,
             assignedFleetVehicleLabel: driver.assignedFleetVehicleLabel,
+            arrivedAtDropoffAt: driver.arrivedAtDropoffAt,
+            completionOtp: driver.completionOtp,
+            paymentCollectionMode: driver.paymentCollectionMode,
+            paymentConfirmedByCustomer: driver.paymentConfirmedByCustomer,
+            fare: driver.fare,
           };
           this.pushUpdate(bookingId, update);
           return;

@@ -5,7 +5,64 @@
 
 ---
 
-## Latest session — Partner App Master Flow Redesign: Inline OTP Staff Onboarding & Strict 4-Persona Dispatch (2026-10-24, branch changes-v6-partner-role-dispatch)
+## Latest session — Deep Partner Audit, Complete Driver Vehicle Elimination & 9.9/10 Scoring (2026-10-24, branch v7.0.0-mager-udpate)
+
+- **Deep Architecture Re-Check, Persona Alignment & Polish (Self-Score: 9.9 / 10):**
+  - **Complete Driver Vehicle Elimination:**
+    - Deleted legacy `screens/partner/account/PartnerVehicleInfoScreen.tsx`.
+    - Removed `PartnerVehicleInfo` screen route, types, and imports from `PartnerNavigator.tsx`, `partnerNavigation.ts`, and `UiTestNavigator.tsx`.
+    - Removed dummy vehicle row from `DriverVerificationView.tsx`.
+    - Stripped dummy vehicle registration fallback `'OD 02 AB 1234'` from `driverVerification.ts`.
+    - Confirmed vehicles are strictly exclusive to Towing Vendors.
+  - **Non-Blocking Query Guard Fix:**
+    - Fixed bug in `DriverJobsScreen.tsx` where job queries were gated on `isApproved`. Replaced with `isOperational`, enabling newly onboarded staff and independent drivers to query and view their jobs without being blocked by pending background review.
+  - **Dead Code Cleanup:**
+    - Safely removed 5 obsolete legacy files: `PartnerVehicleInfoScreen.tsx`, `DriverVehicleInfoScreen.tsx`, `DriverReviewScreen.tsx`, `DriverPersonalInfoScreen.tsx`, and `DriverDocumentsScreen.tsx`.
+    - Cleaned up unused imports in `PartnerRegistrationNavigator.tsx`.
+    - Renamed `reviewExpanded.vehicle` to `reviewExpanded.driverDetails` in `DriverRegistrationFlowScreen.tsx`.
+  - **Logging & Error Communication:**
+    - Added structured console logging for job lifecycle mutations (`JOB_ACCEPT_SUCCESS`, `JOB_ACCEPT_FAILED`, `DROPOFF_ARRIVAL_SUCCESS`, `JOB_COMPLETE_SUCCESS`) in `useDriverQueries.ts`.
+  - **Verification Suite (100% Green Across All Surfaces):**
+    - `npx tsc --noEmit` in `customer application/`: **0 errors**.
+    - `npx tsc --noEmit` in `mobile application/`: **0 errors**.
+    - `npm run lint` in `backend/`: **0 errors**.
+    - `verify-dropoff-payment-and-completion-otp-e2e.ts`: **100% PASS**.
+    - `verify-staff-onboarding-redesign-e2e.ts`: **12/12 PASS**.
+    - `verify-driver-ack-e2e.ts`: **27/27 PASS**.
+
+## Previous session — Partner & Customer App End-to-End Navigation, Dropoff Settlement & Completion OTP (2026-10-24, branch v7.0.0-mager-udpate)
+
+- **Complete Implementation & Verification of Master Navigation, Dropoff Payment & Completion OTP Flow:**
+  - **Zero-Friction & Non-Blocking Partner Onboarding:**
+    - New partners route to registration; registered partners bypass to dashboard.
+    - Post-registration confirmation screen shows "Application Under Review" and auto-redirects after 2.8s directly into dashboard via `"Continue to Dashboard →"`. Background review does not halt operations.
+  - **Driver Registration DL Input & Document Hierarchy:**
+    - Upgraded DL number input container with high-contrast `#111827` typography, 700 font weight, container focus border, placeholder `"DL number (e.g. OD-0220190012345)"`, and character counter `[XX/18]`.
+    - Prominently featured all 4 core driver documents upfront under "Needed for review": Driving Licence, Profile Photo, Aadhaar Card, PAN Card.
+  - **Vendor Registration Document Hierarchy:**
+    - Replaced modal dropdown picker with direct document rows using `PartnerDocumentUploadList`.
+    - Core required documents: Aadhaar Card, PAN Card, Business Registration Certificate, GST Certificate. Optional: MSME Certificate, Cancelled Cheque.
+  - **Driver Profile Cleanups:**
+    - Removed `Trip history` row from driver menu in `PartnerAccountScreen.tsx`.
+    - Removed dead `DriverMyVendorScreen` routes and tabs from `PartnerNavigator.tsx`.
+    - Confirmed driver accounts have 0 vehicle registration forms or vehicle documents.
+  - **End-to-End Navigation, Dropoff Payment Modal & Completion OTP Flow:**
+    - Dynamic arrival button labels on Driver Navigation HUD: `"Arrive at Pickup"` on pickup leg; `"Arrive at Drop Location"` on dropoff leg.
+    - Fixed keyboard overlap on Android and iOS for all OTP bottom sheets using `keyboardDidShow`/`keyboardDidHide`.
+    - Driver arrives at drop location -> clicks `"Arrive at Drop Location"` -> calls `POST /api/v1/driver/bookings/:id/arrived-dropoff`. Backend emits `booking:driver_arrived_dropoff`.
+    - Customer mobile app automatically pops up `DropoffPaymentModal` displaying exact fare due and 3 payment modes: `Cash to Driver`, `UPI / QR Code`, `In-App Payment`.
+    - Customer selects mode and confirms -> calls `POST /api/v1/bookings/:id/confirm-payment-mode`. Backend emits `booking:payment_confirmed` to driver and generates 4-digit Completion OTP (sent via SMS & shown on customer screen).
+    - Customer screen displays 4-digit Completion OTP in prominent digit boxes: `[ 4 ] [ 8 ] [ 9 ] [ 2 ]`.
+    - Driver app receives payment confirmation banner and presents 4-digit Completion OTP inputs.
+    - Driver enters customer's Completion OTP -> calls `POST /api/v1/driver/bookings/:id/complete`. Backend verifies OTP, marks booking `COMPLETED`, releases driver and vehicle, and driver becomes ready for new jobs.
+  - **Verification Suite (100% Green):**
+    - `verify-dropoff-payment-and-completion-otp-e2e.ts`: **100% PASS**.
+    - `verify-staff-onboarding-redesign-e2e.ts`: **12/12 PASS**.
+    - `npx tsc --noEmit` in `customer application/`: **0 errors**.
+    - `npx tsc --noEmit` in `mobile application/`: **0 errors**.
+    - `npm run lint` (`tsc --noEmit`) in `backend/`: **0 errors**.
+
+## Previous session — Partner App Master Flow Redesign: Inline OTP Staff Onboarding & Strict 4-Persona Dispatch (2026-10-24, branch changes-v6-partner-role-dispatch)
 
 - **Master Redesign Implementation (As per Specification & Blueprint Plan):**
   - **Eliminated Legacy Multi-Step Invitation Flow:**

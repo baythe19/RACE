@@ -67,6 +67,7 @@ export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
       socket.on('driver:jobs-updated', refreshDriverData);
       socket.on('notification:new', refreshDriverData);
       socket.on('booking:status', refreshDriverData);
+      socket.on('booking:payment_confirmed', refreshDriverData);
       socket.connect();
     };
 

@@ -11,7 +11,6 @@ import PartnerHomeScreen from '../screens/partner/PartnerHomeScreen';
 import DriverDashboardScreen from '../screens/partner/driver/DriverDashboardScreen';
 import DriverJobsScreen from '../screens/partner/driver/DriverJobsScreen';
 import DriverActiveJobScreen from '../screens/partner/driver/DriverActiveJobScreen';
-import DriverMyVendorScreen from '../screens/partner/driver/DriverMyVendorScreen';
 import {
   useDriverVendorInvitationsQuery,
   useDriverVendorMembershipQuery,
@@ -30,7 +29,6 @@ import VendorVehiclesScreen from '../screens/partner/VendorVehiclesScreen';
 import VendorVehicleRegistrationScreen from '../screens/partner/registration/vehicle/VendorVehicleRegistrationScreen';
 import VendorAssignJobScreen from '../screens/partner/VendorAssignJobScreen';
 import PartnerEditProfileScreen from '../screens/partner/account/PartnerEditProfileScreen';
-import PartnerVehicleInfoScreen from '../screens/partner/account/PartnerVehicleInfoScreen';
 import PartnerDocumentsScreen from '../screens/partner/account/PartnerDocumentsScreen';
 import PartnerEarningsScreen from '../screens/partner/account/PartnerEarningsScreen';
 import PartnerNotificationsScreen from '../screens/partner/account/PartnerNotificationsScreen';
@@ -170,11 +168,6 @@ function PartnerAccountStackNavigator() {
         options={{ headerShown: false }}
       />
       <AccountStack.Screen
-        name="PartnerVehicleInfo"
-        component={PartnerVehicleInfoScreen}
-        options={{ headerShown: false }}
-      />
-      <AccountStack.Screen
         name="PartnerDocuments"
         component={PartnerDocumentsScreen}
         options={{ headerShown: false }}
@@ -268,13 +261,6 @@ export default function PartnerNavigator() {
           name="PartnerDrivers"
           component={PartnerDriversStackNavigator}
           options={{ title: 'Drivers' }}
-        />
-      ) : null}
-      {showVendorTab ? (
-        <Tab.Screen
-          name="PartnerVendor"
-          component={DriverMyVendorScreen}
-          options={{ title: 'My Vendor' }}
         />
       ) : null}
       {!isDriver ? (

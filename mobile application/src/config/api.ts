@@ -98,4 +98,6 @@ export const API_ENDPOINTS = {
   driverBookingOffers: '/api/v1/driver/bookings/offers',
   driverRegister: '/api/v1/driver/register',
   driverUploadDocument: '/api/v1/driver/upload-document',
+  driverArrivedDropoff: (id: string) => `/api/v1/driver/bookings/${id}/arrived-dropoff`,
+  driverCompleteBooking: (id: string) => `/api/v1/driver/bookings/${id}/complete`,
 } as const;

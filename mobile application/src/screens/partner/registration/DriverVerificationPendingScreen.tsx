@@ -68,6 +68,13 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
     }
   }, [accessToken, dispatch, navigation]);
 
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      handleGoToDashboard();
+    }, 2800);
+    return () => clearTimeout(timer);
+  }, [handleGoToDashboard]);
+
   /** Registration stack still has the editable review step — allow editing and re-submitting. */
   const handleEditPrevious = useCallback(() => {
     navigation.navigate('DriverReview', {

@@ -443,7 +443,6 @@ export default function DriverVerificationView({
               {detailRow('Driver type', application.driverType, px)}
               {detailRow('Licence number', application.licenseNo, px)}
               {detailRow('Operating city', application.city, px)}
-              {application.vehicleRegistration ? detailRow('Vehicle', application.vehicleRegistration, px) : null}
               {detailRow('Submitted on', submittedLabel, px)}
               {detailRow('Added by', application.fleetSource === 'vendor' ? 'Vendor fleet' : application.fleetSource === 'admin' ? 'RACE admin' : undefined, px)}
               {detailRow(
@@ -567,14 +566,14 @@ export default function DriverVerificationView({
             <Pressable
               onPress={onOpenDashboard}
               accessibilityRole="button"
-              accessibilityLabel={verification.isApproved ? 'Go to Dashboard' : 'Go to Dashboard (Read only)'}
+              accessibilityLabel="Continue to Dashboard"
               style={({ pressed }) => [
                 styles.linkButton,
-                { paddingVertical: px(4), marginTop: px(2) },
+                { paddingVertical: px(6), marginTop: px(4) },
                 pressed && styles.pressed,
               ]}>
-              <PartnerText style={[T.link, { fontSize: px(13), lineHeight: px(18), color: LINK_BLUE }]}>
-                {verification.isApproved ? 'Go to Dashboard' : 'Go to Dashboard (Read only)'}
+              <PartnerText style={[T.link, { fontSize: px(14), fontWeight: '700', lineHeight: px(18), color: '#0F172A' }]}>
+                Continue to Dashboard →
               </PartnerText>
             </Pressable>
           ) : null}

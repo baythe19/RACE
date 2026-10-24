@@ -433,11 +433,6 @@ export default function UiTestNavigator() {
                   onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerEditProfile'))}
                 />
                 <JumpRow
-                  label="Vehicle Info"
-                  sub="Vehicle artwork, plate & RC"
-                  onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerVehicleInfo'))}
-                />
-                <JumpRow
                   label="Documents Hub"
                   sub="Required vs Optional documents"
                   onPress={() => openForRole(() => jumpToPartnerAccountScreen('PartnerDocuments'))}

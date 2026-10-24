@@ -70,6 +70,10 @@ export interface TowingBookingResponseDto {
   };
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  completionOtp?: string;
+  arrivedAtDropoffAt?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
   scheduledAt?: string;
   statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
   cancelledAt?: string;
@@ -108,4 +112,9 @@ export interface TowingTrackingResponseDto {
   dropoff?: { address: string; latitude: number; longitude: number };
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  completionOtp?: string;
+  arrivedAtDropoffAt?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }

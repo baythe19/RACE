@@ -14,63 +14,57 @@ import {
 import type { PartnerDocumentFieldConfig } from '../components/partner/PartnerDocumentUploadList';
 import { VENDOR_UI_TO_BACKEND_DOC } from './backendRequiredDocuments';
 
-export const VENDOR_DOCUMENTS: PartnerDocumentFieldConfig[] = [
+export const VENDOR_CORE_DOCUMENTS: PartnerDocumentFieldConfig[] = [
   {
     id: 'aadhaar',
     label: 'Aadhaar Card',
-    hint: 'Government issued ID proof.',
+    hint: 'Front & back of owner / partner Aadhaar',
     required: true,
     Icon: Fingerprint,
   },
   {
     id: 'pan',
     label: 'PAN Card',
-    hint: 'Permanent Account Number.',
+    hint: 'Owner / Business PAN card',
     required: true,
     Icon: IdCard,
   },
   {
-    id: 'gst',
-    label: 'GST Certificate',
-    hint: 'Goods and Services Tax registration.',
-    required: false,
-    Icon: FileText,
-  },
-  {
     id: 'business_registration',
     label: 'Business Registration Certificate',
-    hint: 'Company / firm registration proof.',
+    hint: 'Trade licence / Company / Firm registration proof',
     required: true,
     Icon: Building2,
   },
   {
-    id: 'shop_photo',
-    label: 'Shop / Office Photo',
-    hint: 'Clear photo of your shop or office.',
+    id: 'gst',
+    label: 'GST Certificate',
+    hint: 'GST registration certificate (REG-06)',
     required: true,
-    Icon: Store,
+    Icon: FileText,
   },
-  {
-    id: 'cancelled_cheque',
-    label: 'Cancelled Cheque / Passbook',
-    hint: 'Bank account proof.',
-    required: true,
-    Icon: CreditCard,
-  },
+];
+
+export const VENDOR_OPTIONAL_DOCUMENTS: PartnerDocumentFieldConfig[] = [
   {
     id: 'msme',
-    label: 'MSME / Udyam Registration',
-    hint: 'Optional government business registration.',
+    label: 'MSME / Udyam Certificate',
+    hint: 'For priority business verification',
     required: false,
     Icon: FileText,
   },
   {
-    id: 'profile_photo',
-    label: 'Profile Photo',
-    hint: 'Your passport size photo.',
-    required: true,
-    Icon: Camera,
+    id: 'cancelled_cheque',
+    label: 'Cancelled Cheque / Bank Passbook',
+    hint: 'Needed for business earnings payout',
+    required: false,
+    Icon: CreditCard,
   },
+];
+
+export const VENDOR_DOCUMENTS: PartnerDocumentFieldConfig[] = [
+  ...VENDOR_CORE_DOCUMENTS,
+  ...VENDOR_OPTIONAL_DOCUMENTS,
 ];
 
 export const DRIVER_DOCUMENTS: PartnerDocumentFieldConfig[] = [

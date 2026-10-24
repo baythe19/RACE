@@ -2,10 +2,6 @@ import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import DriverDocumentsScreen from '../screens/partner/registration/driver/DriverDocumentsScreen';
-import DriverPersonalInfoScreen from '../screens/partner/registration/driver/DriverPersonalInfoScreen';
-import DriverReviewScreen from '../screens/partner/registration/driver/DriverReviewScreen';
-import DriverVehicleInfoScreen from '../screens/partner/registration/driver/DriverVehicleInfoScreen';
 import DriverRegistrationFlowScreen from '../screens/partner/registration/driver/DriverRegistrationFlowScreen';
 import DriverVerificationPendingScreen from '../screens/partner/registration/DriverVerificationPendingScreen';
 import VendorBusinessAddressScreen from '../screens/partner/registration/vendor/VendorBusinessAddressScreen';

@@ -80,3 +80,19 @@ export function onBookingStatus(
   activeSocket.on('booking:status', callback);
   return () => activeSocket.off('booking:status', callback);
 }
+
+export function onDriverArrivedDropoff(
+  callback: (data: {
+    bookingId: string;
+    bookingType: string;
+    status: string;
+    arrivedAtDropoffAt: string;
+    fare: number;
+    paymentOptions: string[];
+    message: string;
+  }) => void,
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('booking:driver_arrived_dropoff', callback);
+  return () => activeSocket.off('booking:driver_arrived_dropoff', callback);
+}

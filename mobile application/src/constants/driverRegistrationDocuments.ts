@@ -35,14 +35,14 @@ export interface DriverDocumentConfig {
 }
 
 /**
- * 6 Core documents needed for initial application review.
- * Matches RACE Driver Registration Screen 3 & patterdata.md exactly.
+ * 4 Core documents needed for initial application review.
+ * Driver provides Driving Licence, Profile Photo, Aadhaar Card, and PAN Card upfront.
  */
 export const CORE_REVIEW_DOCUMENTS: DriverDocumentConfig[] = [
   {
     id: 'driving_license',
-    title: 'Driving licence',
-    subtitle: 'Front side',
+    title: 'Driving licence photo',
+    subtitle: 'Front side photo of your valid DL',
     requirement: 'required',
     badgeLabel: 'Required',
     Icon: IdCard,
@@ -53,7 +53,7 @@ export const CORE_REVIEW_DOCUMENTS: DriverDocumentConfig[] = [
   {
     id: 'profile_photo',
     title: 'Profile photo',
-    subtitle: 'Clear face photo',
+    subtitle: 'Clear, well-lit front face photo',
     requirement: 'required',
     badgeLabel: 'Required',
     Icon: User,
@@ -62,15 +62,26 @@ export const CORE_REVIEW_DOCUMENTS: DriverDocumentConfig[] = [
     backendDocType: 'profile_photo',
   },
   {
-    id: 'government_photo_id',
-    title: 'Government photo ID',
-    subtitle: 'Aadhaar or another accepted ID',
+    id: 'aadhaar_card',
+    title: 'Aadhaar card',
+    subtitle: 'Front & back of Aadhaar for identity verification',
     requirement: 'required',
     badgeLabel: 'Required',
     Icon: Fingerprint,
     iconBg: '#FEF3C7',
     iconColor: '#D97706',
     backendDocType: 'aadhaar_card',
+  },
+  {
+    id: 'pan_card',
+    title: 'PAN card',
+    subtitle: 'PAN card for identity and payout confirmation',
+    requirement: 'required',
+    badgeLabel: 'Required',
+    Icon: CreditCard,
+    iconBg: '#FEF3C7',
+    iconColor: '#D97706',
+    backendDocType: 'pan_card',
   },
 ];
 
@@ -84,20 +95,20 @@ export const CONDITIONAL_DOCUMENTS: DriverDocumentConfig[] = [];
  */
 export const LATER_DOCUMENTS: DriverDocumentConfig[] = [
   {
-    id: 'payout_details',
-    title: 'Before first payout — PAN and bank details',
-    subtitle: 'Can add later • needed before first payout',
+    id: 'bank_details',
+    title: 'Bank account / Passbook',
+    subtitle: 'Can add now or before first payout',
     requirement: 'later',
-    badgeLabel: 'Later',
+    badgeLabel: 'Optional',
     Icon: Landmark,
     iconBg: '#EFF6FF',
     iconColor: '#2563EB',
-    backendDocType: 'pan_card',
+    backendDocType: 'cancelled_cheque',
   },
   {
     id: 'additional_checks',
-    title: 'Additional checks — Police verification / medical fitness',
-    subtitle: 'May be required based on your service category',
+    title: 'Additional checks — Police verification / fitness',
+    subtitle: 'Only if requested by verification team',
     requirement: 'later',
     badgeLabel: 'If requested',
     Icon: Stethoscope,

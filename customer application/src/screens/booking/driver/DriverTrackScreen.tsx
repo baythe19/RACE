@@ -6,6 +6,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LiveTripMap from '../../../components/booking/LiveTripMap';
 import DriverAvatar from '../../../components/bookings/DriverAvatar';
 import TripOtpCard from '../../../components/booking/TripOtpCard';
+import DropoffPaymentModal from '../../../components/booking/DropoffPaymentModal';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import { useBookingTracking } from '../../../hooks/useBookingTracking';
 import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
@@ -46,8 +47,19 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
   const bookingId = route.params?.bookingId;
   const fromBookings = route.params?.fromBookings;
   const booking = useBookingQuery(bookingId ?? '', 'driver');
-  const { etaLabel, status, driverLocation, driverName, driverRating, tripStartOtp: trackedOtp } =
-    useBookingTracking(bookingId, 'driver');
+  const {
+    etaLabel,
+    status,
+    driverLocation,
+    driverName,
+    driverRating,
+    tripStartOtp: trackedOtp,
+    arrivedAtDropoffAt,
+    completionOtp,
+    paymentCollectionMode,
+    paymentConfirmedByCustomer,
+    fare: trackedFare,
+  } = useBookingTracking(bookingId, 'driver');
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
   const displayDriverName =
     driverName ?? booking?.driver?.name ?? 'Assigning driver';
@@ -55,6 +67,18 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
   const isCompleted = isCompletedUnifiedStatus(status);
+
+  const resolvedFare =
+    trackedFare ??
+    (booking?.fareBreakdown && 'totalFare' in booking.fareBreakdown
+      ? (booking.fareBreakdown as { totalFare?: number }).totalFare
+      : booking?.estimatedFare) ??
+    0;
+
+  const isArrivedDropoff = Boolean(
+    arrivedAtDropoffAt || (booking as any)?.arrivedAtDropoffAt,
+  );
+  const showDropoffPayment = isArrivedDropoff && !isCompleted;
 
   const trackParams = bookingId
     ? { bookingId, bookingType: 'driver' as const, fromBookings }
@@ -281,6 +305,18 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
               subtitle="Share this code with your driver when they arrive to start the trip."
             />
           </View>
+        ) : null}
+
+        {bookingId ? (
+          <DropoffPaymentModal
+            visible={showDropoffPayment}
+            bookingId={bookingId}
+            bookingType="driver"
+            fare={resolvedFare}
+            completionOtp={completionOtp ?? (booking as any)?.completionOtp}
+            paymentCollectionMode={paymentCollectionMode ?? (booking as any)?.paymentCollectionMode}
+            paymentConfirmedByCustomer={paymentConfirmedByCustomer ?? (booking as any)?.paymentConfirmedByCustomer}
+          />
         ) : null}
       </View>
     </TowingBookingLayout>

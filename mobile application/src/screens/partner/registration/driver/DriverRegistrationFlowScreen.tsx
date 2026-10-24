@@ -597,11 +597,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   // Each review section opens on its own. Several can stay open together.
   const [reviewExpanded, setReviewExpanded] = useState<{
     personal: boolean;
-    vehicle: boolean;
+    driverDetails: boolean;
     documents: boolean;
-  }>({ personal: false, vehicle: false, documents: false });
+  }>({ personal: false, driverDetails: false, documents: false });
 
-  const toggleReviewSection = (key: 'personal' | 'vehicle' | 'documents') =>
+  const toggleReviewSection = (key: 'personal' | 'driverDetails' | 'documents') =>
     setReviewExpanded((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // -------------------------------------------------------------
@@ -1219,17 +1219,45 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
               Driving licence number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
             </PartnerText>
-            {(driverPersonal.licenseNumber || driverVehicle.licenseNumber).length >= 10 ? (
-              <PartnerText style={[styles.charCountText, { fontSize: px(10.5) }]}>
-                {(driverPersonal.licenseNumber || driverVehicle.licenseNumber).length}/18
-              </PartnerText>
-            ) : null}
+            <PartnerText
+              style={[
+                styles.charCountText,
+                {
+                  fontSize: px(11),
+                  fontWeight: '600',
+                  color:
+                    (driverPersonal.licenseNumber || driverVehicle.licenseNumber).length >= 10
+                      ? '#059669'
+                      : '#9CA3AF',
+                },
+              ]}>
+              [{(driverPersonal.licenseNumber || driverVehicle.licenseNumber).length}/18]
+            </PartnerText>
           </View>
-          <View style={[styles.inputContainer, { height: px(46), paddingHorizontal: px(10) }]}>
-            <FileText size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <View
+            style={[
+              styles.inputContainer,
+              { height: px(48), paddingHorizontal: px(12) },
+              licenceFocused && styles.inputContainerFocused,
+            ]}>
+            <FileText
+              size={px(18)}
+              color={licenceFocused ? '#D97706' : '#9CA3AF'}
+              strokeWidth={2.2}
+              style={styles.leftInputIcon}
+            />
             <LicenceInput
-              style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
-              placeholder="Enter DL number (e.g. OD0220190012345)"
+              style={[
+                styles.textInput,
+                {
+                  fontSize: px(14),
+                  fontWeight: '700',
+                  color: '#111827',
+                  letterSpacing: 0.6,
+                  flex: 1,
+                },
+              ]}
+              placeholder="DL number (e.g. OD-0220190012345)"
               placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
               autoCorrect={false}
@@ -1677,8 +1705,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         <View style={[styles.cardDividerCompact, { marginVertical: px(7) }]} />
 
         {/* Section 2: Driver Details */}
-        <View style={[styles.summarySectionCol, !reviewExpanded.vehicle && styles.summarySectionClosed]}>
-          <Pressable onPress={() => toggleReviewSection('vehicle')} style={styles.summarySectionHeader}>
+        <View style={[styles.summarySectionCol, !reviewExpanded.driverDetails && styles.summarySectionClosed]}>
+          <Pressable onPress={() => toggleReviewSection('driverDetails')} style={styles.summarySectionHeader}>
             <View style={styles.summarySectionLeft}>
               <View style={[styles.headerCheckBadge, { width: px(18), height: px(18), borderRadius: px(9) }]}>
                 <Check size={px(11)} color="#15803D" strokeWidth={3} />
@@ -1701,11 +1729,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   animateToStep(1, 'backward');
                 }}
                 style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.8 }]}>
-                <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
-                <ChevronRight size={px(13)} color="#2563EB" />
+                  <PartnerText style={[styles.editText, { fontSize: px(12) }]}>Edit</PartnerText>
+                  <ChevronRight size={px(13)} color="#2563EB" />
               </Pressable>
               <View style={styles.sectionDropdownBtn}>
-                {reviewExpanded.vehicle ? (
+                {reviewExpanded.driverDetails ? (
                   <ChevronUp size={px(16)} color="#374151" strokeWidth={2.4} />
                 ) : (
                   <ChevronDown size={px(16)} color="#374151" strokeWidth={2.4} />
@@ -1714,7 +1742,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </View>
           </Pressable>
 
-          {reviewExpanded.vehicle && (
+          {reviewExpanded.driverDetails && (
             <View style={[styles.reviewDetailsBox, { paddingHorizontal: px(10), paddingVertical: px(4), marginTop: px(8), borderRadius: px(8) }]}>
               {[
                 ['Work type', driverPersonal.driverType || 'Full-Time'],
@@ -2354,7 +2382,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 <View style={styles.pickerTextWrap}>
                   <PartnerText style={[styles.pickerTitle, { fontSize: px(13.5) }]}>2. Uploaded documents</PartnerText>
                   <PartnerText style={[styles.pickerSubtitle, { fontSize: px(11) }]}>
-                    Driving licence, government photo ID, profile photo
+                    Driving licence, profile photo, Aadhaar card, PAN card
                   </PartnerText>
                 </View>
                 <ChevronRight size={px(16)} color="#9CA3AF" />
@@ -2433,6 +2461,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  inputContainerFocused: {
+    borderColor: '#D97706',
+    backgroundColor: '#FFFDF5',
   },
   lockedInputContainer: {
     backgroundColor: '#F9FAFB',

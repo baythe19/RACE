@@ -72,6 +72,19 @@ router.patch(
   driverController.updateBookingStatus,
 );
 router.post(
+  '/bookings/:id/arrived-dropoff',
+  validate(driverBookingActionSchema),
+  driverController.arrivedAtDropoff,
+);
+router.post(
+  '/bookings/:id/complete',
+  validate(z.object({
+    bookingType: z.enum(['towing', 'driver']),
+    completionOtp: z.string().optional(),
+  })),
+  driverController.completeBooking,
+);
+router.post(
   '/bookings/:id/accept',
   validate(driverBookingActionSchema),
   driverController.acceptBooking,

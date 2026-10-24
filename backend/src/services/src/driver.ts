@@ -5,7 +5,7 @@ import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
-import { assertTripStartOtp, generateTripStartOtp } from './bookings/tripOtp';
+import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp, generateCompletionOtp } from './bookings/tripOtp';
 import { UserModel } from '../../models/src/user';
 import { TowingBookingModel } from '../../models/src/towingBooking';
 import { DriverBookingModel } from '../../models/src/driverBooking';
@@ -336,6 +336,10 @@ export class DriverService {
       assertTripStartOtp(booking, dto.tripOtp);
     }
 
+    if (dto.status === 'COMPLETED' && booking.completionOtp && dto.completionOtp) {
+      assertCompletionOtp(booking, dto.completionOtp);
+    }
+
     // The backend — not the app — confirms the final trip fare. Payment and
     // payout settlement are separate flows and are not performed by this update.
     const breakdownTotal =
@@ -352,9 +356,11 @@ export class DriverService {
         : undefined;
 
     const startsTrip = dto.status === 'IN_PROGRESS' && booking.status === 'DRIVER_ARRIVED';
+    const completesTrip = dto.status === 'COMPLETED';
     const transitionExtra = {
       ...(completionExtra ?? {}),
       ...(startsTrip ? { tripStartOtpVerified: true } : {}),
+      ...(completesTrip ? { completionOtpVerified: true } : {}),
     };
     const updated = await Model.updateStatus(
       bookingId,
@@ -454,6 +460,76 @@ export class DriverService {
     });
 
     return { rejected: true, bookingId, status: 'CONFIRMED' as const };
+  }
+
+  /** Mark arrived at dropoff destination: notifies customer to pay and reveals completion OTP */
+  async arrivedAtDropoff(driverId: string, role: string, bookingId: string, bookingType: 'towing' | 'driver') {
+    assertDriverRole(role);
+    await assertDriverApproved(driverId);
+
+    const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
+    const booking = await Model.findById(bookingId);
+    if (!booking) throw new NotFoundError('Booking not found');
+    if (!booking.driverId || booking.driverId.toString() !== driverId) {
+      throw new ForbiddenError('This booking is not assigned to you');
+    }
+    if (booking.status !== 'IN_PROGRESS') {
+      throw new BadRequestError('Booking must be IN_PROGRESS to mark arrival at dropoff');
+    }
+
+    const completionOtp = booking.completionOtp ?? generateCompletionOtp();
+    const arrivedAtDropoffAt = new Date();
+
+    await Model.updateById(bookingId, {
+      arrivedAtDropoffAt,
+      completionOtp,
+    });
+
+    const fare =
+      booking.fareBreakdown && 'totalFare' in booking.fareBreakdown
+        ? (booking.fareBreakdown as { totalFare?: number }).totalFare
+        : booking.estimatedFare;
+
+    emitBookingStatusUpdate(bookingId, 'IN_PROGRESS', {
+      arrivedAtDropoff: true,
+      arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
+      fare,
+      paymentCollectionMode: booking.paymentCollectionMode,
+      paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
+    });
+
+    emitToDriver(driverId, 'booking:driver_arrived_dropoff', {
+      bookingId,
+      bookingNumber: booking.bookingNumber,
+      fare,
+      completionOtp,
+      arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
+    });
+
+    return {
+      success: true,
+      bookingId,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
+      arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
+      fare,
+      completionOtp,
+    };
+  }
+
+  /** Complete job with customer's completion OTP */
+  async completeBooking(
+    driverId: string,
+    role: string,
+    bookingId: string,
+    bookingType: 'towing' | 'driver',
+    completionOtp?: string,
+  ) {
+    return this.updateBookingStatus(driverId, role, bookingId, {
+      status: 'COMPLETED',
+      bookingType,
+      completionOtp,
+    });
   }
 }
 

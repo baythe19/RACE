@@ -54,16 +54,13 @@ export default function ArrivedPickupCard({
   const cardRef = useRef<View>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   useEffect(() => {
-    if (Platform.OS !== 'ios') return undefined;
-    const show = Keyboard.addListener('keyboardWillShow', event => {
-      const { height, screenY } = event.endCoordinates;
-      // The card already sits above the tab bar: lift it only by what the keys cover of it.
-      cardRef.current?.measureInWindow((_x, y, _w, h) => {
-        const cardBottom = y + h;
-        setKeyboardHeight(Math.max(0, Math.min(height, cardBottom - screenY)));
-      });
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const show = Keyboard.addListener(showEvent, event => {
+      const { height } = event.endCoordinates;
+      setKeyboardHeight(height);
     });
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboardHeight(0));
+    const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
     return () => {
       show.remove();
       hide.remove();
