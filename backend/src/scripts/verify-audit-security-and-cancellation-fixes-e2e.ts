@@ -5,9 +5,7 @@ import { TowingBookingModel } from '../models/src/towingBooking';
 import { VendorVehicleModel } from '../models/src/vendorVehicle';
 import { driverService } from '../services/src/driver';
 import { towingBookingService } from '../services/src/bookings/towingBooking';
-import { reserveFleetVehicleForBooking } from '../services/src/bookings/driverAssignment';
 import { adminBookingsService } from '../services/src/admin/adminBookings';
-import { combinedBookingService } from '../services/src/combinedBooking';
 
 async function run() {
   console.log('--- STARTING AUDIT SECURITY & CONCURRENCY FIXES E2E VERIFICATION ---');

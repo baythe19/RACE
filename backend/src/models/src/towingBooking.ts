@@ -174,5 +174,8 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
 
 TowingBookingSchema.index({ customerId: 1, createdAt: -1 });
 TowingBookingSchema.index({ status: 1, createdAt: -1 });
+TowingBookingSchema.index({ driverId: 1, status: 1 });
+TowingBookingSchema.index({ vendorId: 1, status: 1 });
+TowingBookingSchema.index({ assignedFleetVehicleId: 1, status: 1 });
 
 export const TowingBookingModel = model<ITowingBooking>('TowingBooking', TowingBookingSchema);

@@ -46,9 +46,6 @@ export function useServiceBookingPayment() {
         await refreshBookings();
         return { booking } satisfies ConfirmResult;
       }
-      if (!__DEV__) {
-        throw new Error('Online booking payments are not configured yet.');
-      }
       const booking = await createTowingBooking(payload);
       await completeAdvancePayment(booking.id, 'towing');
       await refreshBookings();
@@ -73,9 +70,6 @@ export function useServiceBookingPayment() {
         await refreshBookings();
         return { booking } satisfies ConfirmResult;
       }
-      if (!__DEV__) {
-        throw new Error('Online booking payments are not configured yet.');
-      }
       const booking = await createDriverBooking(payload);
       await completeAdvancePayment(booking.id, 'driver');
       await refreshBookings();
@@ -99,9 +93,6 @@ export function useServiceBookingPayment() {
           previewAdvancePayment(bookingId, bookingType);
           await refreshBookings();
           return;
-        }
-        if (!__DEV__) {
-          throw new Error('Online booking payments are not configured yet.');
         }
         await completeAdvancePayment(bookingId, bookingType);
         await refreshBookings();

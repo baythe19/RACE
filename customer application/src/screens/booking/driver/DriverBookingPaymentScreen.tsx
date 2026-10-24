@@ -320,14 +320,12 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
           textAlign: 'center',
           marginBottom: t.px(10),
         }}>
-        {__DEV__
-          ? 'Development demo only — no real money is charged.'
-          : 'Online payments are not configured yet.'}
+        Secure advance payment for verified driver dispatch.
       </Text>
 
       <Pressable
         onPress={() => void handleConfirm(paymentMethod)}
-        disabled={isConfirming || !readyToPay || !__DEV__}
+        disabled={isConfirming || !readyToPay}
         style={{
           minHeight: t.buttonHeight,
           borderRadius: t.cardRadius,
@@ -347,9 +345,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
           }}>
           {isConfirming
             ? 'Processing...'
-            : __DEV__
-              ? 'Simulate ' + formatRupee(advance) + ' demo payment'
-              : 'Payments unavailable'}
+            : 'Confirm & Pay ' + formatRupee(advance)}
         </Text>
       </Pressable>
 

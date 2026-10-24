@@ -140,7 +140,24 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       Alert.alert('Booking failed', 'Unable to create roadside booking. Please try again.');
     } catch (error) {
       if (error instanceof Error && error.message.includes('Add a vehicle')) {
-        Alert.alert('Vehicle required', 'Add a vehicle in Profile before booking roadside help.');
+        Alert.alert(
+          'Vehicle required',
+          'Please add a vehicle to your profile before booking roadside help.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Add Vehicle',
+              onPress: () => {
+                const parent = navigation.getParent();
+                if (parent) {
+                  (parent as any).navigate('Profile', { screen: 'AddVehicle' });
+                } else {
+                  (navigation as any).navigate('Profile', { screen: 'AddVehicle' });
+                }
+              },
+            },
+          ],
+        );
         return;
       }
       if (error instanceof Error && error.message.includes('map')) {

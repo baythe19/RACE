@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { BadRequestError } from '../../../utils/src/errors';
 import {
   canTransition,
@@ -383,9 +384,18 @@ export function assertValidStatusTransition(
 
 export async function generatePrefixedBookingNumber(
   prefix: string,
-  countDocuments: () => Promise<number>,
+  countDocuments?: () => Promise<number>,
 ): Promise<string> {
-  const count = await countDocuments();
-  const seq = String(count + 1).padStart(5, '0');
-  return `${prefix}${seq}`;
+  let count = 0;
+  if (countDocuments) {
+    try {
+      count = await countDocuments();
+    } catch {
+      count = 0;
+    }
+  }
+  const dateStr = new Date().toISOString().slice(2, 10).replace(/-/g, '');
+  const seq = String((count % 10000) + 1).padStart(4, '0');
+  const entropy = crypto.randomBytes(2).toString('hex').toUpperCase();
+  return `${prefix}-${dateStr}-${seq}-${entropy}`;
 }

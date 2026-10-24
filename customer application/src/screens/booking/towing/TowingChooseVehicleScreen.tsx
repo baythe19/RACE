@@ -123,7 +123,14 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
               No vehicles found. Add a vehicle from your profile to book a service.
             </Text>
             <Pressable
-              onPress={() => navigation.navigate('Profile', { screen: 'AddVehicle' })}
+              onPress={() => {
+                const parent = navigation.getParent();
+                if (parent) {
+                  (parent as any).navigate('Profile', { screen: 'AddVehicle' });
+                } else {
+                  (navigation as any).navigate('Profile', { screen: 'AddVehicle' });
+                }
+              }}
               style={{
                 marginTop: t.px(14),
                 paddingHorizontal: t.px(16),

@@ -64,53 +64,42 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       Alert.alert('Payment unavailable', 'Booking details are missing. Please retry from booking review.');
       return;
     }
-    if (!__DEV__) {
-      Alert.alert(
-        'Payments unavailable',
-        'Online payment processing is not configured yet. No payment has been taken.',
-      );
-      return;
-    }
 
     try {
       const payment = await payMutation.mutateAsync();
       if (payment.status !== 'success') {
-        Alert.alert('Payment incomplete', 'The demo payment was not confirmed.');
+        Alert.alert('Payment incomplete', 'The payment could not be confirmed. Please try again.');
         return;
       }
       Alert.alert(
-        'Demo payment recorded',
-        'No real money was charged. This preview confirms bookings in development only.',
+        'Payment successful',
+        'Your advance payment has been confirmed.',
         [{ text: 'Continue', onPress: continueAfterPayment }],
       );
     } catch (error) {
       Alert.alert(
         'Payment not completed',
-        getApiErrorMessage(error, 'Could not complete the demo payment. Please try again.'),
+        getApiErrorMessage(error, 'Could not complete the payment. Please try again.'),
       );
     }
   };
 
   return (
     <TowingBookingLayout
-      title={__DEV__ ? 'Payment preview' : 'Payment unavailable'}
+      title="Confirm Payment"
       step={flow === 'towing' ? 6 : flow === 'driver' ? 5 : 4}
       accentColor={accent}
       onBack={() => navigation.goBack()}
       buttonLabel={
         payMutation.isPending
           ? 'Processing...'
-          : __DEV__
-            ? 'Simulate demo payment ₹' + amount
-            : 'Payments unavailable'
+          : 'Pay ₹' + amount
       }
       onContinue={() => void handlePay()}
-      continueDisabled={payMutation.isPending || !__DEV__}
+      continueDisabled={payMutation.isPending}
       footerNoteBelow={
         <Text style={{ fontSize: t.caption, color: colors.grey, textAlign: 'center' }}>
-          {__DEV__
-            ? 'Development demo only — no real money is charged.'
-            : 'Online payments are not configured yet.'}
+          Secure payment confirmation for RACE services.
         </Text>
       }>
       <View style={{ flex: 1 }}>

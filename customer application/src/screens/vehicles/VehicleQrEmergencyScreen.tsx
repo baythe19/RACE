@@ -93,10 +93,15 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
   };
 
   const handleRequestTowing = () => {
-    try {
-      navigation.navigate('Home', { screen: 'TowingService' });
-    } catch {
-      navigation.navigate('TowingService');
+    const parent = navigation.getParent();
+    if (parent) {
+      (parent as any).navigate('Home', { screen: 'TowingService' });
+    } else {
+      try {
+        navigation.navigate('Home', { screen: 'TowingService' });
+      } catch {
+        navigation.navigate('TowingService');
+      }
     }
   };
 

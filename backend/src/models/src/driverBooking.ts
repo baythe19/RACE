@@ -178,5 +178,7 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
 
 DriverBookingSchema.index({ customerId: 1, createdAt: -1 });
 DriverBookingSchema.index({ status: 1, createdAt: -1 });
+DriverBookingSchema.index({ driverId: 1, status: 1 });
+DriverBookingSchema.index({ vendorId: 1, status: 1 });
 
 export const DriverBookingModel = model<IDriverBooking>('DriverBooking', DriverBookingSchema);

@@ -69,5 +69,6 @@ const VendorVehicleSchema = new Schema<IVendorVehicle>(
 );
 
 VendorVehicleSchema.index({ vendorId: 1, registrationNo: 1 }, { unique: true });
+VendorVehicleSchema.index({ vendorId: 1, status: 1, activeBookingId: 1 });
 
 export const VendorVehicleModel = model<IVendorVehicle>('VendorVehicle', VendorVehicleSchema);
