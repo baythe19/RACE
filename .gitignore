@@ -3,8 +3,7 @@ dist/
 backend/dist/
 web-build/
 .expo/
-.env
-.env*.local
+.env*
 .DS_Store
 *.log
 
