@@ -5,7 +5,7 @@
 
 ---
 
-## Latest session — Customer App APK Crash Fixes, High-Concurrency 100-User Simulation (100% Pass) & Dead Code Elimination (2026-10-24, branch v7.0.0-mager-udpate)
+## Latest session — Customer App APK Crash Fixes, High-Concurrency 100-User Simulation (100% Pass) & Dead Code Elimination (2026-10-24, branch v7.0.0-major-update)
 
 - **Customer App APK Crash Root Causes Diagnosed & Fixed:**
   - **Removed Artificial Production Crash Guards:**
