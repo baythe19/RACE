@@ -22,7 +22,7 @@ import type {
 import type { SubmitServiceBookingRatingDto } from '../bookingRatingValidator';
 import { buildServiceBookingRatingUpdate } from './bookingRating';
 import { getCancellationPolicy, type CancellationResult } from './cancellation';
-import { releaseDriver } from './driverAssignment';
+import { releaseDriver, releaseFleetVehicleFromBooking } from './driverAssignment';
 import { resolveAssignedDriver } from './assignedDriver';
 import {
   isDriverVisibleToCustomer,
@@ -199,11 +199,11 @@ export class TowingBookingService {
       throw new ConflictError('Booking changed before the status update was saved');
     }
 
-    if (
-      (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') &&
-      booking.driverId
-    ) {
-      await releaseDriver(booking.driverId.toString(), bookingId);
+    if (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') {
+      if (booking.driverId) {
+        await releaseDriver(booking.driverId.toString(), bookingId);
+      }
+      await releaseFleetVehicleFromBooking(bookingId);
     }
 
     emitBookingStatusUpdate(bookingId, newStatus, {
@@ -364,6 +364,7 @@ export class TowingBookingService {
     if (booking.driverId) {
       await releaseDriver(booking.driverId.toString(), booking._id.toString());
     }
+    await releaseFleetVehicleFromBooking(booking._id.toString());
 
     if (policy.refundAmount > 0) {
       await PaymentTransactionModel.create({

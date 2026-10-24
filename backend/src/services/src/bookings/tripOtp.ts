@@ -1,12 +1,19 @@
+import { randomInt } from 'crypto';
 import { BadRequestError } from '../../../utils/src/errors';
 
-/** 4-digit trip start code shown to customer (Ola/Uber style). */
+export const MAX_TRIP_OTP_ATTEMPTS = 5;
+
+/** 4-digit cryptographically secure trip start code shown to customer (Ola/Uber style). */
 export function generateTripStartOtp(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(randomInt(1000, 10000));
 }
 
 export function assertTripStartOtp(
-  booking: { tripStartOtp?: string | null; tripStartOtpVerified?: boolean | null },
+  booking: {
+    tripStartOtp?: string | null;
+    tripStartOtpVerified?: boolean | null;
+    tripStartOtpAttempts?: number | null;
+  },
   input: string | undefined,
 ): void {
   if (!booking.tripStartOtp) {
@@ -14,6 +21,9 @@ export function assertTripStartOtp(
   }
   if (booking.tripStartOtpVerified) {
     throw new BadRequestError('Trip OTP was already verified');
+  }
+  if ((booking.tripStartOtpAttempts ?? 0) >= MAX_TRIP_OTP_ATTEMPTS) {
+    throw new BadRequestError('Too many failed OTP attempts. Please contact support or request assistance.');
   }
   const code = (input ?? '').trim();
   if (!/^\d{4}$/.test(code)) {
@@ -35,13 +45,17 @@ export function customerTripOtp(
   return active ? booking.tripStartOtp : undefined;
 }
 
-/** 4-digit trip completion code shown to customer upon payment confirmation */
+/** 4-digit cryptographically secure trip completion code shown to customer upon payment confirmation */
 export function generateCompletionOtp(): string {
-  return String(Math.floor(1000 + Math.random() * 9000));
+  return String(randomInt(1000, 10000));
 }
 
 export function assertCompletionOtp(
-  booking: { completionOtp?: string | null; completionOtpVerified?: boolean | null },
+  booking: {
+    completionOtp?: string | null;
+    completionOtpVerified?: boolean | null;
+    completionOtpAttempts?: number | null;
+  },
   input: string | undefined,
 ): void {
   if (!booking.completionOtp) {
@@ -49,6 +63,9 @@ export function assertCompletionOtp(
   }
   if (booking.completionOtpVerified) {
     throw new BadRequestError('Completion OTP was already verified');
+  }
+  if ((booking.completionOtpAttempts ?? 0) >= MAX_TRIP_OTP_ATTEMPTS) {
+    throw new BadRequestError('Too many failed completion OTP attempts. Please contact support.');
   }
   const code = (input ?? '').trim();
   if (!/^\d{4}$/.test(code)) {

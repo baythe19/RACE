@@ -5,7 +5,37 @@
 
 ---
 
-## Latest session — Deep Partner Audit, Complete Driver Vehicle Elimination & 9.9/10 Scoring (2026-10-24, branch v7.0.0-mager-udpate)
+## Latest session — Comprehensive Product & QA Audit Fixes, Security Hardening & Concurrency Locks (2026-10-24, branch v7.0.0-mager-udpate)
+
+- **Comprehensive Security, Concurrency & Spec Parity Hardening:**
+  - **BUG-01 Fix (Completion OTP Check Bypass Elimination):**
+    - Updated `driver.ts` to strictly enforce `assertCompletionOtp(booking, dto.completionOtp)` when `dto.status === 'COMPLETED'`. Omitting `completionOtp` now strictly rejects with 400 Bad Request instead of bypassing the check and marking `completionOtpVerified: true`.
+  - **BUG-02 Fix (CSPRNG & Trip OTP Rate-Limiting):**
+    - Upgraded `generateTripStartOtp` and `generateCompletionOtp` in `tripOtp.ts` from `Math.random()` to Node.js `crypto.randomInt(1000, 10000)`.
+    - Added `tripStartOtpAttempts` and `completionOtpAttempts` fields to `TowingBooking` and `DriverBooking` models and schemas.
+    - Implemented a 5-attempt rate-limiting lockout in `assertTripStartOtp` and `assertCompletionOtp` to eliminate 4-digit brute-force attacks.
+  - **BUG-03 Fix (Fleet Truck Concurrency Lock on Cancellation):**
+    - Fixed `towingBooking.ts` and `adminServiceBookings.ts` to unconditionally call `releaseFleetVehicleFromBooking` on booking cancellation and completion. Eliminates permanent phantom locks on `VendorVehicle` when cancellations occur prior to driver assignment.
+  - **BUG-04 Fix (Production Build Crash Guard Removal):**
+    - Removed artificial `if (!__DEV__) throw new Error('Online booking payments are not configured yet.')` from `RoadsideReviewScreen.tsx` and `serviceBookingApi.ts`.
+    - Updated `bookingPayment.ts:assertStubPaymentsEnabled` to support `ALLOW_STUB_PAYMENTS=true` for production sandbox testing without crashes.
+  - **GAP-05 Fix (Tow Truck Details in Admin Console):**
+    - Mapped `assignedFleetVehicleLabel` in `adminBookings.ts` for both list and detail queries.
+    - Updated `BookingDetail` in `packages/types` and `booking-detail-content.tsx` in `race-admin` to render assigned tow truck license plate and vehicle model in a responsive entity card.
+  - **PM-02 Fix (HanuSMS Delivery for Dropoff Completion OTP):**
+    - Updated `combinedBooking.ts` to deliver the completion OTP via `hanuSendOtp` when configured, alongside logger fallbacks.
+  - **Full Verification Suite (100% Green Across All Surfaces):**
+    - `npm run lint` in `backend/`: **0 errors**.
+    - `npx tsc --noEmit` in `customer application/`: **0 errors**.
+    - `npx tsc --noEmit` in `mobile application/`: **0 errors**.
+    - `npm run build` in `race-admin/apps/admin-web/`: **Build succeeded in 12.7s (0 errors)**.
+    - `verify-audit-security-and-cancellation-fixes-e2e.ts`: **100% PASS (All 4 security & concurrency checks green)**.
+    - `verify-dropoff-payment-and-completion-otp-e2e.ts`: **100% PASS**.
+    - `verify-staff-onboarding-redesign-e2e.ts`: **12/12 PASS**.
+    - `verify-driver-ack-e2e.ts`: **27/27 PASS**.
+    - `comprehensive-audit.ts`: **41/41 PASS (100% success rate)**.
+
+## Previous session — Deep Partner Audit, Complete Driver Vehicle Elimination & 9.9/10 Scoring (2026-10-24, branch v7.0.0-mager-udpate)
 
 - **Deep Architecture Re-Check, Persona Alignment & Polish (Self-Score: 9.9 / 10):**
   - **Complete Driver Vehicle Elimination:**

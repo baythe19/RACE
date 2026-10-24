@@ -39,9 +39,9 @@ interface BookingPaymentSnapshot {
  * mark real production bookings as paid; replace this guard when a gateway is wired.
  */
 function assertStubPaymentsEnabled(): void {
-  if (env.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production' && process.env.ALLOW_STUB_PAYMENTS !== 'true') {
     throw new AppError(
-      'Online booking payments are not configured. No payment was processed.',
+      'Online booking payments are not configured. Set ALLOW_STUB_PAYMENTS=true for sandbox testing.',
       503,
     );
   }

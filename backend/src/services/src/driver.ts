@@ -333,11 +333,31 @@ export class DriverService {
     assertValidStatusTransition(booking.status, dto.status);
 
     if (dto.status === 'IN_PROGRESS' && booking.status === 'DRIVER_ARRIVED') {
-      assertTripStartOtp(booking, dto.tripOtp);
+      try {
+        assertTripStartOtp(booking, dto.tripOtp);
+      } catch (otpErr) {
+        if (dto.bookingType === 'towing') {
+          await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { tripStartOtpAttempts: 1 } });
+        } else {
+          await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { tripStartOtpAttempts: 1 } });
+        }
+        throw otpErr;
+      }
     }
 
-    if (dto.status === 'COMPLETED' && booking.completionOtp && dto.completionOtp) {
-      assertCompletionOtp(booking, dto.completionOtp);
+    if (dto.status === 'COMPLETED') {
+      if (booking.completionOtp || booking.arrivedAtDropoffAt) {
+        try {
+          assertCompletionOtp(booking, dto.completionOtp);
+        } catch (otpErr) {
+          if (dto.bookingType === 'towing') {
+            await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
+          } else {
+            await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
+          }
+          throw otpErr;
+        }
+      }
     }
 
     // The backend — not the app — confirms the final trip fare. Payment and
@@ -359,8 +379,8 @@ export class DriverService {
     const completesTrip = dto.status === 'COMPLETED';
     const transitionExtra = {
       ...(completionExtra ?? {}),
-      ...(startsTrip ? { tripStartOtpVerified: true } : {}),
-      ...(completesTrip ? { completionOtpVerified: true } : {}),
+      ...(startsTrip ? { tripStartOtpVerified: true, tripStartOtpAttempts: 0 } : {}),
+      ...(completesTrip ? { completionOtpVerified: true, completionOtpAttempts: 0 } : {}),
     };
     const updated = await Model.updateStatus(
       bookingId,

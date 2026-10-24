@@ -357,7 +357,16 @@ export class VendorBookingsService {
       throw new BadRequestError('Mark driver as arrived before verifying trip OTP');
     }
 
-    assertTripStartOtp(booking, dto.tripOtp);
+    try {
+      assertTripStartOtp(booking, dto.tripOtp);
+    } catch (otpErr) {
+      if (dto.bookingType === 'towing') {
+        await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { tripStartOtpAttempts: 1 } });
+      } else {
+        await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { tripStartOtpAttempts: 1 } });
+      }
+      throw otpErr;
+    }
 
     const expected = {
       _id: bookingId,
@@ -372,6 +381,7 @@ export class VendorBookingsService {
       $set: {
         status: 'IN_PROGRESS',
         tripStartOtpVerified: true,
+        tripStartOtpAttempts: 0,
       },
       $push: {
         statusHistory: {

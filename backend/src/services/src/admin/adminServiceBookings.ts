@@ -3,9 +3,8 @@ import { emitBookingStatusUpdate } from '../socket';
 import { userRepository } from '../userRepository';
 import { towingBookingRepository } from '../towingBookingRepository';
 import { driverBookingRepository } from '../driverBookingRepository';
-import { assignDriverToBooking } from '../bookings/driverAssignment';
+import { assignDriverToBooking, releaseDriver, releaseFleetVehicleFromBooking } from '../bookings/driverAssignment';
 import { getCancellationPolicy } from '../bookings/cancellation';
-import { releaseDriver } from '../bookings/driverAssignment';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
@@ -137,6 +136,7 @@ export class AdminServiceBookingsService {
     if (booking.driverId) {
       await releaseDriver(booking.driverId.toString(), booking._id.toString());
     }
+    await releaseFleetVehicleFromBooking(booking._id.toString());
 
     if (refundAmount > 0) {
       await PaymentTransactionModel.create({

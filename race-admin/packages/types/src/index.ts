@@ -436,6 +436,7 @@ export interface BookingListItem {
   fareBreakdown?: Record<string, unknown>;
   vehicleCategory?: string;
   packageHours?: number;
+  assignedFleetVehicleLabel?: string;
 }
 
 export interface BookingListFilters {

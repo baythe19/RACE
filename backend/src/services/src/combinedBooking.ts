@@ -7,6 +7,8 @@ import { userRepository } from './userRepository';
 import { NotFoundError, ForbiddenError } from '../../utils/src/errors';
 import { generateCompletionOtp } from './bookings/tripOtp';
 import { emitBookingStatusUpdate, emitToDriver } from './socket';
+import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
+import { logger } from '../../utils/src/logger';
 
 function mapTowingItem(
   booking: Awaited<ReturnType<typeof towingBookingService.listBookings>>[number],
@@ -148,7 +150,14 @@ export class CombinedBookingService {
     // Send SMS with completion OTP to customer (as requested: "जैसे ही कन्फर्म करेगा तो SMS के थ्रू कस्टमर को एक OTP आएगा")
     const customer = await userRepository.findById(customerId);
     if (customer?.mobileNumber) {
-      console.log(`[COMPLETION OTP SMS] Sent OTP ${completionOtp} to ${customer.mobileNumber} for booking #${booking.bookingNumber}`);
+      if (isHanuConfigured()) {
+        try {
+          await hanuSendOtp(customer.mobileNumber, completionOtp);
+        } catch (smsErr) {
+          logger.warn('Failed to send completion OTP via HanuSMS', { error: smsErr });
+        }
+      }
+      logger.info(`[COMPLETION OTP SMS] Sent OTP ${completionOtp} to ${customer.mobileNumber} for booking #${booking.bookingNumber}`);
     }
 
     // Emit socket event to Driver

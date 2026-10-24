@@ -64,6 +64,7 @@ type ServiceBookingRecord = {
   cancelledBy?: string;
   refundAmount?: number;
   refundStatus?: string;
+  assignedFleetVehicleLabel?: string;
   createdAt: Date;
 };
 
@@ -289,6 +290,7 @@ export const adminBookingsService = {
         fareBreakdown: booking.fareBreakdown,
         vehicleCategory: booking.vehicleCategory,
         packageHours: booking.packageHours,
+        assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
       };
     });
 
@@ -414,6 +416,7 @@ export const adminBookingsService = {
               vehicleNumber: vehicle.vehicleNumber,
             }
           : undefined,
+        assignedFleetVehicleLabel: (booking as unknown as { assignedFleetVehicleLabel?: string }).assignedFleetVehicleLabel,
         service: type === 'towing' ? 'Towing' : 'Driver Service',
         serviceType: type,
         amount: booking.estimatedFare ?? 0,

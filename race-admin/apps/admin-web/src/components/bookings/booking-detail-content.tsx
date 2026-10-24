@@ -273,7 +273,7 @@ export function BookingDetailContent({
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <EntityCard
             title="Customer Details"
             name={booking.customerName}
@@ -292,6 +292,11 @@ export function BookingDetailContent({
             name={booking.driverName ?? 'Not assigned'}
             phone={booking.driverPhone ?? '—'}
             linkTo={booking.driverId ? `/drivers/${booking.driverId}` : undefined}
+          />
+          <EntityCard
+            title={booking.assignedFleetVehicleLabel ? "Assigned Tow Truck" : "Vehicle Details"}
+            name={booking.assignedFleetVehicleLabel ?? (booking.vehicle ? `${booking.vehicle.brand ?? ''} ${booking.vehicle.model ?? ''}`.trim() : '—')}
+            phone={booking.vehicle?.vehicleNumber ? `Plate: ${booking.vehicle.vehicleNumber}` : '—'}
           />
         </div>
 

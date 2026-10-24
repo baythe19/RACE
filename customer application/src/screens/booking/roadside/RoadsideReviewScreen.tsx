@@ -123,9 +123,6 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
         return;
       }
 
-      if (!__DEV__) {
-        throw new Error('Online booking payments are not configured yet.');
-      }
       const response = await createRoadsideBooking(payload);
 
       if (!response.available) {
