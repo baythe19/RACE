@@ -167,6 +167,24 @@ export class VendorController {
     return sendSuccess(res, drivers);
   });
 
+  sendDriverOnboardingOtp = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await vendorDriversService.sendOnboardingOtp(user.id, req.body);
+    return sendSuccess(res, result);
+  });
+
+  verifyDriverOnboardingOtp = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await vendorDriversService.verifyOnboardingOtp(user.id, req.body);
+    return sendSuccess(res, result);
+  });
+
+  createStaffDriver = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const driver = await vendorDriversService.createStaffDriver(user.id, req.body);
+    return sendSuccess(res, driver, 201);
+  });
+
   createDriver = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const driver = await vendorDriversService.create(user.id, req.body);

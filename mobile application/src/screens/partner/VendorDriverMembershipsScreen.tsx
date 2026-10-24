@@ -1,20 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Linking,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
 import {
   Check,
+  CheckCircle2,
   Clock3,
   Info,
   Phone,
-  Search,
+  ShieldCheck,
   Star,
   UserCheck,
   ClipboardList,
@@ -22,124 +24,28 @@ import {
   UserRound,
   UserRoundPlus,
   X,
+  Sparkles,
 } from 'lucide-react-native';
 import { jumpToPartnerJobsScreen } from '../../navigation/partnerNavigationRef';
 import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQueries';
-
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { PartnerText } from '../../components/partner/PartnerText';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import {
-  useInviteVendorDriverMutation,
   useRevokeVendorDriverMembershipMutation,
-  useSearchVendorDriversQuery,
   useVendorMembershipsQuery,
 } from '../../services/vendor/useVendorMembershipQueries';
-import type { DriverSearchResult, VendorMembership } from '../../services/vendor/vendorMembershipApi';
+import {
+  sendVendorDriverOnboardingOtp,
+  verifyVendorDriverOnboardingOtp,
+  createVendorStaffDriver,
+} from '../../services/vendor/vendorDriversApi';
+import type { VendorMembership } from '../../services/vendor/vendorMembershipApi';
 
 const AMBER = '#F9A602';
 const INK = '#191919';
 const MUTED = '#6B7280';
-
-const DRIVERS_HELP_MESSAGE =
-  'Search and phone invite both send the same fleet invitation. Use search for name or driver code; use phone when you only have their verified mobile. After the driver accepts, they appear under Connected fleet drivers and in Assign driver on new jobs.';
-
-function DriverSearchResultCard({
-  driver,
-  onInvite,
-  inviting,
-}: {
-  driver: DriverSearchResult;
-  onInvite: () => void;
-  inviting: boolean;
-}) {
-  const px = useScreenPx();
-  const isAvailableForInvite = driver.membershipStatus === 'AVAILABLE_FOR_INVITE';
-  const isPending = driver.membershipStatus === 'INVITED_PENDING';
-  const isAlreadyInFleet = driver.membershipStatus === 'ALREADY_IN_FLEET';
-
-  return (
-    <View style={[styles.card, { borderRadius: px(14), padding: px(13), marginBottom: px(10) }]}>
-      <View style={styles.row}>
-        <View style={[styles.avatar, { width: px(40), height: px(40), borderRadius: px(13) }]}>
-          <UserRound size={px(20)} color={AMBER} />
-        </View>
-
-        <View style={styles.grow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6) }}>
-            <PartnerText style={[styles.name, { fontSize: px(14) }]}>{driver.name}</PartnerText>
-            {driver.driverCode ? (
-              <View style={[styles.codeBadge, { paddingHorizontal: px(6), paddingVertical: px(2), borderRadius: px(6) }]}>
-                <PartnerText style={{ color: '#2563EB', fontSize: px(10), fontWeight: '700' }}>
-                  {driver.driverCode}
-                </PartnerText>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6), marginTop: px(2) }}>
-            <PartnerText style={[styles.sub, { fontSize: px(11.5) }]}>{driver.maskedPhone || driver.phone}</PartnerText>
-            {driver.rating ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(2) }}>
-                <Star size={px(11)} color="#F59E0B" fill="#F59E0B" />
-                <PartnerText style={{ color: '#92400E', fontSize: px(11), fontWeight: '700' }}>
-                  {driver.rating.toFixed(1)}
-                </PartnerText>
-              </View>
-            ) : null}
-          </View>
-
-          <PartnerText style={[styles.sub, { fontSize: px(11), marginTop: px(3) }]}>
-            {driver.driverType}
-            {driver.city ? ` · ${driver.city}` : ''}
-            {typeof driver.experienceYears === 'number' ? ` · ${driver.experienceYears}y exp` : ''}
-          </PartnerText>
-        </View>
-
-        <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
-          {isAvailableForInvite ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={inviting}
-              onPress={onInvite}
-              style={[
-                styles.inviteActionBtn,
-                {
-                  paddingHorizontal: px(12),
-                  paddingVertical: px(7),
-                  borderRadius: px(10),
-                  opacity: inviting ? 0.6 : 1,
-                },
-              ]}>
-              {inviting ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <UserRoundPlus size={px(14)} color="#FFFFFF" />
-                  <PartnerText style={{ color: '#FFFFFF', fontSize: px(12), fontWeight: '700', marginLeft: px(4) }}>
-                    Invite
-                  </PartnerText>
-                </>
-              )}
-            </Pressable>
-          ) : isPending ? (
-            <View style={[styles.statusPill, { backgroundColor: '#FFF4D6', paddingHorizontal: px(8), paddingVertical: px(4), borderRadius: px(8) }]}>
-              <PartnerText style={{ color: '#9A6700', fontSize: px(11), fontWeight: '700' }}>Pending</PartnerText>
-            </View>
-          ) : isAlreadyInFleet ? (
-            <View style={[styles.statusPill, { backgroundColor: '#E9F8EF', paddingHorizontal: px(8), paddingVertical: px(4), borderRadius: px(8) }]}>
-              <PartnerText style={{ color: '#13834C', fontSize: px(11), fontWeight: '700' }}>In Fleet</PartnerText>
-            </View>
-          ) : (
-            <View style={[styles.statusPill, { backgroundColor: '#F3F4F6', paddingHorizontal: px(8), paddingVertical: px(4), borderRadius: px(8) }]}>
-              <PartnerText style={{ color: '#6B7280', fontSize: px(11), fontWeight: '600' }}>Other Fleet</PartnerText>
-            </View>
-          )}
-        </View>
-      </View>
-    </View>
-  );
-}
+const GREEN = '#10B981';
 
 function MemberCard({
   member,
@@ -175,28 +81,33 @@ function MemberCard({
       onPress: onRemove,
     });
     options.push({ text: 'Close', style: 'cancel' });
-    Alert.alert(name, pending ? 'Pending fleet invitation' : 'Fleet driver', options);
+    Alert.alert(name, pending ? 'Pending fleet driver' : 'Fleet driver', options);
   };
 
   return (
     <View style={[styles.card, { borderRadius: px(16), padding: px(14), marginBottom: px(10) }]}>
       <View style={styles.row}>
-        <View style={[styles.avatar, { width: px(42), height: px(42), borderRadius: px(14) }]}>
-          {pending ? <Clock3 size={px(20)} color={AMBER} /> : <UserRound size={px(20)} color={AMBER} />}
+        <View style={[styles.avatar, { width: px(44), height: px(44), borderRadius: px(14) }]}>
+          <UserRound size={px(22)} color={AMBER} />
         </View>
         <View style={styles.grow}>
-          <PartnerText style={[styles.name, { fontSize: px(15) }]}>
-            {pending ? member.driver?.name ?? 'Invitation pending' : member.driver?.name ?? 'Driver'}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6) }}>
+            <PartnerText style={[styles.name, { fontSize: px(15) }]}>
+              {member.driver?.name ?? 'Staff Driver'}
+            </PartnerText>
+            {member.driver?.driverCode ? (
+              <View style={[styles.codeBadge, { paddingHorizontal: px(6), paddingVertical: px(2), borderRadius: px(6) }]}>
+                <PartnerText style={{ color: '#2563EB', fontSize: px(10), fontWeight: '700' }}>
+                  {member.driver.driverCode}
+                </PartnerText>
+              </View>
+            ) : null}
+          </View>
+          <PartnerText style={[styles.sub, { fontSize: px(12), marginTop: px(2) }]}>
+            {member.driver?.phone ?? 'Fleet Driver'}
           </PartnerText>
-          <PartnerText style={[styles.sub, { fontSize: px(12) }]}>
-            {pending
-              ? member.driver?.name
-                ? `Waiting for ${member.driver.name} to accept in the driver app`
-                : 'Waiting for the Driver to accept'
-              : member.driver?.phone ?? 'Connected Driver'}
-          </PartnerText>
-          {!pending && member.driver?.driverType ? (
-            <PartnerText style={[styles.sub, { fontSize: px(11), marginTop: px(3) }]}>
+          {member.driver?.driverType ? (
+            <PartnerText style={[styles.sub, { fontSize: px(11), marginTop: px(3), color: '#4B5563' }]}>
               {member.driver.driverType + (member.driver.city ? ' · ' + member.driver.city : '')}
             </PartnerText>
           ) : null}
@@ -225,14 +136,14 @@ function MemberCard({
             {
               flexDirection: 'row',
               marginTop: px(12),
-              height: px(44),
+              height: px(42),
               borderRadius: px(11),
               backgroundColor: member.driver?.isBusy ? '#E5E7EB' : AMBER,
               opacity: busy ? 0.7 : 1,
             },
           ]}>
           <ClipboardList size={px(16)} color={INK} strokeWidth={2.3} />
-          <PartnerText style={{ color: INK, fontSize: px(13.5), fontWeight: '700', marginLeft: px(6) }}>
+          <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700', marginLeft: px(6) }}>
             {member.driver?.isBusy ? 'On another job' : 'Assign to open job'}
           </PartnerText>
         </Pressable>
@@ -243,23 +154,143 @@ function MemberCard({
 
 export default function VendorDriverMembershipsScreen() {
   const px = useScreenPx();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  // Form state
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [showManualPhone, setShowManualPhone] = useState(false);
+  const [licenseNo, setLicenseNo] = useState('');
+  const [driverType, setDriverType] = useState<'Tow Driver' | 'Full-Time' | 'Part-Time'>('Tow Driver');
+  const [city, setCity] = useState('Bhubaneswar');
+
+  // Inline OTP state
+  const [otpState, setOtpState] = useState<'IDLE' | 'SENDING' | 'SENT' | 'VERIFYING' | 'VERIFIED'>('IDLE');
+  const [otpCode, setOtpCode] = useState('');
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [onboardingProofToken, setOnboardingProofToken] = useState<string | null>(null);
+  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const { data: members = [], isLoading, isError, refetch, isRefetching } = useVendorMembershipsQuery();
-  const { data: searchResults = [], isLoading: searchLoading } = useSearchVendorDriversQuery(searchQuery);
-  const invite = useInviteVendorDriverMutation();
   const revoke = useRevokeVendorDriverMembershipMutation();
   const { data: vendorBookings = [] } = useVendorBookingsQuery(true);
+
+  // Resend OTP countdown timer
+  useEffect(() => {
+    if (otpSecondsLeft <= 0) return;
+    const interval = setInterval(() => {
+      setOtpSecondsLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [otpSecondsLeft]);
+
+  const cleanPhone = useMemo(() => phone.replace(/\D/g, '').slice(-10), [phone]);
+
+  const resetForm = () => {
+    setFullName('');
+    setPhone('');
+    setLicenseNo('');
+    setDriverType('Tow Driver');
+    setCity('Bhubaneswar');
+    setOtpState('IDLE');
+    setOtpCode('');
+    setDevOtp(null);
+    setOnboardingProofToken(null);
+    setOtpSecondsLeft(0);
+    setErrorMessage('');
+    setShowAddForm(false);
+  };
+
+  const handleSendOtp = async () => {
+    if (cleanPhone.length < 10) {
+      setErrorMessage('Enter a valid 10-digit driver mobile number');
+      return;
+    }
+    setErrorMessage('');
+    setOtpState('SENDING');
+    try {
+      const res = await sendVendorDriverOnboardingOtp(cleanPhone, fullName);
+      setOtpState('SENT');
+      setOtpSecondsLeft(60);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
+    } catch (err: unknown) {
+      setOtpState('IDLE');
+      setErrorMessage(err instanceof Error ? err.message : 'Could not send OTP');
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+    if (otpCode.length < 4) {
+      setErrorMessage('Enter the OTP code received by the driver');
+      return;
+    }
+    setErrorMessage('');
+    setOtpState('VERIFYING');
+    try {
+      const res = await verifyVendorDriverOnboardingOtp(cleanPhone, otpCode);
+      if (res.verified && (res.onboardingProofToken || res.proofToken)) {
+        setOnboardingProofToken(res.onboardingProofToken || res.proofToken);
+        setOtpState('VERIFIED');
+      } else {
+        setOtpState('SENT');
+        setErrorMessage('Verification failed. Please re-enter the code.');
+      }
+    } catch (err: unknown) {
+      setOtpState('SENT');
+      setErrorMessage(err instanceof Error ? err.message : 'Invalid verification code');
+    }
+  };
+
+  const handleSubmitStaffDriver = async () => {
+    if (!fullName.trim() || fullName.trim().length < 2) {
+      setErrorMessage('Please enter driver’s full name');
+      return;
+    }
+    if (cleanPhone.length !== 10) {
+      setErrorMessage('Please enter a valid 10-digit mobile number');
+      return;
+    }
+    if (!licenseNo.trim() || licenseNo.trim().length < 4) {
+      setErrorMessage('Please enter a valid driving license number');
+      return;
+    }
+    if (!onboardingProofToken) {
+      setErrorMessage('Please verify the driver’s mobile number first');
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage('');
+    try {
+      await createVendorStaffDriver({
+        name: fullName.trim(),
+        phone: cleanPhone,
+        licenseNo: licenseNo.trim().toUpperCase(),
+        driverType,
+        city: city.trim() || 'Bhubaneswar',
+        onboardingProofToken,
+      });
+
+      await refetch();
+      Alert.alert(
+        'Driver Added to Fleet! 🎉',
+        `${fullName.trim()} has been registered directly into your fleet. They can now log in via mobile number and start working immediately without filling any registration forms!`,
+        [{ text: 'Great!', onPress: resetForm }],
+      );
+    } catch (err: unknown) {
+      setSubmitting(false);
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to create staff driver');
+    }
+  };
 
   const openAssignForMember = (member: VendorMembership) => {
     const driverId = member.driver?.id;
     if (!driverId) return;
     const openJob = vendorBookings.find(
-      b =>
-        (b.status === 'REQUESTED' || b.status === 'CONFIRMED') &&
-        !b.driver,
+      b => (b.status === 'REQUESTED' || b.status === 'CONFIRMED') && !b.driver,
     );
     if (!openJob) {
       Alert.alert(
@@ -284,23 +315,6 @@ export default function VendorDriverMembershipsScreen() {
     });
   };
 
-  const normalizedPhone = useMemo(() => phone.replace(/\D/g, ''), [phone]);
-
-  const sendDirectInvite = async (targetPhone: string) => {
-    const raw = targetPhone.replace(/\D/g, '');
-    if (raw.length < 10) {
-      Alert.alert('Check the phone number', 'Enter the Driver’s verified 10-digit mobile number.');
-      return;
-    }
-    try {
-      const result = await invite.mutateAsync('+91' + raw.slice(-10));
-      setPhone('');
-      Alert.alert('Invitation sent', result.message);
-    } catch (error) {
-      Alert.alert('Could not send invitation', error instanceof Error ? error.message : 'Please try again.');
-    }
-  };
-
   const confirmRemove = (member: VendorMembership) => {
     const isPending = member.status === 'PENDING';
     Alert.alert(
@@ -311,13 +325,13 @@ export default function VendorDriverMembershipsScreen() {
       [
         { text: 'Keep', style: 'cancel' },
         {
-          text: isPending ? 'Cancel Invite' : 'Remove',
+          text: isPending ? 'Cancel' : 'Remove',
           style: 'destructive',
           onPress: () =>
             revoke.mutate(member.id, {
               onError: error =>
                 Alert.alert(
-                  isPending ? 'Could not cancel invitation' : 'Could not remove Driver',
+                  isPending ? 'Could not cancel' : 'Could not remove Driver',
                   error instanceof Error ? error.message : 'Please try again.',
                 ),
             }),
@@ -329,203 +343,293 @@ export default function VendorDriverMembershipsScreen() {
   const activeMembers = members.filter(m => m.status === 'ACTIVE');
   const pendingMembers = members.filter(m => m.status === 'PENDING');
 
-  const switchToPhoneInvite = () => {
-    setShowManualPhone(true);
-    setSearchQuery('');
-  };
-
   return (
     <AppScreenLayout
       header={
         <View style={[styles.header, { paddingHorizontal: px(18), paddingTop: px(14), paddingBottom: px(12) }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <PartnerText style={[styles.title, { fontSize: px(22) }]}>Drivers</PartnerText>
-              <Pressable
-                onPress={() =>
-                  Alert.alert('Search vs phone invite', DRIVERS_HELP_MESSAGE, [{ text: 'OK' }])
-                }
-                hitSlop={10}
-                accessibilityRole="button"
-                accessibilityLabel="How search and phone invite work"
-                style={{ marginLeft: px(8), padding: px(2) }}>
-                <Info size={px(20)} color={MUTED} strokeWidth={2.3} />
-              </Pressable>
+            <View>
+              <PartnerText style={[styles.title, { fontSize: px(22) }]}>Fleet Drivers</PartnerText>
+              <PartnerText style={[styles.subtitle, { fontSize: px(12.5) }]}>
+                {activeMembers.length} active driver{activeMembers.length === 1 ? '' : 's'} in your fleet
+              </PartnerText>
             </View>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Invite by number"
-              onPress={switchToPhoneInvite}
+              accessibilityLabel="Add staff driver"
+              onPress={() => setShowAddForm(prev => !prev)}
               style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: px(5),
-                height: px(36),
-                paddingHorizontal: px(12),
-                borderRadius: px(18),
-                backgroundColor: pressed ? '#F59E0B' : AMBER,
+                height: px(38),
+                paddingHorizontal: px(14),
+                borderRadius: px(19),
+                backgroundColor: showAddForm ? '#1F2937' : AMBER,
+                opacity: pressed ? 0.88 : 1,
               })}>
-              <Phone size={px(14)} color="#FFFFFF" strokeWidth={2.4} />
-              <PartnerText style={{ color: '#FFFFFF', fontSize: px(12.5), fontWeight: '700' }}>
-                Invite by number
-              </PartnerText>
+              {showAddForm ? (
+                <>
+                  <X size={px(15)} color="#FFFFFF" strokeWidth={2.4} />
+                  <PartnerText style={{ color: '#FFFFFF', fontSize: px(13), fontWeight: '700' }}>
+                    Cancel
+                  </PartnerText>
+                </>
+              ) : (
+                <>
+                  <UserRoundPlus size={px(16)} color={INK} strokeWidth={2.4} />
+                  <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700' }}>
+                    + Add Driver
+                  </PartnerText>
+                </>
+              )}
             </Pressable>
           </View>
-          <PartnerText style={[styles.subtitle, { fontSize: px(13) }]}>
-            Search drivers to build your fleet.
-          </PartnerText>
         </View>
       }
       refreshing={isRefetching}
       onRefresh={() => {
         void refetch();
       }}
-      contentStyle={{ paddingTop: px(8) }}>
-      {/* Search Full-Time Drivers */}
-      <View style={[styles.searchCard, { borderRadius: px(18), padding: px(15), marginBottom: px(16) }]}>
-        <View style={styles.row}>
-          <View style={[styles.avatar, { width: px(38), height: px(38), borderRadius: px(13), backgroundColor: '#EFF6FF' }]}>
-            <Search size={px(19)} color="#2563EB" />
+      contentStyle={{ paddingTop: px(12) }}>
+      {/* Direct Staff Onboarding Card */}
+      {showAddForm ? (
+        <View style={[styles.formCard, { borderRadius: px(18), padding: px(16), marginBottom: px(18) }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: px(12) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(8) }}>
+              <View style={[styles.avatar, { width: px(36), height: px(36), borderRadius: px(12), backgroundColor: '#EFF6FF' }]}>
+                <Sparkles size={px(18)} color="#2563EB" />
+              </View>
+              <View>
+                <PartnerText style={{ color: INK, fontSize: px(15), fontWeight: '800' }}>
+                  Onboard Staff Driver
+                </PartnerText>
+                <PartnerText style={{ color: MUTED, fontSize: px(11) }}>
+                  Inline OTP verification · Instant fleet activation
+                </PartnerText>
+              </View>
+            </View>
           </View>
-          <View style={styles.grow}>
-            <PartnerText style={{ color: INK, fontWeight: '700', fontSize: px(15) }}>Search drivers</PartnerText>
-          </View>
-        </View>
 
-        <View style={[styles.searchInputRow, { marginTop: px(12), borderRadius: px(12), height: px(44) }]}>
-          <Search size={px(16)} color={MUTED} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search by Name, Mobile, or Code (e.g. RC-DR-1042)"
-            placeholderTextColor="#9CA3AF"
-            style={[
-              styles.input,
-              {
-                fontSize: px(13.5),
-                paddingHorizontal: 0,
-                marginLeft: 0,
-                ...(Platform.OS === 'android' ? { includeFontPadding: false } : null),
-              },
-            ]}
-            accessibilityLabel="Search full time drivers"
-            autoCapitalize="none"
-          />
-          {searchQuery.length > 0 ? (
-            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-              <X size={px(16)} color={MUTED} />
-            </Pressable>
+          {errorMessage ? (
+            <View style={[styles.errorBanner, { padding: px(10), borderRadius: px(10), marginBottom: px(12) }]}>
+              <PartnerText style={{ color: '#DC2626', fontSize: px(12), fontWeight: '600' }}>
+                {errorMessage}
+              </PartnerText>
+            </View>
           ) : null}
-        </View>
 
-        {/* Live Search Results */}
-        {searchQuery.trim().length >= 2 ? (
-          <View style={{ marginTop: px(12), borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: px(10) }}>
-            <PartnerText style={{ color: MUTED, fontSize: px(12), fontWeight: '700', marginBottom: px(8) }}>
-              Search Results
-            </PartnerText>
-            {searchLoading ? (
-              <View style={{ paddingVertical: px(14) }}>
-                <ActivityIndicator color={AMBER} />
-              </View>
-            ) : searchResults.length > 0 ? (
-              searchResults.map(result => (
-                <DriverSearchResultCard
-                  key={result.id}
-                  driver={result}
-                  inviting={invite.isPending}
-                  onInvite={() => void sendDirectInvite(result.rawPhone)}
-                />
-              ))
-            ) : (
-              <View style={[styles.emptySearch, { padding: px(14), borderRadius: px(12) }]}>
-                <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700', textAlign: 'center' }}>
-                  No Full-Time drivers found
-                </PartnerText>
-                <PartnerText style={{ color: MUTED, fontSize: px(11.5), textAlign: 'center', marginTop: px(3) }}>
-                  Make sure the driver has registered with role "Full-Time" and completed verification.
-                </PartnerText>
-              </View>
-            )}
-          </View>
-        ) : null}
-      </View>
-
-      {/* Manual Invite by Phone Collapsible */}
-      <View style={[styles.inviteCard, { borderRadius: px(16), padding: px(14), marginBottom: px(18) }]}>
-        <Pressable
-          style={{ flexDirection: 'row', alignItems: 'center' }}
-          onPress={() => setShowManualPhone(prev => !prev)}>
-          <View style={[styles.row, { flex: 1, minWidth: 0, marginRight: px(10) }]}>
-            <View style={[styles.avatar, { width: px(34), height: px(34), borderRadius: px(11), backgroundColor: '#FFF7E5' }]}>
-              <UserRoundPlus size={px(17)} color={AMBER} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <PartnerText style={{ color: INK, fontWeight: '700', fontSize: px(13.5) }}>
-                Invite by Verified Phone Number
-              </PartnerText>
-              <PartnerText style={{ color: MUTED, fontSize: px(11.5) }}>
-                Directly enter the driver's registered 10-digit number
-              </PartnerText>
-            </View>
-          </View>
-          <PartnerText
-            style={{
-              color: '#2563EB',
-              fontSize: px(12),
-              fontWeight: '700',
-              flexShrink: 0,
-              paddingLeft: px(4),
-            }}>
-            {showManualPhone ? 'Hide' : 'Enter'}
-          </PartnerText>
-        </Pressable>
-        {showManualPhone ? (
-          <View style={{ marginTop: px(12) }}>
-            <View style={[styles.phoneInputRow, { borderRadius: px(12), height: px(46) }]}>
-              <Phone size={px(16)} color={MUTED} />
-              <PartnerText style={{ color: INK, fontSize: px(14), fontWeight: '600' }}>+91</PartnerText>
+          {/* Full Name */}
+          <View style={{ marginBottom: px(12) }}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Driver Full Name *</PartnerText>
+            <View style={[styles.textInputWrap, { borderRadius: px(12), height: px(46) }]}>
               <TextInput
-                value={phone}
-                onChangeText={value => setPhone(value.replace(/[^\d]/g, '').slice(-10))}
-                keyboardType="phone-pad"
-                maxLength={10}
-                placeholder="Verified mobile number"
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="e.g. Ramesh Kumar"
                 placeholderTextColor="#9CA3AF"
                 style={[styles.input, { fontSize: px(14) }]}
-                accessibilityLabel="Driver verified mobile number"
-                autoFocus
               />
             </View>
-            <Pressable
-              accessibilityRole="button"
-              disabled={invite.isPending || normalizedPhone.length < 10}
-              onPress={() => {
-                void sendDirectInvite(phone);
-              }}
-              style={[
-                styles.primaryButton,
-                {
-                  marginTop: px(10),
-                  height: px(44),
-                  borderRadius: px(12),
-                  opacity: invite.isPending || normalizedPhone.length < 10 ? 0.6 : 1,
-                },
-              ]}>
-              {invite.isPending ? <ActivityIndicator color="#FFFFFF" /> : <UserRoundPlus size={px(16)} color="#FFFFFF" />}
-              <PartnerText style={{ color: '#FFFFFF', fontSize: px(13.5), fontWeight: '700', marginLeft: px(6) }}>
-                {invite.isPending ? 'Sending…' : 'Send invitation'}
-              </PartnerText>
-            </Pressable>
           </View>
-        ) : null}
-      </View>
 
-      {/* Pending Invitations Section */}
+          {/* Mobile Number & Inline OTP */}
+          <View style={{ marginBottom: px(12) }}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Driver Mobile Number *</PartnerText>
+            <View style={[styles.phoneInputRow, { borderRadius: px(12), height: px(46) }]}>
+              <PartnerText style={{ color: INK, fontSize: px(14), fontWeight: '700' }}>+91</PartnerText>
+              <TextInput
+                value={phone}
+                onChangeText={val => {
+                  setPhone(val.replace(/\D/g, '').slice(0, 10));
+                  if (otpState === 'VERIFIED') {
+                    setOtpState('IDLE');
+                    setOnboardingProofToken(null);
+                  }
+                }}
+                keyboardType="phone-pad"
+                maxLength={10}
+                placeholder="10-digit mobile number"
+                placeholderTextColor="#9CA3AF"
+                editable={otpState !== 'VERIFIED'}
+                style={[styles.input, { fontSize: px(14) }]}
+              />
+              {otpState === 'IDLE' && cleanPhone.length === 10 ? (
+                <Pressable
+                  onPress={handleSendOtp}
+                  style={[styles.smallActionBtn, { paddingHorizontal: px(10), paddingVertical: px(6), borderRadius: px(8) }]}>
+                  <PartnerText style={{ color: '#FFFFFF', fontSize: px(12), fontWeight: '700' }}>
+                    Send Code
+                  </PartnerText>
+                </Pressable>
+              ) : null}
+            </View>
+
+            {/* Inline OTP Widget */}
+            {otpState === 'SENDING' ? (
+              <View style={[styles.inlineOtpBox, { padding: px(12), borderRadius: px(12), marginTop: px(8) }]}>
+                <ActivityIndicator size="small" color={AMBER} />
+                <PartnerText style={{ color: MUTED, fontSize: px(12), marginLeft: px(8) }}>
+                  Sending verification SMS code to +91 {cleanPhone}...
+                </PartnerText>
+              </View>
+            ) : null}
+
+            {otpState === 'SENT' || otpState === 'VERIFYING' ? (
+              <View style={[styles.inlineOtpBox, { padding: px(12), borderRadius: px(12), marginTop: px(8) }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: px(8) }}>
+                  <PartnerText style={{ color: INK, fontSize: px(12.5), fontWeight: '700' }}>
+                    Enter 6-digit Code sent to +91 {cleanPhone}
+                  </PartnerText>
+                  {otpSecondsLeft > 0 ? (
+                    <PartnerText style={{ color: MUTED, fontSize: px(11) }}>
+                      Resend in {otpSecondsLeft}s
+                    </PartnerText>
+                  ) : (
+                    <Pressable onPress={handleSendOtp}>
+                      <PartnerText style={{ color: '#2563EB', fontSize: px(11.5), fontWeight: '700' }}>
+                        Resend Code
+                      </PartnerText>
+                    </Pressable>
+                  )}
+                </View>
+
+                {devOtp ? (
+                  <Pressable
+                    onPress={() => setOtpCode(devOtp)}
+                    style={[styles.devOtpChip, { paddingHorizontal: px(8), paddingVertical: px(4), borderRadius: px(6), marginBottom: px(8) }]}>
+                    <PartnerText style={{ color: '#1E40AF', fontSize: px(11), fontWeight: '700' }}>
+                      ⚡ Dev Auto-Fill Code: {devOtp} (tap to paste)
+                    </PartnerText>
+                  </Pressable>
+                ) : null}
+
+                <View style={{ flexDirection: 'row', gap: px(8), alignItems: 'center' }}>
+                  <TextInput
+                    value={otpCode}
+                    onChangeText={setOtpCode}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    placeholder="6-digit code"
+                    placeholderTextColor="#9CA3AF"
+                    style={[styles.otpInput, { flex: 1, height: px(42), borderRadius: px(10), fontSize: px(16) }]}
+                  />
+                  <Pressable
+                    disabled={otpCode.length < 4 || otpState === 'VERIFYING'}
+                    onPress={handleVerifyOtp}
+                    style={[
+                      styles.verifyBtn,
+                      {
+                        height: px(42),
+                        paddingHorizontal: px(16),
+                        borderRadius: px(10),
+                        opacity: otpCode.length >= 4 ? 1 : 0.6,
+                      },
+                    ]}>
+                    {otpState === 'VERIFYING' ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <PartnerText style={{ color: '#FFFFFF', fontSize: px(13), fontWeight: '700' }}>
+                        Verify
+                      </PartnerText>
+                    )}
+                  </Pressable>
+                </View>
+              </View>
+            ) : null}
+
+            {otpState === 'VERIFIED' ? (
+              <View style={[styles.verifiedBanner, { padding: px(10), borderRadius: px(10), marginTop: px(8) }]}>
+                <CheckCircle2 size={px(18)} color="#059669" />
+                <PartnerText style={{ color: '#065F46', fontSize: px(12.5), fontWeight: '700', marginLeft: px(6) }}>
+                  Mobile Verified (+91 {cleanPhone}) ✓
+                </PartnerText>
+              </View>
+            ) : null}
+          </View>
+
+          {/* License Number */}
+          <View style={{ marginBottom: px(12) }}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Driving License Number *</PartnerText>
+            <View style={[styles.textInputWrap, { borderRadius: px(12), height: px(46) }]}>
+              <TextInput
+                value={licenseNo}
+                onChangeText={val => setLicenseNo(val.toUpperCase())}
+                placeholder="e.g. OD02 20230012345"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="characters"
+                style={[styles.input, { fontSize: px(14) }]}
+              />
+            </View>
+          </View>
+
+          {/* Driver Type Picker */}
+          <View style={{ marginBottom: px(16) }}>
+            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Fleet Role / Driver Type *</PartnerText>
+            <View style={{ flexDirection: 'row', gap: px(8) }}>
+              {(['Tow Driver', 'Full-Time', 'Part-Time'] as const).map(type => {
+                const selected = driverType === type;
+                return (
+                  <Pressable
+                    key={type}
+                    onPress={() => setDriverType(type)}
+                    style={[
+                      styles.typePill,
+                      {
+                        flex: 1,
+                        paddingVertical: px(9),
+                        borderRadius: px(10),
+                        backgroundColor: selected ? AMBER : '#F3F4F6',
+                        borderColor: selected ? AMBER : '#E5E7EB',
+                      },
+                    ]}>
+                    <PartnerText
+                      style={{
+                        textAlign: 'center',
+                        fontSize: px(12),
+                        fontWeight: selected ? '800' : '600',
+                        color: selected ? INK : '#4B5563',
+                      }}>
+                      {type}
+                    </PartnerText>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Submit Action */}
+          <Pressable
+            disabled={submitting || !onboardingProofToken || !fullName.trim() || !licenseNo.trim()}
+            onPress={handleSubmitStaffDriver}
+            style={[
+              styles.primaryButton,
+              {
+                height: px(48),
+                borderRadius: px(12),
+                backgroundColor: onboardingProofToken && fullName.trim() && licenseNo.trim() ? AMBER : '#E5E7EB',
+                opacity: submitting ? 0.7 : 1,
+              },
+            ]}>
+            {submitting ? (
+              <ActivityIndicator color={INK} />
+            ) : (
+              <>
+                <UserCheck size={px(18)} color={INK} strokeWidth={2.4} />
+                <PartnerText style={{ color: INK, fontSize: px(14), fontWeight: '800', marginLeft: px(8) }}>
+                  Add Driver to Fleet
+                </PartnerText>
+              </>
+            )}
+          </Pressable>
+        </View>
+      ) : null}
+
+      {/* Pending Drivers Section if any */}
       {pendingMembers.length > 0 ? (
         <View style={{ marginBottom: px(16) }}>
-          <PartnerText style={[styles.sectionTitle, { fontSize: px(16), marginBottom: px(8) }]}>
-            Pending Invitations · {pendingMembers.length}
+          <PartnerText style={[styles.sectionTitle, { fontSize: px(15), marginBottom: px(8) }]}>
+            Pending Review Drivers · {pendingMembers.length}
           </PartnerText>
           {pendingMembers.map(member => (
             <MemberCard
@@ -538,18 +642,19 @@ export default function VendorDriverMembershipsScreen() {
         </View>
       ) : null}
 
-      {/* Active Fleet Drivers Section */}
-      <PartnerText style={[styles.sectionTitle, { fontSize: px(16), marginBottom: px(10) }]}>
+      {/* Active Fleet Drivers List */}
+      <PartnerText style={[styles.sectionTitle, { fontSize: px(15), marginBottom: px(10) }]}>
         Connected Fleet Drivers · {activeMembers.length}
       </PartnerText>
+
       {isLoading ? (
-        <View style={{ paddingVertical: px(25) }}>
+        <View style={{ paddingVertical: px(30) }}>
           <ActivityIndicator color={AMBER} />
         </View>
       ) : isError ? (
         <View style={[styles.empty, { padding: px(18), borderRadius: px(15) }]}>
           <PartnerText style={{ color: MUTED, textAlign: 'center', fontSize: px(13) }}>
-            Driver list could not load. Pull down to retry.
+            Fleet list could not load. Pull down to retry.
           </PartnerText>
         </View>
       ) : activeMembers.length ? (
@@ -563,12 +668,15 @@ export default function VendorDriverMembershipsScreen() {
           />
         ))
       ) : (
-        <View style={[styles.empty, { padding: px(20), borderRadius: px(15) }]}>
-          <PartnerText style={{ color: INK, fontWeight: '700', fontSize: px(14) }}>
-            No Drivers connected yet
+        <View style={[styles.empty, { padding: px(24), borderRadius: px(16) }]}>
+          <View style={[styles.avatar, { width: px(50), height: px(50), borderRadius: px(16), marginBottom: px(10) }]}>
+            <UserRoundPlus size={px(24)} color={AMBER} />
+          </View>
+          <PartnerText style={{ color: INK, fontWeight: '800', fontSize: px(15) }}>
+            No Drivers in your fleet yet
           </PartnerText>
-          <PartnerText style={{ color: MUTED, fontSize: px(12), textAlign: 'center', marginTop: px(5) }}>
-            Search for your registered full-time drivers above or enter their phone number to invite them to your fleet.
+          <PartnerText style={{ color: MUTED, fontSize: px(12.5), textAlign: 'center', marginTop: px(5), lineHeight: px(18) }}>
+            Tap <PartnerText style={{ fontWeight: '700', color: INK }}>+ Add Driver</PartnerText> above to directly onboard staff drivers with verified phone OTP into your fleet.
           </PartnerText>
         </View>
       )}
@@ -577,60 +685,109 @@ export default function VendorDriverMembershipsScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { backgroundColor: '#FFFFFF', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E8E8E8' },
+  header: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E8E8E8',
+  },
   title: { color: INK, fontWeight: '800' },
-  subtitle: { color: MUTED, marginTop: 3 },
+  subtitle: { color: MUTED, marginTop: 2 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   grow: { flex: 1 },
   avatar: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF7E5' },
   card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
   name: { color: INK, fontWeight: '700' },
   sub: { color: MUTED, marginTop: 1 },
-  statusPill: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 20 },
+  statusPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 12 },
   codeBadge: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
-  inviteActionBtn: {
+  sectionTitle: { color: INK, fontWeight: '800' },
+  empty: { alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
   },
-  removeButton: {
+  formCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
+  },
+  inputLabel: {
+    color: INK,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  textInputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1,
-    borderColor: '#F2C6C3',
-    backgroundColor: '#FFF8F7',
-  },
-  searchCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
-  searchInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  inviteCard: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
   phoneInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#F7F7F7',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#E9EAEC',
+    borderColor: '#E2E8F0',
   },
-  input: { flex: 1, color: INK, paddingVertical: 0, minWidth: 0 },
-  primaryButton: {
-    flexDirection: 'row',
+  input: {
+    flex: 1,
+    color: INK,
+    paddingVertical: 0,
+    minWidth: 0,
+  },
+  smallActionBtn: {
+    backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: AMBER,
   },
-  sectionTitle: { color: INK, fontWeight: '800' },
-  empty: { alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
-  emptySearch: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' },
+  inlineOtpBox: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+  },
+  devOtpChip: {
+    backgroundColor: '#DBEAFE',
+    alignSelf: 'flex-start',
+  },
+  otpInput: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#93C5FD',
+    textAlign: 'center',
+    fontWeight: '700',
+    color: INK,
+    letterSpacing: 4,
+  },
+  verifyBtn: {
+    backgroundColor: '#0284C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  typePill: {
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  errorBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
 });

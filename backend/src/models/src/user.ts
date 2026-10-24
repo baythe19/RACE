@@ -52,6 +52,14 @@ export interface IUser extends Document {
   accountStatus?: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
   vendorProfile?: IVendorProfile;
   driverProfile?: IDriverProfile;
+  /** Redesign v6: Explicit persona context and operational lifecycle */
+  driverContext?: 'VENDOR_MANAGED' | 'INDEPENDENT';
+  selfDriverCategory?: 'FULL_TIME' | 'PART_TIME';
+  vendorUserId?: Types.ObjectId;
+  phoneVerifiedAt?: Date;
+  registrationStatus?: 'DRAFT' | 'SUBMITTED';
+  reviewStatus?: 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'CHANGES_REQUESTED' | 'REJECTED';
+  operationalStatus?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';
   /** Only relevant when role === 'driver' */
   isAvailable?: boolean;
   currentLocation?: IDriverCurrentLocation;
@@ -117,6 +125,40 @@ const UserSchema = new Schema<IUser>(
     },
     vendorProfile: { type: VendorProfileSchema },
     driverProfile: { type: DriverProfileSchema },
+    driverContext: {
+      type: String,
+      enum: ['VENDOR_MANAGED', 'INDEPENDENT'],
+      index: true,
+    },
+    selfDriverCategory: {
+      type: String,
+      enum: ['FULL_TIME', 'PART_TIME'],
+      index: true,
+    },
+    vendorUserId: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      index: true,
+    },
+    phoneVerifiedAt: { type: Date },
+    registrationStatus: {
+      type: String,
+      enum: ['DRAFT', 'SUBMITTED'],
+      default: 'SUBMITTED',
+      index: true,
+    },
+    reviewStatus: {
+      type: String,
+      enum: ['PENDING', 'UNDER_REVIEW', 'VERIFIED', 'CHANGES_REQUESTED', 'REJECTED'],
+      default: 'PENDING',
+      index: true,
+    },
+    operationalStatus: {
+      type: String,
+      enum: ['ENABLED', 'SUSPENDED', 'DISABLED'],
+      default: 'ENABLED',
+      index: true,
+    },
     isAvailable: { type: Boolean, default: true },
     currentLocation: { type: DriverCurrentLocationSchema },
     activeBookingId: { type: Schema.Types.ObjectId, default: null },
@@ -132,6 +174,7 @@ UserSchema.index({ 'driverProfile.licenseNo': 1 }, { unique: true, sparse: true 
 UserSchema.index({ 'driverProfile.loginId': 1 }, { unique: true, sparse: true });
 UserSchema.index({ 'driverProfile.status': 1 });
 UserSchema.index({ 'driverProfile.vendorUserId': 1 });
+UserSchema.index({ driverContext: 1, selfDriverCategory: 1 });
 UserSchema.index({ fullName: 'text', mobileNumber: 'text', 'driverProfile.driverCode': 'text' });
 
 UserSchema.pre('save', function (next) {

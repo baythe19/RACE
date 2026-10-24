@@ -70,6 +70,7 @@ import {
   formatKm,
   haversineMeters,
   legForJobStatus,
+  legTitle,
 } from '../../../services/driver/tripNavigation';
 import { formatEta } from '../../../services/driver/roadRoutingService';
 import { updateMockActiveJobStatus } from '../../../data/mockPartnerData';
@@ -909,7 +910,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         {/* 4 — Route overview to pickup */}
         {effectiveScreen === 4 ? (
           <RouteOverviewCards
-            title={toDrop ? 'Go to drop location' : 'Go to pickup location'}
+            title={legTitle(tripLeg)}
             destinationAddress={destinationAddress || (toDrop ? 'Drop location' : 'Pickup location')}
             destinationCaption={toDrop ? 'Drop location' : 'Pickup location'}
             distanceLabel={distanceLabel}

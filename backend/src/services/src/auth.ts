@@ -36,6 +36,12 @@ export interface AuthTokensResponse {
     isProfileCompleted: boolean;
     fullName?: string;
     email?: string;
+    driverContext?: 'VENDOR_MANAGED' | 'INDEPENDENT';
+    selfDriverCategory?: 'FULL_TIME' | 'PART_TIME';
+    vendorUserId?: string;
+    registrationStatus?: 'DRAFT' | 'SUBMITTED';
+    reviewStatus?: 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'CHANGES_REQUESTED' | 'REJECTED';
+    operationalStatus?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';
   };
   onboardingRequired: boolean;
 }
@@ -139,8 +145,10 @@ export class AuthService {
             : computeProfileCompleted(user)
           : false,
         onboardingRequired:
-          !user.isVerified ||
-          (role === 'driver' ? !user.driverProfile?.licenseNo : !computeProfileCompleted(user)),
+          user.driverContext === 'VENDOR_MANAGED'
+            ? false
+            : !user.isVerified ||
+              (role === 'driver' ? !user.driverProfile?.licenseNo : !computeProfileCompleted(user)),
         role,
       };
     }
@@ -179,6 +187,7 @@ export class AuthService {
     await user.save();
 
     const tokens = await generateTokenPair(user.id, role, user.mobileNumber);
+    const isVendorManaged = role === 'driver' && user.driverContext === 'VENDOR_MANAGED';
 
     return {
       ...tokens,
@@ -191,8 +200,18 @@ export class AuthService {
         isProfileCompleted: user.isProfileCompleted,
         fullName: user.fullName,
         email: user.email,
+        driverContext: user.driverContext,
+        selfDriverCategory: user.selfDriverCategory,
+        vendorUserId: user.vendorUserId?.toString(),
+        registrationStatus: user.registrationStatus,
+        reviewStatus: user.reviewStatus,
+        operationalStatus: user.operationalStatus,
       },
-      onboardingRequired: role === 'driver' ? !user.driverProfile?.licenseNo : !user.isProfileCompleted,
+      onboardingRequired: isVendorManaged
+        ? false
+        : role === 'driver'
+          ? !user.driverProfile?.licenseNo
+          : !user.isProfileCompleted,
     };
   }
 
@@ -240,6 +259,12 @@ export class AuthService {
         isProfileCompleted: user.isProfileCompleted,
         fullName: user.fullName,
         email: user.email,
+        driverContext: user.driverContext,
+        selfDriverCategory: user.selfDriverCategory,
+        vendorUserId: user.vendorUserId?.toString(),
+        registrationStatus: user.registrationStatus,
+        reviewStatus: user.reviewStatus,
+        operationalStatus: user.operationalStatus,
       },
       onboardingRequired: false,
     };
@@ -269,6 +294,7 @@ export class AuthService {
       payload.role && hasUserCapability(user, payload.role) ? payload.role : user.role;
     await revokeRefreshToken(payload.sub, payload.jti);
     const tokens = await generateTokenPair(user.id, activeRole, user.mobileNumber);
+    const isVendorManaged = activeRole === 'driver' && user.driverContext === 'VENDOR_MANAGED';
 
     return {
       ...tokens,
@@ -281,9 +307,18 @@ export class AuthService {
         isProfileCompleted: user.isProfileCompleted,
         fullName: user.fullName,
         email: user.email,
+        driverContext: user.driverContext,
+        selfDriverCategory: user.selfDriverCategory,
+        vendorUserId: user.vendorUserId?.toString(),
+        registrationStatus: user.registrationStatus,
+        reviewStatus: user.reviewStatus,
+        operationalStatus: user.operationalStatus,
       },
-      onboardingRequired:
-        activeRole === 'driver' ? !user.driverProfile?.licenseNo : !computeProfileCompleted(user),
+      onboardingRequired: isVendorManaged
+        ? false
+        : activeRole === 'driver'
+          ? !user.driverProfile?.licenseNo
+          : !computeProfileCompleted(user),
     };
   }
 }

@@ -519,7 +519,7 @@ export default function DriverMyVendorScreen() {
                 { fontSize: px(12.5), marginTop: px(4) },
               ]}>
               You are currently operating independently. You can take direct
-              consumer driver bookings, or join a Towing Vendor fleet when invited.
+              consumer driver bookings in customer vehicles, or be onboarded to a Towing Vendor fleet.
             </PartnerText>
           </View>
           )}
@@ -641,8 +641,8 @@ export default function DriverMyVendorScreen() {
                   styles.emptyDesc,
                   { fontSize: px(12), textAlign: 'center' },
                 ]}>
-                No pending vendor invitations. Towing vendors can send invitations
-                using your verified mobile number.
+                No pending invitations. When onboarded into a towing fleet by a vendor,
+                your connected depot, tow trucks, and assignments will appear here.
               </PartnerText>
             </View>
           )}

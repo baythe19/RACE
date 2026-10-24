@@ -1,11 +1,77 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-20
+> **Updated:** 2026-10-24
 > **Read this first in every new session.**
 
 ---
 
-## Latest session — Handoff, in-app driver navigation (2026-10-20, branch changes-v6-partner-role-dispatch)
+## Latest session — Partner App Master Flow Redesign: Inline OTP Staff Onboarding & Strict 4-Persona Dispatch (2026-10-24, branch changes-v6-partner-role-dispatch)
+
+- **Master Redesign Implementation (As per Specification & Blueprint Plan):**
+  - **Eliminated Legacy Multi-Step Invitation Flow:**
+    - Replaced the search-invitation-acceptance flow with direct vendor-managed staff onboarding.
+    - Vendor enters driver full name, phone number, and driving license, triggers inline OTP to driver's phone, verifies OTP with proof token, and directly adds driver into their fleet with pre-verified status.
+  - **Direct Inline OTP Staff Onboarding:**
+    - Added backend endpoints: `POST /api/v1/vendor/driver-onboarding/otp/send`, `POST /api/v1/vendor/driver-onboarding/otp/verify`, and `POST /api/v1/vendor/drivers`.
+    - Cryptographic 15-minute proof token (`signDriverOnboardingProof` / `verifyDriverOnboardingProof`) ensures vendor cannot add unverified mobile numbers.
+    - Automatic `DriverVendorMembership` creation with `status: 'ACTIVE'`, `fleetSource: 'vendor'`, and immediate real-time socket dispatch.
+  - **Zero-Friction Staff Driver First Login:**
+    - When staff driver logs in via phone OTP, backend marks `onboardingRequired: false`.
+    - Mobile app navigator (`PartnerAppNavigator.tsx`) detects `driverContext === 'VENDOR_MANAGED'` and directs driver straight to `PartnerMain` dashboard without ever opening the registration form.
+  - **Non-Blocking Review Policy:**
+    - Submitting registration immediately activates the dashboard and Online availability toggle.
+    - Background admin review (`reviewStatus: 'PENDING'`) does not block daily work or job claims. Only explicit `operationalStatus === 'SUSPENDED'` or `reviewStatus === 'REJECTED'` halts operations.
+  - **Strict 4-Persona Dispatch & Isolation:**
+    - `vendor`: Towing jobs only. Dispatches fleet tow truck + staff driver.
+    - `vendor_driver`: Only jobs specifically assigned by their vendor. Sees 0 open marketplace offers. "Available" tab hidden; only "Assigned / Active" and "Done" tabs are rendered.
+    - `self_driver_full_time`: Only Full-Time driver hire jobs in customer vehicle.
+    - `self_driver_part_time`: Only Part-Time on-demand driver hire jobs in customer vehicle.
+  - **Mobile Partner App UI Redesign:**
+    - Rebuilt `VendorDriverMembershipsScreen.tsx` with top `+ Add Driver` toggle, real-time input validation, inline OTP entry with countdown resend timer and dev OTP quick-fill chip, verified badge, and clean fleet cards with quick Call, Assign to open job, and Remove actions.
+    - Updated `DriverJobsScreen.tsx` to conditionally hide marketplace offers tab for vendor staff drivers.
+  - **Deep Self-Audit, Role Alignment & UI/UX Polish Round:**
+    - **Driver Vehicle Elimination:** Removed the vehicle information section and row from Driver Profile in `PartnerAccountScreen.tsx`. Updated section title to "Account Operations". Removed vehicle documents (`rc`, `insurance`, `fitness`) from driver required/optional documents in `PartnerDocumentsScreen.tsx`. Confirmed that vehicle registration and management is strictly restricted to Towing Vendors (`VendorVehiclesScreen`).
+    - **Dashboard Non-Blocking Fix:** Replaced restrictive `isApproved` guards in `DriverDashboardScreen.tsx` with `isOperational` (`profile?.operationalStatus !== 'SUSPENDED' && profile?.operationalStatus !== 'DISABLED' && profile?.reviewStatus !== 'REJECTED'`), enabling live availability toggle, queries, location reporting, and background review informational banners for newly submitted drivers.
+    - **Driver Verification Copy:** Updated `driverVerification.ts` pending review state copy to non-blocking message: `"Documents under verification · You can accept jobs in the meantime"`.
+    - **Vendor Job Assignment Non-Blocking Fix:** Updated `eligibleDrivers` predicate in `VendorAssignJobScreen.tsx` to permit staff drivers under pending review (`driverStatus !== 'REJECTED' && driverStatus !== 'SUSPENDED'`), enabling vendors to assign newly onboarded staff drivers immediately.
+    - **Driver My Vendor Screen Polish:** Enhanced `DriverMyVendorScreen.tsx` by replacing legacy invitation prompts in independent driver state with clear role context explaining independent customer bookings vs vendor fleet depot.
+    - **Vendor Driver Memberships API Polish:** Updated `driverVendorMembership.ts` to expose `reviewStatus`, `operationalStatus`, and non-blocking availability calculation in `listVendorMemberships`.
+  - **Comprehensive Verification Suite (100% Green Across All Surfaces):**
+    - `verify-staff-onboarding-redesign-e2e.ts`: **12/12 CHECKS PASSED (100%)**, covering inline OTP onboarding, proof token, zero-friction login, non-blocking toggle, zero marketplace offers, vendor dispatch, staff accept to EN_ROUTE, Trip OTP verification to COMPLETED, atomic resource release (truck and driver freed), FT & PT driver segregation, and driver vehicle isolation.
+    - `verify-driver-ack-e2e.ts`: **27/27 CHECKS PASSED**.
+    - `comprehensive-audit.ts`: **41/41 CHECKS PASSED (100% Success Rate)**.
+    - `partner-v6-offer-routing-audit.ts`: **PASSED**.
+    - `verify-trip-navigation.mjs`: **TRIP_MATH_OK, NO_EXTERNAL_MAPS_OK**.
+    - `npm run lint` in `backend/`: **tsc --noEmit (0 errors)**.
+    - `npm run lint` in `mobile application/`: **tsc --noEmit (0 errors)**.
+    - `npm run build` in `race-admin/apps/admin-web/`: **Production build succeeded in 10.84s**.
+
+## Previous session — Monorepo Environments, Database & Full Partner App Audit (2026-10-24, branch changes-v6-partner-role-dispatch)
+
+- **Monorepo Environment Setup & Mapping:**
+  - Evaluated `.env`, `.envv`, and `.envvv` and deployed correct configuration targets across all surfaces:
+    - `backend/.env`: Configured from `.envv` (MongoDB URI, Redis, JWT, OTP parameters, Admin credentials, SMTP, Twilio, MessageCentral) plus Google Maps API key `AIzaSyDJq1BVg0Q9coQDBLwQx3nWW5I8PuudnSE`.
+    - `mobile application/.env`: Configured from `.env` with `EXPO_PUBLIC_API_URL`, Google Maps API keys, UI preview, UI test permissive mode, and UI QA navigator.
+    - `customer application/.env`: Configured from `.envvv` with `EXPO_PUBLIC_API_URL`, UI preview auth flow, skip OTP, and Google Maps API keys.
+    - `race-admin/apps/admin-web/.env`: Configured with `VITE_API_URL=https://race-api-w361.onrender.com/api/v1`.
+- **Database & Backend Health Verification:**
+  - Initialized local MongoDB 7 and Redis via Docker on default ports (`27017` / `6379`).
+  - Ran `npm run seed:fresh` -> successfully seeded 19 services catalog, brand settings, platform settings, super admin (`admin@raceservice.com`), and test users (Customer, Tow Driver, Chauffeur, Towing Vendor).
+  - Verified Cloud backend (`https://race-api-w361.onrender.com/health`) -> `{"success":true,"data":{"status":"ok"}}`.
+  - Verified Local backend (`http://127.0.0.1:3000/health`) -> `{"success":true,"data":{"status":"ok"}}`.
+  - Ran `npm run seed:fresh && npx tsx src/scripts/comprehensive-audit.ts` -> **41/41 CHECKS PASSED (100% Success Rate)** across Database, Admin, Customer, and Partner APIs.
+  - Ran `npx tsx src/scripts/verify-driver-ack-e2e.ts` -> **ALL 27 E2E CHECKS PASSED** covering status transitions, atomic vehicle reservations, 1-to-1 driver-vendor exclusivity, and multi-fleet invitation prevention.
+  - Ran `npm run audit:partner-v6` -> **PARTNER_V6_ROLE_DISPATCH_AUDIT_PASSED**.
+- **Partner Mobile Application Review & In-App Navigation Fix:**
+  - Fixed missing `legTitle` import & invocation in `DriverActiveJobScreen.tsx` for route overview card labeling.
+  - Ran `node scripts/verify-trip-navigation.mjs math && node scripts/verify-trip-navigation.mjs screen` -> **PASS (TRIP_MATH_OK, NO_EXTERNAL_MAPS_OK)**.
+  - Ran `npm run lint` in `mobile application/` -> **Exit code 0 (0 errors)**.
+  - Ran `npm run lint` in `customer application/` -> **Exit code 0 (0 errors)**.
+  - Fixed syntax error in `race-admin/apps/admin-web/src/hooks/use-bookings.ts` (missing closing brace/parenthesis on `countsQuery`) and verified `npm run build` -> **100% successful**.
+- **Partner App Comprehensive Architecture Review:**
+  - Full end-to-end review of Driver & Towing Vendor navigation stacks, screens, authentication, onboarding, live dispatch, and state management prepared for next operational tasks.
+
+## Previous session — Handoff, in-app driver navigation (2026-10-20, branch changes-v6-partner-role-dispatch)
 
 Session stopped so the same work can continue on another machine. Pull this branch. Reconnect Cursor plugins from `docs/ops/CURSOR_MCP_SETUP.md`. No API keys are stored in the repo.
 

@@ -9,29 +9,45 @@ import {
 import { storageService } from '../../storage/src/index';
 import { UserModel, type IUser } from '../../models/src/user';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
+import { DriverVendorMembershipModel } from '../../models/src/driverVendorMembership';
+import { otpService } from './otp';
+import { signDriverOnboardingProof, verifyDriverOnboardingProof } from '../../utils/src/jwt';
+import { emitToDriver } from './socket';
 import { driverRepository } from './driverRepository';
 import type {
   AssignVendorDriverVehicleDto,
   CreateVendorDriverDto,
   ResetVendorDriverPasswordDto,
+  VendorDriverOnboardingSendOtpDto,
+  VendorDriverOnboardingVerifyOtpDto,
+  CreateVendorStaffDriverDto,
 } from './vendorDriversValidator';
 
 function mapVendorDriver(user: IUser) {
   const profile = user.driverProfile;
+  const isSuspended = user.accountStatus === 'SUSPENDED' || user.operationalStatus === 'SUSPENDED';
+  const isRejected = profile?.status === 'REJECTED' || user.reviewStatus === 'REJECTED';
+  const operational = !isSuspended && !isRejected;
+
   return {
     id: user.id,
     name: user.fullName ?? 'Driver',
+    fullName: user.fullName ?? 'Driver',
     phone: user.mobileNumber,
     email: user.email,
     driverType: profile?.driverType ?? 'Tow Driver',
     licenseNo: profile?.licenseNo ?? '',
     city: profile?.city ?? '',
     vehicleRegistration: profile?.vehicleRegistration,
-    status: profile?.status ?? 'PENDING',
-    isAvailable: profile?.status === 'APPROVED' && Boolean(user.isAvailable) && !user.activeBookingId,
+    status: profile?.status ?? user.reviewStatus ?? 'PENDING',
+    reviewStatus: user.reviewStatus ?? profile?.status ?? 'PENDING',
+    operationalStatus: user.operationalStatus ?? 'ENABLED',
+    driverContext: user.driverContext ?? 'VENDOR_MANAGED',
+    fleetSource: profile?.fleetSource ?? 'vendor',
+    isAvailable: operational && Boolean(user.isAvailable) && !user.activeBookingId,
     isBusy: Boolean(user.activeBookingId),
-    rating: profile?.rating ?? 0,
-    vendorId: profile?.vendorUserId?.toString() ?? '',
+    rating: profile?.rating ?? 5.0,
+    vendorId: profile?.vendorUserId?.toString() ?? user.vendorUserId?.toString() ?? '',
     loginId: profile?.loginId,
     hasPasswordLogin: Boolean(profile?.loginId),
   };
@@ -58,11 +74,12 @@ export class VendorDriversService {
 
   private async assertVendorApproved(userId: string) {
     const user = await this.assertVendor(userId);
-    const status = user.vendorProfile?.status;
-    if (status !== 'approved') {
-      throw new ForbiddenError(
-        'Your vendor account must be approved by admin before you can add vendor drivers.',
-      );
+    // Non-blocking review policy (R09): submitted vendors can manage fleet unless explicitly suspended or rejected
+    if (user.accountStatus === 'SUSPENDED' || user.operationalStatus === 'SUSPENDED') {
+      throw new ForbiddenError('Your vendor account is suspended.');
+    }
+    if (user.vendorProfile?.status === 'rejected') {
+      throw new ForbiddenError('Your vendor account was rejected by administrator.');
     }
     return user;
   }
@@ -71,9 +88,222 @@ export class VendorDriversService {
     await this.assertVendor(vendorUserId);
     const drivers = await UserModel.find({
       role: 'driver',
-      'driverProfile.vendorUserId': new Types.ObjectId(vendorUserId),
+      $or: [
+        { 'driverProfile.vendorUserId': new Types.ObjectId(vendorUserId) },
+        { vendorUserId: new Types.ObjectId(vendorUserId) },
+      ],
     }).exec();
     return drivers.map(mapVendorDriver);
+  }
+
+  async sendOnboardingOtp(vendorUserId: string, dto: VendorDriverOnboardingSendOtpDto) {
+    await this.assertVendorApproved(vendorUserId);
+    const phone = normalizeMobileNumber(dto.phone);
+
+    // Pre-check if driver is already locked in another fleet
+    const existing = await UserModel.findOne({ mobileNumber: phone }).exec();
+    if (existing) {
+      if (existing.role === 'vendor') {
+        throw new ConflictError('This mobile number is already registered as a vendor account');
+      }
+      const existingVendor = existing.vendorUserId?.toString() ?? existing.driverProfile?.vendorUserId?.toString();
+      if (existingVendor && existingVendor !== vendorUserId) {
+        throw new ConflictError('This driver is already part of another vendor fleet');
+      }
+    }
+
+    const result = await otpService.sendOtp(phone, 'driver');
+    return {
+      phone,
+      message: 'OTP sent successfully to driver mobile',
+      expiresIn: result.expiresIn,
+      devOtp: result.devOtp,
+    };
+  }
+
+  async verifyOnboardingOtp(vendorUserId: string, dto: VendorDriverOnboardingVerifyOtpDto) {
+    await this.assertVendorApproved(vendorUserId);
+    const phone = normalizeMobileNumber(dto.phone);
+    await otpService.verifyOtp(phone, dto.otp);
+    const proofToken = signDriverOnboardingProof(phone, vendorUserId);
+    return {
+      verified: true,
+      proofToken,
+      onboardingProofToken: proofToken,
+      phone,
+    };
+  }
+
+  async createStaffDriver(vendorUserId: string, dto: CreateVendorStaffDriverDto) {
+    await this.assertVendorApproved(vendorUserId);
+    const phone = normalizeMobileNumber(dto.phone);
+    const token = (dto.proofToken || dto.onboardingProofToken)!;
+
+    let proofPayload;
+    try {
+      proofPayload = verifyDriverOnboardingProof(token);
+    } catch {
+      throw new BadRequestError('Invalid or expired phone verification proof. Please verify OTP again.');
+    }
+
+    if (
+      proofPayload.vendorUserId !== vendorUserId ||
+      normalizeMobileNumber(proofPayload.mobileNumber) !== phone
+    ) {
+      throw new ForbiddenError('Phone verification proof does not match this driver or vendor');
+    }
+
+    let driver = await UserModel.findOne({ mobileNumber: phone }).exec();
+    if (driver) {
+      if (driver.role !== 'driver' && driver.role !== 'customer') {
+        throw new ConflictError('This mobile number is registered under an incompatible role');
+      }
+      const existingVendor = driver.vendorUserId?.toString() ?? driver.driverProfile?.vendorUserId?.toString();
+      if (existingVendor && existingVendor !== vendorUserId) {
+        throw new ConflictError('This driver already belongs to another vendor fleet');
+      }
+      if (driver.activeBookingId) {
+        throw new BadRequestError('Driver currently has an active booking and cannot be reassigned');
+      }
+
+      driver.role = 'driver';
+      driver.driverContext = 'VENDOR_MANAGED';
+      driver.vendorUserId = new Types.ObjectId(vendorUserId);
+      driver.phoneVerifiedAt = new Date();
+      driver.isVerified = true;
+      driver.isProfileCompleted = true;
+      driver.registrationStatus = 'SUBMITTED';
+      driver.operationalStatus = 'ENABLED';
+      driver.isAvailable = true;
+      if (dto.fullName || dto.name) driver.fullName = dto.fullName ?? dto.name;
+      if (dto.email) driver.email = dto.email;
+      if (dto.dateOfBirth) driver.dateOfBirth = new Date(dto.dateOfBirth);
+
+      if (!driver.driverProfile) {
+        const driverCode = `DRV-${Date.now().toString().slice(-6)}`;
+        driver.driverProfile = {
+          driverCode,
+          licenseNo: dto.licenseNo,
+          vendorUserId: new Types.ObjectId(vendorUserId),
+          fleetSource: 'vendor',
+          driverType: dto.driverType ?? 'Tow Driver',
+          city: dto.city ?? 'Bhubaneswar',
+          state: dto.state ?? 'Odisha',
+          rating: 5.0,
+          reviewCount: 1,
+          status: 'PENDING',
+          totalTrips: 0,
+          experienceYears: dto.experienceYears ?? 3,
+          documents: Object.entries(dto.documents ?? {})
+            .filter(([_, url]) => Boolean(url))
+            .map(([type, url]) => ({
+              type,
+              url: url as string,
+              status: 'PENDING',
+              uploadedAt: new Date(),
+            })),
+          statusHistory: [
+            {
+              status: 'PENDING',
+              note: 'Direct staff onboarding by vendor',
+              changedAt: new Date(),
+            },
+          ],
+        };
+      } else {
+        driver.driverProfile.vendorUserId = new Types.ObjectId(vendorUserId);
+        driver.driverProfile.fleetSource = 'vendor';
+        driver.driverProfile.driverType = dto.driverType ?? driver.driverProfile.driverType ?? 'Tow Driver';
+        if (dto.licenseNo) driver.driverProfile.licenseNo = dto.licenseNo;
+        if (dto.city) driver.driverProfile.city = dto.city;
+        if (dto.experienceYears != null) driver.driverProfile.experienceYears = dto.experienceYears;
+        if (dto.documents) {
+          for (const [type, url] of Object.entries(dto.documents)) {
+            if (!url) continue;
+            const existingDoc = driver.driverProfile.documents.find((d) => d.type === type);
+            if (existingDoc) {
+              existingDoc.url = url;
+              existingDoc.uploadedAt = new Date();
+            } else {
+              driver.driverProfile.documents.push({
+                type,
+                url,
+                status: 'PENDING',
+                uploadedAt: new Date(),
+              });
+            }
+          }
+        }
+      }
+      await driver.save();
+    } else {
+      const driverCode = `DRV-${Date.now().toString().slice(-6)}`;
+      driver = new UserModel({
+        fullName: dto.fullName ?? dto.name,
+        mobileNumber: phone,
+        email: dto.email,
+        role: 'driver',
+        driverContext: 'VENDOR_MANAGED',
+        vendorUserId: new Types.ObjectId(vendorUserId),
+        phoneVerifiedAt: new Date(),
+        isVerified: true,
+        isProfileCompleted: true,
+        registrationStatus: 'SUBMITTED',
+        reviewStatus: 'PENDING',
+        operationalStatus: 'ENABLED',
+        isAvailable: true,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        driverProfile: {
+          driverCode,
+          licenseNo: dto.licenseNo,
+          vendorUserId: new Types.ObjectId(vendorUserId),
+          fleetSource: 'vendor',
+          driverType: dto.driverType ?? 'Tow Driver',
+          city: dto.city ?? 'Bhubaneswar',
+          state: dto.state ?? 'Odisha',
+          rating: 5.0,
+          reviewCount: 1,
+          status: 'PENDING',
+          totalTrips: 0,
+          experienceYears: dto.experienceYears ?? 3,
+          documents: Object.entries(dto.documents ?? {})
+            .filter(([_, url]) => Boolean(url))
+            .map(([type, url]) => ({
+              type,
+              url: url as string,
+              status: 'PENDING',
+              uploadedAt: new Date(),
+            })),
+          statusHistory: [
+            {
+              status: 'PENDING',
+              note: 'Direct staff onboarding by vendor with inline OTP',
+              changedAt: new Date(),
+            },
+          ],
+        },
+      });
+      await driver.save();
+    }
+
+    // Atomically maintain 1-to-1 DriverVendorMembership record in ACTIVE status
+    await DriverVendorMembershipModel.findOneAndUpdate(
+      { driverUserId: driver._id },
+      {
+        $set: {
+          vendorUserId: new Types.ObjectId(vendorUserId),
+          driverUserId: driver._id,
+          status: 'ACTIVE',
+          driverLockKey: `driver-lock:${driver._id}`,
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true, new: true },
+    ).exec();
+
+    emitToDriver(driver.id, 'driver:jobs-updated', { reason: 'vendor_staff_onboarded' });
+
+    return mapVendorDriver(driver);
   }
 
   async create(vendorUserId: string, dto: CreateVendorDriverDto) {

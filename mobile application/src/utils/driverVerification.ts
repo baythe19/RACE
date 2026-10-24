@@ -203,12 +203,12 @@ function stateCopy(state: DriverVerificationState) {
       };
     default:
       return {
-        title: 'Your account is under verification',
+        title: 'Documents under review',
         subtitle:
-          "We're reviewing your documents. You'll be notified once approved. You can still complete or update your details below.",
-        note: 'This usually takes 24–48 hours. We\'ll notify you in the app.',
+          'Your account is active. Documents are being verified by RACE admins in the background.',
+        note: 'This usually takes 24–48 hours. You can accept jobs in the meantime.',
         badge: 'In review',
-        hint: "We're reviewing your documents.",
+        hint: 'Documents under verification · You can accept jobs in the meantime',
       };
   }
 }

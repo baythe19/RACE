@@ -31,6 +31,18 @@ export function useCreateVendorDriverMutation() {
   });
 }
 
+export function useCreateVendorStaffDriverMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: import('./vendorDriversApi').CreateVendorStaffDriverInput) =>
+      import('./vendorDriversApi').then(m => m.createVendorStaffDriver(payload)),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: vendorDriverKeys.list });
+      void queryClient.invalidateQueries({ queryKey: ['vendor', 'driver-memberships'] });
+    },
+  });
+}
+
 export function useClaimVendorDriverMutation() {
   const queryClient = useQueryClient();
   return useMutation({

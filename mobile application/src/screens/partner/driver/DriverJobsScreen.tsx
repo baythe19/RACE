@@ -1106,6 +1106,19 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const unreadNotifCount = notifData?.unreadCount ?? 0;
 
   const [segment, setSegment] = useState<Segment>('available');
+
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    Boolean(profile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
+
+  useEffect(() => {
+    if (isVendorStaff && segment === 'available') {
+      setSegment('active');
+    }
+  }, [isVendorStaff, segment]);
+
   useEffect(() => {
     const initial = route.params?.initialSegment;
     if (initial) {
@@ -1224,11 +1237,16 @@ export default function DriverJobsScreen({ navigation }: Props) {
     [pendingAcceptId, pendingDeclineId, rejectMutation],
   );
 
-  const segments: Array<{ id: Segment; label: string; count: number }> = [
-    { id: 'available', label: 'Available', count: offers.length },
-    { id: 'active', label: 'Active', count: activeJobs.length },
-    { id: 'done', label: 'Done', count: doneJobs.length },
-  ];
+  const segments: Array<{ id: Segment; label: string; count: number }> = isVendorStaff
+    ? [
+        { id: 'active', label: 'Assigned / Active', count: activeJobs.length },
+        { id: 'done', label: 'Done', count: doneJobs.length },
+      ]
+    : [
+        { id: 'available', label: 'Available', count: offers.length },
+        { id: 'active', label: 'Active', count: activeJobs.length },
+        { id: 'done', label: 'Done', count: doneJobs.length },
+      ];
 
   return (
     <View style={{ flex: 1, backgroundColor: C.pageBg }}>
@@ -1303,7 +1321,9 @@ export default function DriverJobsScreen({ navigation }: Props) {
         <PartnerText
           style={[T.subtitle, { fontSize: px(12.5), lineHeight: px(16), color: C.grey, marginTop: px(4) }]}
           numberOfLines={1}>
-          Trips approved by your vendor appear here — accept to start.
+          {isVendorStaff
+            ? 'Trips assigned by your vendor appear here — tap to start.'
+            : 'Customer booking requests appear here — accept to start.'}
         </PartnerText>
       </View>
 

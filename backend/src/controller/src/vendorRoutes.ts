@@ -6,8 +6,11 @@ import { vendorDocumentUpload } from '../../middleware/src/upload';
 import { validate } from '../../middleware/src/validation';
 import { vendorController } from './vendor';
 import {
+  createVendorStaffDriverSchema,
   inviteVendorDriverSchema,
   revokeVendorDriverMembershipSchema,
+  vendorDriverOnboardingSendOtpSchema,
+  vendorDriverOnboardingVerifyOtpSchema,
 } from '../../services/src/vendorDriversValidator';
 import { savePayoutAccountSchema } from '../../services/src/vendorValidator';
 import {
@@ -33,6 +36,26 @@ router.put('/update', validate(updateVendorSchema), vendorController.update);
 router.get('/profile', vendorController.getProfile);
 router.get('/status', vendorController.getStatus);
 router.get('/dashboard', requireRole('vendor'), vendorController.getDashboard);
+
+/** Driver onboarding: inline phone OTP send & verify proof token for direct staff registration */
+router.post(
+  '/driver-onboarding/otp/send',
+  requireRole('vendor'),
+  validate(vendorDriverOnboardingSendOtpSchema),
+  vendorController.sendDriverOnboardingOtp,
+);
+router.post(
+  '/driver-onboarding/otp/verify',
+  requireRole('vendor'),
+  validate(vendorDriverOnboardingVerifyOtpSchema),
+  vendorController.verifyDriverOnboardingOtp,
+);
+router.post(
+  '/drivers',
+  requireRole('vendor'),
+  validate(createVendorStaffDriverSchema),
+  vendorController.createStaffDriver,
+);
 
 /** Payout account — real persistence on the vendor's user profile. */
 router.get('/payout-account', requireRole('vendor'), vendorController.getPayoutAccount);

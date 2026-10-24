@@ -201,3 +201,102 @@ export async function uploadVendorDriverDocument(
     throw error;
   }
 }
+
+export type CreateVendorStaffDriverInput = {
+  phone: string;
+  name: string;
+  licenseNo: string;
+  driverType: 'Tow Driver' | 'Full-Time' | 'Part-Time';
+  onboardingProofToken: string;
+  city?: string;
+  state?: string;
+  experienceYears?: number;
+  email?: string;
+  dateOfBirth?: string;
+  documents?: {
+    drivingLicense?: string;
+    aadhaarCard?: string;
+    profilePhoto?: string;
+  };
+};
+
+export async function sendVendorDriverOnboardingOtp(phone: string, name?: string): Promise<{
+  phone: string;
+  message: string;
+  expiresIn?: string;
+  devOtp?: string;
+}> {
+  try {
+    const { data } = await api.post<ApiSuccessResponse<{
+      phone: string;
+      message: string;
+      expiresIn?: string;
+      devOtp?: string;
+    }>>(API_ENDPOINTS.vendorDriverOnboardingSendOtp, { phone, name });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      return { phone, message: 'OTP sent in demo mode', devOtp: '123456' };
+    }
+    throw error;
+  }
+}
+
+export async function verifyVendorDriverOnboardingOtp(phone: string, otp: string): Promise<{
+  verified: boolean;
+  onboardingProofToken: string;
+  proofToken: string;
+  phone: string;
+}> {
+  try {
+    const { data } = await api.post<ApiSuccessResponse<{
+      verified: boolean;
+      onboardingProofToken: string;
+      proofToken: string;
+      phone: string;
+    }>>(API_ENDPOINTS.vendorDriverOnboardingVerifyOtp, { phone, otp });
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      const demoToken = `demo-proof-${Date.now()}`;
+      return {
+        verified: true,
+        onboardingProofToken: demoToken,
+        proofToken: demoToken,
+        phone,
+      };
+    }
+    throw error;
+  }
+}
+
+export async function createVendorStaffDriver(payload: CreateVendorStaffDriverInput): Promise<VendorDriver> {
+  try {
+    const { data } = await api.post<ApiSuccessResponse<VendorDriver>>(
+      API_ENDPOINTS.vendorCreateStaffDriver,
+      payload,
+    );
+    return data.data;
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      const newDriver: VendorDriver = {
+        id: `mock-driver-${Date.now()}`,
+        name: payload.name,
+        phone: payload.phone,
+        email: payload.email,
+        driverType: payload.driverType,
+        licenseNo: payload.licenseNo,
+        city: payload.city || 'Bhubaneswar',
+        status: 'PENDING',
+        isAvailable: true,
+        isBusy: false,
+        rating: 5.0,
+        vendorId: 'mock-vendor-001',
+      };
+      MOCK_VENDOR_DRIVERS.unshift(newDriver);
+      return newDriver;
+    }
+    throw error;
+  }
+}
+

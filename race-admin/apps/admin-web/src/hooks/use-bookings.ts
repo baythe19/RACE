@@ -51,6 +51,7 @@ export function useBookings() {
     queryFn: getBookingStatusCountsApi,
     refetchInterval: 10_000,
     refetchIntervalInBackground: false,
+  });
 
   const serviceTypes = useMemo(() => getBookingServiceTypes(), []);
 

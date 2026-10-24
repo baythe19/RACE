@@ -895,30 +895,36 @@ export default function DriverDashboardScreen() {
   } = useDriverProfileQuery(true);
   const verification = useMemo(() => buildDriverVerification(profile), [profile]);
   const isApproved = verification.isApproved;
+  const isOperational =
+    profile?.operationalStatus !== 'SUSPENDED' &&
+    profile?.operationalStatus !== 'DISABLED' &&
+    profile?.reviewStatus !== 'REJECTED' &&
+    verification.state !== 'rejected' &&
+    verification.state !== 'suspended';
 
   const {
     data: jobs = [],
     isLoading: jobsLoading,
     isError: jobsError,
     refetch: refetchJobs,
-  } = useDriverJobsQuery(isApproved);
+  } = useDriverJobsQuery(isOperational);
   const {
     data: offers = [],
     isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
-  } = useDriverJobOffersQuery(isApproved);
+  } = useDriverJobOffersQuery(isOperational);
   const {
     data: activeJob,
     isLoading: activeLoading,
     isError: activeError,
     refetch: refetchActive,
-  } = useDriverActiveJobQuery(isApproved);
-  const { data: driverMembership } = useDriverVendorMembershipQuery(isApproved);
+  } = useDriverActiveJobQuery(isOperational);
+  const { data: driverMembership } = useDriverVendorMembershipQuery(isOperational);
   const {
     data: vendorInvitations = [],
     refetch: refetchVendorInvitations,
-  } = useDriverVendorInvitationsQuery(isApproved && !driverMembership);
+  } = useDriverVendorInvitationsQuery(isOperational && !driverMembership);
   const respondInvitationMutation = useRespondToVendorInvitationMutation();
 
   const availabilityMutation = useDriverAvailabilityMutation();
@@ -933,15 +939,13 @@ export default function DriverDashboardScreen() {
   /* Availability is read from the backend — never mutated on mount. */
   useEffect(() => {
     if (typeof profile?.isAvailable !== 'boolean') return;
-    // A pending driver may carry a stale `isAvailable` value from registration,
-    // but approval is the backend gate for presence and job visibility.
-    const available = isApproved && profile.isAvailable;
+    const available = isOperational && profile.isAvailable;
     setIsOnline(available);
     // Share availability with the request alert + location reporter.
     useDriverPresenceStore.getState().setOnline(available);
-  }, [isApproved, profile?.isAvailable]);
+  }, [isOperational, profile?.isAvailable]);
 
-  useDriverLocationReporting(isApproved && isOnline);
+  useDriverLocationReporting(isOperational && isOnline);
 
   const todayCompleted = useMemo(() => {
     const dayStart = +startOfDay(new Date());
@@ -1055,9 +1059,9 @@ export default function DriverDashboardScreen() {
   const locationIssue = locationHealthCopy(locationHealth);
   const dataIssue = jobsError || offersError || activeError;
   const initialLoading = (loadingProfile && !profile) ||
-    (isApproved && !jobs.length && jobsLoading) ||
-    (isApproved && !offers.length && offersLoading) ||
-    (isApproved && !activeJob && activeLoading);
+    (isOperational && !jobs.length && jobsLoading) ||
+    (isOperational && !offers.length && offersLoading) ||
+    (isOperational && !activeJob && activeLoading);
 
   return (
     <AppScreenLayout
@@ -1245,12 +1249,12 @@ export default function DriverDashboardScreen() {
           marginTop: px(10),
           borderRadius: px(16),
           borderWidth: 1,
-          borderColor: !isApproved
-            ? '#FDE68A'
+          borderColor: !isOperational
+            ? '#FECACA'
             : isOnline
               ? '#D1FAE5'
               : '#E2E8F0',
-          backgroundColor: !isApproved ? C.cream : '#FFFFFF',
+          backgroundColor: !isOperational ? '#FEF2F2' : '#FFFFFF',
           flexDirection: 'row',
           alignItems: 'center',
           paddingLeft: px(14),
@@ -1268,22 +1272,22 @@ export default function DriverDashboardScreen() {
             width: px(34),
             height: px(34),
             borderRadius: px(17),
-            backgroundColor: !isApproved
-              ? '#FEF3C7'
+            backgroundColor: !isOperational
+              ? '#FEE2E2'
               : isOnline
                 ? '#ECFDF5'
                 : '#F1F5F9',
             borderWidth: 1,
-            borderColor: !isApproved
-              ? '#FDE68A'
+            borderColor: !isOperational
+              ? '#FECACA'
               : isOnline
                 ? '#A7F3D0'
                 : '#E2E8F0',
             alignItems: 'center',
             justifyContent: 'center',
           }}>
-          {!isApproved ? (
-            <ShieldCheck size={px(16)} color="#D97706" strokeWidth={2.4} />
+          {!isOperational ? (
+            <ShieldCheck size={px(16)} color="#DC2626" strokeWidth={2.4} />
           ) : isOnline ? (
             <View
               style={{
@@ -1325,13 +1329,13 @@ export default function DriverDashboardScreen() {
                 color: C.ink,
                 letterSpacing: -0.2,
               }}>
-              {!isApproved
-                ? 'Offline until approved'
+              {!isOperational
+                ? 'Account suspended or rejected'
                 : isOnline
                   ? "You're online"
                   : "You're offline"}
             </PartnerText>
-            {isOnline && isApproved ? (
+            {isOnline && isOperational ? (
               <View
                 style={{
                   backgroundColor: '#ECFDF5',
@@ -1361,17 +1365,17 @@ export default function DriverDashboardScreen() {
               color: C.grey,
               marginTop: px(2),
             }}>
-            {!isApproved
-              ? 'Accepting jobs unlocks once RACE approves your account'
+            {!isOperational
+              ? 'Please contact RACE support to resolve account status'
               : isOnline
-                ? 'Receiving nearby requests'
+                ? (!isApproved ? 'Receiving jobs · Review in background' : 'Receiving nearby requests')
                 : 'Go online to receive jobs'}
           </PartnerText>
         </View>
 
         {availabilityMutation.isPending || loadingProfile ? (
           <ActivityIndicator size="small" color="#10B981" />
-        ) : isApproved ? (
+        ) : isOperational ? (
           <DriverToggle value={isOnline} onChange={() => void toggleAvailability()} />
         ) : (
           <View
@@ -1381,9 +1385,9 @@ export default function DriverDashboardScreen() {
               paddingHorizontal: px(12),
               justifyContent: 'center',
               marginRight: px(4),
-              backgroundColor: C.amberTile,
+              backgroundColor: '#FEE2E2',
             }}>
-            <PartnerText style={[T.pill, { fontSize: px(12), lineHeight: px(16), color: C.ink }]}>In review</PartnerText>
+            <PartnerText style={[T.pill, { fontSize: px(12), lineHeight: px(16), color: '#DC2626' }]}>Blocked</PartnerText>
           </View>
         )}
       </View>
@@ -1602,7 +1606,7 @@ export default function DriverDashboardScreen() {
         </View>
       ) : null}
 
-      {isApproved && dataIssue ? (
+      {isOperational && dataIssue ? (
         <View
           style={{
             marginTop: px(10),

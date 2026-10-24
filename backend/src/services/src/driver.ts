@@ -49,8 +49,11 @@ async function assertDriverApproved(driverId: string): Promise<void> {
   if (!driver?.driverProfile) {
     throw new NotFoundError('Driver not found');
   }
-  if (driver.driverProfile.status !== 'APPROVED') {
-    throw new ForbiddenError('Driver account pending admin approval');
+  if (driver.operationalStatus === 'SUSPENDED') {
+    throw new ForbiddenError('Driver account has been suspended');
+  }
+  if (driver.reviewStatus === 'REJECTED' || driver.driverProfile.status === 'REJECTED') {
+    throw new ForbiddenError('Driver account documents were rejected');
   }
 }
 
@@ -70,15 +73,20 @@ export class DriverService {
     if (driver.activeBookingId) {
       throw new BadRequestError('Availability cannot change while you have an active booking');
     }
-    if (dto.isAvailable && driver.driverProfile?.status !== 'APPROVED') {
-      throw new ForbiddenError('Driver account pending admin approval');
+    if (driver.operationalStatus === 'SUSPENDED') {
+      throw new ForbiddenError('Driver account has been suspended');
+    }
+    if (driver.reviewStatus === 'REJECTED' || driver.driverProfile?.status === 'REJECTED') {
+      throw new ForbiddenError('Driver account documents were rejected');
     }
 
     const availabilityFilter = {
       _id: driverId,
       role: 'driver',
       activeBookingId: null,
-      ...(dto.isAvailable ? { 'driverProfile.status': 'APPROVED' } : {}),
+      operationalStatus: { $ne: 'SUSPENDED' },
+      reviewStatus: { $ne: 'REJECTED' },
+      'driverProfile.status': { $ne: 'REJECTED' },
     };
     const updated = await UserModel.findOneAndUpdate(
       availabilityFilter,

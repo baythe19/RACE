@@ -72,10 +72,23 @@ export default function PartnerAppNavigator() {
     Boolean(enterMain) && isDriver,
   );
   const verification = useMemo(() => buildDriverVerification(profile), [profile]);
-  const needsDriverGate =
-    Boolean(enterMain) && isDriver && (!verification.known || !verification.isApproved);
+  const isVendorStaff =
+    (user as { driverContext?: string })?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean((user as { vendorUserId?: string })?.vendorUserId);
+  const isSuspendedOrRejected =
+    verification.state === 'rejected' ||
+    verification.state === 'suspended' ||
+    (user as { operationalStatus?: string })?.operationalStatus === 'SUSPENDED';
 
-  /** Approved while sitting on the gate (status polls every 60s) → enter the app. */
+  /**
+   * Non-blocking review policy: Vendor staff drivers and pending review independent drivers
+   * enter the dashboard directly with online availability enabled.
+   * Only explicitly suspended or rejected accounts are held at the verification gate screen.
+   */
+  const needsDriverGate =
+    Boolean(enterMain) && isDriver && !isVendorStaff && isSuspendedOrRejected;
+
+  /** Approved or reactivated while sitting on the gate (status polls every 60s) → enter the app. */
   useEffect(() => {
     if (needsDriverGate || !partnerNavigationRef.isReady()) return;
     if (partnerNavigationRef.getCurrentRoute()?.name === 'PartnerDriverVerification') {

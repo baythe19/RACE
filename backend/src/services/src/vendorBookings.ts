@@ -59,10 +59,12 @@ export class VendorBookingsService {
     if (!user || user.role !== 'vendor') {
       throw new ForbiddenError('Vendor access only');
     }
-    if (user.vendorProfile?.status !== 'approved') {
-      throw new ForbiddenError(
-        'Your vendor account must be approved before you can assign jobs.',
-      );
+    if (user.operationalStatus === 'SUSPENDED' || user.reviewStatus === 'REJECTED') {
+      throw new ForbiddenError('Vendor account is suspended or rejected');
+    }
+    const legacyStatus = user.vendorProfile?.status;
+    if (legacyStatus === 'rejected') {
+      throw new ForbiddenError('Vendor registration has been rejected');
     }
     return user;
   }
@@ -278,10 +280,13 @@ export class VendorBookingsService {
       status: 'ACTIVE',
     }).exec();
     if (!membership) {
-      throw new ForbiddenError('Driver has not accepted your fleet invitation');
+      throw new ForbiddenError('Driver is not an active member of your fleet');
     }
-    if (driver.driverProfile.status !== 'APPROVED') {
-      throw new BadRequestError('Driver account pending admin approval');
+    if (driver.operationalStatus === 'SUSPENDED') {
+      throw new BadRequestError('Driver account has been suspended');
+    }
+    if (driver.reviewStatus === 'REJECTED' || driver.driverProfile.status === 'REJECTED') {
+      throw new BadRequestError('Driver account documents were rejected');
     }
     if (!isDriverEligibleForBooking(driver, dto.bookingType)) {
       throw new BadRequestError(

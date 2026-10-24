@@ -27,16 +27,13 @@ type DocumentItem = {
 };
 
 const REQUIRED_DOCS: DocumentItem[] = [
+  { id: 'dl', name: 'Driving License', status: 'Approved', type: 'license' },
   { id: 'aadhaar', name: 'Aadhaar Card', status: 'Approved', type: 'identity' },
   { id: 'pan', name: 'PAN Card', status: 'Approved', type: 'identity' },
-  { id: 'dl', name: 'Driving License', status: 'Approved', type: 'license' },
-  { id: 'rc', name: 'RC Book', status: 'Approved', type: 'vehicle' },
-  { id: 'insurance', name: 'Insurance Certificate', status: 'Approved', type: 'vehicle' },
   { id: 'photo', name: 'Profile Photo', status: 'Approved', type: 'photo' },
 ];
 
 const OPTIONAL_DOCS: DocumentItem[] = [
-  { id: 'fitness', name: 'Vehicle Fitness Certificate', status: 'Under Review', type: 'vehicle', isOptional: true },
   { id: 'police', name: 'Police Verification Record', status: 'Approved', type: 'identity', isOptional: true },
 ];
 

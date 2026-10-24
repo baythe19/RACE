@@ -8,8 +8,7 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|----------------|
-| codex-cross-app-logic-audit | backend | Reconcile cross-app booking and availability state | 2026-10-17 |
-| codex-cross-app-audit-ledger | docs | Maintain the cross-app logic audit gates and findings | 2026-10-17 |
+
 
 
 

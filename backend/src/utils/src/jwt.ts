@@ -108,3 +108,26 @@ function parseRefreshTtlSeconds(duration: string): number {
       return 7 * 24 * 60 * 60;
   }
 }
+
+export interface DriverOnboardingProofPayload {
+  purpose: 'VENDOR_DRIVER_ONBOARDING';
+  mobileNumber: string;
+  vendorUserId: string;
+}
+
+export function signDriverOnboardingProof(mobileNumber: string, vendorUserId: string): string {
+  return jwt.sign(
+    { purpose: 'VENDOR_DRIVER_ONBOARDING', mobileNumber, vendorUserId } satisfies DriverOnboardingProofPayload,
+    env.JWT_ACCESS_SECRET,
+    { expiresIn: '15m' },
+  );
+}
+
+export function verifyDriverOnboardingProof(token: string): DriverOnboardingProofPayload {
+  const payload = jwt.verify(token, env.JWT_ACCESS_SECRET) as DriverOnboardingProofPayload;
+  if (!payload || payload.purpose !== 'VENDOR_DRIVER_ONBOARDING') {
+    throw new Error('Invalid onboarding proof token purpose');
+  }
+  return payload;
+}
+

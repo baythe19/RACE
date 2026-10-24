@@ -227,7 +227,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         </View>
 
         {/* Section 1: Account Operations & Fleet */}
-        <PartnerText style={styles.sectionHeader}>{isVendor ? 'Vendor Operations' : 'Account & Vehicle'}</PartnerText>
+        <PartnerText style={styles.sectionHeader}>{isVendor ? 'Vendor Operations' : 'Account Operations'}</PartnerText>
         <View style={styles.menuCard}>
           {!isVendor ? (
             <>
@@ -240,25 +240,6 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                 <View style={styles.menuTextCol}>
                   <PartnerText style={styles.menuTitle}>Personal Information</PartnerText>
                   <PartnerText style={styles.menuSubtitle}>View and edit your details</PartnerText>
-                </View>
-                <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-              </Pressable>
-
-              <View style={styles.divider} />
-
-              <Pressable
-                style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-                onPress={() => navigation.navigate('PartnerVehicleInfo')}>
-                <View style={[styles.menuIconCircle, { backgroundColor: '#FFF7ED' }]}>
-                  <Truck size={18} color="#EA580C" strokeWidth={2.2} />
-                </View>
-                <View style={styles.menuTextCol}>
-                  <PartnerText style={styles.menuTitle}>Vehicle Information</PartnerText>
-                  <PartnerText style={styles.menuSubtitle}>
-                    {driverProfile?.driverProfile?.vehicleRegistration ||
-                      driverProfile?.driverProfile?.driverType ||
-                      'Vehicle details not added'}
-                  </PartnerText>
                 </View>
                 <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
               </Pressable>

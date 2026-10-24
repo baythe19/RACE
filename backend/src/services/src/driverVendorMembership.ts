@@ -121,11 +121,12 @@ export class DriverVendorMembershipService {
     }).sort({ updatedAt: -1 }).lean().exec();
     const drivers = await UserModel.find({
       _id: { $in: memberships.filter((m) => m.status === 'ACTIVE').map((m) => m.driverUserId) },
-    }).select('fullName mobileNumber email isAvailable activeBookingId driverProfile.driverCode driverProfile.status driverProfile.driverType driverProfile.city driverProfile.rating').lean().exec();
+    }).select('fullName mobileNumber email isAvailable activeBookingId driverProfile.driverCode driverProfile.status driverProfile.driverType driverProfile.city driverProfile.rating reviewStatus operationalStatus accountStatus').lean().exec();
     const byId = new Map(drivers.map((d) => [d._id.toString(), d]));
 
     return memberships.map((membership) => {
       const driver = byId.get(membership.driverUserId.toString());
+      const isOperational = driver && driver.operationalStatus !== 'SUSPENDED' && driver.reviewStatus !== 'REJECTED' && driver.accountStatus !== 'SUSPENDED';
       return {
         id: membership._id.toString(),
         status: membership.status,
@@ -137,11 +138,13 @@ export class DriverVendorMembershipService {
           phone: driver.mobileNumber,
           email: driver.email,
           driverCode: driver.driverProfile?.driverCode,
-          driverStatus: driver.driverProfile?.status,
+          driverStatus: driver.driverProfile?.status ?? driver.reviewStatus ?? 'PENDING',
+          reviewStatus: driver.reviewStatus ?? driver.driverProfile?.status ?? 'PENDING',
+          operationalStatus: driver.operationalStatus ?? 'ENABLED',
           driverType: driver.driverProfile?.driverType,
           city: driver.driverProfile?.city,
           rating: driver.driverProfile?.rating ?? 0,
-          isAvailable: driver.isAvailable === true,
+          isAvailable: Boolean(isOperational && driver.isAvailable === true && !driver.activeBookingId),
           isBusy: Boolean(driver.activeBookingId),
         } : undefined,
       };

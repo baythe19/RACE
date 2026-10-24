@@ -100,6 +100,11 @@ export class DriverSelfService {
         user.driverProfile.documents = formattedDocs;
       }
       user.driverProfile.status = status as 'PENDING' | 'APPROVED';
+      user.driverContext = 'INDEPENDENT';
+      user.selfDriverCategory = dto.driverType === 'Full-Time' ? 'FULL_TIME' : 'PART_TIME';
+      user.registrationStatus = 'SUBMITTED';
+      user.reviewStatus = 'PENDING';
+      user.operationalStatus = 'ENABLED';
       user.isAvailable = false;
       user.isProfileCompleted = true;
       user.isVerified = true;
@@ -133,6 +138,11 @@ export class DriverSelfService {
         country: 'India',
       };
     }
+    user.driverContext = 'INDEPENDENT';
+    user.selfDriverCategory = dto.driverType === 'Full-Time' ? 'FULL_TIME' : 'PART_TIME';
+    user.registrationStatus = 'SUBMITTED';
+    user.reviewStatus = 'PENDING';
+    user.operationalStatus = 'ENABLED';
     user.isVerified = true;
     user.isProfileCompleted = true;
     // A new driver stays offline until approved and explicitly available.

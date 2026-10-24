@@ -66,7 +66,8 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
   const eligibleDrivers = React.useMemo(() => memberships.filter(member =>
     member.status === 'ACTIVE' &&
     Boolean(member.driver) &&
-    member.driver?.driverStatus === 'APPROVED' &&
+    member.driver?.driverStatus !== 'REJECTED' &&
+    member.driver?.driverStatus !== 'SUSPENDED' &&
     (bookingType === 'towing'
       ? member.driver?.driverType === 'Tow Driver' || member.driver?.driverType === 'Full-Time'
       : member.driver?.driverType === 'Full-Time'),
@@ -113,7 +114,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
   const onApprove = async () => {
     if (!driverId || !selectedDriverIsAvailable) {
-      Alert.alert('Select an available Driver', 'Choose a connected Driver who is approved and currently available.');
+      Alert.alert('Select an available Driver', 'Choose a connected Driver who is currently available.');
       return;
     }
     if (bookingType === 'towing' && (!vehicleId || !selectedVehicleIsAvailable)) {

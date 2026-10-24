@@ -59,7 +59,9 @@ async function reserveDriverForBooking(
     _id: driverObjectId,
     role: 'driver',
     isAvailable: true,
-    'driverProfile.status': 'APPROVED',
+    'driverProfile.status': { $ne: 'REJECTED' },
+    operationalStatus: { $ne: 'SUSPENDED' },
+    reviewStatus: { $ne: 'REJECTED' },
     activeBookingId: null,
   };
   if (expectedVendorId === null) {
@@ -374,6 +376,11 @@ export async function listOpenBookingOffers(options?: {
   /** Vendor portal: open jobs + jobs this vendor already approved (awaiting driver). */
   forVendorId?: string;
 }): Promise<OpenBookingOffer[]> {
+  // Vendor-managed staff drivers only receive jobs assigned to them by their vendor. Zero open marketplace offers.
+  if (options?.forDriver?.driverContext === 'VENDOR_MANAGED') {
+    return [];
+  }
+
   // P0-3 (v6 audit): a connected driver is defined by an ACTIVE membership —
   // the legacy embedded vendor pointer no longer expands the offer feed.
   let memberVendorUserId: string | undefined;
@@ -443,6 +450,8 @@ export async function listOpenBookingOffers(options?: {
       _id?: { toString(): string };
       bookingNumber: string;
       status: string;
+      driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
+      towingMode?: 'instant' | 'scheduled' | 'emergency';
       pickup?: { address?: string; latitude?: number; longitude?: number };
       dropoff?: { address?: string; latitude?: number; longitude?: number } | null;
       estimatedFare?: number;
@@ -451,6 +460,20 @@ export async function listOpenBookingOffers(options?: {
       assignedFleetVehicleLabel?: string | null;
     },
   ) => {
+    if (options?.forDriver) {
+      if (options.forDriver.driverContext === 'INDEPENDENT' && bookingType !== 'driver') {
+        return;
+      }
+      const selfCategory = options.forDriver.selfDriverCategory;
+      const driverServiceType = booking.driverServiceType;
+      if (selfCategory === 'FULL_TIME' && driverServiceType === 'part_time') {
+        return;
+      }
+      if (selfCategory === 'PART_TIME' && driverServiceType === 'full_time') {
+        return;
+      }
+    }
+
     if (options?.forDriver && !isDriverEligibleForBooking(options.forDriver, bookingType)) {
       const bookingVendorIdEarly = booking.vendorId?.toString();
       if (
@@ -606,8 +629,11 @@ export async function claimOpenBookingOffer(
 }> {
   const driver = await UserModel.findOne({ _id: driverId, role: 'driver' }).exec();
   if (!driver) throw new NotFoundError('Driver not found');
-  if (driver.driverProfile?.status !== 'APPROVED') {
-    throw new BadRequestError('Driver account pending admin approval');
+  if (driver.operationalStatus === 'SUSPENDED') {
+    throw new BadRequestError('Driver account has been suspended');
+  }
+  if (driver.reviewStatus === 'REJECTED' || driver.driverProfile?.status === 'REJECTED') {
+    throw new BadRequestError('Driver account documents were rejected');
   }
   if (!driver.isAvailable || driver.activeBookingId) {
     throw new BadRequestError('You already have an active booking or are offline');
@@ -867,8 +893,11 @@ export async function assignDriverToBooking(
   if (!driver) {
     throw new NotFoundError('Driver not found');
   }
-  if (driver.driverProfile?.status !== 'APPROVED') {
-    throw new BadRequestError('Driver account pending admin approval');
+  if (driver.operationalStatus === 'SUSPENDED') {
+    throw new BadRequestError('Driver account has been suspended');
+  }
+  if (driver.reviewStatus === 'REJECTED' || driver.driverProfile?.status === 'REJECTED') {
+    throw new BadRequestError('Driver account documents were rejected');
   }
 
   if (!isDriverEligibleForBooking(driver, bookingType)) {

@@ -40,6 +40,7 @@ export interface DriverProfileSummary {
   state?: string;
   vehicleRegistration?: string;
   fleetSource?: 'vendor' | 'admin';
+  vendorUserId?: string;
   policeVerificationStatus?: DriverDocumentStatus;
   documents: Array<{
     type: string;
@@ -75,6 +76,11 @@ export interface Profile {
   isProfileCompleted: boolean;
   role: 'customer' | 'vendor' | 'driver';
   isAvailable?: boolean;
+  driverContext?: 'INDEPENDENT' | 'VENDOR_MANAGED';
+  selfDriverCategory?: 'FULL_TIME' | 'PART_TIME';
+  vendorUserId?: string;
+  reviewStatus?: 'PENDING' | 'UNDER_REVIEW' | 'VERIFIED' | 'CHANGES_REQUESTED' | 'REJECTED';
+  operationalStatus?: 'ENABLED' | 'SUSPENDED' | 'DISABLED';
   driverProfile?: DriverProfileSummary;
 }
 
