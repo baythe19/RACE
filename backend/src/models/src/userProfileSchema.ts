@@ -36,7 +36,7 @@ export interface VendorBankDetails {
   upiId?: string;
   isVerified?: boolean;
   verifiedAt?: Date;
-  source?: 'vendor_app' | 'admin' | 'seed';
+  source?: 'vendor_app' | 'driver_app' | 'admin' | 'seed';
   updatedAt?: Date;
 }
 
@@ -121,6 +121,7 @@ export interface IDriverProfile {
     status: 'PENDING' | 'VERIFIED' | 'REJECTED';
     uploadedAt: Date;
   }>;
+  bankDetails?: VendorBankDetails;
   statusHistory: Array<{
     status: string;
     note?: string;
@@ -270,6 +271,18 @@ export const DriverProfileSchema = new Schema<IDriverProfile>(
         changedBy: { type: String },
       },
     ],
+    bankDetails: {
+      accountHolderName: String,
+      accountNumber: String,
+      ifsc: String,
+      bankName: String,
+      payoutMethod: { type: String, enum: ['bank', 'upi'] },
+      upiId: { type: String, trim: true, lowercase: true },
+      isVerified: { type: Boolean, default: false },
+      verifiedAt: Date,
+      source: { type: String, enum: ['vendor_app', 'driver_app', 'admin', 'seed'] },
+      updatedAt: Date,
+    },
   },
   { _id: false },
 );

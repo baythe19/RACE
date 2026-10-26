@@ -30,7 +30,6 @@ import { PartnerText } from '../../../components/partner/PartnerText';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   AppState,
   BackHandler,
   Keyboard,
@@ -64,6 +63,7 @@ import {
   isUiTestPermissiveMode,
   UI_PREVIEW_MODE,
   UI_PREVIEW_MUTATIONS_ENABLED,
+  UI_QA_NAVIGATOR_ENABLED,
 } from '../../../constants/preview';
 import {
   ARRIVAL_PROMPT_METERS,
@@ -76,6 +76,7 @@ import { formatEta } from '../../../services/driver/roadRoutingService';
 import { updateMockActiveJobStatus } from '../../../data/mockPartnerData';
 import { getPreviewDriverStart } from '../../../data/previewPartnerWorld';
 import { useScreenPx } from '../../../hooks/useScreenPx';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import { retryDriverLocationReport, useDriverLocationReporting } from '../../../hooks/useDriverLocationReporting';
 import { useNavigationGps, useTravelHeading } from '../../../hooks/useNavigationGps';
@@ -177,6 +178,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const px = useScreenPx();
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const bookingId = route.params?.bookingId;
   const { data: activeJob, isLoading, isError, refetch } = useDriverActiveJobQuery(true);
   const statusMutation = useUpdateDriverBookingStatusMutation();
@@ -205,6 +207,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const [weakDismissedAt, setWeakDismissedAt] = useState(0);
 
   const driverLocation = useDriverPresenceStore(state => state.driverLocation);
+  const navSyncKey = useRef('');
 
   /**
    * Coming back from the background (or a cold relaunch) must re-sync the real
@@ -229,6 +232,26 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         : null;
   const step: Step = job ? stepForStatus(job.status) : 'en_route';
   const jobStatus = job?.status ?? '';
+
+  // Re-open or a status change restores the same stage. A local Exit navigation
+  // tap does not change the key, so it is not forced back into turn-by-turn.
+  useEffect(() => {
+    if (!job) return;
+    const key = `${job.id}:${job.status}:${job.arrivedAtDropoffAt ?? ''}`;
+    if (navSyncKey.current === key) return;
+    navSyncKey.current = key;
+    if (job.arrivedAtDropoffAt) {
+      setArrivedAtDrop(true);
+      setNavMode('overview');
+      return;
+    }
+    setArrivedAtDrop(false);
+    if (job.status === 'DRIVER_EN_ROUTE' || job.status === 'IN_PROGRESS') {
+      setNavMode('turn_by_turn');
+      return;
+    }
+    setNavMode('overview');
+  }, [job]);
 
   const reportingEnabled = Boolean(
     job && ['DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'].includes(job.status),
@@ -380,13 +403,13 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           setOtpError(message);
           setTripOtp('');
         } else {
-          Alert.alert('Update failed', message);
+          showAlert({ tone: 'error', title: 'Update failed', message });
         }
       } finally {
         setActing(false);
       }
     },
-    [job, refetch, statusMutation],
+    [job, refetch, statusMutation, showAlert],
   );
 
   const undoPickupArrival = useCallback(() => {
@@ -399,40 +422,52 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   const confirmUndoPickupArrival = useCallback(() => {
     if (acting || step !== 'verify_otp') return;
-    Alert.alert(
-      'Not at pickup yet?',
-      'You can go back to navigation. The customer code will stay hidden until you confirm arrival again.',
-      [
-        { text: 'Stay here', style: 'cancel' },
-        { text: 'Go back', onPress: undoPickupArrival },
-      ],
-    );
-  }, [acting, step, undoPickupArrival]);
+    showAlert({
+      tone: 'info',
+      title: 'Not at pickup yet?',
+      message: 'You can go back to navigation. The customer code will stay hidden until you confirm arrival again.',
+      primaryAction: { label: 'Go back', onPress: undoPickupArrival },
+      secondaryAction: { label: 'Stay here', onPress: () => {} },
+    });
+  }, [acting, step, undoPickupArrival, showAlert]);
+
+  const onTripBack = useCallback(() => {
+    if (menuOpen) {
+      setMenuOpen(false);
+      return;
+    }
+    if (qaMenuOpen) {
+      setQaMenuOpen(false);
+      return;
+    }
+    if (step === 'verify_otp') {
+      confirmUndoPickupArrival();
+      return;
+    }
+    if (navMode === 'turn_by_turn') {
+      setNavMode('overview');
+      return;
+    }
+    if (step === 'en_route' || step === 'in_progress') {
+      showAlert({
+        tone: 'info',
+        title: 'Leave this trip screen?',
+        message: 'The trip stays on this job. Open it again from Jobs and you continue from the same step.',
+        primaryAction: { label: 'Stay', onPress: () => {} },
+        secondaryAction: { label: 'Leave', onPress: () => navigation.goBack() },
+      });
+      return;
+    }
+    navigation.goBack();
+  }, [confirmUndoPickupArrival, menuOpen, navMode, navigation, qaMenuOpen, showAlert, step]);
 
   useEffect(() => {
-    const onBackPress = () => {
-      if (menuOpen) {
-        setMenuOpen(false);
-        return true;
-      }
-      if (qaMenuOpen) {
-        setQaMenuOpen(false);
-        return true;
-      }
-      if (step === 'verify_otp') {
-        confirmUndoPickupArrival();
-        return true;
-      }
-      if (navMode === 'turn_by_turn') {
-        // Back leaves turn-by-turn first (overview), then the screen.
-        setNavMode('overview');
-        return true;
-      }
-      return false;
-    };
-    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onTripBack();
+      return true;
+    });
     return () => sub.remove();
-  }, [confirmUndoPickupArrival, menuOpen, navMode, qaMenuOpen, step]);
+  }, [onTripBack]);
 
   /** "Start navigation": the driver is now moving. First tap also moves ASSIGNED → EN_ROUTE. */
   const startNavigation = useCallback(() => {
@@ -448,12 +483,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         onConfirm();
         return;
       }
-      Alert.alert(title, message, [
-        { text: 'Not yet', style: 'cancel' },
-        { text: confirmLabel, onPress: onConfirm },
-      ]);
+      showAlert({
+        tone: 'warning',
+        title,
+        message,
+        primaryAction: { label: confirmLabel, onPress: onConfirm },
+        secondaryAction: { label: 'Not yet', onPress: () => {} },
+      });
     },
-    [farFromDestination],
+    [farFromDestination, showAlert],
   );
 
   const arrivedAtPickup = useCallback(() => {
@@ -483,7 +521,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           setArrivedAtDrop(true);
           setNavMode('overview');
         } catch (err) {
-          Alert.alert('Arrival notice', getApiErrorMessage(err, 'Failed to update drop arrival.'));
+          showAlert({
+            tone: 'error',
+            title: 'Arrival notice',
+            message: getApiErrorMessage(err, 'Failed to update drop arrival.'),
+          });
         } finally {
           setActing(false);
         }
@@ -505,6 +547,10 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   const verifyAndCompleteJob = useCallback(async () => {
     if (acting || !job) return;
+    if (!job.paymentConfirmedByCustomer && !customerPaymentConfirmed) {
+      setCompletionOtpError('Wait until the customer confirms Cash, UPI, or in-app payment. Then enter the SMS code.');
+      return;
+    }
     const code = completionOtp.trim();
     if (code.length !== OTP_LENGTH || /\D/.test(code)) {
       setCompletionOtpError('Enter the 4-digit completion code provided by the customer.');
@@ -535,7 +581,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     } finally {
       setActing(false);
     }
-  }, [acting, completeBookingMutation, completionOtp, job, refetch]);
+  }, [acting, completeBookingMutation, completionOtp, customerPaymentConfirmed, job, refetch]);
 
   const completeJob = useCallback(() => {
     if (acting || !job || step !== 'in_progress') return;
@@ -549,34 +595,39 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   const onDeclineAssignment = useCallback(() => {
     if (acting || !job) return;
-    Alert.alert(
-      'Decline assignment?',
-      'This job will be returned to your vendor so another driver can be assigned.',
-      [
-        { text: 'Keep Job', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            setActing(true);
-            try {
-              await rejectMutation.mutateAsync({
-                bookingId: job.id,
-                bookingType: job.bookingType,
-              });
-              Alert.alert('Assignment declined', 'The vendor has been notified.', [
-                { text: 'OK', onPress: goHome },
-              ]);
-            } catch (error) {
-              Alert.alert('Could not decline', getApiErrorMessage(error, 'Failed to decline assignment.'));
-            } finally {
-              setActing(false);
-            }
-          },
+    showAlert({
+      tone: 'warning',
+      title: 'Decline assignment?',
+      message: 'This job will be returned to your vendor so another driver can be assigned.',
+      primaryAction: {
+        label: 'Decline',
+        onPress: async () => {
+          setActing(true);
+          try {
+            await rejectMutation.mutateAsync({
+              bookingId: job.id,
+              bookingType: job.bookingType,
+            });
+            showAlert({
+              tone: 'success',
+              title: 'Assignment declined',
+              message: 'The vendor has been notified.',
+              primaryAction: { label: 'OK', onPress: goHome },
+            });
+          } catch (error) {
+            showAlert({
+              tone: 'error',
+              title: 'Could not decline',
+              message: getApiErrorMessage(error, 'Failed to decline assignment.'),
+            });
+          } finally {
+            setActing(false);
+          }
         },
-      ],
-    );
-  }, [acting, goHome, job, rejectMutation]);
+      },
+      secondaryAction: { label: 'Keep Job', onPress: () => {} },
+    });
+  }, [acting, goHome, job, rejectMutation, showAlert]);
 
   const recenterMap = useCallback(() => {
     setFollowUser(true);
@@ -643,7 +694,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         zIndex: 10,
       }}>
       <Pressable
-        onPress={() => navigation.goBack()}
+        onPress={onTripBack}
         hitSlop={10}
         accessibilityRole="button"
         accessibilityLabel="Go back"
@@ -905,6 +956,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             <PartnerText style={[T.button, { fontSize: px(16), color: C.ink }]}>Back to jobs</PartnerText>
           </Pressable>
         </View>
+        {partnerDialog}
       </View>
     );
   }
@@ -1031,10 +1083,10 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             dropAddress={dropoff || 'Drop location'}
             distanceLabel={distanceLabel}
             durationMinutes={remainingMinutes}
-            atDrop={arrivedAtDrop || nearDestination}
+            atDrop={Boolean(job.arrivedAtDropoffAt) || arrivedAtDrop}
             startedAt={startedAt}
             onResumeNavigation={() => {
-              setArrivedAtDrop(false);
+              if (!job.arrivedAtDropoffAt) setArrivedAtDrop(false);
               setFollowUser(true);
               setNavMode('turn_by_turn');
             }}
@@ -1069,10 +1121,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           durationMinutes={minutesBetween(startedAt, completedAtIso)}
           onBackToHome={goHome}
           onViewJobDetails={() => {
-            Alert.alert(
-              'Job Details',
-              `Booking #${job.bookingNumber}\nStatus: COMPLETED`,
-            );
+            showAlert({
+              tone: 'info',
+              title: 'Job Details',
+              message: `Booking #${job.bookingNumber}\nStatus: COMPLETED`,
+            });
           }}
           insetsTop={insets.top}
           insetsBottom={insets.bottom}
@@ -1100,9 +1153,10 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           insetsBottom={insets.bottom}
         />
       </View>
+      {partnerDialog}
 
-      {/* UI QA switcher: docked to the right edge so it never covers a sheet's actions. */}
-      {UI_PREVIEW_MODE || __DEV__ ? (
+      {/* UI QA switcher — only when preview + QA navigator are explicitly enabled in env. */}
+      {UI_PREVIEW_MODE && UI_QA_NAVIGATOR_ENABLED ? (
         <View style={{ position: 'absolute', right: 6, top: screenHeight * 0.4, zIndex: 100 }}>
           <Pressable
             onPress={() => setQaMenuOpen(prev => !prev)}
@@ -1214,6 +1268,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       </Modal>
 
       {menuModal}
+      {partnerDialog}
     </View>
   );
 }

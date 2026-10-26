@@ -98,6 +98,12 @@ function mapServiceBookingToBooking(
     advancePaid: item.advancePaid,
     remainingPaid: item.remainingPaid,
     paymentStatus: item.paymentStatus,
+    estimatedFare: item.estimatedFare,
+    fareBreakdown: item.fareBreakdown,
+    arrivedAtDropoffAt: item.arrivedAtDropoffAt,
+    completionOtp: item.completionOtp,
+    paymentCollectionMode: item.paymentCollectionMode,
+    paymentConfirmedByCustomer: item.paymentConfirmedByCustomer,
   };
 }
 

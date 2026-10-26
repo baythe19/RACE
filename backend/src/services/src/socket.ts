@@ -1,4 +1,6 @@
 import { Server as SocketIOServer, type Socket } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
+import Redis from 'ioredis';
 
 import { env } from '../../config/env';
 import { logger } from '../../utils/src/logger';
@@ -134,6 +136,33 @@ export function initializeSocket(httpServer: import('http').Server): void {
     },
   });
 
+  // Attach Redis adapter if configured and reachable (enables multi-node PM2 cluster mode)
+  if (process.env.USE_REDIS_SOCKET_ADAPTER === 'true' || env.NODE_ENV === 'production') {
+    try {
+      const pubClient = new Redis(env.REDIS_URL, {
+        lazyConnect: true,
+        maxRetriesPerRequest: 1,
+        retryStrategy: () => null,
+      });
+      const subClient = pubClient.duplicate();
+
+      Promise.all([pubClient.connect(), subClient.connect()])
+        .then(() => {
+          io?.adapter(createAdapter(pubClient, subClient));
+          logger.info('Socket.IO Redis multi-node adapter activated successfully', {
+            redisUrl: env.REDIS_URL,
+          });
+        })
+        .catch((err) => {
+          logger.warn('Socket.IO running with fallback in-memory adapter (Redis unavailable)', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        });
+    } catch (err) {
+      logger.warn('Could not initialize Redis adapter, defaulting to in-memory adapter', { error: err });
+    }
+  }
+
   io.use((socket, next) => {
     if (authenticateHandshake(socket as SocketWithPrincipal)) {
       next();
@@ -148,7 +177,22 @@ export function initializeSocket(httpServer: import('http').Server): void {
     if (!principal) return;
 
     socket.join(`user:${principal.userId}`);
-    if (principal.role === 'driver') socket.join(DRIVER_OFFER_ROOM);
+    if (principal.role === 'driver') {
+      void UserModel.findById(principal.userId)
+        .select('driverContext')
+        .lean()
+        .exec()
+        .then(user => {
+          if (user?.driverContext === 'VENDOR_MANAGED') return;
+          socket.join(DRIVER_OFFER_ROOM);
+        })
+        .catch(error => {
+          logger.warn('Could not check driver context for offer room', {
+            userId: principal.userId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+    }
     if (principal.role === 'vendor') socket.join(VENDOR_OFFER_ROOM);
 
     socket.on('driver:join', async (data: { driverId: string }) => {

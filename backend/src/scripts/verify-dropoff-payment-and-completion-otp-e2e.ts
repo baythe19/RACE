@@ -87,7 +87,7 @@ async function run() {
   if (!arrivalResult.success || !arrivalResult.arrivedAtDropoffAt) {
     throw new Error('Failed to mark arrival at dropoff');
   }
-  console.log('✓ Driver marked arrival at dropoff successfully. Generated OTP:', arrivalResult.completionOtp);
+  console.log('✓ Driver marked arrival at dropoff successfully at:', arrivalResult.arrivedAtDropoffAt);
 
   // Verify booking has arrivedAtDropoffAt and completionOtp
   const arrivedBooking = await TowingBookingModel.findById(booking._id);

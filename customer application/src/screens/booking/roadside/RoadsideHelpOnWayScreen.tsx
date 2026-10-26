@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Linking, Pressable, Text, View } from 'react-native';
+import { Image, Linking, Pressable, Share, Text, View } from 'react-native';
 import {
   Check,
   MapPin,
@@ -266,6 +266,16 @@ export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
             </Text>
           </Pressable>
           <Pressable
+            onPress={async () => {
+              try {
+                await Share.share({
+                  message: `RACE Roadside Assistance: A mechanic (${ROADSIDE_MECHANIC.name}) is on the way to my breakdown location. ETA: ~${ROADSIDE_TRACK_ETA_MINUTES} mins. Emergency Helpline: ${brand.phone}`,
+                  title: 'RACE Live Roadside Help',
+                });
+              } catch {
+                // share sheet closed
+              }
+            }}
             style={{
               flex: 1,
               minHeight: t.px(52),
@@ -293,6 +303,34 @@ export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
             </Text>
           </Pressable>
         </View>
+
+        <Pressable
+          onPress={() => {
+            const parent = navigation.getParent();
+            if (parent) {
+              parent.navigate('Bookings' as any);
+            } else {
+              navigation.navigate('HomeMain' as any);
+            }
+          }}
+          style={{
+            marginTop: t.px(12),
+            width: '100%',
+            height: t.px(48),
+            borderRadius: t.inputRadius,
+            backgroundColor: ROADSIDE_ACCENT,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Text
+            style={{
+              fontSize: t.body,
+              fontWeight: typography.weights.bold,
+              color: colors.background,
+            }}>
+            Done · Go to Bookings
+          </Text>
+        </Pressable>
       </View>
     </TowingBookingLayout>
   );

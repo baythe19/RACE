@@ -7,10 +7,10 @@ export const AUTH_USER = {
 /** Demo: registered returning user (10-digit mobile without country code) */
 export const REGISTERED_PHONE_DIGITS = '8249472910';
 
-/** Prefer Om Singh for partner demo login UI (legacy constant; prefer real Twilio OTP login). */
+/** Prefer Om Singh for partner demo login UI (legacy constant; prefer real HanuSMS OTP login). */
 export const PARTNER_DEMO_PHONE = '8888880001';
 
-/** @deprecated Fixed OTP removed — backend sends real Twilio SMS OTP. */
+/** @deprecated Fixed OTP removed — backend sends real HanuSMS OTP. */
 export const DEMO_OTP = '';
 
 /** Legacy seed phones — not used for login shortcuts anymore. */

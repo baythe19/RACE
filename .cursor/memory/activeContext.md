@@ -1,8 +1,28 @@
 # Active context
 
-Updated: 2026-10-20
+Updated: 2026-10-26
 
 ## Current focus
+
+**2026-10-26 (drop pay + vendor jobs):** Vendor sees towing jobs with or without a vehicle. Assign stays locked until one vehicle is active. Drop flow: driver confirms arrival → customer popup and notification with the fare, no SMS yet → customer chooses Cash / UPI / in-app → SMS OTP to the customer and the same choice appears on the driver → driver enters that OTP → job completes and the driver is free. Backend, partner, and customer `tsc` clean. Live GPS / SMS / UPI not run.
+
+**2026-10-26 (partner navigation):** Back/stack fixes — `VendorAssignJob` on Jobs + Drivers + Account stacks; fleet assign uses in-stack `navigate` (not Jobs tab jump); assign success uses `goBack()`; `partnerJobsParams` / `partnerAccountParams` no longer replace whole stack `state`; Account tab re-tap → `PartnerAccountMain` (`merge: false`); `PartnerVendor` tab restored for drivers with fleet invite/membership. Map: `mobile application/docs/PARTNER_NAVIGATION.md`.
+
+**2026-10-26 (partner real backend mode):** `mobile application/.env` — UI preview, mutations, permissive QA, and UI QA navigator all **false**; API `http://localhost:3000`. Metro restarted `--clear`. Active-job QA dock gated to `UI_PREVIEW_MODE && UI_QA_NAVIGATOR_ENABLED` only (not `__DEV__`). `PartnerScreenLayout` keyboard: iOS `padding` + `keyboardVerticalOffset` from safe area; Android `height`. Mock walkthrough: `cp .env.testing .env` + restart Metro.
+
+**2026-10-26 (notifications actions):** Partner notifications — **Mark all read** removed; **Delete all** only, top-right in header (red text). Filter chips unchanged. Peach-checked sim `38f56c0a`.
+
+**2026-10-26 (partner console errors):** The four redbox errors were mid-edit bundle failures. Current source parses clean (`@babel/parser` on `mobile application/src`), `tsc --noEmit` is clean, and Metro serves `VendorAddDriverScreen`, `VendorDriverMembershipsScreen` (`useNavigation` imported), `DriverJobsScreen` (one `isVendorStaff`), and `TripInProgressSheet`. Peach sim `38f56c0a` reloaded onto that bundle and shows the driver home (Abhishek). Older NAVIGATE / syntax lines in `peach get errors` are from before that reload.
+
+**2026-10-26 (driver trip gates):** Active job restores from server status. Near the drop no longer opens payment/OTP. Completion requires drop arrival, customer payment confirm, then the SMS code. Driver app does not receive that code.
+
+**2026-10-26 (vendor add driver):** Add driver uses the real Driver registration screens. Work-type cards are hidden there; staff is always Full-Time. Open marketplace offers are empty for `VENDOR_MANAGED` (offer query now selects `driverContext`). A staff driver cannot claim an open job; only a vendor assignment reaches them. Jobs UI hides Available for fleet staff.
+
+**2026-10-26 (dialog unification):** Partner app ab **zero system `Alert.alert`** — saare popups designed `PartnerDialog` se. New `src/hooks/usePartnerDialog.tsx` (`showAlert({tone,title,message,primaryAction,secondaryAction})` + `{dialog}` render). Migrated: DriverRegistrationFlow (13), VendorDriverMemberships (incl. ⋮ menu → custom bottom action-sheet, in-file styles), PartnerJobs, VendorAssignJob, DriverJobs, ActiveJob (7), DriverDashboard, VendorVehicles, account batch (Documents/EditProfile/Settings/HelpSupport/Notifications/Bank), Vendor reg (Documents/Review/VehicleRegistration), DriverVerificationPending, PartnerAccount, DriverMyVendor, PartnerDocumentUploadList (doc-type chooser → custom bottom sheet; camera-permission error + Open Settings action), LocationSelectorSheet, NotServiceableScreen, LocationPickerMap, emergency-contact relationship picker (custom sheet). `utils/serviceableLocation.ts` → `isServiceableBookingLocation` + `OUT_OF_AREA_DIALOG` (UI-free; caller renders). `Alert` imports removed everywhere. **tsc 0.** Peach-verified: "Job assigned" success dialog renders amber-check design (screenshot /tmp/dialog-warning-test.png). Side fix: PartnerJobsScreen job-card `key` inner GlassCard se outer Pressable pe move (RN key warning). Load pattern: large screens me wrapper `<View style={{flex:1}}>` needed for dialog sibling.
+
+**2026-10-26 (v7 flow test):** Backend scripts all green (comprehensive-audit 41/41, staff-onboarding 12/12, driver-ack, dropoff-OTP, security/cancellation, partner-v6). Peach UI: vendor add-driver inline-OTP ✅ (`/tmp/v7-01-driver-added.png`), "No open jobs" stale-state resolved after real lead (`/tmp/v7-03-vendor-newlead.png`); Part-Time/Tow-Driver pill check evidence `/tmp/v7-05..07`.
+
+**2026-10-26 (Peach runbook update):** `.cursor/memory/partner-run-steps.md` — CLI: `peach open 8082 --new --driver playwright --headless --chromium --ephemeral --project-root ... --no-describe` + `peach claim <id> --force` (Xvfb absent → non-chromium host dies, socket 1001). Browser URL: **no `packageVersions`** (expo 57.0.26 vs 57.0.30 redbox), no `fetchProxyOrigin`, fresh runtime prefix per session. Backend deep review doc: `docs/reviews/backend-deep-security-architecture-review-2026-10-26.md`; env hardening done (`MOCK_DATA_MODE=false` default, `OTP_PEPPER` guard).
 
 **Handoff — 2026-10-20, branch `changes-v6-partner-role-dispatch`.** This Codespace session is stopping. Next machine: pull this branch, then reconnect tools from `docs/ops/CURSOR_MCP_SETUP.md`. Partner lock is clear.
 

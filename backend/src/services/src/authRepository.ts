@@ -47,18 +47,13 @@ export class AuthRepository {
     const since = new Date(Date.now() - withinMs);
     /**
      * Idempotent re-verify within the expiry window.
-     * VOC P0.8 fix: the previous `$or: [{mobileOtp: otp}, {mcVerificationId: $exists}]`
-     * accepted ANY submitted code when a recently-verified MessageCentral log
-     * existed — an OTP-replay hole (arbitrary code → new token session).
-     * Replay credit is now given only when the OtpLog carries proof bound to
-     * THIS submission: the stored MC verificationIdHash must equal the hash of
-     * the submitted code, or a hashed hanu/local OTP must match.
+     * Matches the submitted OTP against the verified record.
      */
     return OtpLogModel.findOne({
       mobileNumber,
       mobileVerified: true,
       createdAt: { $gte: since },
-      $or: [{ mobileOtp: otp }, { mcVerificationIdHash: otp }],
+      mobileOtp: otp,
     })
       .sort({ createdAt: -1 })
       .exec();

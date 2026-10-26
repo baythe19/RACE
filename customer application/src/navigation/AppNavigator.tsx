@@ -8,6 +8,7 @@ import {
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
+import CustomerDropoffPrompt from '../components/booking/CustomerDropoffPrompt';
 import CustomTabBar from '../components/navigation/CustomTabBar';
 import StackBackButton from '../components/navigation/StackBackButton';
 import { DriverBookingProvider } from '../context/DriverBookingContext';
@@ -597,6 +598,7 @@ export default function AppNavigator() {
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <NavigationContainer
       ref={navigationRef}
       theme={navigationTheme}
@@ -612,5 +614,7 @@ export default function AppNavigator() {
         <RootStack.Screen name="WrongApp" component={WrongAppRoleScreen} />
       </RootStack.Navigator>
     </NavigationContainer>
+    {showMainApp ? <CustomerDropoffPrompt /> : null}
+    </View>
   );
 }

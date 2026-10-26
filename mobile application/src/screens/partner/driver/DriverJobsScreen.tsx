@@ -15,7 +15,7 @@ import { PartnerText } from '../../../components/partner/PartnerText';
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Linking, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Linking, Pressable, ScrollView, View } from 'react-native';
 import {
   ArrowRight,
   Bell,
@@ -44,6 +44,7 @@ import { openPartnerNotifications } from '../../../navigation/partnerNavigationR
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
 import {
   useAcceptDriverJobMutation,
@@ -1080,15 +1081,20 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const px = useScreenPx();
   useRefreshDriverDataOnFocus(true);
   const insets = useSafeAreaInsets();
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const { data: profile, isLoading: profileLoading } = useDriverProfileQuery(true);
   const verification = useMemo(() => buildDriverVerification(profile), [profile]);
-  const isApproved = verification.isApproved;
   const isOperational =
     profile?.operationalStatus !== 'SUSPENDED' &&
     profile?.operationalStatus !== 'DISABLED' &&
     profile?.reviewStatus !== 'REJECTED' &&
     verification.state !== 'rejected' &&
     verification.state !== 'suspended';
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    Boolean(profile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
   const {
     data: jobs = [],
     isLoading: jobsLoading,
@@ -1100,7 +1106,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
     isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
-  } = useDriverJobOffersQuery(isOperational);
+  } = useDriverJobOffersQuery(isOperational && !isVendorStaff);
   const {
     data: activeJob,
     isLoading: activeLoading,
@@ -1113,12 +1119,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const unreadNotifCount = notifData?.unreadCount ?? 0;
 
   const [segment, setSegment] = useState<Segment>('available');
-
-  const isVendorStaff =
-    profile?.driverContext === 'VENDOR_MANAGED' ||
-    Boolean(profile?.driverProfile?.vendorUserId) ||
-    Boolean(profile?.vendorUserId) ||
-    profile?.driverProfile?.fleetSource === 'vendor';
 
   useEffect(() => {
     if (isVendorStaff && segment === 'available') {
@@ -1182,22 +1182,21 @@ export default function DriverJobsScreen({ navigation }: Props) {
     async (job: DriverJobBooking) => {
       if (pendingAcceptId || pendingDeclineId) return;
       if (hasActiveJob) {
-        Alert.alert(
-          'Active Trip in Progress',
-          'You already have an active trip in progress. Please complete or cancel your current trip before accepting a new request.',
-          [
-            {
-              text: 'View Active Trip',
-              onPress: () => {
-                const currentJob = activeJob || activeJobs[0];
-                if (currentJob) {
-                  openActiveJob(currentJob);
-                }
-              },
+        showAlert({
+          tone: 'warning',
+          title: 'Active Trip in Progress',
+          message: 'You already have an active trip in progress. Please complete or cancel your current trip before accepting a new request.',
+          primaryAction: {
+            label: 'View Active Trip',
+            onPress: () => {
+              const currentJob = activeJob || activeJobs[0];
+              if (currentJob) {
+                openActiveJob(currentJob);
+              }
             },
-            { text: 'OK', style: 'cancel' },
-          ],
-        );
+          },
+          secondaryAction: { label: 'OK', onPress: () => {} },
+        });
         return;
       }
       setPendingAcceptId(job.id);
@@ -1210,38 +1209,45 @@ export default function DriverJobsScreen({ navigation }: Props) {
           bookingType: job.bookingType,
         });
       } catch (error) {
-        Alert.alert('Accept failed', getApiErrorMessage(error, 'Could not accept this trip'));
+        showAlert({
+          tone: 'error',
+          title: 'Accept failed',
+          message: getApiErrorMessage(error, 'Could not accept this trip'),
+        });
       } finally {
         setPendingAcceptId(null);
       }
     },
-    [acceptMutation, activeJob, activeJobs, hasActiveJob, navigation, openActiveJob, pendingAcceptId, pendingDeclineId, refetchJobs],
+    [acceptMutation, activeJob, activeJobs, hasActiveJob, navigation, openActiveJob, pendingAcceptId, pendingDeclineId, refetchJobs, showAlert],
   );
 
   const onDecline = useCallback(
     (job: DriverJobBooking) => {
       if (pendingAcceptId || pendingDeclineId) return;
-      Alert.alert('Decline trip', `Remove request #${job.bookingNumber} from your list?`, [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
+      showAlert({
+        tone: 'warning',
+        title: 'Decline trip',
+        message: `Remove request #${job.bookingNumber} from your list?`,
+        primaryAction: {
+          label: 'Decline',
           onPress: () => {
             setPendingDeclineId(job.id);
             void rejectMutation
               .mutateAsync({ bookingId: job.id, bookingType: job.bookingType })
               .catch(error => {
-                Alert.alert(
-                  'Decline failed',
-                  getApiErrorMessage(error, 'Could not decline this trip'),
-                );
+                showAlert({
+                  tone: 'error',
+                  title: 'Decline failed',
+                  message: getApiErrorMessage(error, 'Could not decline this trip'),
+                });
               })
               .finally(() => setPendingDeclineId(null));
           },
         },
-      ]);
+        secondaryAction: { label: 'Keep', onPress: () => {} },
+      });
     },
-    [pendingAcceptId, pendingDeclineId, rejectMutation],
+    [pendingAcceptId, pendingDeclineId, rejectMutation, showAlert],
   );
 
   const segments: Array<{ id: Segment; label: string; count: number }> = isVendorStaff
@@ -1438,7 +1444,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(12) }}>
           {initialLoading ? (
             <JobsSkeleton px={px} />
-          ) : !isApproved ? (
+          ) : !isOperational ? (
             <JobsApprovalState px={px} />
           ) : hasQueryError ? (
             <JobsErrorState px={px} onRetry={retryQueries} />
@@ -1544,6 +1550,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           )}
         </View>
       </ScrollView>
+      {partnerDialog}
     </View>
   );
 }
@@ -1611,14 +1618,14 @@ function JobsApprovalState({ px }: { px: (value: number) => number }) {
         <TriangleAlert size={px(24)} color={C.amberText} strokeWidth={2.2} />
       </View>
       <PartnerText style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
-        Jobs unlock after approval
+        Account cannot take jobs
       </PartnerText>
       <PartnerText
         style={[
           T.cardSubtitle,
           { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
         ]}>
-        Your account is still under review. You can view the dashboard while RACE verifies your documents.
+        This account is suspended or rejected. Contact RACE support before taking jobs.
       </PartnerText>
     </View>
   );

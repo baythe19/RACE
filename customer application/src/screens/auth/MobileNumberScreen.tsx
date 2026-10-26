@@ -57,7 +57,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'MobileNumber'>;
 
 const MOBILE_REGEX = /^[6-9]\d{9}$/;
 
-/** Re-enabled OTP verification screen for real MessageCentral SMS delivery. Can be forced off via EXPO_PUBLIC_SKIP_OTP_AUTH=true */
+/** OTP verification screen for HanuSMS delivery. Can be forced off in preview via EXPO_PUBLIC_SKIP_OTP_AUTH=true */
 const SKIP_OTP_AUTH = process.env.EXPO_PUBLIC_SKIP_OTP_AUTH === 'true';
 
 function friendlyAuthError(raw: string): string {

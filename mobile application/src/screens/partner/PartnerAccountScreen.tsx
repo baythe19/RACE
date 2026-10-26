@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StatusBar, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 
 import { useAuthActions } from '../../hooks/useAuth';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { usePartnerOnboardingStore } from '../../store/partnerOnboardingStore';
 import { useDriverProfileQuery } from '../../services/driver/useDriverQueries';
@@ -50,6 +51,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { logout } = useAuthActions();
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
   const user = useAppSelector(state => state.auth.user);
   const isVendor = user?.role === 'vendor';
@@ -86,7 +88,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
       usePartnerOnboardingStore.getState().clearSelectedRole();
       await logout();
     } catch {
-      Alert.alert('Logout failed', 'Please try again.');
+      showAlert({ tone: 'error', title: 'Logout failed', message: 'Please try again.' });
     } finally {
       setLoggingOut(false);
       setLogoutVisible(false);
@@ -524,6 +526,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         visible={notifPrefsVisible}
         onClose={() => setNotifPrefsVisible(false)}
       />
+      {partnerDialog}
     </View>
   );
 }

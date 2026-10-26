@@ -20,7 +20,7 @@ import { PartnerText } from '../../../components/partner/PartnerText';
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 import {
   ArrowRight,
   Bell,
@@ -48,6 +48,7 @@ import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import { useAppSelector } from '../../../redux/hooks';
 import {
   openLocationSettings,
@@ -884,10 +885,10 @@ export default function DriverDashboardScreen() {
   const px = useScreenPx();
   const navigation = useNavigation<BottomTabNavigationProp<PartnerTabParamList>>();
   const user = useAppSelector(state => state.auth.user);
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
-  /* Approval state first — everything else is gated on it. The backend rejects
-     jobs, offers, availability and location for an unapproved driver, so asking
-     for them would only produce failures. */
+  /* Review status is shown on this screen. Queries stay open while review is
+     pending. Only a suspended, disabled, or rejected account stops them. */
   const {
     data: profile,
     isLoading: loadingProfile,
@@ -901,6 +902,11 @@ export default function DriverDashboardScreen() {
     profile?.reviewStatus !== 'REJECTED' &&
     verification.state !== 'rejected' &&
     verification.state !== 'suspended';
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    Boolean(profile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
 
   const {
     data: jobs = [],
@@ -913,7 +919,7 @@ export default function DriverDashboardScreen() {
     isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
-  } = useDriverJobOffersQuery(isOperational);
+  } = useDriverJobOffersQuery(isOperational && !isVendorStaff);
   const {
     data: activeJob,
     isLoading: activeLoading,
@@ -1030,12 +1036,13 @@ export default function DriverDashboardScreen() {
       setIsOnline(result.isAvailable);
       useDriverPresenceStore.getState().setOnline(result.isAvailable);
     } catch (error) {
-      Alert.alert(
-        'Availability',
-        getApiErrorMessage(error, 'Could not update availability. Please try again.'),
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Availability',
+        message: getApiErrorMessage(error, 'Could not update availability. Please try again.'),
+      });
     }
-  }, [availabilityMutation, isOnline]);
+  }, [availabilityMutation, isOnline, showAlert]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -1064,6 +1071,7 @@ export default function DriverDashboardScreen() {
     (isOperational && !activeJob && activeLoading);
 
   return (
+    <View style={{ flex: 1 }}>
     <AppScreenLayout
       backgroundColor={C.pageBg}
       horizontalPadding={px(M.pagePadding)}
@@ -1478,7 +1486,11 @@ export default function DriverDashboardScreen() {
                   { id: vendorInvitations[0].id, decision: 'decline' },
                   {
                     onError: error =>
-                      Alert.alert('Could not update', error instanceof Error ? error.message : 'Please try again.'),
+                      showAlert({
+                        tone: 'error',
+                        title: 'Could not update',
+                        message: error instanceof Error ? error.message : 'Please try again.',
+                      }),
                   },
                 );
               }}
@@ -1504,13 +1516,18 @@ export default function DriverDashboardScreen() {
                   { id: vendorInvitations[0].id, decision: 'accept' },
                   {
                     onSuccess: () => {
-                      Alert.alert(
-                        'Connected to Fleet',
-                        `You are now officially connected with ${vendorInvitations[0].vendor.name}.`,
-                      );
+                      showAlert({
+                        tone: 'success',
+                        title: 'Connected to Fleet',
+                        message: `You are now officially connected with ${vendorInvitations[0].vendor.name}.`,
+                      });
                     },
                     onError: error =>
-                      Alert.alert('Could not update', error instanceof Error ? error.message : 'Please try again.'),
+                      showAlert({
+                        tone: 'error',
+                        title: 'Could not update',
+                        message: error instanceof Error ? error.message : 'Please try again.',
+                      }),
                   },
                 );
               }}
@@ -2298,6 +2315,8 @@ export default function DriverDashboardScreen() {
         </>
       )}
     </AppScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

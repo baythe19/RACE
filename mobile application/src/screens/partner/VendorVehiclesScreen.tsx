@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   ArrowLeft,
   Calendar,
@@ -16,6 +16,7 @@ import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import VendorVehicleImage from '../../components/partner/VendorVehicleImage';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
@@ -30,7 +31,6 @@ import {
 import type {
   PartnerJobsStackParamList,
 } from '../../types/partnerNavigation';
-import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
 import { colors, radius, spacing, typography } from '../../theme';
 
 const PAGE_BG = '#FFFFFF';
@@ -96,6 +96,7 @@ function statusMeta(status: string, driverBusy?: boolean) {
 export default function VendorVehiclesScreen() {
   const navigation = useNavigation<NavigationProp<PartnerJobsStackParamList>>();
   const insets = useSafeAreaInsets();
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
   const isApproved = vendor?.status === 'approved';
 
@@ -158,18 +159,10 @@ export default function VendorVehiclesScreen() {
   }, [vehicles, search, statusFilter]);
 
   const openForm = () => {
-    if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
-      return;
-    }
     navigation.navigate('VendorVehicleRegistration');
   };
 
   const startEdit = (vehicle: FleetVehicle) => {
-    if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
-      return;
-    }
     setMenuVehicle(null);
     navigation.navigate('VendorVehicleRegistration', { vehicleId: vehicle.id });
   };
@@ -179,31 +172,42 @@ export default function VendorVehiclesScreen() {
       await updateMutation.mutateAsync({ vehicleId: vehicle.id, payload: { status } });
       setMenuVehicle(null);
     } catch (error) {
-      Alert.alert('Update failed', getApiErrorMessage(error, 'Please try again'));
+      showAlert({
+        tone: 'error',
+        title: 'Update failed',
+        message: getApiErrorMessage(error, 'Please try again'),
+      });
     }
   };
 
   const onRemove = (vehicle: FleetVehicle) => {
     setMenuVehicle(null);
-    Alert.alert('Remove vehicle?', `Remove ${formatPlate(vehicle.registrationNo)} from your vendor team?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
+    showAlert({
+      tone: 'error',
+      title: 'Remove vehicle?',
+      message: `Remove ${formatPlate(vehicle.registrationNo)} from your vendor team?`,
+      primaryAction: {
+        label: 'Remove',
         onPress: () => {
           void (async () => {
             try {
               await removeMutation.mutateAsync(vehicle.id);
             } catch (error) {
-              Alert.alert('Remove failed', getApiErrorMessage(error, 'Please try again'));
+              showAlert({
+                tone: 'error',
+                title: 'Remove failed',
+                message: getApiErrorMessage(error, 'Please try again'),
+              });
             }
           })();
         },
       },
-    ]);
+      secondaryAction: { label: 'Cancel', onPress: () => {} },
+    });
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <AppScreenLayout
       backgroundColor={PAGE_BG}
       keyboardAvoiding
@@ -253,7 +257,9 @@ export default function VendorVehiclesScreen() {
         <View style={styles.content}>
           {!isApproved ? (
             <View style={styles.pendingBanner}>
-              <PartnerText style={styles.pendingText}>{PARTNER_WAITING_ADMIN_APPROVAL}</PartnerText>
+              <PartnerText style={styles.pendingText}>
+                Document review runs in the background. You can add vehicles and take towing jobs now. Status stays on your profile.
+              </PartnerText>
             </View>
           ) : null}
 
@@ -473,6 +479,8 @@ export default function VendorVehiclesScreen() {
 
 
     </AppScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

@@ -1,10 +1,11 @@
 import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MapPin } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
 import { formatLocationDisplay } from '../../utils/readableAddress';
 import { useLocationStore } from '../../store/locationStore';
@@ -17,6 +18,7 @@ interface NotServiceableScreenProps {
 }
 
 export default function NotServiceableScreen({ onChangeLocation }: NotServiceableScreenProps) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const selectedLocation = useLocationStore(state => state.selectedLocation);
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -28,7 +30,7 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
   const handleNotify = async () => {
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes('@')) {
-      Alert.alert('Valid email needed', 'Enter a valid email so we can notify you.');
+      showAlert({ tone: 'warning', title: 'Valid email needed', message: 'Enter a valid email so we can notify you.' });
       return;
     }
 
@@ -44,13 +46,14 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
       );
       setSubmitted(true);
     } catch {
-      Alert.alert('Could not save', 'Please try again.');
+      showAlert({ tone: 'error', title: 'Could not save', message: 'Please try again.' });
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -130,6 +133,8 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+      {partnerDialog}
+    </View>
   );
 }
 

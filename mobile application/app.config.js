@@ -23,6 +23,9 @@ module.exports = {
       bundleIdentifier: 'com.racecar.partner',
       buildNumber: '1',
       supportsTablet: true,
+      infoPlist: {
+        UIBackgroundModes: ['location', 'fetch'],
+      },
       config: {
         googleMapsApiKey,
       },
@@ -45,6 +48,11 @@ module.exports = {
         'android.permission.READ_EXTERNAL_STORAGE',
         'android.permission.WRITE_EXTERNAL_STORAGE',
         'android.permission.READ_MEDIA_IMAGES',
+        'android.permission.ACCESS_FINE_LOCATION',
+        'android.permission.ACCESS_COARSE_LOCATION',
+        'android.permission.ACCESS_BACKGROUND_LOCATION',
+        'android.permission.FOREGROUND_SERVICE',
+        'android.permission.FOREGROUND_SERVICE_LOCATION',
       ],
     },
     scheme: 'race-partner',

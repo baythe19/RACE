@@ -10,6 +10,12 @@ import {
 
 const router = Router();
 
+/**
+ * Server-to-server gateway callback webhook (unauthenticated, HMAC signature-verified).
+ * Mounts before authMiddleware.
+ */
+router.post('/webhook', bookingPaymentController.handleWebhook);
+
 router.use(authMiddleware);
 
 router.post('/advance', validate(initiateBookingPaymentSchema), bookingPaymentController.initiateAdvance);

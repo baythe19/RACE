@@ -8,10 +8,11 @@ import {
 } from '../../services/src/vehicleValidator';
 import { validate } from '../../middleware/src/validation';
 import { authMiddleware } from '../../middleware/src/auth';
+import { qrRateLimiter } from '../../middleware/src/rateLimiter';
 
 const router = Router();
 
-router.get('/:id/verify', validate(vehicleIdSchema, 'params'), vehicleController.verifyQr);
+router.get('/:id/verify', qrRateLimiter, validate(vehicleIdSchema, 'params'), vehicleController.verifyQr);
 
 router.use(authMiddleware);
 

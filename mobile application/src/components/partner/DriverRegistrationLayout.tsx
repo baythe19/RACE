@@ -235,10 +235,10 @@ export default function DriverRegistrationLayout({
 
                 {/* Step Label (Centered directly beneath circle) */}
                 <PartnerText
-                  numberOfLines={1}
+                  numberOfLines={2}
                   style={[
                     styles.stepLabel,
-                    { fontSize: px(9.5), marginTop: px(3) },
+                    { fontSize: px(10), lineHeight: px(13), marginTop: px(4), minHeight: px(26) },
                     isActive && styles.stepLabelActive,
                     isCompleted && styles.stepLabelCompleted,
                     !isActive && !isCompleted && styles.stepLabelIdle,
@@ -401,6 +401,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F3F4F6',
+    overflow: 'hidden',
   },
   stepperRow: {
     flexDirection: 'row',
@@ -409,8 +410,10 @@ const styles = StyleSheet.create({
   },
   stepColumn: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
     position: 'relative',
+    paddingHorizontal: 2,
   },
   connectorHalfLine: {
     position: 'absolute',
@@ -452,6 +455,7 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   stepLabel: {
+    width: '100%',
     fontWeight: '600',
     textAlign: 'center',
   },

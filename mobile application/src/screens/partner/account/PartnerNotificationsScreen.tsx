@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Truck,
@@ -16,12 +16,12 @@ import { spacing } from '../../../theme';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import { openDriverJobsDone } from '../../../navigation/partnerNavigationRef';
 import {
   useDeleteAllNotificationsMutation,
   useNotificationsQuery,
-  useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
 } from '../../../services/useNotificationQueries';
 import type { PartnerNotificationItem } from '../../../services/notificationService';
@@ -31,9 +31,9 @@ type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerNotifi
 type CategoryFilter = 'All' | 'Job Updates' | 'Drivers & Vehicles' | 'Account' | 'Earnings';
 
 export default function PartnerNotificationsScreen({ navigation }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
   const { data, isLoading, isError, refetch } = useNotificationsQuery();
-  const markAllReadMutation = useMarkAllNotificationsReadMutation();
   const deleteAllMutation = useDeleteAllNotificationsMutation();
   const markReadMutation = useMarkNotificationReadMutation();
 
@@ -89,18 +89,13 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
 
   const confirmDeleteAll = () => {
     if (notifications.length === 0) return;
-    Alert.alert(
-      'Delete all notifications?',
-      'This removes every notification from your inbox. You cannot undo this.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete all',
-          style: 'destructive',
-          onPress: () => deleteAllMutation.mutate(),
-        },
-      ],
-    );
+    showAlert({
+      tone: 'error',
+      title: 'Delete all notifications?',
+      message: 'This removes every notification from your inbox. You cannot undo this.',
+      primaryAction: { label: 'Delete all', onPress: () => deleteAllMutation.mutate() },
+      secondaryAction: { label: 'Cancel', onPress: () => {} },
+    });
   };
 
   const handleItemPress = (item: PartnerNotificationItem) => {
@@ -211,6 +206,7 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title={unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications'}
       onBack={() => navigation.goBack()}
@@ -218,26 +214,20 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
       contentTopSpacing={spacing.xs}
       headerExtra={filterChips}
       headerRight={
-        <View style={styles.headerActions}>
-          <Pressable
-            hitSlop={8}
-            style={({ pressed }) => [styles.headerActionBtn, pressed && styles.headerActionPressed]}
-            onPress={() => markAllReadMutation.mutate()}
-            disabled={notifications.length === 0 || markAllReadMutation.isPending}>
-            <PartnerText style={styles.markReadText} numberOfLines={1}>
-              Mark all read
-            </PartnerText>
-          </Pressable>
-          <Pressable
-            hitSlop={8}
-            style={({ pressed }) => [styles.headerActionBtn, pressed && styles.headerActionPressed]}
-            onPress={confirmDeleteAll}
-            disabled={notifications.length === 0 || deleteAllMutation.isPending}>
-            <PartnerText style={styles.deleteAllText} numberOfLines={1}>
-              Delete all
-            </PartnerText>
-          </Pressable>
-        </View>
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.headerDeleteBtn,
+            pressed && styles.headerActionPressed,
+            (notifications.length === 0 || deleteAllMutation.isPending) && styles.headerDeleteDisabled,
+          ]}
+          onPress={confirmDeleteAll}
+          disabled={notifications.length === 0 || deleteAllMutation.isPending}>
+          <PartnerText style={styles.deleteAllText} numberOfLines={1}>
+            Delete all
+          </PartnerText>
+        </Pressable>
       }>
       {isLoading && !data ? (
         <DriverDataSkeleton variant="notifications" />
@@ -277,34 +267,30 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
         </View>
       )}
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  headerActions: {
-    alignItems: 'flex-end',
-    gap: 2,
-    maxWidth: 108,
-  },
-  headerActionBtn: {
-    paddingVertical: 2,
-    paddingHorizontal: 4,
+  headerDeleteBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
     borderRadius: 6,
+    maxWidth: 76,
+    alignItems: 'flex-end',
+  },
+  headerDeleteDisabled: {
+    opacity: 0.45,
   },
   headerActionPressed: {
-    backgroundColor: '#FEF3C7',
-  },
-  markReadText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: driverColors.amberText,
-    flexShrink: 0,
+    backgroundColor: '#FEE2E2',
   },
   deleteAllText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#DC2626',
-    flexShrink: 0,
+    textAlign: 'right',
   },
   filterRowContent: {
     flexDirection: 'row',

@@ -81,15 +81,28 @@ export default function DriverOfferAlert() {
   const isOnline = useDriverPresenceStore(state => state.isOnline);
 
   const { data: profile } = useDriverProfileQuery(isDriver);
-  const isApproved = buildDriverVerification(profile).isApproved;
+  const verification = buildDriverVerification(profile);
+  const canWork =
+    verification.state !== 'rejected' &&
+    verification.state !== 'suspended' &&
+    profile?.operationalStatus !== 'SUSPENDED' &&
+    profile?.operationalStatus !== 'DISABLED' &&
+    profile?.reviewStatus !== 'REJECTED';
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.vendorUserId) ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
   // This host is mounted above the tab navigator, so job and notification events
   // keep syncing while the driver moves between tabs and nested screens.
-  useDriverRealtimeSync(isDriver && isApproved, user?.id);
+  // Pending review still syncs. Fleet drivers never browse marketplace offers.
+  useDriverRealtimeSync(isDriver && canWork, user?.id);
   useVendorRealtimeSync(isVendor, user?.id);
-  const { data: offers = [] } = useDriverJobOffersQuery(isDriver && isApproved);
-  const { data: activeJob } = useDriverActiveJobQuery(isDriver && isApproved);
+  const showMarketplaceOffers = isDriver && canWork && !isVendorStaff;
+  const { data: offers = [] } = useDriverJobOffersQuery(showMarketplaceOffers);
+  const { data: activeJob } = useDriverActiveJobQuery(isDriver && canWork);
   // Keep the notification cache live while the driver is in any nested screen.
-  useNotificationsQuery(isDriver && isApproved);
+  useNotificationsQuery(isDriver && canWork);
   const acceptMutation = useAcceptDriverJobMutation();
   const rejectMutation = useRejectDriverJobMutation();
 
@@ -112,7 +125,7 @@ export default function DriverOfferAlert() {
   const activeOutcome = outcome && offerKey && outcome.key === offerKey ? outcome : null;
   const shouldShow =
     isDriver &&
-    isApproved &&
+    showMarketplaceOffers &&
     isOnline &&
     !activeJob &&
     Boolean(offer) &&

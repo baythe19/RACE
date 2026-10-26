@@ -1,10 +1,11 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { Check, Info, MapPin, Truck, UserRound } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PartnerScreenLayout from '../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { images } from '../../assets';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
@@ -16,11 +17,21 @@ import {
 } from '../../services/vendor/useVendorBookingsQueries';
 import { useVendorMembershipsQuery } from '../../services/vendor/useVendorMembershipQueries';
 import { formatReadableAddress } from '../../utils/readableAddress';
-import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
+import type {
+  PartnerAccountStackParamList,
+  PartnerDriversStackParamList,
+  PartnerJobsStackParamList,
+} from '../../types/partnerNavigation';
+import { partnerAccountParams } from '../../navigation/partnerNavigationRef';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
 import { spacing } from '../../theme';
 
-type Props = NativeStackScreenProps<PartnerJobsStackParamList, 'VendorAssignJob'>;
+type AssignJobStacks =
+  | PartnerJobsStackParamList
+  | PartnerDriversStackParamList
+  | PartnerAccountStackParamList;
+
+type Props = NativeStackScreenProps<AssignJobStacks, 'VendorAssignJob'>;
 
 const normalizeVehicleReference = (value?: string) =>
   (value ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase();
@@ -36,6 +47,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     estimatedFare,
     preferredDriverId,
   } = route.params;
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
   const {
     data: vehicles = [],
@@ -114,11 +126,19 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
   const onApprove = async () => {
     if (!driverId || !selectedDriverIsAvailable) {
-      Alert.alert('Select an available Driver', 'Choose a connected Driver who is currently available.');
+      showAlert({
+        tone: 'warning',
+        title: 'Select an available Driver',
+        message: 'Choose a connected Driver who is currently available.',
+      });
       return;
     }
     if (bookingType === 'towing' && (!vehicleId || !selectedVehicleIsAvailable)) {
-      Alert.alert('Select an available vehicle', 'Towing work requires an active fleet vehicle.');
+      showAlert({
+        tone: 'warning',
+        title: 'Select an available vehicle',
+        message: 'Towing work requires an active fleet vehicle.',
+      });
       return;
     }
     if (approveMutation.isPending) return;
@@ -129,23 +149,84 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         driverId,
         ...(bookingType === 'towing' && vehicleId ? { vehicleId } : {}),
       });
-      Alert.alert(
-        'Job assigned',
-        result.message ||
+      showAlert({
+        tone: 'success',
+        title: 'Job assigned',
+        message:
+          result.message ||
           `Driver assigned to #${bookingNumber}. The trip starts once the driver accepts the job.`,
-        [{ text: 'OK', onPress: () => navigation.navigate('PartnerJobsList') }],
-      );
+        primaryAction: { label: 'OK', onPress: () => navigation.goBack() },
+      });
     } catch (error) {
-      Alert.alert('Assignment failed', getApiErrorMessage(error, 'Could not assign this job'));
+      showAlert({
+        tone: 'error',
+        title: 'Assignment failed',
+        message: getApiErrorMessage(error, 'Could not assign this job'),
+      });
       void refetchOffers();
       void refetchVehicles();
       void refetchDrivers();
     }
   };
 
+  const activeVehicles = vehicles.filter(vehicle => vehicle.status === 'ACTIVE');
+
+  if (!vehiclesLoading && activeVehicles.length === 0) {
+    return (
+      <View style={{ flex: 1 }}>
+        <PartnerScreenLayout
+          title="Add a vehicle first"
+          onBack={() => navigation.goBack()}
+          contentTopSpacing={spacing.sm}
+          footer={
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() =>
+                navigation.getParent()?.navigate('PartnerAccount', partnerAccountParams('VendorVehicles'))
+              }>
+              <PartnerText style={styles.primaryButtonText}>Add vehicle</PartnerText>
+            </Pressable>
+          }>
+          <View style={styles.emptyCard}>
+            <PartnerText style={styles.emptyTitle}>This job is waiting</PartnerText>
+            <PartnerText style={styles.emptySub}>
+              The request stays on your jobs list. Assignment opens after one towing vehicle is active.
+            </PartnerText>
+          </View>
+        </PartnerScreenLayout>
+        {partnerDialog}
+      </View>
+    );
+  }
+
+  if (bookingType !== 'towing') {
+    return (
+      <View style={{ flex: 1 }}>
+        <PartnerScreenLayout
+          title="Towing jobs only"
+          onBack={() => navigation.goBack()}
+          contentTopSpacing={spacing.sm}
+          footer={
+            <Pressable style={styles.primaryButton} onPress={() => navigation.goBack()}>
+              <PartnerText style={styles.primaryButtonText}>Back to jobs</PartnerText>
+            </Pressable>
+          }>
+          <View style={styles.emptyCard}>
+            <PartnerText style={styles.emptyTitle}>This is not a towing job</PartnerText>
+            <PartnerText style={styles.emptySub}>
+              Vendor fleets receive customer towing requests only. Driver-hire jobs go to independent drivers.
+            </PartnerText>
+          </View>
+        </PartnerScreenLayout>
+        {partnerDialog}
+      </View>
+    );
+  }
+
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
-      title={bookingType === 'towing' ? 'Assign driver & vehicle' : 'Assign driver'}
+      title="Assign driver & vehicle"
       onBack={() => navigation.goBack()}
       contentTopSpacing={spacing.sm}
       footer={
@@ -287,10 +368,12 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           <UserRound size={30} color={driverColors.greySoft} />
           <PartnerText style={styles.emptyTitle}>No eligible connected Drivers</PartnerText>
           <PartnerText style={styles.emptySub}>
-            Invite an approved Full-Time or Tow Driver to your fleet before assigning this job.
+            Register a driver on your fleet first. They sign in with that phone and only receive jobs you assign.
           </PartnerText>
-          <Pressable style={styles.addVehicleBtn} onPress={() => navigation.navigate('VendorDrivers')}>
-            <PartnerText style={styles.addVehicleBtnText}>Manage Drivers</PartnerText>
+          <Pressable
+            style={styles.addVehicleBtn}
+            onPress={() => navigation.navigate('VendorAddDriver')}>
+            <PartnerText style={styles.addVehicleBtnText}>Add driver</PartnerText>
           </Pressable>
         </View>
       ) : (
@@ -339,6 +422,8 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         </View>
       )}
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 
@@ -490,7 +575,7 @@ const styles = StyleSheet.create({
   },
   optionCardSelected: {
     borderColor: driverColors.amber,
-    backgroundColor: '#FFFDF5',
+    backgroundColor: driverColors.white,
   },
   optionCardUnavailable: {
     opacity: 0.58,

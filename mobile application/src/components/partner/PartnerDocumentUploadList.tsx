@@ -1,6 +1,7 @@
 import { PartnerText } from './PartnerText';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, InteractionManager, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, InteractionManager, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Check, CloudUpload, FileText, MoreHorizontal, type LucideIcon } from 'lucide-react-native';
@@ -50,6 +51,11 @@ export default function PartnerDocumentUploadList({
   documents, uploadedIds, onUpload, selectedFiles, uploadStates = {}, disabled = false,
   variant = 'default', hideTitle = false, compact = false,
 }: PartnerDocumentUploadListProps) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
+  const [altDialog, setAltDialog] = useState<{
+    title: string;
+    options: Array<{ label: string; onPress: () => void }>;
+  } | null>(null);
   const [activeDoc, setActiveDoc] = useState<PartnerDocumentFieldConfig | null>(null);
   const [preview, setPreview] = useState<PartnerDocumentSelection | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -89,7 +95,30 @@ export default function PartnerDocumentUploadList({
       const file = await pickFile(source, doc.id);
       if (file && mounted.current) onUpload(doc.id, file.uri, file.name, file.mimeType);
     } catch (error) {
-      if (mounted.current) Alert.alert('Could not select document', error instanceof Error ? error.message : 'Please try again.');
+      if (!mounted.current) return;
+      const raw = error instanceof Error ? error.message : 'Please try again.';
+      if (raw.startsWith('CAMERA_SETTINGS::')) {
+        showAlert({
+          tone: 'warning',
+          title: 'Camera permission required',
+          message: raw.replace('CAMERA_SETTINGS::', ''),
+          primaryAction: {
+            label: 'Open Settings',
+            onPress: () => void Linking.openSettings().catch(() => showAlert({
+              tone: 'error',
+              title: 'Could not open Settings',
+              message: 'Open your device settings to allow camera access.',
+            })),
+          },
+          secondaryAction: { label: 'Close', onPress: () => {} },
+        });
+      } else {
+        showAlert({
+          tone: 'error',
+          title: 'Could not select document',
+          message: raw,
+        });
+      }
     } finally {
       pickerBusy.current = false;
       if (mounted.current) setPickingId(null);
@@ -100,13 +129,13 @@ export default function PartnerDocumentUploadList({
     const doc = activeDoc;
     pendingAction.current = () => {
       if (doc.alternatives?.length) {
-        Alert.alert(doc.label, 'Choose the document type.', [
-          ...doc.alternatives.map(option => ({
-            text: option.label,
+        setAltDialog({
+          title: doc.label,
+          options: doc.alternatives.map(option => ({
+            label: option.label,
             onPress: () => void pick({ ...doc, ...option, alternatives: undefined }, source),
           })),
-          { text: 'Cancel', style: 'cancel' },
-        ]);
+        });
       } else void pick(doc, source);
     };
   };
@@ -218,7 +247,11 @@ export default function PartnerDocumentUploadList({
               <FileText size={44} color={colors.primary} />
               <PartnerText style={styles.infoText}>PDF document</PartnerText>
               <Pressable style={styles.uploadPill} onPress={() => {
-                if (preview) void Linking.openURL(preview.uri).catch(() => Alert.alert('Could not open PDF', 'A PDF viewer is required to open this file on your device.'));
+                if (preview) void Linking.openURL(preview.uri).catch(() => showAlert({
+                  tone: 'error',
+                  title: 'Could not open PDF',
+                  message: 'A PDF viewer is required to open this file on your device.',
+                }));
               }}><PartnerText style={styles.uploadPillLabel}>Open PDF</PartnerText></Pressable>
             </View> : preview ? <View style={styles.imagePreview}>
               <Image source={{ uri: preview.uri }} style={styles.previewImage} resizeMode="contain"
@@ -232,6 +265,35 @@ export default function PartnerDocumentUploadList({
           </View>
         </View>
       </Modal>
+
+      {/* Document-type chooser (replaces system Alert options) */}
+      <Modal transparent animationType="fade" visible={Boolean(altDialog)} onRequestClose={() => setAltDialog(null)}>
+        <Pressable style={styles.altOverlay} onPress={() => setAltDialog(null)}>
+          <Pressable style={styles.altSheet} onPress={e => e.stopPropagation()}>
+            <PartnerText style={styles.altTitle}>{altDialog?.title ?? ''}</PartnerText>
+            <PartnerText style={styles.altSubtitle}>Choose the document type.</PartnerText>
+            {altDialog?.options.map(option => (
+              <Pressable
+                key={option.label}
+                accessibilityRole="button"
+                onPress={() => {
+                  setAltDialog(null);
+                  option.onPress();
+                }}
+                style={({ pressed }) => [styles.altOption, pressed && styles.altOptionPressed]}>
+                <PartnerText style={styles.altOptionText}>{option.label}</PartnerText>
+              </Pressable>
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setAltDialog(null)}
+              style={({ pressed }) => [styles.altOption, styles.altClose, pressed && styles.altOptionPressed]}>
+              <PartnerText style={styles.altCloseText}>Cancel</PartnerText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      {partnerDialog}
     </View>
   );
 }
@@ -247,11 +309,11 @@ async function pickFile(source: PickerSource, id: string): Promise<{ uri: string
     if (source === 'camera') {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert('Camera permission required', 'Allow camera access in Settings or choose a file instead.', [
-          { text: 'Close', style: 'cancel' },
-          ...(!permission.canAskAgain ? [{ text: 'Open Settings', onPress: () => void Linking.openSettings().catch(() => Alert.alert('Could not open Settings', 'Open your device settings to allow camera access.')) }] : []),
-        ]);
-        return null;
+        throw new Error(
+          permission.canAskAgain
+            ? 'Allow camera access in Settings or choose a file instead.'
+            : 'CAMERA_SETTINGS::Allow camera access in Settings or choose a file instead.',
+        );
       }
     }
     const result = source === 'camera' ? await ImagePicker.launchCameraAsync({ quality: 0.85 }) :
@@ -267,6 +329,53 @@ async function pickFile(source: PickerSource, id: string): Promise<{ uri: string
 }
 
 const styles = StyleSheet.create({
+  altOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,18,25,0.45)',
+    justifyContent: 'flex-end',
+  },
+  altSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    alignItems: 'center',
+  },
+  altTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.dark,
+    marginTop: 14,
+  },
+  altSubtitle: {
+    fontSize: 12,
+    color: colors.grey,
+    marginTop: 2,
+  },
+  altOption: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F5F9',
+  },
+  altOptionPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  altOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.dark,
+  },
+  altClose: {
+    marginTop: 4,
+  },
+  altCloseText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.grey,
+  },
   listTitle: {
     color: colors.dark,
     fontSize: typography.sizes.md,

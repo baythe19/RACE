@@ -247,7 +247,7 @@ function verificationCopy(vendor?: VendorProfileResponse | null) {
   return {
     title: `Verification: ${stage}`,
     badge: 'In progress',
-    hint: "We're reviewing your documents.",
+    hint: 'Review runs in the background. Add a vehicle and take towing jobs while this finishes.',
     tone: 'progress' as const,
   };
 }
@@ -429,7 +429,11 @@ export default function PartnerHomeScreen() {
 
   const homeLoading =
     vendorLoading || dashboardLoading || offersLoading || driversLoading || vehiclesLoading;
-  const openOffers = useMemo(() => offers.filter(offer => !offer.vendorApproved), [offers]);
+  const openOffers = useMemo(
+    () => offers.filter(offer => offer.bookingType === 'towing' && !offer.vendorApproved),
+    [offers],
+  );
+  const activeVehicleCount = vehicles.filter(vehicle => vehicle.status === 'ACTIVE').length;
   const openJobs = openOffers.length;
   const awaitingClaimJobs = offers.length - openJobs;
   const onJobDrivers = drivers.filter(d => d.isBusy).length;
@@ -522,6 +526,36 @@ export default function PartnerHomeScreen() {
         <DriverDataSkeleton variant="vendor-dashboard" />
       ) : (
         <>
+          {activeVehicleCount === 0 && verification.tone !== 'rejected' ? (
+            <Pressable
+              onPress={() => goAccountScreen('VendorVehicles')}
+              style={styles.reviewBanner}
+              accessibilityRole="button"
+              accessibilityLabel="Add a towing vehicle">
+              <Truck size={16} color={colors.primaryDark} strokeWidth={2.2} />
+              <View style={styles.reviewBannerCopy}>
+                <PartnerText style={styles.reviewBannerTitle}>Add a vehicle to assign jobs</PartnerText>
+                <PartnerText style={styles.reviewBannerHint}>
+                  Customer towing requests still show here. Assignment stays locked until one vehicle is active.
+                </PartnerText>
+              </View>
+              <ChevronRight size={16} color={colors.grey} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
+          {verification.tone !== 'completed' ? (
+            <Pressable
+              onPress={() => goAccountScreen('VendorVerificationStatus')}
+              style={styles.reviewBanner}
+              accessibilityRole="button"
+              accessibilityLabel="Open verification status">
+              <Info size={16} color={colors.primaryDark} strokeWidth={2.2} />
+              <View style={styles.reviewBannerCopy}>
+                <PartnerText style={styles.reviewBannerTitle}>{verification.title}</PartnerText>
+                <PartnerText style={styles.reviewBannerHint}>{verification.hint}</PartnerText>
+              </View>
+              <ChevronRight size={16} color={colors.grey} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
           {openOffers.length > 0 ? (
         <View style={styles.leadsBanner}>
           <View style={styles.leadsHeaderRow}>
@@ -610,6 +644,10 @@ export default function PartnerHomeScreen() {
                 <Pressable
                   style={styles.reviewLeadCta}
                   onPress={() => {
+                    if (activeVehicleCount === 0) {
+                      goAccountScreen('VendorVehicles');
+                      return;
+                    }
                     navigation.navigate('PartnerJobs', {
                       screen: 'VendorAssignJob',
                       params: {
@@ -622,7 +660,9 @@ export default function PartnerHomeScreen() {
                       },
                     } as never);
                   }}>
-                  <PartnerText style={styles.reviewLeadText}>Review lead</PartnerText>
+                  <PartnerText style={styles.reviewLeadText}>
+                    {activeVehicleCount === 0 ? 'Add vehicle' : 'Review lead'}
+                  </PartnerText>
                 </Pressable>
               </View>
               <View style={styles.leadFareCol}>
@@ -640,13 +680,25 @@ export default function PartnerHomeScreen() {
             <ClipboardList size={18} color={colors.primaryDark} strokeWidth={2.2} />
           </View>
           <View style={styles.leadsEmptyCopy}>
-            <PartnerText style={styles.leadsEmptyTitle}>No new booking leads</PartnerText>
+            <PartnerText style={styles.leadsEmptyTitle}>
+              {verification.tone === 'rejected' ? 'Account rejected' : 'No new booking leads'}
+            </PartnerText>
             <PartnerText style={styles.leadsEmptySub}>
-              Open customer requests will land here for your fleet.
+              {verification.tone === 'rejected'
+                ? 'This account cannot take jobs. Open verification for the review note.'
+                : 'Customer towing requests show here. Assigning one needs an active vehicle.'}
             </PartnerText>
           </View>
-          <Pressable onPress={() => navigation.navigate('PartnerJobs')} hitSlop={8}>
-            <PartnerText style={styles.leadsViewAll}>View all</PartnerText>
+          <Pressable
+            onPress={() =>
+              verification.tone === 'rejected'
+                ? goAccountScreen('VendorVerificationStatus')
+                : navigation.navigate('PartnerJobs')
+            }
+            hitSlop={8}>
+            <PartnerText style={styles.leadsViewAll}>
+              {verification.tone === 'rejected' ? 'View status' : 'View all'}
+            </PartnerText>
           </Pressable>
         </View>
       )}
@@ -1439,6 +1491,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     width: 32,
     textAlign: 'center',
+  },
+  reviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFF7E6',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F3D19C',
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  reviewBannerCopy: {
+    flex: 1,
+  },
+  reviewBannerTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.dark,
+  },
+  reviewBannerHint: {
+    marginTop: 2,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.grey,
   },
   leadsEmptyCard: {
     flexDirection: 'row',

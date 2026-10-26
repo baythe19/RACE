@@ -8,6 +8,7 @@ import { API_BASE_URL, TOKEN_KEYS } from '../../config/env';
 import { notificationQueryKeys } from '../useNotificationQueries';
 import { vendorBookingQueryKeys } from './useVendorBookingsQueries';
 import { vendorMembershipKeys } from './useVendorMembershipQueries';
+import { presentOuterAppAlert } from '../notificationService';
 
 /** Refresh vendor data on authenticated socket signals; polling remains the recovery path. */
 export function useVendorRealtimeSync(enabled: boolean, vendorId?: string) {
@@ -75,7 +76,14 @@ export function useVendorRealtimeSync(enabled: boolean, vendorId?: string) {
         timeout: 10_000,
       });
       socket.on('connect', refreshVendorData);
-      socket.on('vendor:jobs-updated', refreshVendorData);
+      socket.on('vendor:jobs-updated', () => {
+        void presentOuterAppAlert({
+          title: '📋 Fleet Dispatch Available',
+          body: 'A new towing or service request is waiting for your fleet. Tap to view and assign.',
+          channelId: 'dispatch_urgent',
+        });
+        refreshVendorData();
+      });
       socket.on('notification:new', refreshVendorData);
       socket.connect();
     };
@@ -84,10 +92,9 @@ export function useVendorRealtimeSync(enabled: boolean, vendorId?: string) {
     const subscription = AppState.addEventListener('change', next => {
       appState = next;
       if (next === 'active') {
-        if (socket) socket.connect();
-        else void connect();
-      } else {
-        socket?.disconnect();
+        if (socket && !socket.connected) socket.connect();
+        else if (!socket) void connect();
+        refreshVendorData();
       }
     });
 

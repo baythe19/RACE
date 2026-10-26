@@ -4,7 +4,7 @@ import { towingBookingService } from './bookings/towingBooking';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { userRepository } from './userRepository';
-import { NotFoundError, ForbiddenError } from '../../utils/src/errors';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../utils/src/errors';
 import { generateCompletionOtp } from './bookings/tripOtp';
 import { emitBookingStatusUpdate, emitToDriver } from './socket';
 import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
@@ -35,6 +35,10 @@ function mapTowingItem(
     vendorId: booking.vendorId,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
     tripStartOtp: booking.tripStartOtp,
+    arrivedAtDropoffAt: booking.arrivedAtDropoffAt,
+    completionOtp: booking.completionOtp,
+    paymentCollectionMode: booking.paymentCollectionMode,
+    paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     scheduledAt: booking.scheduledAt,
     statusHistory: booking.statusHistory,
     createdAt: booking.createdAt,
@@ -70,6 +74,10 @@ function mapDriverItem(
     vendorId: booking.vendorId,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
     tripStartOtp: booking.tripStartOtp,
+    arrivedAtDropoffAt: booking.arrivedAtDropoffAt,
+    completionOtp: booking.completionOtp,
+    paymentCollectionMode: booking.paymentCollectionMode,
+    paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     scheduledAt: booking.scheduledAt,
     statusHistory: booking.statusHistory,
     createdAt: booking.createdAt,
@@ -131,6 +139,29 @@ export class CombinedBookingService {
     if (booking.customerId.toString() !== customerId) {
       throw new ForbiddenError('You do not have access to this booking');
     }
+    if (!booking.arrivedAtDropoffAt) {
+      throw new BadRequestError('The driver has not confirmed arrival at the drop yet');
+    }
+    if (booking.status === 'COMPLETED' || booking.status === 'RATED' || booking.status === 'CANCELLED') {
+      throw new BadRequestError('This trip is no longer waiting for payment');
+    }
+
+    const fare =
+      booking.fareBreakdown && 'totalFare' in booking.fareBreakdown
+        ? (booking.fareBreakdown as { totalFare?: number }).totalFare
+        : booking.estimatedFare;
+
+    if (booking.paymentConfirmedByCustomer && booking.completionOtp) {
+      return {
+        success: true,
+        bookingId,
+        bookingNumber: booking.bookingNumber,
+        bookingType: type,
+        paymentMode: booking.paymentCollectionMode ?? paymentMode,
+        amount: fare,
+        completionOtp: booking.completionOtp,
+      };
+    }
 
     const completionOtp = booking.completionOtp ?? generateCompletionOtp();
     const paymentCollectedAt = new Date();
@@ -142,12 +173,7 @@ export class CombinedBookingService {
       completionOtp,
     });
 
-    const fare =
-      booking.fareBreakdown && 'totalFare' in booking.fareBreakdown
-        ? (booking.fareBreakdown as { totalFare?: number }).totalFare
-        : booking.estimatedFare;
-
-    // Send SMS with completion OTP to customer (as requested: "जैसे ही कन्फर्म करेगा तो SMS के थ्रू कस्टमर को एक OTP आएगा")
+    // SMS goes out only after the customer confirms cash, UPI, or in-app payment.
     const customer = await userRepository.findById(customerId);
     if (customer?.mobileNumber) {
       if (isHanuConfigured()) {
@@ -157,7 +183,7 @@ export class CombinedBookingService {
           logger.warn('Failed to send completion OTP via HanuSMS', { error: smsErr });
         }
       }
-      logger.info(`[COMPLETION OTP SMS] Sent OTP ${completionOtp} to ${customer.mobileNumber} for booking #${booking.bookingNumber}`);
+      logger.info(`[COMPLETION OTP SMS] Sent completion code for booking #${booking.bookingNumber}`);
     }
 
     // Emit socket event to Driver
@@ -176,7 +202,6 @@ export class CombinedBookingService {
       paymentMode,
       paymentConfirmed: true,
       amount: fare,
-      completionOtp,
     });
 
     return {

@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Camera, Calendar, MapPin, CheckCircle, ChevronDown, Plus, X } from 'lucide-react-native';
@@ -15,6 +15,7 @@ import { usePartnerPayoutStore } from '../../../store/partnerPayoutStore';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuccessDialog';
 import PartnerUploadSheet from '../../../components/partner/dialogs/PartnerUploadSheet';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 
@@ -24,6 +25,7 @@ type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerEditPr
 
 export default function PartnerEditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const queryClient = useQueryClient();
   const user = useAppSelector(state => state.auth.user);
   const { data: profile, isLoading: profileLoading } = useDriverProfileQuery();
@@ -68,7 +70,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
         setAvatarUri(result.assets[0].uri);
       }
     } catch {
-      Alert.alert('Error', 'Unable to capture photo. Please try again.');
+      showAlert({ tone: 'error', title: 'Error', message: 'Unable to capture photo. Please try again.' });
     }
   };
 
@@ -91,7 +93,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       }
       await triggerCameraLaunch();
     } catch {
-      Alert.alert('Error', 'Unable to capture photo. Please try again.');
+      showAlert({ tone: 'error', title: 'Error', message: 'Unable to capture photo. Please try again.' });
     }
   };
 
@@ -107,7 +109,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
         setAvatarUri(result.assets[0].uri);
       }
     } catch {
-      Alert.alert('Error', 'Unable to select image. Please try again.');
+      showAlert({ tone: 'error', title: 'Error', message: 'Unable to select image. Please try again.' });
     }
   };
 
@@ -130,7 +132,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
       }
       await triggerGalleryLaunch();
     } catch {
-      Alert.alert('Error', 'Unable to select image. Please try again.');
+      showAlert({ tone: 'error', title: 'Error', message: 'Unable to select image. Please try again.' });
     }
   };
 
@@ -207,6 +209,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title="Edit Profile"
       onBack={() => navigation.goBack()}
@@ -419,6 +422,8 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
         }}
       />
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

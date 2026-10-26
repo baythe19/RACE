@@ -10,12 +10,13 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import { Alert } from 'react-native';
+import { View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import DriverVerificationView from '../../../components/partner/DriverVerificationView';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
 import { finishPartnerSignup } from '../../../redux/onboarding/onboardingSlice';
 import { useDriverProfileQuery } from '../../../services/driver/useDriverQueries';
@@ -32,6 +33,7 @@ type Props = NativeStackScreenProps<
 >;
 
 export default function DriverVerificationPendingScreen({ navigation, route }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const dispatch = useAppDispatch();
   const accessToken = useAppSelector(state => state.auth.accessToken);
   const { data: profile, refetch, isRefetching, isLoading } = useDriverProfileQuery();
@@ -51,10 +53,11 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
     if (!accessToken) {
       // Never fabricate a session to get past the gate — without a token the
       // dashboard would be empty and every request would 401.
-      Alert.alert(
-        'Sign in required',
-        'Sign in again to open your dashboard. Your application is already submitted.',
-      );
+      showAlert({
+        tone: 'warning',
+        title: 'Sign in required',
+        message: 'Sign in again to open your dashboard. Your application is already submitted.',
+      });
       return;
     }
 
@@ -94,6 +97,7 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <DriverVerificationView
       verification={verification}
       onOpenDashboard={handleGoToDashboard}
@@ -102,5 +106,7 @@ export default function DriverVerificationPendingScreen({ navigation, route }: P
       onRefresh={() => void refetch()}
       refreshing={isRefetching}
     />
+    {partnerDialog}
+    </View>
   );
 }

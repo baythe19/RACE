@@ -22,6 +22,19 @@ function monthLabel(monthNumber: number) {
   return MONTH_NAMES[Math.max(0, Math.min(11, monthNumber - 1))] ?? `Month ${monthNumber}`;
 }
 
+function formatServiceName(type: string): string {
+  switch (type) {
+    case 'instant': return 'Instant Towing';
+    case 'emergency': return 'Emergency Towing';
+    case 'scheduled': return 'Scheduled Towing';
+    case 'full_time': return 'Full-Time Driver';
+    case 'part_time': return 'Part-Time Driver';
+    case 'outstation': return 'Outstation Driver';
+    case 'night': return 'Night Shift Driver';
+    default: return type ? type.charAt(0).toUpperCase() + type.slice(1).replace(/_/g, ' ') : 'Other';
+  }
+}
+
 export const adminReportsService = {
   async getReports(dateFrom?: string, dateTo?: string) {
     const match = buildDateMatch(dateFrom, dateTo);
@@ -35,8 +48,8 @@ export const adminReportsService = {
       vendorGrowth,
       customerGrowth,
       legacyServiceDistribution,
-      towingCount,
-      driverCount,
+      towingServiceDistribution,
+      driverServiceDistribution,
       topVendors,
       legacyCompletionRate,
       towingCompletionRate,
@@ -89,8 +102,14 @@ export const adminReportsService = {
         { $sort: { count: -1 } },
         { $limit: 6 },
       ]),
-      TowingBookingModel.countDocuments(match),
-      DriverBookingModel.countDocuments(match),
+      TowingBookingModel.aggregate([
+        { $match: match },
+        { $group: { _id: { $ifNull: ['$towingMode', 'instant'] }, count: { $sum: 1 } } },
+      ]),
+      DriverBookingModel.aggregate([
+        { $match: match },
+        { $group: { _id: { $ifNull: ['$driverServiceType', 'full_time'] }, count: { $sum: 1 } } },
+      ]),
       UserModel.find({ ...match, role: 'vendor' }).sort({ createdAt: -1 }).limit(5).lean(),
       BookingModel.aggregate([
         { $match: match },
@@ -179,8 +198,14 @@ export const adminReportsService = {
 
     // Combined service distribution
     const combinedServiceDistribution = [
-      ...(towingCount > 0 ? [{ name: 'Towing Service', value: towingCount }] : []),
-      ...(driverCount > 0 ? [{ name: 'Driver Service', value: driverCount }] : []),
+      ...towingServiceDistribution.map((row) => ({
+        name: formatServiceName(row._id ?? 'instant'),
+        value: row.count,
+      })),
+      ...driverServiceDistribution.map((row) => ({
+        name: formatServiceName(row._id ?? 'full_time'),
+        value: row.count,
+      })),
       ...legacyServiceDistribution.map((row) => ({ name: row._id ?? 'Other', value: row.count })),
     ];
 

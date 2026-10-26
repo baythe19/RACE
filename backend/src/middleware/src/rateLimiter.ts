@@ -18,6 +18,14 @@ export const authRateLimiter = rateLimit({
   message: { success: false, message: 'Too many authentication attempts' },
 });
 
+export const adminAuthRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: env.NODE_ENV === 'production' ? 5 : 500,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many admin login attempts. Please try again later.' },
+});
+
 export const otpRateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: env.NODE_ENV === 'production' ? 10 : 5000,

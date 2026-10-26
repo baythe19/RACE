@@ -1,6 +1,7 @@
 import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert as SystemAlert, Animated, Easing, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { usePartnerDialog } from '../../../../hooks/usePartnerDialog';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -46,7 +47,19 @@ import {
   type DriverDocumentConfig,
   LATER_DOCUMENTS,
 } from '../../../../constants/driverRegistrationDocuments';
-import { usePartnerRegistrationStore } from '../../../../store/partnerRegistrationStore';
+import {
+  defaultDriverPersonal,
+  defaultDriverVehicle,
+  usePartnerRegistrationStore,
+} from '../../../../store/partnerRegistrationStore';
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  createVendorStaffDriver,
+  sendVendorDriverOnboardingOtp,
+  uploadVendorDriverDocument,
+  verifyVendorDriverOnboardingOtp,
+} from '../../../../services/vendor/vendorDriversApi';
+import { vendorMembershipKeys } from '../../../../services/vendor/useVendorMembershipQueries';
 import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
 import { completeOnboarding } from '../../../../redux/auth/authSlice';
 import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlice';
@@ -171,9 +184,20 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const scale = Math.min(1.22, Math.max(0.88, width / REF_W));
   const px = (val: number) => Math.max(1, Math.round(val * scale));
 
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
+
   const initialStepParam = route.params?.initialStep ?? 1;
   const fromReviewParam = Boolean(route.params?.fromReview);
   const isResubmitParam = Boolean((route.params as any)?.isResubmit);
+  /** Vendor fleet “Add driver” reuses this screen. Submit must not switch the vendor session. */
+  const vendorStaffOnboarding = Boolean((route.params as { vendorStaffOnboarding?: boolean } | undefined)?.vendorStaffOnboarding);
+  const queryClient = useQueryClient();
+  const [staffPhoneVerified, setStaffPhoneVerified] = useState(false);
+  const [staffProofToken, setStaffProofToken] = useState('');
+  const [staffOtpSent, setStaffOtpSent] = useState(false);
+  const [staffOtp, setStaffOtp] = useState('');
+  const [staffDevOtp, setStaffDevOtp] = useState('');
+  const [staffOtpBusy, setStaffOtpBusy] = useState(false);
 
   // Flow Step State (1: Personal & Driver Details, 2: Documents, 3: Review)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(
@@ -226,6 +250,24 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const setDriverVehicle = usePartnerRegistrationStore((s) => s.setDriverVehicle);
   const addDriverDocument = usePartnerRegistrationStore((s) => s.addDriverDocument);
   const removeDriverDocument = usePartnerRegistrationStore((s) => s.removeDriverDocument);
+
+  useEffect(() => {
+    if (!vendorStaffOnboarding) return;
+    const snap = usePartnerRegistrationStore.getState();
+    const previous = {
+      driverPersonal: snap.driverPersonal,
+      driverVehicle: snap.driverVehicle,
+      driverDocuments: snap.driverDocuments,
+    };
+    usePartnerRegistrationStore.setState({
+      driverPersonal: { ...defaultDriverPersonal },
+      driverVehicle: { ...defaultDriverVehicle },
+      driverDocuments: [],
+    });
+    return () => {
+      usePartnerRegistrationStore.setState(previous);
+    };
+  }, [vendorStaffOnboarding]);
 
   // -------------------------------------------------------------
   // Step 1: Personal Info States
@@ -331,6 +373,24 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
     try {
       if (!realFile) throw new Error('Choose a document before uploading.');
+
+      // Vendor is still logged in. Driver upload API would reject this token.
+      // Keep the file locally and attach it after the staff driver account exists.
+      if (vendorStaffOnboarding) {
+        addDriverDocument({
+          id: doc.id,
+          label: doc.title,
+          uri: realFile.uri,
+          name: realFile.name,
+          mimeType: realFile.mimeType,
+        });
+        setUploadProgressState(prev =>
+          prev ? { ...prev, progress: 100, statusText: 'Saved. It uploads when you submit.', isComplete: true } : null,
+        );
+        setTimeout(() => setUploadProgressState(null), 700);
+        return;
+      }
+
       const isPreviewSample =
         sourceLabel === 'Sample' && UI_PREVIEW_MODE && isUiTestPermissiveMode();
       let remoteUrl = '';
@@ -383,10 +443,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       setTimeout(() => setUploadProgressState(null), 700);
     } catch (error) {
       setUploadProgressState(null);
-      Alert.alert(
-        'Document upload failed',
-        getApiErrorMessage(error, 'The document was not saved. Check your connection and try again.'),
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Document upload failed',
+        message: getApiErrorMessage(error, 'The document was not saved. Check your connection and try again.'),
+      });
     }
   };
 
@@ -400,19 +461,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       if (!granted) {
         if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
-          Alert.alert(
-            'Camera Permission Required',
-            'Camera access is disabled for RACE Partner. To take clear photos of your documents (e.g. Driving License, RC, Insurance) for quick verification, please enable camera access in your device settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Open Settings',
-                onPress: () => {
-                  Linking.openSettings().catch(() => {});
-                },
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Camera Permission Required',
+            message: 'Camera access is disabled for RACE Partner. To take clear photos of your documents (e.g. Driving License, RC, Insurance) for quick verification, please enable camera access in your device settings.',
+            primaryAction: { label: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
 
@@ -420,17 +475,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         granted = requested.granted;
 
         if (!granted) {
-          Alert.alert(
-            'Camera Permission Needed',
-            'Camera access is required to take photos of your official documents for verification.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Try Again',
-                onPress: () => handlePickFromCamera(doc),
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Camera Permission Needed',
+            message: 'Camera access is required to take photos of your official documents for verification.',
+            primaryAction: { label: 'Try Again', onPress: () => { void handlePickFromCamera(doc); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
       }
@@ -457,11 +508,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
     } catch (err: any) {
       console.warn('[CameraPicker] Error launching camera:', err);
-      Alert.alert(
-        'Camera Error',
-        'Could not access the camera. You can also select a photo from your gallery or upload a PDF document.',
-        [{ text: 'OK' }],
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Camera Error',
+        message: 'Could not access the camera. You can also select a photo from your gallery or upload a PDF document.',
+      });
     }
   };
 
@@ -472,19 +523,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       if (!granted) {
         if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
-          Alert.alert(
-            'Photo Library Permission Required',
-            'Photo library access is disabled for RACE Partner. To select your document photos from your device, please allow photos access in your device settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Open Settings',
-                onPress: () => {
-                  Linking.openSettings().catch(() => {});
-                },
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Photo Library Permission Required',
+            message: 'Photo library access is disabled for RACE Partner. To select your document photos from your device, please allow photos access in your device settings.',
+            primaryAction: { label: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
 
@@ -492,17 +537,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         granted = requested.granted;
 
         if (!granted) {
-          Alert.alert(
-            'Gallery Permission Needed',
-            'Photo library access is needed to select and upload document photos.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Try Again',
-                onPress: () => handlePickFromGallery(doc),
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Gallery Permission Needed',
+            message: 'Photo library access is needed to select and upload document photos.',
+            primaryAction: { label: 'Try Again', onPress: () => { void handlePickFromGallery(doc); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
       }
@@ -529,11 +570,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
     } catch (err: any) {
       console.warn('[GalleryPicker] Error launching gallery:', err);
-      Alert.alert(
-        'Gallery Error',
-        'Could not open gallery. Please try again or select a PDF document.',
-        [{ text: 'OK' }],
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Gallery Error',
+        message: 'Could not open gallery. Please try again or select a PDF document.',
+      });
     }
   };
 
@@ -553,11 +594,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       const asset = result.assets[0];
       const maxBytes = 10 * 1024 * 1024; // 10MB
       if (asset.size && asset.size > maxBytes) {
-        Alert.alert(
-          'File Too Large',
-          'The selected file exceeds 10 MB. Please choose a smaller photo or compressed PDF.',
-          [{ text: 'OK' }],
-        );
+        showAlert({
+          tone: 'warning',
+          title: 'File Too Large',
+          message: 'The selected file exceeds 10 MB. Please choose a smaller photo or compressed PDF.',
+        });
         return;
       }
 
@@ -568,11 +609,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
     } catch (err: any) {
       console.warn('[FilePicker] Error selecting document:', err);
-      Alert.alert(
-        'File Picker Error',
-        'Could not open document picker. Please try taking a photo with the camera or choosing from gallery.',
-        [{ text: 'OK' }],
-      );
+      showAlert({
+        tone: 'error',
+        title: 'File Picker Error',
+        message: 'Could not open document picker. Please try taking a photo with the camera or choosing from gallery.',
+      });
     }
   };
 
@@ -615,6 +656,10 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     }
 
     if (currentStep === 1) {
+      if (vendorStaffOnboarding && navigation.canGoBack()) {
+        navigation.goBack();
+        return;
+      }
       partnerRegistrationGoBack(navigation, 'DriverPersonalInfo', {
         role: route.params?.role || 'driver',
         mobileNumber: route.params?.mobileNumber,
@@ -630,28 +675,36 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     const name = driverPersonal.fullName.trim();
     const mobile = normalizeIndianPhone(driverPersonal.mobileNumber);
     if (name.length < 2) {
-      Alert.alert('Full name required', 'Enter your full name as it appears on your driving licence.');
+      showAlert({ tone: 'warning', title: 'Full name required', message: 'Enter your full name as it appears on your driving licence.' });
       return false;
     }
     if (mobile.length !== 10) {
-      Alert.alert('Mobile number required', 'Enter the 10-digit verified mobile number.');
+      showAlert({ tone: 'warning', title: 'Mobile number required', message: 'Enter the 10-digit verified mobile number.' });
+      return false;
+    }
+    if (vendorStaffOnboarding && !staffPhoneVerified) {
+      showAlert({
+        tone: 'warning',
+        title: 'Verify mobile number',
+        message: 'Send an OTP to this driver and confirm it before continuing.',
+      });
       return false;
     }
     if (!normalizeDobForApi(driverPersonal.dateOfBirth)) {
-      Alert.alert('Date of birth required', 'Enter a valid date in DD/MM/YYYY format.');
+      showAlert({ tone: 'warning', title: 'Date of birth required', message: 'Enter a valid date in DD/MM/YYYY format.' });
       return false;
     }
     if (driverPersonal.address.trim().length < 5) {
-      Alert.alert('Address required', 'Enter your current address.');
+      showAlert({ tone: 'warning', title: 'Address required', message: 'Enter your current address.' });
       return false;
     }
     if (!driverPersonal.city?.trim()) {
-      Alert.alert('City required', 'Select your operating city.');
+      showAlert({ tone: 'warning', title: 'City required', message: 'Select your operating city.' });
       return false;
     }
     const dlNumber = (driverPersonal.licenseNumber || driverVehicle.licenseNumber || '').trim();
     if (dlNumber.length < 4) {
-      Alert.alert('Driving licence required', 'Enter your driving licence number.');
+      showAlert({ tone: 'warning', title: 'Driving licence required', message: 'Enter your driving licence number.' });
       return false;
     }
     return true;
@@ -659,10 +712,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
   const validateDocumentsStep = () => {
     if (missingCoreDocs.length === 0) return true;
-    Alert.alert(
-      'Documents required',
-      `Upload ${missingCoreDocs.map(doc => doc.title).join(', ')} before continuing.`,
-    );
+    showAlert({
+      tone: 'warning',
+      title: 'Documents required',
+      message: `Upload ${missingCoreDocs.map(doc => doc.title).join(', ')} before continuing.`,
+    });
     return false;
   };
 
@@ -680,7 +734,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     }
 
     if (currentStep === 1) {
-      const selectedType = driverPersonal.driverType || 'Full-Time';
+      const selectedType = vendorStaffOnboarding ? 'Full-Time' : driverPersonal.driverType || 'Full-Time';
       const dlNumber = (driverPersonal.licenseNumber || driverVehicle.licenseNumber || '').trim() || (permissivePreview ? 'OD-0220190012345' : '');
       setDriverPersonal({
         fullName: driverPersonal.fullName.trim() || (permissivePreview ? 'Rajesh Kumar' : ''),
@@ -724,7 +778,85 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     }
   };
 
+  const submitVendorStaffDriver = async () => {
+    setSubmitting(true);
+    try {
+      const phone = normalizeIndianPhone(driverPersonal.mobileNumber);
+      let proofToken = staffProofToken;
+      if (!proofToken && UI_PREVIEW_MUTATIONS_ENABLED) {
+        const verified = await verifyVendorDriverOnboardingOtp(phone || '9876543210', staffOtp || '123456');
+        proofToken = verified.onboardingProofToken || verified.proofToken;
+      }
+      if (!proofToken) {
+        throw new Error('Verify the driver mobile number before submitting.');
+      }
+
+      const driverType = 'Full-Time' as const;
+
+      const created = await createVendorStaffDriver({
+        phone,
+        name: driverPersonal.fullName.trim(),
+        licenseNo: (driverPersonal.licenseNumber || driverVehicle.licenseNumber).trim(),
+        driverType,
+        onboardingProofToken: proofToken,
+        city: driverPersonal.city?.trim() || undefined,
+        state: driverPersonal.state?.trim() || undefined,
+        email: driverPersonal.email.trim() || undefined,
+        dateOfBirth: normalizeDobForApi(driverPersonal.dateOfBirth),
+        experienceYears: driverPersonal.yearsOfExperience
+          ? Number(driverPersonal.yearsOfExperience)
+          : undefined,
+      });
+
+      const vendorDocType: Record<string, string> = {
+        driving_license: 'driving_license',
+        profile_photo: 'profile_photo',
+        aadhaar_card: 'aadhaar',
+        pan_card: 'pan_card',
+      };
+      if (created?.id) {
+        for (const doc of driverDocuments) {
+          if (!doc.uri || /^https?:\/\//i.test(doc.uri)) continue;
+          try {
+            await uploadVendorDriverDocument(created.id, vendorDocType[doc.id] ?? doc.id, {
+              uri: doc.uri,
+              name: doc.name || `${doc.id}.jpg`,
+              mimeType: doc.mimeType || 'image/jpeg',
+            });
+          } catch (uploadError) {
+            console.warn('Staff document upload failed:', doc.id, uploadError);
+          }
+        }
+      }
+
+      await queryClient.invalidateQueries({ queryKey: vendorMembershipKeys.vendor });
+      showAlert({
+        tone: 'success',
+        title: 'Driver added',
+        message: `${driverPersonal.fullName.trim()} is on your fleet. Documents stay in review until admin approves them.`,
+        primaryAction: {
+          label: 'Done',
+          onPress: () => {
+            if (navigation.canGoBack()) navigation.goBack();
+          },
+        },
+      });
+    } catch (error) {
+      showAlert({
+        tone: 'error',
+        title: 'Could not add driver',
+        message: getApiErrorMessage(error, 'Check the details and try again.'),
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSubmit = async () => {
+    if (vendorStaffOnboarding) {
+      await submitVendorStaffDriver();
+      return;
+    }
     setSubmitting(true);
     try {
       const emergencyContact = driverPersonal.emergencyContactNumber
@@ -820,10 +952,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         mobileNumber: driverPersonal.mobileNumber,
       });
     } catch (error) {
-      Alert.alert(
-        'Submission notice',
-        getApiErrorMessage(error, 'Please check your connection and submit again.'),
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Submission notice',
+        message: getApiErrorMessage(error, 'Please check your connection and submit again.'),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -906,7 +1039,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           </View>
         </View>
 
-        {/* Mobile Number (Locked / Verified from OTP) */}
+        {/* Mobile Number. Self-registration is locked after login OTP.
+            Vendor staff onboarding types the new driver's number, then the same Verified lock. */}
         <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
           <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
             Mobile number <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
@@ -914,21 +1048,150 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           <View
             style={[
               styles.inputContainer,
-              styles.lockedInputContainer,
+              !vendorStaffOnboarding || staffPhoneVerified ? styles.lockedInputContainer : null,
               { height: px(44), paddingHorizontal: px(10) },
             ]}>
             <Phone size={px(16)} color="#6B7280" strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerText style={[styles.countryPrefix, { fontSize: px(13.5) }]}>+91</PartnerText>
             <PartnerTextInput
-              style={[styles.textInput, styles.lockedTextInput, { fontSize: px(13.5), flex: 1 }]}
-              editable={false}
-              value={driverPersonal.mobileNumber || '9876543210'}
+              style={[
+                styles.textInput,
+                !vendorStaffOnboarding || staffPhoneVerified ? styles.lockedTextInput : null,
+                { fontSize: px(13.5), flex: 1 },
+              ]}
+              editable={vendorStaffOnboarding && !staffPhoneVerified}
+              keyboardType="number-pad"
+              maxLength={10}
+              placeholder={vendorStaffOnboarding ? '10-digit mobile number' : undefined}
+              placeholderTextColor="#9CA3AF"
+              value={
+                vendorStaffOnboarding
+                  ? driverPersonal.mobileNumber
+                  : driverPersonal.mobileNumber || '9876543210'
+              }
+              onChangeText={(text) => {
+                const digits = text.replace(/\D/g, '').slice(0, 10);
+                setDriverPersonal({ mobileNumber: digits });
+                if (staffPhoneVerified || staffProofToken) {
+                  setStaffPhoneVerified(false);
+                  setStaffProofToken('');
+                  setStaffOtpSent(false);
+                  setStaffOtp('');
+                }
+              }}
             />
-            <View style={styles.verifiedBadge}>
-              <Check size={px(11)} color="#15803D" strokeWidth={3} />
-              <PartnerText style={[styles.verifiedText, { fontSize: px(10.5) }]}>Verified</PartnerText>
-            </View>
+            {vendorStaffOnboarding && !staffPhoneVerified ? (
+              <Pressable
+                disabled={staffOtpBusy}
+                onPress={() => {
+                  void (async () => {
+                    const phone = normalizeIndianPhone(driverPersonal.mobileNumber);
+                    if (phone.length !== 10) {
+                      showAlert({
+                        tone: 'warning',
+                        title: 'Mobile number required',
+                        message: 'Enter the driver’s 10-digit mobile number first.',
+                      });
+                      return;
+                    }
+                    setStaffOtpBusy(true);
+                    try {
+                      const sent = await sendVendorDriverOnboardingOtp(
+                        phone,
+                        driverPersonal.fullName.trim() || undefined,
+                      );
+                      setStaffOtpSent(true);
+                      setStaffDevOtp(sent.devOtp ?? '');
+                    } catch (error) {
+                      showAlert({
+                        tone: 'error',
+                        title: 'Could not send OTP',
+                        message: getApiErrorMessage(error, 'Try again in a moment.'),
+                      });
+                    } finally {
+                      setStaffOtpBusy(false);
+                    }
+                  })();
+                }}
+                style={[styles.verifiedBadge, { backgroundColor: '#FEF3C7' }]}>
+                <PartnerText style={[styles.verifiedText, { fontSize: px(10.5), color: '#B45309' }]}>
+                  {staffOtpBusy ? 'Sending' : 'Verify'}
+                </PartnerText>
+              </Pressable>
+            ) : (
+              <View style={styles.verifiedBadge}>
+                <Check size={px(11)} color="#15803D" strokeWidth={3} />
+                <PartnerText style={[styles.verifiedText, { fontSize: px(10.5) }]}>Verified</PartnerText>
+              </View>
+            )}
           </View>
+          {vendorStaffOnboarding && staffOtpSent && !staffPhoneVerified ? (
+            <View style={{ marginTop: px(8), gap: px(8) }}>
+              <PartnerTextInput
+                keyboardType="number-pad"
+                maxLength={6}
+                value={staffOtp}
+                placeholder="Enter OTP"
+                placeholderTextColor="#9CA3AF"
+                onChangeText={(text) => setStaffOtp(text.replace(/\D/g, '').slice(0, 6))}
+                style={[
+                  styles.inputContainer,
+                  {
+                    height: px(44),
+                    paddingHorizontal: px(12),
+                    fontSize: px(14),
+                    letterSpacing: 4,
+                    fontWeight: '700',
+                  },
+                ]}
+              />
+              {staffDevOtp ? (
+                <PartnerText style={{ fontSize: px(11), color: '#6B7280' }}>
+                  Dev code {staffDevOtp}
+                </PartnerText>
+              ) : null}
+              <Pressable
+                disabled={staffOtpBusy}
+                onPress={() => {
+                  void (async () => {
+                    const phone = normalizeIndianPhone(driverPersonal.mobileNumber);
+                    if (staffOtp.length < 4) {
+                      showAlert({
+                        tone: 'warning',
+                        title: 'OTP required',
+                        message: 'Enter the code sent to the driver.',
+                      });
+                      return;
+                    }
+                    setStaffOtpBusy(true);
+                    try {
+                      const verified = await verifyVendorDriverOnboardingOtp(phone, staffOtp);
+                      setStaffProofToken(verified.onboardingProofToken || verified.proofToken);
+                      setStaffPhoneVerified(true);
+                    } catch (error) {
+                      showAlert({
+                        tone: 'error',
+                        title: 'OTP not confirmed',
+                        message: getApiErrorMessage(error, 'Check the code and try again.'),
+                      });
+                    } finally {
+                      setStaffOtpBusy(false);
+                    }
+                  })();
+                }}
+                style={{
+                  height: px(40),
+                  borderRadius: px(10),
+                  backgroundColor: '#F9A602',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <PartnerText style={{ fontWeight: '700', color: '#191919', fontSize: px(13) }}>
+                  {staffOtpBusy ? 'Checking…' : 'Confirm OTP'}
+                </PartnerText>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
 
         {/* Date of Birth (DD/MM/YYYY) */}
@@ -1125,10 +1388,12 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         <View style={[styles.cardDivider, { marginTop: px(4), marginBottom: px(12) }]} />
 
         <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(8) }]}>
-          Licence & work preference
+          {vendorStaffOnboarding ? 'Driving licence' : 'Licence & work preference'}
         </PartnerText>
 
-        {/* Work Preference / Driver Type (Full-Time vs Part-Time) */}
+        {/* Work type is a choice only for a driver who registers themselves.
+            A vendor-added driver is always full-time fleet staff. */}
+        {vendorStaffOnboarding ? null : (
         <View style={[styles.inputGroup, { marginBottom: px(14) }]}>
           <View style={styles.inputLabelRow}>
             <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>
@@ -1212,6 +1477,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </Pressable>
           </View>
         </View>
+        )}
 
         {/* Driving Licence Number */}
         <View style={[styles.inputGroup, { marginBottom: px(12) }]}>
@@ -1745,7 +2011,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           {reviewExpanded.driverDetails && (
             <View style={[styles.reviewDetailsBox, { paddingHorizontal: px(10), paddingVertical: px(4), marginTop: px(8), borderRadius: px(8) }]}>
               {[
-                ['Work type', driverPersonal.driverType || 'Full-Time'],
+                ...(vendorStaffOnboarding
+                  ? []
+                  : [['Work type', driverPersonal.driverType || 'Full-Time'] as [string, string]]),
                 ['Licence number', driverPersonal.licenseNumber || driverVehicle.licenseNumber || '—'],
                 ['Experience', driverPersonal.yearsOfExperience || '—'],
               ].map(([label, value]) => (
@@ -1893,6 +2161,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       continueDisabled={currentStep === 3 ? !confirmAgreed || submitting : false}
       continueLoading={currentStep === 3 ? submitting : false}
       showFooter={true}>
+      {partnerDialog}
       {/* Animated Sliding Container: only form cards slide smoothly! */}
       <Animated.View
         style={{
@@ -3432,6 +3701,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
     marginRight: 8,
   },
   summarySectionRight: {
@@ -3477,11 +3747,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryTitleRow: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
   },
   summaryTitle: {
+    flexShrink: 1,
     fontWeight: '700',
     color: '#111827',
   },

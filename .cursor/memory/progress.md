@@ -1,5 +1,13 @@
 # Progress
 
+## Done (partner day-one logic — 2026-10-26)
+
+- [x] Pending review no longer blocks jobs, going online, or adding a vehicle
+- [x] Vendor feed and assignment are towing-only, and empty until an active vehicle exists
+- [x] Fleet drivers do not see open offers; they take vendor-assigned jobs only
+- [x] Backend and partner `tsc` clean; offer-routing audit passed
+- [ ] Live GPS, SMS OTP, and UPI were not run
+
 ## Handoff (in-app driver navigation — 2026-10-20)
 
 - [x] Bhopal mock route, in-app turn-by-turn, single OTP, drop navigation, call-only trip sheet

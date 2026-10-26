@@ -1,11 +1,13 @@
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
-import { emitBookingStatusUpdate, emitDriverLocation, emitToDriver } from './socket';
+import { emitBookingStatusUpdate, emitDriverLocation, emitToBooking, emitToDriver, emitToUser } from './socket';
 import { userRepository } from './userRepository';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
-import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp, generateCompletionOtp } from './bookings/tripOtp';
+import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp } from './bookings/tripOtp';
+import { processBookingCompletionEscrowSettlement } from './payments/escrowSettlement';
+import { logger } from '../../utils/src/logger';
 import { UserModel } from '../../models/src/user';
 import { TowingBookingModel } from '../../models/src/towingBooking';
 import { DriverBookingModel } from '../../models/src/driverBooking';
@@ -102,9 +104,6 @@ export class DriverService {
       if (current.activeBookingId) {
         throw new BadRequestError('Availability cannot change while you have an active booking');
       }
-      if (dto.isAvailable && current.driverProfile?.status !== 'APPROVED') {
-        throw new ForbiddenError('Driver account pending admin approval');
-      }
       throw new BadRequestError('Availability changed; refresh and try again');
     }
 
@@ -185,7 +184,7 @@ export class DriverService {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
 
-    const driver = await UserModel.findById(driverId).select('driverProfile currentLocation role').exec();
+    const driver = await UserModel.findById(driverId).select('driverProfile currentLocation role driverContext').exec();
     if (!driver) throw new NotFoundError('Driver not found');
 
     return listOpenBookingOffers({ forDriver: driver });
@@ -271,6 +270,9 @@ export class DriverService {
         statusHistory?: Array<{ status: string; timestamp: Date }>;
         vendorId?: { toString(): string } | null;
         assignedFleetVehicleLabel?: string;
+        arrivedAtDropoffAt?: Date | null;
+        paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE' | null;
+        paymentConfirmedByCustomer?: boolean | null;
       },
     ) => ({
       bookingType: type,
@@ -286,6 +288,11 @@ export class DriverService {
       statusHistory: mapStatusHistory(booking.statusHistory),
       vendorId: booking.vendorId?.toString(),
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
+      arrivedAtDropoffAt: booking.arrivedAtDropoffAt
+        ? new Date(booking.arrivedAtDropoffAt).toISOString()
+        : undefined,
+      paymentCollectionMode: booking.paymentCollectionMode ?? undefined,
+      paymentConfirmedByCustomer: Boolean(booking.paymentConfirmedByCustomer),
     });
 
     if (bookingType === 'towing') {
@@ -346,17 +353,21 @@ export class DriverService {
     }
 
     if (dto.status === 'COMPLETED') {
-      if (booking.completionOtp || booking.arrivedAtDropoffAt) {
-        try {
-          assertCompletionOtp(booking, dto.completionOtp);
-        } catch (otpErr) {
-          if (dto.bookingType === 'towing') {
-            await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
-          } else {
-            await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
-          }
-          throw otpErr;
+      if (!booking.arrivedAtDropoffAt) {
+        throw new BadRequestError('Mark arrival at the drop before completing the job');
+      }
+      if (!booking.paymentConfirmedByCustomer) {
+        throw new BadRequestError('The customer must confirm payment before this job can be completed');
+      }
+      try {
+        assertCompletionOtp(booking, dto.completionOtp);
+      } catch (otpErr) {
+        if (dto.bookingType === 'towing') {
+          await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
+        } else {
+          await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
         }
+        throw otpErr;
       }
     }
 
@@ -422,6 +433,21 @@ export class DriverService {
 
     if (dto.status === 'COMPLETED') {
       await releaseDriver(driverId, bookingId);
+      // Automated escrow settlement disbursement (85% vendor payout / 15% platform commission)
+      const finalFare = updated.finalFare ?? updated.estimatedFare ?? 0;
+      void processBookingCompletionEscrowSettlement({
+        bookingId: updated._id.toString(),
+        bookingNumber: updated.bookingNumber,
+        finalFare,
+        vendorId: updated.vendorId,
+        driverId: updated.driverId,
+        customerId: updated.customerId,
+      }).catch((err) => {
+        logger.error('Failed to disburse automated escrow settlement', {
+          bookingId: updated._id.toString(),
+          error: err,
+        });
+      });
     }
 
     emitBookingStatusUpdate(bookingId, dto.status, {
@@ -440,7 +466,7 @@ export class DriverService {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
 
-    const driver = await UserModel.findById(driverId).select('activeBookingId isAvailable driverProfile').exec();
+    const driver = await UserModel.findById(driverId).select('activeBookingId isAvailable driverProfile driverContext').exec();
     if (driver?.activeBookingId && driver.activeBookingId.toString() !== bookingId) {
       throw new BadRequestError('You already have an active booking in progress');
     }
@@ -450,6 +476,9 @@ export class DriverService {
     if (!booking) throw new NotFoundError('Booking not found');
 
     if (booking.status === 'CONFIRMED' && !booking.driverId) {
+      if (driver?.driverContext === 'VENDOR_MANAGED') {
+        throw new ForbiddenError('Your vendor assigns your jobs. Open requests are not available.');
+      }
       return claimOpenBookingOffer(bookingId, bookingType, driverId);
     }
 
@@ -482,7 +511,7 @@ export class DriverService {
     return { rejected: true, bookingId, status: 'CONFIRMED' as const };
   }
 
-  /** Mark arrived at dropoff destination: notifies customer to pay and reveals completion OTP */
+    /** Driver confirms drop arrival. Customer is asked to pay. The SMS code is not sent yet. */
   async arrivedAtDropoff(driverId: string, role: string, bookingId: string, bookingType: 'towing' | 'driver') {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
@@ -497,12 +526,10 @@ export class DriverService {
       throw new BadRequestError('Booking must be IN_PROGRESS to mark arrival at dropoff');
     }
 
-    const completionOtp = booking.completionOtp ?? generateCompletionOtp();
     const arrivedAtDropoffAt = new Date();
 
     await Model.updateById(bookingId, {
       arrivedAtDropoffAt,
-      completionOtp,
     });
 
     const fare =
@@ -510,19 +537,34 @@ export class DriverService {
         ? (booking.fareBreakdown as { totalFare?: number }).totalFare
         : booking.estimatedFare;
 
-    emitBookingStatusUpdate(bookingId, 'IN_PROGRESS', {
+    const arrivalNotice = {
+      bookingId,
+      bookingType,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
       arrivedAtDropoff: true,
       arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
+      fare,
+      paymentOptions: ['CASH', 'UPI', 'ONLINE'],
+      message: 'Driver has reached your location. Pay the driver to finish the trip.',
+    };
+
+    emitBookingStatusUpdate(bookingId, 'IN_PROGRESS', {
+      arrivedAtDropoff: true,
+      arrivedAtDropoffAt: arrivalNotice.arrivedAtDropoffAt,
       fare,
       paymentCollectionMode: booking.paymentCollectionMode,
       paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     });
+    emitToBooking(bookingId, 'booking:driver_arrived_dropoff', arrivalNotice);
+    if (booking.customerId) {
+      emitToUser(booking.customerId.toString(), 'booking:driver_arrived_dropoff', arrivalNotice);
+    }
 
     emitToDriver(driverId, 'booking:driver_arrived_dropoff', {
       bookingId,
       bookingNumber: booking.bookingNumber,
       fare,
-      completionOtp,
       arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
     });
 
@@ -533,7 +575,6 @@ export class DriverService {
       status: booking.status,
       arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
       fare,
-      completionOtp,
     };
   }
 

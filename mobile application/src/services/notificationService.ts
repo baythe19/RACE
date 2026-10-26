@@ -1,9 +1,22 @@
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 import { TOKEN_KEYS } from '../config/env';
 import { api, unwrapApi } from './api';
 import { API_ENDPOINTS } from '../config/api';
 import { UI_PREVIEW_MODE, UI_PREVIEW_MUTATIONS_ENABLED } from '../constants/preview';
+
+// Configure lock-screen and heads-up banner presentation
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
 import {
   getPreviewDriverNotifications,
   getPreviewVendorNotifications,
@@ -145,4 +158,122 @@ export async function updateNotificationPreferences(
     }
     throw error;
   }
+}
+
+/**
+ * Configure high-priority Android notification channels with lock screen visibility.
+ */
+export async function setupLockScreenNotificationChannels(): Promise<void> {
+  if (Platform.OS === 'android') {
+    // 1. MAX priority channel for incoming dispatch jobs (heads-up on lock screen)
+    await Notifications.setNotificationChannelAsync('dispatch_urgent', {
+      name: '🚨 Urgent Dispatch Offers',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 500, 200, 500],
+      lightColor: '#FFBF00',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
+      sound: 'default',
+    });
+
+    // 2. High priority channel for active trip milestones (OTP, arrival, payment)
+    await Notifications.setNotificationChannelAsync('trip_updates', {
+      name: 'Trip & Payment Updates',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#0066FF',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      sound: 'default',
+    });
+  }
+}
+
+/**
+ * Request notification permissions from OS.
+ */
+export async function requestNotificationPermissions(): Promise<boolean> {
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    await setupLockScreenNotificationChannels();
+    return finalStatus === 'granted';
+  } catch (e) {
+    console.warn('Failed to get notification permissions', e);
+    return false;
+  }
+}
+
+/**
+ * Display an immediate outer-app notification on the lock screen / status bar.
+ */
+export async function presentOuterAppAlert(params: {
+  title: string;
+  body: string;
+  channelId?: 'dispatch_urgent' | 'trip_updates';
+  data?: Record<string, unknown>;
+}): Promise<string> {
+  try {
+    return await Notifications.scheduleNotificationAsync({
+      content: {
+        title: params.title,
+        body: params.body,
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.MAX,
+        ...(Platform.OS === 'android' ? { channelId: params.channelId ?? 'dispatch_urgent' } : {}),
+        data: params.data ?? {},
+      },
+      trigger: null, // triggers immediately
+    });
+  } catch (err) {
+    console.warn('Could not schedule local notification', err);
+    return '';
+  }
+}
+
+/**
+ * High-priority outer-app lockscreen alert when a new job offer arrives.
+ */
+export async function alertNewDispatchOffer(job?: {
+  serviceType?: string;
+  estimatedFare?: number;
+  pickupAddress?: string;
+  bookingNumber?: string;
+}): Promise<void> {
+  const fareStr = job?.estimatedFare ? ` · ₹${job.estimatedFare}` : '';
+  const pickup = job?.pickupAddress ? ` · ${job.pickupAddress}` : '';
+  await presentOuterAppAlert({
+    title: '🚨 New Dispatch Offer Nearby!',
+    body: `${job?.serviceType ?? 'Flatbed Towing'}${fareStr}${pickup} — Tap to review and accept`,
+    channelId: 'dispatch_urgent',
+    data: { type: 'JOB_OFFER', bookingNumber: job?.bookingNumber },
+  });
+}
+
+/**
+ * High-priority outer-app alert when customer confirms payment at dropoff.
+ */
+export async function alertCustomerPaymentConfirmed(fare?: number): Promise<void> {
+  const amountStr = fare ? ` of ₹${fare}` : '';
+  await presentOuterAppAlert({
+    title: '💰 Payment Confirmed by Customer!',
+    body: `Customer confirmed payment${amountStr}. Collect the 4-digit completion code to finish the service.`,
+    channelId: 'trip_updates',
+    data: { type: 'PAYMENT_CONFIRMED' },
+  });
+}
+
+/**
+ * High-priority outer-app alert when trip start OTP is ready.
+ */
+export async function alertTripOtpReady(customerName?: string): Promise<void> {
+  await presentOuterAppAlert({
+    title: '🔑 Pickup Reached — Verify OTP',
+    body: `Ask ${customerName ?? 'customer'} for the 4-digit trip start OTP before loading vehicle.`,
+    channelId: 'trip_updates',
+    data: { type: 'TRIP_OTP' },
+  });
 }

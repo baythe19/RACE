@@ -50,7 +50,7 @@ export default function DropoffPaymentModal({
   onSuccess,
   onClose,
 }: Props) {
-  const [selectedMode, setSelectedMode] = useState<PaymentOption>('CASH');
+  const [selectedMode, setSelectedMode] = useState<PaymentOption>('UPI');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [localConfirmedOtp, setLocalConfirmedOtp] = useState<string | null>(null);
@@ -171,7 +171,33 @@ export default function DropoffPaymentModal({
               <View style={styles.modeSection}>
                 <Text style={styles.sectionHeading}>Choose How You Are Paying</Text>
 
-                {/* Option 1: Cash */}
+                {/* Option 1: UPI / QR (Priority #1) */}
+                <TouchableOpacity
+                  activeOpacity={0.75}
+                  style={[
+                    styles.modeOption,
+                    selectedMode === 'UPI' && styles.modeOptionSelected,
+                  ]}
+                  onPress={() => setSelectedMode('UPI')}
+                >
+                  <View style={[styles.modeIconCircle, selectedMode === 'UPI' && styles.modeIconCircleSelected]}>
+                    <QrCode size={20} color={selectedMode === 'UPI' ? colors.primary : colors.dark} />
+                  </View>
+                  <View style={styles.modeDetails}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={styles.modeTitle}>UPI / QR Code</Text>
+                      <View style={styles.recommendedBadge}>
+                        <Text style={styles.recommendedBadgeText}>Fastest</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.modeSubtitle}>Scan driver's QR code or pay via GPay, PhonePe, Paytm</Text>
+                  </View>
+                  <View style={[styles.radioCircle, selectedMode === 'UPI' && styles.radioCircleSelected]}>
+                    {selectedMode === 'UPI' && <View style={styles.radioInner} />}
+                  </View>
+                </TouchableOpacity>
+
+                {/* Option 2: Cash to Driver (Priority #2) */}
                 <TouchableOpacity
                   activeOpacity={0.75}
                   style={[
@@ -189,48 +215,6 @@ export default function DropoffPaymentModal({
                   </View>
                   <View style={[styles.radioCircle, selectedMode === 'CASH' && styles.radioCircleSelected]}>
                     {selectedMode === 'CASH' && <View style={styles.radioInner} />}
-                  </View>
-                </TouchableOpacity>
-
-                {/* Option 2: UPI / QR */}
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  style={[
-                    styles.modeOption,
-                    selectedMode === 'UPI' && styles.modeOptionSelected,
-                  ]}
-                  onPress={() => setSelectedMode('UPI')}
-                >
-                  <View style={[styles.modeIconCircle, selectedMode === 'UPI' && styles.modeIconCircleSelected]}>
-                    <QrCode size={20} color={selectedMode === 'UPI' ? colors.primary : colors.dark} />
-                  </View>
-                  <View style={styles.modeDetails}>
-                    <Text style={styles.modeTitle}>UPI / QR Code</Text>
-                    <Text style={styles.modeSubtitle}>Scan driver's QR code or pay via GPay, PhonePe, Paytm</Text>
-                  </View>
-                  <View style={[styles.radioCircle, selectedMode === 'UPI' && styles.radioCircleSelected]}>
-                    {selectedMode === 'UPI' && <View style={styles.radioInner} />}
-                  </View>
-                </TouchableOpacity>
-
-                {/* Option 3: In-App Online */}
-                <TouchableOpacity
-                  activeOpacity={0.75}
-                  style={[
-                    styles.modeOption,
-                    selectedMode === 'ONLINE' && styles.modeOptionSelected,
-                  ]}
-                  onPress={() => setSelectedMode('ONLINE')}
-                >
-                  <View style={[styles.modeIconCircle, selectedMode === 'ONLINE' && styles.modeIconCircleSelected]}>
-                    <CreditCard size={20} color={selectedMode === 'ONLINE' ? colors.primary : colors.dark} />
-                  </View>
-                  <View style={styles.modeDetails}>
-                    <Text style={styles.modeTitle}>In-App Payment</Text>
-                    <Text style={styles.modeSubtitle}>Pay via connected account / card to driver wallet</Text>
-                  </View>
-                  <View style={[styles.radioCircle, selectedMode === 'ONLINE' && styles.radioCircleSelected]}>
-                    {selectedMode === 'ONLINE' && <View style={styles.radioInner} />}
                   </View>
                 </TouchableOpacity>
 
@@ -395,6 +379,17 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: typography.weights.bold,
     color: colors.dark,
+  },
+  recommendedBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  recommendedBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+    color: '#15803D',
   },
   modeSubtitle: {
     fontSize: 12,

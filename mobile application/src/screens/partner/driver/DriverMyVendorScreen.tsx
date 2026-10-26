@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   StyleSheet,
@@ -25,6 +24,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 
 import AppScreenLayout from '../../../components/ui/AppScreenLayout';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import { PartnerText } from '../../../components/partner/PartnerText';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import { useDriverJobsQuery } from '../../../services/driver/useDriverQueries';
@@ -64,6 +64,7 @@ const PREVIEW_SCENARIOS: { id: DriverVendorPreviewScenario; label: string }[] = 
 ];
 
 export default function DriverMyVendorScreen() {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const px = useScreenPx();
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
@@ -138,10 +139,11 @@ export default function DriverMyVendorScreen() {
           }
         },
         onError: error =>
-          Alert.alert(
-            'Could not update invitation',
-            error instanceof Error ? error.message : 'Please try again.',
-          ),
+          showAlert({
+            tone: 'error',
+            title: 'Could not update invitation',
+            message: error instanceof Error ? error.message : 'Please try again.',
+          }),
       },
     );
   };
@@ -154,6 +156,7 @@ export default function DriverMyVendorScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <AppScreenLayout
       header={
         <View
@@ -715,6 +718,8 @@ export default function DriverMyVendorScreen() {
         </Pressable>
       </Modal>
     </AppScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

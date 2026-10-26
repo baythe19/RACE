@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useNavigation, useRoute, type NavigationProp, type RouteProp } from '@react-navigation/native';
 import {
   ArrowLeft,
@@ -26,7 +26,7 @@ import PartnerDocumentUploadList, {
 import VendorVehicleImage from '../../../../components/partner/VendorVehicleImage';
 import { PartnerText } from '../../../../components/partner/PartnerText';
 import AppScreenLayout from '../../../../components/ui/AppScreenLayout';
-import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../../../constants/partnerCopy';
+import { usePartnerDialog } from '../../../../hooks/usePartnerDialog';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import {
   useCreateVendorVehicleMutation,
@@ -113,12 +113,12 @@ function maskDate(value: string) {
 }
 
 export default function VendorVehicleRegistrationScreen() {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const navigation = useNavigation<NavigationProp<NavigationParams>>();
   const route = useRoute<RouteProp<PartnerAccountStackParamList, 'VendorVehicleRegistration'>>();
   const vehicleId = route.params?.vehicleId;
 
-  const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
-  const isApproved = vendor?.status === 'approved';
+  const { isLoading: vendorLoading } = useVendorStatusQuery(true);
   const {
     data: vehicles = [],
     isLoading: vehiclesLoading,
@@ -269,10 +269,6 @@ export default function VendorVehicleRegistrationScreen() {
 
   const saveVehicle = async () => {
     if (savingRef.current) return;
-    if (!isApproved) {
-      Alert.alert('Approval required', PARTNER_WAITING_ADMIN_APPROVAL);
-      return;
-    }
     if (!validateVehicle() || !validateRegistration()) return;
     const missingDocuments = REQUIRED_VEHICLE_DOCUMENTS.filter(
       document => !vehicleDocuments.some(file => file.id === document.id),
@@ -379,14 +375,15 @@ export default function VendorVehicleRegistrationScreen() {
     if (assignedDriverId !== originalAssignedDriverId) await refetchDrivers();
 
     navigation.goBack();
-    Alert.alert(
-      editingVehicle || createdVehicleId ? 'Vehicle updated' : 'Vehicle added',
-      driverLinkFailed
+    showAlert({
+      tone: 'success',
+      title: editingVehicle || createdVehicleId ? 'Vehicle updated' : 'Vehicle added',
+      message: driverLinkFailed
         ? 'Vehicle details were saved, but the driver assignment could not be updated. Review the assignment on the fleet card.'
         : editingVehicle || createdVehicleId
           ? 'Vehicle details were saved.'
           : 'The vehicle is ready to assign to jobs.',
-    );
+    });
   };
 
   const ready = !vehicleId || initializedVehicleId === vehicleId;
@@ -415,27 +412,8 @@ export default function VendorVehicleRegistrationScreen() {
     );
   }
 
-  if (!isApproved) {
-    return (
-      <AppScreenLayout
-        backgroundColor={PAGE_BG}
-        header={<View style={styles.header}><PartnerText style={styles.title}>Vehicle registration</PartnerText></View>}
-        footer={
-          <View style={styles.footer}>
-            <Pressable onPress={() => navigation.goBack()} style={styles.secondaryButton}>
-              <PartnerText style={styles.secondaryLabel}>Back to vehicles</PartnerText>
-            </Pressable>
-          </View>
-        }>
-        <View style={styles.infoBanner}>
-          <Info size={17} color={colors.primaryDark} />
-          <PartnerText style={styles.infoText}>{PARTNER_WAITING_ADMIN_APPROVAL}</PartnerText>
-        </View>
-      </AppScreenLayout>
-    );
-  }
-
   return (
+    <View style={{ flex: 1 }}>
     <AppScreenLayout
       backgroundColor={PAGE_BG}
       keyboardAvoiding
@@ -776,6 +754,8 @@ export default function VendorVehicleRegistrationScreen() {
         </Pressable>
       </Modal>
     </AppScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

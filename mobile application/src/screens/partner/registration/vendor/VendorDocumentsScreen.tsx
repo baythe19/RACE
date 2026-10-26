@@ -3,6 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import { FileCheck2, ShieldCheck } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { usePartnerDialog } from '../../../../hooks/usePartnerDialog';
 import DriverRegistrationLayout from '../../../../components/partner/DriverRegistrationLayout';
 import PartnerDocumentUploadList from '../../../../components/partner/PartnerDocumentUploadList';
 import PartnerRegistrationStepCard from '../../../../components/partner/PartnerRegistrationStepCard';
@@ -20,6 +21,7 @@ import { partnerRegistrationGoBack } from '../../../../utils/partnerRegistration
 type Props = NativeStackScreenProps<PartnerRegistrationStackParamList, 'VendorDocuments'>;
 
 export default function VendorDocumentsScreen({ navigation, route }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const vendorDocuments = usePartnerRegistrationStore((s) => s.vendorDocuments);
   const addVendorDocument = usePartnerRegistrationStore((s) => s.addVendorDocument);
 
@@ -37,12 +39,13 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
 
   const handleContinue = () => {
     if (!isAllCoreComplete) {
-      Alert.alert(
-        'Required documents needed',
-        `Please upload the following required documents before proceeding:\n\n• ${missingCoreDocs
+      showAlert({
+        tone: 'warning',
+        title: 'Required documents needed',
+        message: `Please upload the following required documents before proceeding:\n\n• ${missingCoreDocs
           .map((d) => d.label)
           .join('\n• ')}`,
-      );
+      });
       return;
     }
     navigation.navigate('VendorReview', route.params);
@@ -59,6 +62,7 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <DriverRegistrationLayout
       step={3}
       stepLabels={VENDOR_REGISTRATION_STEPS}
@@ -101,6 +105,8 @@ export default function VendorDocumentsScreen({ navigation, route }: Props) {
         </View>
       </PartnerRegistrationStepCard>
     </DriverRegistrationLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

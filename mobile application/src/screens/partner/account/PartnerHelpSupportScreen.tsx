@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Search,
@@ -17,6 +17,7 @@ import {
 
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerHelpSupport'>;
@@ -30,17 +31,18 @@ const TOPICS = [
 ];
 
 export default function PartnerHelpSupportScreen({ navigation }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const [searchQuery, setSearchQuery] = useState('');
 
   const handleCall = () => {
     Linking.openURL('tel:+917205012345').catch(() => {
-      Alert.alert('Customer Care', 'Toll-free partner support: +91 72050 12345');
+      showAlert({ tone: 'info', title: 'Customer Care', message: 'Toll-free partner support: +91 72050 12345' });
     });
   };
 
   const handleWhatsApp = () => {
     Linking.openURL('https://wa.me/917205012345').catch(() => {
-      Alert.alert('WhatsApp Support', 'Partner help desk on WhatsApp: +91 72050 12345');
+      showAlert({ tone: 'info', title: 'WhatsApp Support', message: 'Partner help desk on WhatsApp: +91 72050 12345' });
     });
   };
 
@@ -51,6 +53,7 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title="Help & Support"
       onBack={() => navigation.goBack()}>
@@ -108,10 +111,11 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
                   getPressableFeedback(pressed),
                 ]}
                 onPress={() =>
-                  Alert.alert(
-                    topic.title,
-                    `For ${topic.title.toLowerCase()} inquiries, our team is available 24/7 at +91 72050 12345.`,
-                  )
+                  showAlert({
+                    tone: 'info',
+                    title: topic.title,
+                    message: `For ${topic.title.toLowerCase()} inquiries, our team is available 24/7 at +91 72050 12345.`,
+                  })
                 }>
                 <View style={[styles.topicIconCircle, { backgroundColor: topic.bg }]}>
                   <IconComp size={18} color={topic.color} strokeWidth={2.2} />
@@ -148,6 +152,8 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
         </Pressable>
       </View>
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

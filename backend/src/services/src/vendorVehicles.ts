@@ -88,11 +88,11 @@ export class VendorVehiclesService {
 
   private async assertVendorApproved(userId: string) {
     const user = await this.assertVendor(userId);
-    const status = user.vendorProfile?.status;
-    if (status !== 'approved') {
-      throw new ForbiddenError(
-        'Your vendor account must be approved by admin before you can register vehicles.',
-      );
+    if (user.accountStatus === 'SUSPENDED' || user.operationalStatus === 'SUSPENDED') {
+      throw new ForbiddenError('Your vendor account is suspended.');
+    }
+    if (user.vendorProfile?.status === 'rejected' || user.reviewStatus === 'REJECTED') {
+      throw new ForbiddenError('Your vendor account was rejected by administrator.');
     }
     return user;
   }

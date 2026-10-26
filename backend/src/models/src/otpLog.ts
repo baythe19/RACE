@@ -4,7 +4,7 @@ export interface IOtpLog extends Document {
   mobileNumber: string;
   email?: string;
   fullName?: string;
-  mobileOtp?: string;          // Stored only in dev/mock mode for logDevOtp
+  mobileOtp?: string;          // Stored only in dev/mock mode for logDevOtp or post-verify idempotency
   emailOtp?: string;
   mobileOtpExpiry?: Date;
   emailOtpExpiry?: Date;
@@ -12,10 +12,8 @@ export interface IOtpLog extends Document {
   emailVerified: boolean;
   mobileAttempts: number;
   emailAttempts: number;
-  mcVerificationId?: string;   // MessageCentral verificationId for server-side OTP validation
-  mcVerificationIdHash?: string; // sha256(verificationId + submitted-otp) — replay-proof idempotency key
-  provider?: 'messagecentral' | 'hanu' | 'local'; // which SMS route created this log
-  otpHash?: string;            // sha256(otp + pepper) for provider==='hanu' (digits never stored)
+  provider?: 'hanu' | 'local'; // exclusively HanuSMS (or local dev)
+  otpHash?: string;            // sha256(otp + pepper) for provider==='hanu' (digits never stored in DB)
   createdAt: Date;
 }
 
@@ -32,10 +30,8 @@ const OtpLogSchema = new Schema<IOtpLog>(
     emailVerified: { type: Boolean, default: false },
     mobileAttempts: { type: Number, default: 0 },
     emailAttempts: { type: Number, default: 0 },
-    mcVerificationId: { type: String },
-    provider: { type: String, enum: ['messagecentral', 'hanu', 'local'] },
+    provider: { type: String, enum: ['hanu', 'local'] },
     otpHash: { type: String },
-    mcVerificationIdHash: { type: String },
     createdAt: { type: Date, default: Date.now, index: true },
   },
   { timestamps: false },

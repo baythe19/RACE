@@ -346,9 +346,8 @@ function mapOffer(
  * Selects which booking collections may contribute to an open-offer feed.
  *
  * Independent drivers receive driver-hire jobs only, even when a caller asks
- * for all offers or explicitly requests towing. Vendor-linked drivers retain
- * the existing vendor-routed towing compatibility; vendors can browse both
- * booking types. The internal audience preserves the legacy unscoped behavior.
+ * for all offers or explicitly requests towing. Vendors receive towing jobs
+ * only. The internal audience preserves the unscoped behavior.
  */
 export function selectOpenOfferBookingTypes(options: {
   audience: 'driver' | 'vendor' | 'internal';
@@ -361,6 +360,11 @@ export function selectOpenOfferBookingTypes(options: {
 
   if (options.audience === 'driver' && !options.vendorLinkedDriver) {
     return requestedTypes.filter((bookingType) => bookingType === 'driver');
+  }
+
+  // A towing vendor only receives vehicle jobs. Driver-hire stays with independent drivers.
+  if (options.audience === 'vendor') {
+    return requestedTypes.filter((bookingType) => bookingType === 'towing');
   }
 
   return requestedTypes;
@@ -393,6 +397,10 @@ export async function listOpenBookingOffers(options?: {
       .lean()
       .exec();
     memberVendorUserId = membership?.vendorUserId?.toString();
+  }
+  // Fleet drivers only work jobs their vendor assigns. They never browse open offers.
+  if (memberVendorUserId) {
+    return [];
   }
   const selectedBookingTypes = selectOpenOfferBookingTypes({
     audience: options?.forVendorId ? 'vendor' : options?.forDriver ? 'driver' : 'internal',
@@ -757,11 +765,25 @@ export async function claimOpenBookingOffer(
       },
     },
   };
-  const filter = {
+  const unassignedDriver = { $or: [{ driverId: null }, { driverId: { $exists: false } }] };
+  const filter: Record<string, unknown> = {
     _id: bookingId,
     status: 'CONFIRMED',
-    $or: [{ driverId: null }, { driverId: { $exists: false } }],
+    ...unassignedDriver,
   };
+  if (vendorId) {
+    filter.$and = [
+      unassignedDriver,
+      {
+        $or: [
+          { vendorId: null },
+          { vendorId: { $exists: false } },
+          { vendorId: new Types.ObjectId(vendorId) },
+        ],
+      },
+    ];
+    delete filter.$or;
+  }
 
   await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, vendorId ? undefined : null);
 
@@ -857,10 +879,18 @@ export async function findNearestAvailableDriver(
   pickupLongitude: number,
   bookingType: ActiveBookingType,
 ): Promise<{ driverId: string; distanceKm: number } | null> {
+  if (bookingType === 'towing') {
+    return null;
+  }
+
   const drivers = await UserModel.find({
     role: 'driver',
     isAvailable: true,
-    'driverProfile.status': 'APPROVED',
+    driverContext: { $ne: 'VENDOR_MANAGED' },
+    'driverProfile.vendorUserId': null,
+    'driverProfile.status': { $ne: 'REJECTED' },
+    operationalStatus: { $ne: 'SUSPENDED' },
+    reviewStatus: { $ne: 'REJECTED' },
     'driverProfile.driverType': { $in: [...driverTypesForBooking(bookingType)] },
     $or: [{ activeBookingId: null }, { activeBookingId: { $exists: false } }],
   }).exec();
@@ -926,6 +956,9 @@ export async function assignDriverToBooking(
 
   const bookingVendorId = booking.vendorId?.toString() ?? null;
   const driverVendorId = driver.driverProfile?.vendorUserId?.toString() ?? null;
+  if (bookingType === 'towing' && !bookingVendorId) {
+    throw new BadRequestError('A towing vendor accepts this job and assigns one of their drivers');
+  }
   if (bookingVendorId !== driverVendorId) {
     throw new ForbiddenError('Assign a driver from the booking vendor fleet');
   }
@@ -1080,7 +1113,9 @@ export async function listAvailableDrivers(options?: {
   const filter: Record<string, unknown> = {
     role: 'driver',
     isAvailable: true,
-    'driverProfile.status': 'APPROVED',
+    'driverProfile.status': { $ne: 'REJECTED' },
+    operationalStatus: { $ne: 'SUSPENDED' },
+    reviewStatus: { $ne: 'REJECTED' },
     $or: [{ activeBookingId: null }, { activeBookingId: { $exists: false } }],
   };
 
@@ -1097,7 +1132,13 @@ export async function listAvailableDrivers(options?: {
         ? await TowingBookingModel.findById(options.bookingId).select('vendorId').exec()
         : await DriverBookingModel.findById(options.bookingId).select('vendorId').exec();
     if (!booking) throw new NotFoundError('Booking not found');
+    if (options.bookingType === 'towing' && !booking.vendorId) return [];
     filter['driverProfile.vendorUserId'] = booking.vendorId ?? null;
+  } else if (options?.bookingType === 'towing') {
+    return [];
+  } else {
+    filter.driverContext = { $ne: 'VENDOR_MANAGED' };
+    filter['driverProfile.vendorUserId'] = null;
   }
 
   const drivers = await UserModel.find(filter).exec();

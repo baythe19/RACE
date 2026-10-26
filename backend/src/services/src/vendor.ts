@@ -550,7 +550,7 @@ export class VendorService {
   }
 
   /**
-   * Save (upsert) the vendor's payout account on the user profile.
+   * Save (upsert) the partner's (vendor or independent driver) payout account on the user profile.
    * Real validation happens in savePayoutAccountSchema; verification is a
    * separate step — saving alone never marks the channel verified.
    */
@@ -562,7 +562,8 @@ export class VendorService {
     if (!user) throw new NotFoundError('User not found');
 
     const now = new Date();
-    const existing = user.vendorProfile?.bankDetails;
+    const isDriver = user.role === 'driver';
+    const existing = isDriver ? user.driverProfile?.bankDetails : user.vendorProfile?.bankDetails;
     const accountNumber =
       dto.payoutMethod === 'bank'
         ? dto.bank?.accountNumber ??
@@ -586,7 +587,7 @@ export class VendorService {
       payoutMethod: dto.payoutMethod,
       isVerified: keepVerified,
       verifiedAt: keepVerified ? existing?.verifiedAt : undefined,
-      source: 'vendor_app',
+      source: isDriver ? 'driver_app' : 'vendor_app',
       updatedAt: now,
     };
     if (dto.payoutMethod === 'bank' && dto.bank) {
@@ -598,16 +599,22 @@ export class VendorService {
       bankDetails.upiId = dto.upi.upiId;
     }
 
-    await userRepository.updateById(userId, {
-      vendorProfile: { ...user.vendorProfile, bankDetails } as NonNullable<typeof user.vendorProfile>,
-    });
+    if (isDriver) {
+      await userRepository.updateById(userId, {
+        driverProfile: { ...user.driverProfile, bankDetails } as NonNullable<typeof user.driverProfile>,
+      });
+    } else {
+      await userRepository.updateById(userId, {
+        vendorProfile: { ...user.vendorProfile, bankDetails } as NonNullable<typeof user.vendorProfile>,
+      });
+    }
     return this.getPayoutAccount(userId);
   }
 
   async getPayoutAccount(userId: string): Promise<PayoutAccountDto> {
     const user = await userRepository.findById(userId);
     if (!user) throw new NotFoundError('User not found');
-    const bank = user.vendorProfile?.bankDetails;
+    const bank = user.role === 'driver' ? user.driverProfile?.bankDetails : user.vendorProfile?.bankDetails;
     if (!bank || (!bank.accountNumber && !bank.upiId)) {
       throw new NotFoundError('No payout account saved yet');
     }

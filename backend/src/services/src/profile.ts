@@ -31,6 +31,7 @@ function mapDriverProfile(user: IUser): ProfileDriverSummaryDto | undefined {
     state: profile.state,
     vehicleRegistration: profile.vehicleRegistration,
     fleetSource: profile.fleetSource,
+    vendorUserId: profile.vendorUserId?.toString(),
     policeVerificationStatus: profile.policeVerificationStatus,
     documents: (profile.documents ?? []).map((doc) => ({
       type: doc.type,
@@ -60,6 +61,8 @@ function mapProfile(user: IUser): ProfileResponseDto {
     isVerified: user.isVerified,
     isProfileCompleted: user.isProfileCompleted,
     role: user.role,
+    driverContext: user.driverContext,
+    vendorUserId: user.vendorUserId?.toString() ?? user.driverProfile?.vendorUserId?.toString(),
     ...(user.role === 'driver' ? { isAvailable: user.driverProfile?.status === 'APPROVED' && user.isAvailable === true && !user.activeBookingId } : {}),
     ...(user.role === 'driver' ? { driverProfile: mapDriverProfile(user) } : {}),
   };

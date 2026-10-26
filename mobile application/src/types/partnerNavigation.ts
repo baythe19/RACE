@@ -41,8 +41,22 @@ export type PartnerRootStackParamList = {
   PartnerDriverVerification: undefined;
 };
 
+/** Shared assign-job payload (same screen may live on Jobs, Drivers, or Account stack). */
+export type VendorAssignJobRouteParams = {
+  bookingId: string;
+  bookingType: 'towing' | 'driver';
+  bookingNumber: string;
+  serviceLabel: string;
+  pickupAddress?: string;
+  dropoffAddress?: string;
+  estimatedFare?: number;
+  preferredDriverId?: string;
+};
+
 export type PartnerDriversStackParamList = {
   VendorDriversList: { fullScreen?: boolean } | undefined;
+  VendorAddDriver: undefined;
+  VendorAssignJob: VendorAssignJobRouteParams;
   VendorVehicles: undefined;
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
 };
@@ -76,17 +90,9 @@ export type PartnerJobsStackParamList = {
   VendorVehicles: undefined;
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
   VendorDrivers: { fullScreen?: boolean } | undefined;
-  VendorAssignJob: {
-    bookingId: string;
-    bookingType: 'towing' | 'driver';
-    bookingNumber: string;
-    serviceLabel: string;
-    pickupAddress?: string;
-    dropoffAddress?: string;
-    estimatedFare?: number;
-    /** Pre-select a connected fleet driver (from Drivers tab). */
-    preferredDriverId?: string;
-  };
+  /** Vendor-side staff-driver onboarding: the full 3-step driver registration flow. */
+  VendorAddDriver: undefined;
+  VendorAssignJob: VendorAssignJobRouteParams;
 };
 
 export type PartnerAccountStackParamList = {
@@ -100,6 +106,9 @@ export type PartnerAccountStackParamList = {
   PartnerBankDetails: undefined;
   VendorVerificationStatus: undefined;
   VendorDrivers: { fullScreen?: boolean } | undefined;
+  /** Vendor-side staff-driver onboarding (same flow as the Jobs-stack copy). */
+  VendorAddDriver: undefined;
+  VendorAssignJob: VendorAssignJobRouteParams;
   VendorVehicles: undefined;
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
 };
