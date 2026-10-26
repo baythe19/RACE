@@ -98,7 +98,6 @@ export default function VendorVehiclesScreen() {
   const insets = useSafeAreaInsets();
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
-  const isApproved = vendor?.status === 'approved';
 
   const {
     data: vehicles = [],
@@ -211,6 +210,7 @@ export default function VendorVehiclesScreen() {
     <AppScreenLayout
       backgroundColor={PAGE_BG}
       keyboardAvoiding
+      growContent
       refreshing={isRefetching}
       onRefresh={() => {
         void refetch();
@@ -255,14 +255,6 @@ export default function VendorVehiclesScreen() {
         <DriverDataSkeleton variant="vehicles" />
       ) : (
         <View style={styles.content}>
-          {!isApproved ? (
-            <View style={styles.pendingBanner}>
-              <PartnerText style={styles.pendingText}>
-                Document review runs in the background. You can add vehicles and take towing jobs now. Status stays on your profile.
-              </PartnerText>
-            </View>
-          ) : null}
-
           <View style={styles.statsRow}>
             <View style={styles.statCard}>
               <View style={styles.statTop}>
@@ -537,18 +529,7 @@ const styles = StyleSheet.create({
   content: {
     gap: spacing.md,
     paddingBottom: spacing.xxl,
-  },
-  pendingBanner: {
-    backgroundColor: colors.goldLight,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: '#F5D98A',
-  },
-  pendingText: {
-    color: colors.primaryDark,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
+    flexGrow: 1,
   },
   statsRow: {
     flexDirection: 'row',
@@ -636,6 +617,8 @@ const styles = StyleSheet.create({
   },
   empty: {
     alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
     paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },

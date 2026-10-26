@@ -93,7 +93,7 @@ export default function AccountTypeScreen({ navigation }: Props) {
         ]}>
         <Image
           source={images.logo}
-          style={{ width: px(64), height: px(64), alignSelf: 'center', marginTop: px(8) }}
+          style={{ width: px(150), height: px(150 * (230 / 480)), alignSelf: 'center', marginTop: px(8) }}
           resizeMode="contain"
         />
 

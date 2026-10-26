@@ -1,277 +1,79 @@
+import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import {
   ArrowLeft,
-  Check,
+ Calendar,
   CheckCircle2,
-  Clock3,
-  Info,
-  Phone,
-  Plus,
-  ShieldCheck,
-  Star,
   ClipboardList,
   MoreVertical,
+  Phone,
+  Plus,
+  Search,
+  ShieldCheck,
+  Star,
   UserRound,
-  UserRoundPlus,
-  X,
 } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../../theme';
+import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
+import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
+import { useScreenPx } from '../../hooks/useScreenPx';
+import type { VendorMembership } from '../../services/vendor/vendorMembershipApi';
+import {
+  useRevokeVendorDriverMembershipMutation,
+  useVendorMembershipsQuery,
+} from '../../services/vendor/useVendorMembershipQueries';
+import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQueries';
 import { jumpToPartnerJobsScreen } from '../../navigation/partnerNavigationRef';
+import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import type {
   PartnerAccountStackParamList,
   PartnerDriversStackParamList,
   PartnerJobsStackParamList,
 } from '../../types/partnerNavigation';
-import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQueries';
-import AppScreenLayout from '../../components/ui/AppScreenLayout';
-import { PartnerText } from '../../components/partner/PartnerText';
-import { useScreenPx } from '../../hooks/useScreenPx';
-import { usePartnerDialog } from '../../hooks/usePartnerDialog';
-import {
-  useRevokeVendorDriverMembershipMutation,
-  useVendorMembershipsQuery,
-} from '../../services/vendor/useVendorMembershipQueries';
-import type { VendorMembership } from '../../services/vendor/vendorMembershipApi';
-import { useNavigation } from '@react-navigation/native';
-import type { NavigationProp } from '@react-navigation/native';
 
-const AMBER = '#F9A602';
+const PAGE_BG = '#FFFFFF';
+const SUCCESS_GREEN = '#22C55E';
 const INK = '#191919';
 const MUTED = '#6B7280';
-const GREEN = '#10B981';
+const AMBER = '#F9A602';
 
-function MemberCard({
-  member,
-  busy,
-  onRemove,
-  onAssign,
-}: {
-  member: VendorMembership;
-  busy: boolean;
-  onRemove: () => void;
-  onAssign?: () => void;
-}) {
-  const px = useScreenPx();
-  const pending = member.status === 'PENDING';
-  const [menuVisible, setMenuVisible] = useState(false);
+type MemberFilter = 'all' | 'ACTIVE' | 'BUSY' | 'PENDING';
 
-  const name = member.driver?.name ?? 'Driver';
-  const menuOptions: Array<{
-    key: string;
-    label: string;
-    destructive?: boolean;
-    onPress: () => void;
-  }> = [];
-  if (!pending && member.driver?.phone) {
-    menuOptions.push({
-      key: 'call',
-      label: 'Call driver',
-      onPress: () => {
-        setMenuVisible(false);
-        void Linking.openURL(`tel:${member.driver?.phone}`);
-      },
-    });
-  }
-  if (!pending && onAssign) {
-    menuOptions.push({
-      key: 'assign',
-      label: 'Assign to job',
-      onPress: () => {
-        setMenuVisible(false);
-        onAssign();
-      },
-    });
-  }
-  menuOptions.push({
-    key: 'remove',
-    label: pending ? 'Cancel invitation' : 'Remove from fleet',
-    destructive: true,
-    onPress: () => {
-      setMenuVisible(false);
-      onRemove();
-    },
-  });
+type AssignStacks =
+  | PartnerJobsStackParamList
+  | PartnerDriversStackParamList
+  | PartnerAccountStackParamList;
 
-  const openMenu = () => setMenuVisible(true);
-
-  return (
-    <View style={[styles.card, { borderRadius: px(16), padding: px(14), marginBottom: px(10) }]}>
-      <View style={styles.row}>
-        <View style={[styles.avatar, { width: px(44), height: px(44), borderRadius: px(14) }]}>
-          <UserRound size={px(22)} color={AMBER} />
-        </View>
-        <View style={styles.grow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6) }}>
-            <PartnerText style={[styles.name, { fontSize: px(15) }]}>
-              {member.driver?.name ?? 'Staff Driver'}
-            </PartnerText>
-            {member.driver?.driverCode ? (
-              <View style={[styles.codeBadge, { paddingHorizontal: px(6), paddingVertical: px(2), borderRadius: px(6) }]}>
-                <PartnerText style={{ color: '#2563EB', fontSize: px(10), fontWeight: '700' }}>
-                  {member.driver.driverCode}
-                </PartnerText>
-              </View>
-            ) : null}
-          </View>
-          <PartnerText style={[styles.sub, { fontSize: px(12), marginTop: px(2) }]}>
-            {member.driver?.phone ?? 'Fleet Driver'}
-          </PartnerText>
-          {member.driver?.driverType ? (
-            <PartnerText style={[styles.sub, { fontSize: px(11), marginTop: px(3), color: '#4B5563' }]}>
-              {member.driver.driverType + (member.driver.city ? ' · ' + member.driver.city : '')}
-            </PartnerText>
-          ) : null}
-        </View>
-        <View style={[styles.statusPill, { backgroundColor: pending ? '#FFF4D6' : '#E9F8EF' }]}>
-          <PartnerText style={{ color: pending ? '#9A6700' : '#13834C', fontSize: px(11), fontWeight: '700' }}>
-            {pending ? 'Pending' : 'Active'}
-          </PartnerText>
-        </View>
-        <Pressable
-          onPress={openMenu}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="Driver options"
-          style={{ padding: px(4), marginLeft: px(4) }}>
-          <MoreVertical size={px(20)} color={MUTED} strokeWidth={2.2} />
-        </Pressable>
-      </View>
-      {!pending && onAssign ? (
-        <Pressable
-          accessibilityRole="button"
-          disabled={busy || member.driver?.isBusy}
-          onPress={onAssign}
-          style={[
-            styles.primaryButton,
-            {
-              flexDirection: 'row',
-              marginTop: px(12),
-              height: px(42),
-              borderRadius: px(11),
-              backgroundColor: member.driver?.isBusy ? '#E5E7EB' : AMBER,
-              opacity: busy ? 0.7 : 1,
-            },
-          ]}>
-          <ClipboardList size={px(16)} color={INK} strokeWidth={2.3} />
-          <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700', marginLeft: px(6) }}>
-            {member.driver?.isBusy ? 'On another job' : 'Assign to open job'}
-          </PartnerText>
-        </Pressable>
-      ) : null}
-
-      {/* Driver options action sheet (replaces system Alert menu) */}
-      <Modal transparent animationType="fade" visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
-        <Pressable style={memberMenuStyles.overlay} onPress={() => setMenuVisible(false)}>
-          <Pressable style={[memberMenuStyles.sheet, { paddingBottom: px(10) }]} onPress={e => e.stopPropagation()}>
-            <View style={[memberMenuStyles.handle, { marginTop: px(10) }]} />
-            <PartnerText style={[memberMenuStyles.title, { fontSize: px(15), marginTop: px(8) }]}>{name}</PartnerText>
-            <PartnerText style={[memberMenuStyles.subtitle, { fontSize: px(12) }]}>
-              {pending ? 'Pending fleet driver' : 'Fleet driver'}
-            </PartnerText>
-            {menuOptions.map(option => (
-              <Pressable
-                key={option.key}
-                accessibilityRole="button"
-                onPress={option.onPress}
-                style={({ pressed }) => [memberMenuStyles.option, pressed && memberMenuStyles.optionPressed]}>
-                <PartnerText
-                  style={[
-                    memberMenuStyles.optionText,
-                    { fontSize: px(14) },
-                    option.destructive ? memberMenuStyles.optionDestructive : null,
-                  ]}>
-                  {option.label}
-                </PartnerText>
-              </Pressable>
-            ))}
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setMenuVisible(false)}
-              style={({ pressed }) => [memberMenuStyles.closeButton, pressed && memberMenuStyles.optionPressed]}>
-              <PartnerText style={[memberMenuStyles.closeText, { fontSize: px(14) }]}>Close</PartnerText>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
-  );
+function driverTypeBadge(type?: string) {
+  const lower = (type ?? '').toLowerCase();
+  if (lower.includes('tow')) return { bg: '#EDE9FE', text: '#7C3AED', label: type ?? 'Tow Driver' };
+  if (lower.includes('part')) return { bg: '#DBEAFE', text: '#1D4ED8', label: type ?? 'Part-Time' };
+  return { bg: '#FFF3D6', text: '#B45309', label: type ?? 'Full-Time' };
 }
 
-const memberMenuStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15,18,25,0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-  },
-  handle: {
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E2E4E8',
-  },
-  title: {
-    fontWeight: '800',
-    color: INK,
-  },
-  subtitle: {
-    color: MUTED,
-    marginTop: 2,
-  },
-  option: {
-    width: '100%',
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#F1F5F9',
-  },
-  optionPressed: {
-    backgroundColor: '#F8FAFC',
-  },
-  optionText: {
-    fontWeight: '600',
-    color: INK,
-  },
-  optionDestructive: {
-    color: '#DC2626',
-  },
-  closeButton: {
-    width: '100%',
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  closeText: {
-    fontWeight: '700',
-    color: MUTED,
-  },
-});
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(part => part.charAt(0).toUpperCase())
+    .join('');
+}
 
 export default function VendorDriverMembershipsScreen() {
   const px = useScreenPx();
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
-  const navigation = useNavigation<
-    NavigationProp<
-      PartnerJobsStackParamList | PartnerDriversStackParamList | PartnerAccountStackParamList
-    >
-  >();
+  const navigation = useNavigation<NavigationProp<AssignStacks>>();
 
   const { data: members = [], isLoading, isError, refetch, isRefetching } = useVendorMembershipsQuery();
   const revoke = useRevokeVendorDriverMembershipMutation();
@@ -280,6 +82,9 @@ export default function VendorDriverMembershipsScreen() {
   /** Multiple open jobs: vendor picks which job to assign the driver to. */
   const [assignPickerVisible, setAssignPickerVisible] = useState(false);
   const [assignPickerDriver, setAssignPickerDriver] = useState<{ driverId: string; driverName: string } | null>(null);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<MemberFilter>('all');
+  const [menuMember, setMenuMember] = useState<VendorMembership | null>(null);
   const assignPickerJobs = useMemo(
     () =>
       assignPickerDriver
@@ -336,6 +141,7 @@ export default function VendorDriverMembershipsScreen() {
   };
 
   const confirmRemove = (member: VendorMembership) => {
+    setMenuMember(null);
     const isPending = member.status === 'PENDING';
     showAlert({
       tone: isPending ? 'warning' : 'error',
@@ -361,10 +167,52 @@ export default function VendorDriverMembershipsScreen() {
 
   const activeMembers = members.filter(m => m.status === 'ACTIVE');
   const pendingMembers = members.filter(m => m.status === 'PENDING');
+  const busyMembers = activeMembers.filter(m => m.driver?.isBusy);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = members.filter(member => {
+      const isPending = member.status === 'PENDING';
+      if (statusFilter === 'PENDING' && !isPending) return false;
+      if (statusFilter === 'ACTIVE' && (isPending || member.driver?.isBusy)) return false;
+      if (statusFilter === 'BUSY' && (isPending || !member.driver?.isBusy)) return false;
+      if (!q) return true;
+      const haystack = [
+        member.driver?.name,
+        member.driver?.phone,
+        member.driver?.driverCode,
+        member.driver?.city,
+        member.driver?.driverType,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+    // Pending first (needs action), then alphabetical by name.
+    return [...list].sort((a, b) => {
+      const aPending = a.status === 'PENDING' ? 0 : 1;
+      const bPending = b.status === 'PENDING' ? 0 : 1;
+      if (aPending !== bPending) return aPending - bPending;
+      return (a.driver?.name ?? '').localeCompare(b.driver?.name ?? '');
+    });
+  }, [members, search, statusFilter]);
+
+  const stats = useMemo(
+    () => ({ total: members.length, active: activeMembers.length, busy: busyMembers.length, pending: pendingMembers.length }),
+    [members.length, activeMembers.length, busyMembers.length, pendingMembers.length],
+  );
 
   return (
     <View style={{ flex: 1 }}>
     <AppScreenLayout
+      backgroundColor={PAGE_BG}
+      keyboardAvoiding
+      growContent
+      refreshing={isRefetching}
+      onRefresh={() => {
+        void refetch();
+      }}
       header={
         <View style={styles.headerPad}>
           <View style={styles.titleRow}>
@@ -382,7 +230,7 @@ export default function VendorDriverMembershipsScreen() {
               <PartnerText style={styles.title}>Fleet Drivers</PartnerText>
               {!navigation.canGoBack() ? (
                 <PartnerText style={styles.subtitle}>
-                  {activeMembers.length} active driver{activeMembers.length === 1 ? '' : 's'} in your fleet
+                  Onboard staff drivers, assign jobs, keep the fleet moving
                 </PartnerText>
               ) : null}
             </View>
@@ -392,152 +240,401 @@ export default function VendorDriverMembershipsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Add driver"
                 onPress={openAddDriverFlow}
-                style={({ pressed }) => [styles.registerBtn, pressed && { opacity: 0.88 }]}>
+                style={({ pressed }) => [styles.registerBtn, pressed && styles.pressed]}>
                 <Plus size={15} color={colors.dark} strokeWidth={2.8} />
                 <PartnerText style={styles.registerLabel}>Add driver</PartnerText>
               </Pressable>
             </View>
           </View>
         </View>
-      }
-      refreshing={isRefetching}
-      onRefresh={() => {
-        void refetch();
-      }}
-      contentStyle={{ paddingTop: px(12) }}>
-      {/* Pending Drivers Section if any */}
-      {pendingMembers.length > 0 ? (
-        <View style={{ marginBottom: px(16) }}>
-          <PartnerText style={[styles.sectionTitle, { fontSize: px(15), marginBottom: px(8) }]}>
-            Pending Review Drivers · {pendingMembers.length}
-          </PartnerText>
-          {pendingMembers.map(member => (
-            <MemberCard
-              key={member.id}
-              member={member}
-              busy={revoke.isPending}
-              onRemove={() => confirmRemove(member)}
-            />
-          ))}
-        </View>
-      ) : null}
-
-      {/* Active Fleet Drivers List */}
-      <PartnerText style={[styles.sectionTitle, { fontSize: px(15), marginBottom: px(10) }]}>
-        Connected Fleet Drivers · {activeMembers.length}
-      </PartnerText>
-
+      }>
       {isLoading ? (
-        <View style={{ paddingVertical: px(30) }}>
-          <ActivityIndicator color={AMBER} />
-        </View>
-      ) : isError ? (
-        <View style={[styles.empty, { padding: px(18), borderRadius: px(15) }]}>
-          <PartnerText style={{ color: MUTED, textAlign: 'center', fontSize: px(13) }}>
-            Fleet list could not load. Pull down to retry.
-          </PartnerText>
-        </View>
-      ) : activeMembers.length ? (
-        activeMembers.map(member => (
-          <MemberCard
-            key={member.id}
-            member={member}
-            busy={revoke.isPending}
-            onRemove={() => confirmRemove(member)}
-            onAssign={() => openAssignForMember(member)}
-          />
-        ))
+        <DriverDataSkeleton variant="vehicles" />
       ) : (
-        <View style={[styles.empty, { padding: px(24), borderRadius: px(16) }]}>
-          <View style={[styles.avatar, { width: px(50), height: px(50), borderRadius: px(16), marginBottom: px(10) }]}>
-            <UserRoundPlus size={px(24)} color={AMBER} />
+        <View style={styles.content}>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <View style={styles.statTop}>
+                <View style={[styles.statIcon, { backgroundColor: '#DBEAFE' }]}>
+                  <UserRound size={16} color="#2563EB" strokeWidth={2.2} />
+                </View>
+                <PartnerText style={styles.statLabel} numberOfLines={1}>Total</PartnerText>
+              </View>
+              <PartnerText style={styles.statValue}>{String(stats.total)}</PartnerText>
+            </View>
+            <View style={styles.statCard}>
+              <View style={styles.statTop}>
+                <View style={[styles.statIcon, { backgroundColor: '#DCFCE7' }]}>
+                  <CheckCircle2 size={16} color={SUCCESS_GREEN} strokeWidth={2.2} />
+                </View>
+                <PartnerText style={styles.statLabel} numberOfLines={1}>Available</PartnerText>
+              </View>
+              <PartnerText style={styles.statValue}>{String(stats.active - stats.busy)}</PartnerText>
+            </View>
+            <View style={styles.statCard}>
+              <View style={styles.statTop}>
+                <View style={[styles.statIcon, { backgroundColor: colors.goldLight }]}>
+                  <ClipboardList size={16} color={colors.primaryDark} strokeWidth={2.2} />
+                </View>
+                <PartnerText style={styles.statLabel} numberOfLines={1}>On duty</PartnerText>
+              </View>
+              <PartnerText style={styles.statValue}>{String(stats.busy)}</PartnerText>
+            </View>
           </View>
-          <PartnerText style={{ color: INK, fontWeight: '800', fontSize: px(15) }}>
-            No Drivers in your fleet yet
-          </PartnerText>
-          <PartnerText style={{ color: MUTED, fontSize: px(12.5), textAlign: 'center', marginTop: px(5), lineHeight: px(18) }}>
-            Tap <PartnerText style={{ fontWeight: '700', color: INK }}>+ Add Driver</PartnerText> above to directly onboard staff drivers with verified phone OTP into your fleet.
-          </PartnerText>
-        </View>
-      )}
-    </AppScreenLayout>
-    {partnerDialog}
 
-    {/* Job picker sheet — multiple open jobs, vendor chooses (no auto-select) */}
-    <Modal transparent animationType="slide" visible={assignPickerVisible} onRequestClose={() => setAssignPickerVisible(false)}>
-      <Pressable style={memberMenuStyles.overlay} onPress={() => setAssignPickerVisible(false)}>
-        <Pressable style={[memberMenuStyles.sheet, { paddingBottom: px(14) }]} onPress={e => e.stopPropagation()}>
-          <View style={[memberMenuStyles.handle, { marginTop: px(10) }]} />
-          <PartnerText style={[memberMenuStyles.title, { fontSize: px(16), marginTop: px(10) }]}>
-            Assign {assignPickerDriver?.driverName ?? 'driver'} to which job?
-          </PartnerText>
-          <PartnerText style={[memberMenuStyles.subtitle, { fontSize: px(12), marginBottom: px(6) }]}>
-            {assignPickerJobs.length} open job{assignPickerJobs.length === 1 ? '' : 's'} — tap to choose
-          </PartnerText>
-          <ScrollView style={{ maxHeight: px(380), width: '100%' }}>
-            {assignPickerJobs.map(job => (
+          <View style={styles.searchRow}>
+            <View style={styles.searchBox}>
+              <Search size={16} color={colors.grey} strokeWidth={2.2} />
+              <PartnerTextInput
+                value={search}
+                onChangeText={setSearch}
+                placeholder="Search by name, phone or code"
+                placeholderTextColor={colors.textMuted}
+                style={styles.searchInput}
+              />
+            </View>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterRow}>
+            {([
+              ['all', `All (${stats.total})`],
+              ['ACTIVE', `Available (${stats.active - stats.busy})`],
+              ['BUSY', `On duty (${stats.busy})`],
+              ['PENDING', `Pending (${stats.pending})`],
+            ] as Array<[MemberFilter, string]>).map(([key, label]) => (
               <Pressable
-                key={job.id}
-                accessibilityRole="button"
-                onPress={() => {
-                  setAssignPickerVisible(false);
-                  if (assignPickerDriver) jumpToAssignJob(job, assignPickerDriver.driverId);
-                }}
-                style={({ pressed }) => [memberMenuStyles.option, pressed && memberMenuStyles.optionPressed, { alignItems: 'flex-start' }]}>
-                <PartnerText style={{ fontSize: px(13.5), fontWeight: '800', color: INK }}>
-                  #{job.bookingNumber || job.id.slice(-6)} · {job.serviceLabel || (job.bookingType === 'towing' ? 'Towing' : 'Driver hire')}
+                key={key}
+                onPress={() => setStatusFilter(key)}
+                style={[styles.filterPill, statusFilter === key && styles.filterPillActive]}>
+                <PartnerText style={[styles.filterText, statusFilter === key && styles.filterTextActive]}>
+                  {label}
                 </PartnerText>
-                <PartnerText style={{ fontSize: px(11.5), color: MUTED, marginTop: px(2) }} numberOfLines={1}>
-                  {job.pickup?.address ?? 'Pickup'} → {job.dropoff?.address ?? 'Drop'}
-                </PartnerText>
-                {job.estimatedFare != null ? (
-                  <PartnerText style={{ fontSize: px(11.5), color: '#D97706', fontWeight: '800', marginTop: px(2) }}>
-                    ₹{job.estimatedFare.toLocaleString('en-IN')}
-                  </PartnerText>
-                ) : null}
               </Pressable>
             ))}
           </ScrollView>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => setAssignPickerVisible(false)}
-            style={({ pressed }) => [memberMenuStyles.closeButton, pressed && memberMenuStyles.optionPressed]}>
-            <PartnerText style={[memberMenuStyles.closeText, { fontSize: px(14) }]}>Cancel</PartnerText>
+
+          {isError ? (
+            <View style={styles.empty}>
+              <PartnerText style={styles.emptySubtitle}>
+                Fleet list could not load. Pull down to retry.
+              </PartnerText>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View style={styles.empty}>
+              <View style={styles.iconWrap}>
+                <UserRound size={30} color={AMBER} strokeWidth={2} />
+              </View>
+              <PartnerText style={styles.emptyTitle}>
+                {members.length === 0 ? 'No Drivers in your fleet yet' : 'No drivers match this filter'}
+              </PartnerText>
+              <PartnerText style={styles.emptySubtitle}>
+                {members.length === 0
+                  ? 'Tap + Add driver to onboard staff drivers with verified phone OTP into your fleet.'
+                  : 'Try a different search or filter.'}
+              </PartnerText>
+            </View>
+          ) : (
+            filtered.map(member => {
+              const driver = member.driver;
+              const pending = member.status === 'PENDING';
+              const badge = driverTypeBadge(driver?.driverType);
+              const busy = Boolean(driver?.isBusy);
+              return (
+                <View key={member.id} style={styles.vehicleCard}>
+                  <View style={styles.vehicleTop}>
+                    <View style={styles.thumb}>
+                      <PartnerText style={styles.thumbInitials}>
+                        {initials(driver?.name ?? 'DR')}
+                      </PartnerText>
+                    </View>
+                    <View style={styles.vehicleMain}>
+                      <View style={styles.plateRow}>
+                        <PartnerText style={styles.plate} numberOfLines={1}>
+                          {driver?.name ?? 'Staff Driver'}
+                        </PartnerText>
+                        {driver?.driverCode ? (
+                          <View style={styles.codeBadge}>
+                            <PartnerText style={styles.codeBadgeText}>{driver.driverCode}</PartnerText>
+                          </View>
+                        ) : null}
+                      </View>
+                      <PartnerText style={styles.modelLine} numberOfLines={1}>
+                        {driver?.phone ?? 'Fleet Driver'}
+                      </PartnerText>
+                      <View style={styles.specRow}>
+                        <Calendar size={12} color={colors.grey} strokeWidth={2.2} />
+                        <PartnerText style={styles.specText}>
+                          {driver?.city ? driver.city : (member.acceptedAt ? 'Joined ' + new Date(member.acceptedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—')}
+                        </PartnerText>
+                        {driver?.rating != null && driver.rating > 0 ? (
+                          <>
+                            <Star size={12} color="#F59E0B" strokeWidth={2.4} />
+                            <PartnerText style={styles.specText}>
+                              {driver.rating.toFixed(1)}
+                            </PartnerText>
+                          </>
+                        ) : null}
+                      </View>
+                    </View>
+                    <Pressable
+                      onPress={() => setMenuMember(member)}
+                      hitSlop={10}
+                      style={styles.menuBtn}
+                      accessibilityRole="button"
+                      accessibilityLabel="Driver options">
+                      <MoreVertical size={18} color={colors.grey} strokeWidth={2.2} />
+                    </Pressable>
+                  </View>
+
+                  <View style={styles.vehicleBottom}>
+                    <View style={styles.driverBlock}>
+                      <View style={[styles.miniAvatar, pending && styles.miniAvatarPending]}>
+                        {pending ? (
+                          <ShieldCheck size={14} color="#B45309" strokeWidth={2.2} />
+                        ) : (
+                          <UserRound size={14} color={colors.dark} strokeWidth={2.2} />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <PartnerText style={styles.driverName}>
+                          {pending ? 'Invitation pending' : busy ? 'On another job' : 'Ready for jobs'}
+                        </PartnerText>
+                        <PartnerText style={styles.driverPhone}>
+                          {pending
+                            ? 'Waiting for driver to accept'
+                            : busy
+                              ? 'Finish or reassign before this driver gets new work'
+                              : driver?.driverType ?? 'Full-Time'}
+                        </PartnerText>
+                      </View>
+                    </View>
+
+                    <View style={styles.statusBlock}>
+                      <View
+                        style={[
+                          styles.statusPill,
+                          !pending && !busy && styles.statusPillActive,
+                          busy && styles.statusPillService,
+                        ]}>
+                        <PartnerText
+                          style={[
+                            styles.statusPillText,
+                            !pending && !busy && { color: '#15803D' },
+                            busy && { color: '#B45309' },
+                          ]}>
+                          {pending ? 'Pending' : busy ? 'On duty' : 'Available'}
+                        </PartnerText>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Driver type badge row keeps vehicles-style type identity */}
+                  <View style={styles.typeRow}>
+                    <View style={[styles.typeBadge, { backgroundColor: badge.bg }]}>
+                      <PartnerText style={[styles.typeBadgeText, { color: badge.text }]}>
+                        {badge.label}
+                      </PartnerText>
+                    </View>
+                    {!pending && driver?.phone ? (
+                      <Pressable
+                        onPress={() => void Linking.openURL(`tel:${driver.phone}`)}
+                        hitSlop={8}
+                        style={styles.callBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel="Call driver">
+                        <Phone size={13} color={colors.primaryDark} strokeWidth={2.3} />
+                        <PartnerText style={styles.callBtnText}>Call</PartnerText>
+                      </Pressable>
+                    ) : null}
+                    {!pending ? (
+                      <Pressable
+                        onPress={() => openAssignForMember(member)}
+                        hitSlop={8}
+                        style={styles.callBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel="Assign driver to a job">
+                        <ClipboardList size={13} color={colors.primaryDark} strokeWidth={2.3} />
+                        <PartnerText style={styles.callBtnText}>Assign job</PartnerText>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })
+          )}
+
+        </View>
+      )}
+
+      {/* Driver options bottom sheet — same pattern as Vehicles ⋮ menu */}
+      <Modal
+        visible={Boolean(menuMember)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuMember(null)}>
+        <Pressable style={styles.modalOverlay} onPress={() => setMenuMember(null)}>
+          <View style={styles.sheet}>
+            <PartnerText style={styles.sheetTitle}>
+              {menuMember?.driver?.name ?? 'Driver'}
+            </PartnerText>
+            {menuMember && !menuMember.driver?.isBusy && menuMember.status === 'ACTIVE' ? (
+              <Pressable
+                style={styles.sheetItem}
+                onPress={() => {
+                  const current = menuMember;
+                  setMenuMember(null);
+                  openAssignForMember(current);
+                }}>
+                <PartnerText style={[styles.sheetItemText, { color: colors.primaryDark }]}>
+                  Assign to job
+                </PartnerText>
+              </Pressable>
+            ) : null}
+            {menuMember?.driver?.phone ? (
+              <Pressable
+                style={styles.sheetItem}
+                onPress={() => {
+                  setMenuMember(null);
+                  void Linking.openURL(`tel:${menuMember.driver?.phone}`);
+                }}>
+                <PartnerText style={styles.sheetItemText}>Call driver</PartnerText>
+              </Pressable>
+            ) : null}
+            {menuMember ? (
+              <Pressable
+                style={styles.sheetItem}
+                onPress={() => confirmRemove(menuMember)}>
+                <PartnerText style={[styles.sheetItemText, { color: colors.error }]}>
+                  {menuMember.status === 'PENDING' ? 'Cancel invitation' : 'Remove from fleet'}
+                </PartnerText>
+              </Pressable>
+            ) : null}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Job picker sheet — multiple open jobs, vendor chooses (no auto-select) */}
+      <Modal transparent animationType="slide" visible={assignPickerVisible} onRequestClose={() => setAssignPickerVisible(false)}>
+        <Pressable style={memberMenuStyles.overlay} onPress={() => setAssignPickerVisible(false)}>
+          <Pressable style={[memberMenuStyles.sheet, { paddingBottom: px(14) }]} onPress={e => e.stopPropagation()}>
+            <PartnerText style={[memberMenuStyles.title, { fontSize: px(16), marginTop: px(10) }]}>
+              Assign {assignPickerDriver?.driverName ?? 'driver'} to which job?
+            </PartnerText>
+            <PartnerText style={[memberMenuStyles.subtitle, { fontSize: px(12), marginBottom: px(6) }]}>
+              {assignPickerJobs.length} open job{assignPickerJobs.length === 1 ? '' : 's'} — tap to choose
+            </PartnerText>
+            <ScrollView style={{ maxHeight: px(380), width: '100%' }}>
+              {assignPickerJobs.map(job => (
+                <Pressable
+                  key={job.id}
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setAssignPickerVisible(false);
+                    if (assignPickerDriver) jumpToAssignJob(job, assignPickerDriver.driverId);
+                  }}
+                  style={({ pressed }) => [memberMenuStyles.option, pressed && memberMenuStyles.optionPressed, { alignItems: 'flex-start' }]}>
+                  <PartnerText style={{ fontSize: px(13.5), fontWeight: '800', color: INK }}>
+                    #{job.bookingNumber || job.id.slice(-6)} · {job.serviceLabel || (job.bookingType === 'towing' ? 'Towing' : 'Driver hire')}
+                  </PartnerText>
+                  <PartnerText style={{ fontSize: px(11.5), color: MUTED, marginTop: px(2) }} numberOfLines={1}>
+                    {job.pickup?.address ?? 'Pickup'} → {job.dropoff?.address ?? 'Drop'}
+                  </PartnerText>
+                  {job.estimatedFare != null ? (
+                    <PartnerText style={{ fontSize: px(11.5), color: '#D97706', fontWeight: '800', marginTop: px(2) }}>
+                      ₹{job.estimatedFare.toLocaleString('en-IN')}
+                    </PartnerText>
+                  ) : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setAssignPickerVisible(false)}
+              style={({ pressed }) => [memberMenuStyles.closeButton, pressed && memberMenuStyles.optionPressed]}>
+              <PartnerText style={[memberMenuStyles.closeText, { fontSize: px(14) }]}>Cancel</PartnerText>
+            </Pressable>
           </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </Modal>
+
+    </AppScreenLayout>
+    {partnerDialog}
     </View>
   );
 }
+
+const memberMenuStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,18,25,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+  },
+  title: {
+    fontWeight: '800',
+    color: INK,
+  },
+  subtitle: {
+    color: MUTED,
+    marginTop: 2,
+  },
+  option: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F5F9',
+  },
+  optionPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  closeButton: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  closeText: {
+    fontWeight: '700',
+    color: MUTED,
+  },
+});
 
 const styles = StyleSheet.create({
   headerPad: {
     paddingHorizontal: 12,
     paddingTop: spacing.xs,
     paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: PAGE_BG,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 44,
+    gap: 0,
+    position: 'relative',
   },
   listBackButton: {
     width: 36,
     alignItems: 'flex-start',
     paddingLeft: 6,
   },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
   title: {
     textAlign: 'left',
     fontSize: 18,
     fontWeight: typography.weights.extrabold,
     color: colors.dark,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   subtitle: {
     marginTop: 2,
@@ -559,102 +656,308 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.sm,
   },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  grow: { flex: 1 },
-  avatar: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF7E5' },
-  card: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
-  name: { color: INK, fontWeight: '700' },
-  sub: { color: MUTED, marginTop: 1 },
-  statusPill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 12 },
-  codeBadge: { backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' },
-  sectionTitle: { color: INK, fontWeight: '800' },
-  empty: { alignItems: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E9EAEC' },
-  primaryButton: {
+  content: {
+    gap: spacing.md,
+    paddingBottom: spacing.xxl,
+    flexGrow: 1,
+  },
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: 2,
   },
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
-  },
-  inputLabel: {
-    color: INK,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  textInputWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  phoneInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  input: {
+  statCard: {
     flex: 1,
-    color: INK,
-    paddingVertical: 0,
     minWidth: 0,
-  },
-  smallActionBtn: {
-    backgroundColor: '#2563EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inlineOtpBox: {
-    backgroundColor: '#F0F9FF',
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  devOtpChip: {
-    backgroundColor: '#DBEAFE',
-    alignSelf: 'flex-start',
-  },
-  otpInput: {
     backgroundColor: '#FFFFFF',
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#93C5FD',
-    textAlign: 'center',
-    fontWeight: '700',
-    color: INK,
-    letterSpacing: 4,
+    borderColor: colors.border,
+    padding: spacing.sm,
+    gap: spacing.xs,
   },
-  verifyBtn: {
-    backgroundColor: '#0284C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifiedBanner: {
+  statTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
+    gap: 6,
   },
-  typePill: {
-    borderWidth: 1,
+  statIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  errorBanner: {
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
+  statValue: {
+    color: colors.dark,
+    fontSize: 19,
+    fontWeight: typography.weights.extrabold,
   },
+  statLabel: {
+    color: colors.grey,
+    fontWeight: typography.weights.semibold,
+    fontSize: 10.5,
+  },
+  searchRow: {},
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: spacing.md,
+    minHeight: 46,
+  },
+  searchInput: {
+    flex: 1,
+    color: colors.dark,
+    fontSize: typography.sizes.sm,
+    paddingVertical: spacing.sm,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingRight: spacing.xs,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: PAGE_BG,
+  },
+  filterPillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterText: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+  },
+  filterTextActive: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+  },
+  empty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    paddingVertical: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+  },
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.goldLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyTitle: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.lg,
+  },
+  emptySubtitle: {
+    marginTop: spacing.sm,
+    color: colors.grey,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  vehicleCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  vehicleTop: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  thumb: {
+    width: 64,
+    height: 52,
+    borderRadius: 10,
+    backgroundColor: '#FFF7E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  thumbInitials: {
+    color: '#B45309',
+    fontWeight: typography.weights.extrabold,
+    fontSize: 16,
+  },
+  vehicleMain: { flex: 1 },
+  plateRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  plate: {
+    color: colors.dark,
+    fontWeight: typography.weights.extrabold,
+    fontSize: typography.sizes.lg,
+    flexShrink: 1,
+  },
+  codeBadge: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  codeBadgeText: {
+    color: '#2563EB',
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+  },
+  modelLine: {
+    marginTop: 4,
+    color: colors.grey,
+    fontSize: typography.sizes.sm,
+  },
+  specRow: {
+    marginTop: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  specText: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+  },
+  menuBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vehicleBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    paddingTop: spacing.md,
+  },
+  driverBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flex: 1,
+  },
+  miniAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  miniAvatarPending: {
+    backgroundColor: '#FEF3C7',
+  },
+  driverName: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+  },
+  driverPhone: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    marginTop: 1,
+  },
+  statusBlock: {
+    alignItems: 'flex-end',
+  },
+  statusPill: {
+    borderRadius: 7,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#F5F6F8',
+  },
+  statusPillActive: {
+    backgroundColor: '#DCFCE7',
+  },
+  statusPillService: {
+    backgroundColor: '#FEF3C7',
+  },
+  statusPillText: {
+    fontSize: 10.5,
+    fontWeight: typography.weights.bold,
+  },
+  typeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  typeBadge: {
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  typeBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+  },
+  callBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 5,
+    backgroundColor: '#FFFFFF',
+  },
+  callBtnText: {
+    color: colors.primaryDark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.xs,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: spacing.lg,
+    paddingBottom: spacing.xxl,
+    gap: 4,
+  },
+  sheetTitle: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.lg,
+    marginBottom: spacing.sm,
+  },
+  sheetItem: {
+    paddingVertical: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  sheetItemText: {
+    color: colors.dark,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.md,
+  },
+  pressed: { opacity: 0.92 },
 });

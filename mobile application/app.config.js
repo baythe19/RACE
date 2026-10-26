@@ -15,9 +15,9 @@ module.exports = {
     icon: './src/assets/images/icon-1024.png',
     userInterfaceStyle: 'light',
     splash: {
-      image: './src/assets/images/logo.png',
+      image: './src/assets/images/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#232323',
+      backgroundColor: '#FFFFFF',
     },
     ios: {
       bundleIdentifier: 'com.racecar.partner',
@@ -36,7 +36,7 @@ module.exports = {
       softwareKeyboardLayoutMode: 'resize',
       adaptiveIcon: {
         foregroundImage: './src/assets/images/icon-1024.png',
-        backgroundColor: '#232323',
+        backgroundColor: '#F5A800',
       },
       config: {
         googleMaps: {

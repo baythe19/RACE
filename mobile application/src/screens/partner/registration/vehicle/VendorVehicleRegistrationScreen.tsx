@@ -212,17 +212,20 @@ export default function VendorVehicleRegistrationScreen() {
     const next: Record<string, string> = {};
     const registration = registrationNo.trim();
     if (registration.length < 4 || registration.length > 20) {
-      next.registrationNo = 'Enter a valid vehicle registration number';
+      next.registrationNo = 'Enter a valid vehicle registration number (4–20 characters)';
     } else if (
       vehicles.some(
         vehicle => vehicle.id !== vehicleId && vehicle.id !== createdVehicleId && normalizeReg(vehicle.registrationNo) === normalizeReg(registration),
       )
     ) {
-      next.registrationNo = 'This vehicle is already in your fleet';
+      next.registrationNo = 'This registration number is already in your fleet';
     }
     if (!model.trim()) next.model = 'Enter vehicle make and model';
+    if (model.trim() && model.trim().length < 2) {
+      next.model = 'Model name looks too short';
+    }
     if (year && (!/^\d{4}$/.test(year) || Number(year) < 1980 || Number(year) > THIS_YEAR)) {
-      next.year = 'Enter a valid manufacturing year';
+      next.year = `Enter a year between 1980 and ${THIS_YEAR}`;
     }
     setErrors(current => ({
       ...current,
@@ -237,7 +240,7 @@ export default function VendorVehicleRegistrationScreen() {
   const validateRegistration = () => {
     const next: Record<string, string> = {};
     if (insuranceExpiry && !isValidDate(insuranceExpiry)) {
-      next.insuranceExpiry = 'Enter a real date in YYYY-MM-DD format';
+      next.insuranceExpiry = 'Enter a real date in YYYY-MM-DD format (e.g. 2027-03-31)';
     }
     setErrors(current => ({ ...current, insuranceExpiry: next.insuranceExpiry ?? '' }));
     return Object.keys(next).length === 0;
@@ -462,13 +465,12 @@ export default function VendorVehicleRegistrationScreen() {
             {step === 'registration' ? <Check size={14} color={colors.dark} strokeWidth={3} /> :
               <PartnerText style={styles.progressStepText}>1</PartnerText>}
           </View>
-          <View style={[styles.progressStep, styles.progressStepEnd, step === 'registration' && styles.progressStepDone]}>
-            <PartnerText style={styles.progressStepText}>2</PartnerText>
+          <View style={styles.progressStepEndWrap}>
+            <View style={[styles.progressStep, styles.progressStepEnd, step === 'registration' && styles.progressStepDone]}>
+              <PartnerText style={styles.progressStepText}>2</PartnerText>
+            </View>
           </View>
         </View>
-        <PartnerText style={styles.progressCaption}>
-          {step === 'vehicle' ? 'Vehicle details · 1 of 2' : 'Vehicle documents · 2 of 2'}
-        </PartnerText>
 
         {step === 'vehicle' ? (
           <View style={styles.formCard}>
@@ -799,9 +801,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  progressStepEnd: {
+  progressStepEndWrap: {
     position: 'absolute',
     right: 0,
+  },
+  progressStepEnd: {
     backgroundColor: colors.lightGrey,
     borderWidth: 1,
     borderColor: colors.border,

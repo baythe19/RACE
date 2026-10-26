@@ -1,7 +1,7 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
 import { Image, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
-import { ArrowLeft, ArrowRight, Building2 } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -228,7 +228,7 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
               accessibilityRole="radio"
               accessibilityState={{ selected: isVendor }}
               accessibilityLabel="Towing Vendor: Manage towing trucks, dispatch emergency jobs, and add fleet drivers">
-              {/* Fleet Headquarters Building Badge */}
+              {/* Tow Truck Artwork Badge (matches Driver card style) */}
               <View
                 style={[
                   styles.iconBox,
@@ -236,10 +236,15 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
                     width: px(52),
                     height: px(52),
                     borderRadius: px(14),
-                    backgroundColor: '#F3F4F6',
+                    backgroundColor: '#FEF3C7',
                   },
                 ]}>
-                <Building2 size={px(27)} color="#374151" strokeWidth={2.3} />
+                <Image
+                  source={images.icons.towing}
+                  style={{ width: px(40), height: px(26) }}
+                  resizeMode="contain"
+                  accessibilityLabel="Towing Vendor"
+                />
               </View>
 
               <View style={styles.roleTextContainer}>
