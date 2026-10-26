@@ -1,7 +1,7 @@
-import { PartnerText } from '../../components/partner/PartnerText';
+import { PartnerText, PartnerTextInput } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
-import { Check, Info, MapPin, Truck, UserRound } from 'lucide-react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Check, ChevronDown, Info, MapPin, Search, Truck, UserRound, X } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PartnerScreenLayout from '../../components/partner/PartnerScreenLayout';
@@ -33,8 +33,14 @@ type AssignJobStacks =
 
 type Props = NativeStackScreenProps<AssignJobStacks, 'VendorAssignJob'>;
 
+/** Above this many vehicles/drivers the screen switches to a searchable picker modal. */
+const LIST_COMPACT_LIMIT = 6;
+
 const normalizeVehicleReference = (value?: string) =>
   (value ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+
+/**_softer legible compact card meta */
+const COLLAPSED_LIST_LIMIT = 3;
 
 export default function VendorAssignJobScreen({ navigation, route }: Props) {
   const {
@@ -87,6 +93,16 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
   const [driverId, setDriverId] = useState<string | null>(null);
   const [vehicleId, setVehicleId] = useState<string | null>(null);
+  const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
+  const [driverPickerOpen, setDriverPickerOpen] = useState(false);
+  const [pickerQuery, setPickerQuery] = useState('');
+
+  // Searchable picker handles huge fleets; flat cards stay for small fleets.
+  const useVehiclePicker = vehicles.length > LIST_COMPACT_LIMIT;
+  const useDriverPicker = eligibleDrivers.length > LIST_COMPACT_LIMIT;
+  const vehicleQuery = pickerQuery.trim().toLowerCase();
+  const selectedVehicle = vehicles.find(vehicle => vehicle.id === vehicleId) ?? null;
+  const selectedDriverMember = eligibleDrivers.find(member => member.driver?.id === driverId) ?? null;
 
   // Auto-select when only 1 vehicle or 1 driver is available to reduce dispatch friction
   React.useEffect(() => {
@@ -242,11 +258,13 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           {approveMutation.isPending ? (
             <ActivityIndicator size="small" color={driverColors.white} />
           ) : (
-            <PartnerText style={styles.primaryButtonText}>Confirm assignment</PartnerText>
+            <PartnerText style={styles.primaryButtonText}>
+              {canAssign ? 'Confirm assignment' : 'Select driver' + (bookingType === 'towing' ? ' & vehicle' : '')}
+            </PartnerText>
           )}
         </Pressable>
       }>
-      {/* Booking summary */}
+      {/* Trip summary: booking, pickup → drop, fare */}
       <View style={styles.summaryCard}>
         <View style={styles.bookingBanner}>
           <View style={styles.bookingArtworkWrap}>
@@ -260,43 +278,66 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <View style={styles.locationRow}>
-          <MapPin size={18} color="#2563EB" fill="#2563EB" />
-          <PartnerText style={styles.locationText} numberOfLines={2}>
-            {formatReadableAddress(pickupAddress) || 'Pickup location'}
-          </PartnerText>
-        </View>
-        {dropoffAddress ? (
-          <View style={styles.locationRow}>
-            <MapPin size={18} color={driverColors.amberText} fill={driverColors.amberText} />
-            <PartnerText style={styles.locationText} numberOfLines={2}>
-              {formatReadableAddress(dropoffAddress)}
+        {/* Pickup → Drop route block */}
+        <View style={styles.routeBlock}>
+          <View style={styles.routeLines}>
+            <View style={styles.routeDots}>
+              <View style={[styles.routeDot, styles.routeDotPickup]} />
+              <View style={styles.routeLink} />
+              <View style={[styles.routeDot, styles.routeDotDrop]} />
+            </View>
+            <View style={styles.routeCopy}>
+              <View style={styles.routeRow}>
+                <PartnerText style={styles.routeTag}>PICKUP</PartnerText>
+                <PartnerText style={styles.locationText} numberOfLines={2}>
+                  {formatReadableAddress(pickupAddress) || 'Pickup location'}
+                </PartnerText>
+              </View>
+              <View style={styles.routeRow}>
+                <PartnerText style={[styles.routeTag, styles.routeTagDrop]}>DROP</PartnerText>
+                <PartnerText style={styles.locationText} numberOfLines={2}>
+                  {dropoffAddress ? formatReadableAddress(dropoffAddress) : 'Same as pickup / not specified'}
+                </PartnerText>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.fareStrip}>
+            <View style={styles.fareLeft}>
+              <PartnerText style={styles.fareLabel}>Estimated Fare</PartnerText>
+            </View>
+            <PartnerText style={styles.fareValue}>
+              {typeof estimatedFare === 'number' ? `₹${Math.round(estimatedFare)}` : '—'}
             </PartnerText>
           </View>
-        ) : null}
-
-        {typeof estimatedFare === 'number' ? (
-          <View style={styles.fareStrip}>
-            <PartnerText style={styles.fareLabel}>₹　Estimated Fare</PartnerText>
-            <PartnerText style={styles.fareValue}>₹{Math.round(estimatedFare)}</PartnerText>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Dispatch explanation */}
-      <View style={styles.infoBanner}>
-        <Info size={16} color="#0284C7" strokeWidth={2.2} />
-        <PartnerText style={styles.infoText}>
-          {bookingType === 'towing'
-            ? 'Assign this towing request to an available connected Driver and one active fleet vehicle.'
-            : 'Assign this Driver-hire request to an available connected Driver. No fleet vehicle is needed.'}
-        </PartnerText>
+        </View>
       </View>
 
       {bookingType === 'towing' ? (
         <>
           <View style={styles.sectionHeader}>
             <PartnerText style={styles.sectionTitle}>1. Select Fleet Tow Truck</PartnerText>
+            <View style={styles.sectionHeaderRight}>
+              {useVehiclePicker && selectedVehicle ? (
+                <PartnerText style={styles.sectionCount}>{vehicles.length} vehicles</PartnerText>
+              ) : null}
+              <Pressable
+                testID="vendorAssignInfoBtn"
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="How assignment works"
+                onPress={() => showAlert({
+                  tone: 'info',
+                  title: 'How assignment works',
+                  message: bookingType === 'towing'
+                    ? 'Assign this towing request to an available connected Driver and one active fleet vehicle. The job reaches the driver as soon as you confirm.'
+                    : 'Assign this Driver-hire request to an available connected Driver. No fleet vehicle is needed.',
+                  primaryAction: { label: 'Got it', onPress: () => undefined },
+                })}
+                style={({ pressed }) => [styles.infoIconBtn, pressed && styles.pressed]}>
+                <Info size={17} color="#0284C7" strokeWidth={2.2} />
+              </Pressable>
+            </View>
           </View>
           {vehiclesLoading ? (
             <DriverDataSkeleton variant="vehicles" />
@@ -311,9 +352,36 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
                 <PartnerText style={styles.addVehicleBtnText}>Add Vehicle to Fleet</PartnerText>
               </Pressable>
             </View>
+          ) : useVehiclePicker ? (
+            /* Big fleet: selected summary + searchable picker modal */
+            <Pressable
+              testID="vendorVehiclePickerTrigger"
+              accessibilityRole="button"
+              accessibilityLabel="Choose fleet vehicle"
+              onPress={() => { setPickerQuery(''); setVehiclePickerOpen(true); }}
+              style={({ pressed }) => [styles.pickerTrigger, pressed && styles.pressed, getPressableFeedback(pressed), selectedVehicle ? styles.optionCardSelected : null]}>
+              <View style={styles.artworkCircle}>
+                <Image source={images.icons.truck} style={styles.vehicleArtwork} resizeMode="contain" />
+              </View>
+              <View style={styles.optionCopy}>
+                <PartnerText style={styles.optionPlate}>{selectedVehicle ? selectedVehicle.registrationNo : 'Choose vehicle'}</PartnerText>
+                {selectedVehicle ? (
+                  <>
+                    <PartnerText style={styles.optionMeta} numberOfLines={1}>{selectedVehicle.model}</PartnerText>
+                    <View style={styles.availabilityRow}>
+                      <View style={styles.availableDot} />
+                      <PartnerText style={styles.availableLabel}>Available</PartnerText>
+                    </View>
+                  </>
+                ) : (
+                  <PartnerText style={styles.optionMeta}>Tap to search — {vehicles.length} in fleet</PartnerText>
+                )}
+              </View>
+              <ChevronDown size={20} color={driverColors.grey} strokeWidth={2.2} />
+            </Pressable>
           ) : (
             <View style={styles.vehiclesList}>
-              {vehicles.map(vehicle => {
+              {vehicles.slice(0, COLLAPSED_LIST_LIMIT).map(vehicle => {
                 const selected = vehicleId === vehicle.id;
                 const available = !reservedVehicleIds.has(vehicle.id);
                 return (
@@ -335,15 +403,17 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
                       <Image source={images.icons.truck} style={styles.vehicleArtwork} resizeMode="contain" />
                     </View>
                     <View style={styles.optionCopy}>
-                      <PartnerText style={styles.optionPlate}>{vehicle.registrationNo}</PartnerText>
+                      <View style={styles.cardTopRow}>
+                        <PartnerText style={styles.optionPlate}>{vehicle.registrationNo}</PartnerText>
+                        <View style={styles.availabilityRow}>
+                          <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                          <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                            {available ? 'Available' : 'In service'}
+                          </PartnerText>
+                        </View>
+                      </View>
                       <PartnerText style={styles.vehicleTypePill} numberOfLines={1}>{vehicle.type}</PartnerText>
                       <PartnerText style={styles.optionMeta} numberOfLines={1}>{vehicle.model}</PartnerText>
-                      <View style={styles.availabilityRow}>
-                        <View style={[styles.availableDot, !available && styles.unavailableDot]} />
-                        <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
-                          {available ? 'Available' : 'In service'}
-                        </PartnerText>
-                      </View>
                     </View>
                     <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
                       {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
@@ -351,6 +421,12 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
                   </Pressable>
                 );
               })}
+              {vehicles.length > COLLAPSED_LIST_LIMIT ? (
+                <Pressable style={styles.showAllBtn} onPress={() => { setPickerQuery(''); setVehiclePickerOpen(true); }}>
+                  <PartnerText style={styles.showAllText}>Show all {vehicles.length} vehicles</PartnerText>
+                  <ChevronDown size={16} color={driverColors.ink} strokeWidth={2.4} />
+                </Pressable>
+              ) : null}
             </View>
           )}
         </>
@@ -360,6 +436,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         <PartnerText style={styles.sectionTitle}>
           {bookingType === 'towing' ? '2. Assign Connected Driver' : 'Select Connected Driver'}
         </PartnerText>
+        {useDriverPicker ? <PartnerText style={styles.sectionCount}>{eligibleDrivers.length} drivers</PartnerText> : null}
       </View>
       {driversLoading ? (
         <View style={styles.emptyCard}><ActivityIndicator color={driverColors.amber} /></View>
@@ -376,9 +453,37 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
             <PartnerText style={styles.addVehicleBtnText}>Add driver</PartnerText>
           </Pressable>
         </View>
+      ) : useDriverPicker ? (
+        <Pressable
+          testID="vendorDriverPickerTrigger"
+          accessibilityRole="button"
+          onPress={() => { setPickerQuery(''); setDriverPickerOpen(true); }}
+          style={({ pressed }) => [styles.pickerTrigger, getPressableFeedback(pressed), selectedDriver ? styles.optionCardSelected : null]}>
+          <View style={styles.artworkCircle}>
+            <UserRound size={25} color={driverColors.amberText} />
+          </View>
+          <View style={styles.optionCopy}>
+            {selectedDriver ? (
+              <>
+                <PartnerText style={styles.optionPlate}>{selectedDriver.name}</PartnerText>
+                <PartnerText style={styles.optionMeta}>{selectedDriver.phone}</PartnerText>
+                <View style={styles.availabilityRow}>
+                  <View style={styles.availableDot} />
+                  <PartnerText style={styles.availableLabel}>Available</PartnerText>
+                </View>
+              </>
+            ) : (
+              <>
+                <PartnerText style={styles.optionPlate}>Choose driver</PartnerText>
+                <PartnerText style={styles.optionMeta}>Tap to search — {eligibleDrivers.length} connected</PartnerText>
+              </>
+            )}
+          </View>
+          <ChevronDown size={20} color={driverColors.grey} strokeWidth={2.2} />
+        </Pressable>
       ) : (
         <View style={styles.vehiclesList}>
-          {eligibleDrivers.map(member => {
+          {eligibleDrivers.slice(0, COLLAPSED_LIST_LIMIT).map(member => {
             const driver = member.driver!;
             const selected = driverId === driver.id;
             const available = driver.isAvailable && !driver.isBusy;
@@ -392,7 +497,6 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
                 disabled={!available}
                 style={({ pressed }) => [
                   styles.optionCard,
-                  { minHeight: 82 },
                   selected && styles.optionCardSelected,
                   !available && styles.optionCardUnavailable,
                   getPressableFeedback(pressed),
@@ -401,17 +505,19 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
                   <UserRound size={25} color={driverColors.amberText} />
                 </View>
                 <View style={styles.optionCopy}>
-                  <PartnerText style={styles.optionPlate}>{driver.name}</PartnerText>
+                  <View style={styles.cardTopRow}>
+                    <PartnerText style={styles.optionPlate}>{driver.name}</PartnerText>
+                    <View style={styles.availabilityRow}>
+                      <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                      <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                        {available ? 'Available' : driver.isBusy ? 'On a job' : 'Offline'}
+                      </PartnerText>
+                    </View>
+                  </View>
                   <PartnerText style={styles.optionMeta}>{driver.phone}</PartnerText>
                   <PartnerText style={styles.optionMeta}>
                     {driver.driverType + (driver.city ? ' · ' + driver.city : '')}
                   </PartnerText>
-                  <View style={styles.availabilityRow}>
-                    <View style={[styles.availableDot, !available && styles.unavailableDot]} />
-                    <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
-                      {available ? 'Available' : driver.isBusy ? 'On an active job' : 'Offline'}
-                    </PartnerText>
-                  </View>
                 </View>
                 <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
                   {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
@@ -419,9 +525,157 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
               </Pressable>
             );
           })}
+          {eligibleDrivers.length > COLLAPSED_LIST_LIMIT ? (
+            <Pressable style={styles.showAllBtn} onPress={() => { setPickerQuery(''); setDriverPickerOpen(true); }}>
+              <PartnerText style={styles.showAllText}>Show all {eligibleDrivers.length} drivers</PartnerText>
+              <ChevronDown size={16} color={driverColors.ink} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
         </View>
       )}
     </PartnerScreenLayout>
+
+    {/* Vehicle picker modal (search + availability filter) */}
+    <Modal visible={vehiclePickerOpen} transparent animationType="slide" onRequestClose={() => setVehiclePickerOpen(false)}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setVehiclePickerOpen(false)} />
+        <View style={styles.pickerSheet}>
+          <View style={styles.pickerHeaderRow}>
+            <PartnerText style={styles.pickerTitle}>Select fleet tow truck</PartnerText>
+            <Pressable hitSlop={8} onPress={() => setVehiclePickerOpen(false)} style={styles.pickerClose}>
+              <X size={18} color={driverColors.grey} strokeWidth={2.3} />
+            </Pressable>
+          </View>
+          <View style={styles.searchBox}>
+            <Search size={16} color={driverColors.grey} strokeWidth={2.2} />
+            <PartnerTextInput
+              value={pickerQuery}
+              onChangeText={setPickerQuery}
+              placeholder="Search plate, model, type…"
+              style={styles.searchInput}
+              placeholderTextColor={driverColors.grey}
+            />
+          </View>
+          <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.pickerListContent}>
+            {vehicles
+              .filter(vehicle => {
+                if (!vehicleQuery) return true;
+                return [vehicle.registrationNo, vehicle.model, vehicle.type]
+                  .join(' ').toLowerCase().includes(vehicleQuery);
+              })
+              .map(vehicle => {
+                const selected = vehicleId === vehicle.id;
+                const available = !reservedVehicleIds.has(vehicle.id);
+                return (
+                  <Pressable
+                    key={vehicle.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: !available }}
+                    onPress={() => { if (available) { setVehicleId(vehicle.id); setVehiclePickerOpen(false); } }}
+                    disabled={!available}
+                    style={({ pressed }) => [
+                      styles.pickerRow,
+                      selected && styles.pickerRowSelected,
+                      !available && styles.optionCardUnavailable,
+                      getPressableFeedback(pressed),
+                    ]}>
+                    <View style={styles.pickerArtwork}>
+                      <Image source={images.icons.truck} style={styles.vehicleArtworkSmall} resizeMode="contain" />
+                    </View>
+                    <View style={styles.optionCopy}>
+                      <PartnerText style={styles.optionPlate}>{vehicle.registrationNo}</PartnerText>
+                      <PartnerText style={styles.optionMeta} numberOfLines={1}>
+                        {vehicle.model} · {vehicle.type}
+                      </PartnerText>
+                      <View style={styles.availabilityRow}>
+                        <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                        <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                          {available ? 'Available' : 'In service'}
+                        </PartnerText>
+                      </View>
+                    </View>
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+
+    {/* Driver picker modal (search + availability) */}
+    <Modal visible={driverPickerOpen} transparent animationType="slide" onRequestClose={() => setDriverPickerOpen(false)}>
+      <View style={styles.modalOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setDriverPickerOpen(false)} />
+        <View style={styles.pickerSheet}>
+          <View style={styles.pickerHeaderRow}>
+            <PartnerText style={styles.pickerTitle}>Select connected driver</PartnerText>
+            <Pressable hitSlop={8} onPress={() => setDriverPickerOpen(false)} style={styles.pickerClose}>
+              <X size={18} color={driverColors.grey} strokeWidth={2.3} />
+            </Pressable>
+          </View>
+          <View style={styles.searchBox}>
+            <Search size={16} color={driverColors.grey} strokeWidth={2.2} />
+            <PartnerTextInput
+              value={pickerQuery}
+              onChangeText={setPickerQuery}
+              placeholder="Search name or phone…"
+              style={styles.searchInput}
+              placeholderTextColor={driverColors.grey}
+            />
+          </View>
+          <ScrollView style={styles.pickerList} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.pickerListContent}>
+            {eligibleDrivers
+              .filter(member => {
+                if (!pickerQuery.trim()) return true;
+                const driver = member.driver!;
+                return [driver.name, driver.phone, driver.driverType, driver.city]
+                  .join(' ').toLowerCase().includes(pickerQuery.trim().toLowerCase());
+              })
+              .map(member => {
+                const driver = member.driver!;
+                const selected = driverId === driver.id;
+                const available = driver.isAvailable && !driver.isBusy;
+                return (
+                  <Pressable
+                    key={member.id}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected, disabled: !available }}
+                    onPress={() => { if (available) { setDriverId(driver.id); setDriverPickerOpen(false); } }}
+                    disabled={!available}
+                    style={({ pressed }) => [
+                      styles.pickerRow,
+                      selected && styles.pickerRowSelected,
+                      !available && styles.optionCardUnavailable,
+                      getPressableFeedback(pressed),
+                    ]}>
+                    <View style={styles.pickerArtwork}>
+                      <UserRound size={22} color={driverColors.amberText} />
+                    </View>
+                    <View style={styles.optionCopy}>
+                      <PartnerText style={styles.optionPlate}>{driver.name}</PartnerText>
+                      <PartnerText style={styles.optionMeta}>
+                        {driver.phone} · {driver.driverType}
+                      </PartnerText>
+                      <View style={styles.availabilityRow}>
+                        <View style={[styles.availableDot, !available && styles.unavailableDot]} />
+                        <PartnerText style={[styles.availableLabel, !available && styles.unavailableLabel]}>
+                          {available ? 'Available' : driver.isBusy ? 'On a job' : 'Offline'}
+                        </PartnerText>
+                      </View>
+                    </View>
+                    <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+                      {selected ? <Check size={14} color={driverColors.white} strokeWidth={3} /> : null}
+                    </View>
+                  </Pressable>
+                );
+              })}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
     {partnerDialog}
     </View>
   );
@@ -441,7 +695,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF7E8',
     borderRadius: 16,
     padding: 10,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   bookingArtworkWrap: {
     width: 78,
@@ -469,26 +723,76 @@ const styles = StyleSheet.create({
     color: driverColors.ink,
     marginTop: 3,
   },
-  locationRow: {
+  routeBlock: {
+    backgroundColor: '#FAFBFC',
+    borderRadius: 14,
+    padding: 12,
+  },
+  routeLines: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 4,
-    paddingVertical: 5,
+  },
+  routeDots: {
+    alignItems: 'center',
+    paddingTop: 4,
+    gap: 6,
+  },
+  routeDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  routeDotPickup: {
+    backgroundColor: '#2563EB',
+  },
+  routeDotDrop: {
+    backgroundColor: driverColors.amber,
+  },
+  routeLink: {
+    width: 2,
+    flex: 1,
+    minHeight: 18,
+    backgroundColor: '#D8DEE7',
+  },
+  routeCopy: {
+    flex: 1,
+    gap: 12,
+  },
+  routeRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  routeTag: {
+    width: 52,
+    marginTop: 1,
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    color: '#2563EB',
+  },
+  routeTagDrop: {
+    color: '#B45309',
   },
   locationText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
+    lineHeight: 17,
     color: driverColors.ink,
   },
   fareStrip: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 6,
+    marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: driverColors.hairline,
+  },
+  fareLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   fareLabel: {
     fontSize: 13,
@@ -515,6 +819,12 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     color: '#0369A1',
   },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -526,6 +836,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: driverColors.ink,
+  },
+  sectionCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: driverColors.grey,
+  },
+  sectionHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  infoIconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F0F9FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyCard: {
     backgroundColor: driverColors.white,
@@ -563,6 +891,118 @@ const styles = StyleSheet.create({
   vehiclesList: {
     gap: 10,
   },
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: driverColors.white,
+    borderRadius: driverRadius.card,
+    padding: 11,
+    borderWidth: 1.5,
+    borderColor: driverColors.hairline,
+    minHeight: 92,
+  },
+  showAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: driverColors.hairline,
+    backgroundColor: driverColors.white,
+  },
+  showAllText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: driverColors.ink,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(10,12,18,0.45)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    backgroundColor: driverColors.white,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    maxHeight: '82%',
+    paddingBottom: 18,
+  },
+  pickerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  pickerTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: driverColors.ink,
+  },
+  pickerClose: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F3F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: driverColors.hairline,
+    backgroundColor: '#FAFBFC',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: driverColors.ink,
+    paddingVertical: 0,
+  },
+  pickerList: {
+    flexGrow: 0,
+  },
+  pickerListContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+    paddingBottom: 8,
+  },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: driverColors.hairline,
+    borderRadius: 14,
+    padding: 10,
+    backgroundColor: driverColors.white,
+  },
+  pickerRowSelected: {
+    borderColor: driverColors.amber,
+    backgroundColor: '#FFFBEB',
+  },
+  pickerArtwork: {
+    width: 46,
+    height: 46,
+    borderRadius: 10,
+    backgroundColor: '#FFF8E8',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  vehicleArtworkSmall: {
+    width: 42,
+    height: 38,
+  },
   optionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -571,7 +1011,7 @@ const styles = StyleSheet.create({
     padding: 11,
     borderWidth: 1.5,
     borderColor: driverColors.hairline,
-    minHeight: 114,
+    minHeight: 96,
   },
   optionCardSelected: {
     borderColor: driverColors.amber,
@@ -591,6 +1031,12 @@ const styles = StyleSheet.create({
   },
   optionCopy: {
     flex: 1,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 6,
   },
   optionPlate: {
     fontSize: 14,
@@ -675,5 +1121,11 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  pressedFab: {
+    opacity: 0.9,
+  },
+  pressed: {
+    opacity: 0.85,
   },
 });

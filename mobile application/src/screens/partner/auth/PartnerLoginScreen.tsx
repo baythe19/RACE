@@ -169,7 +169,12 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
           verifyResult.user.isProfileCompleted &&
           !verifyResult.onboardingRequired;
 
-        // Route straight to registration wizard instead of bypassing to dashboard
+        // Completed partner → dashboard. Registration wizard only for
+        // genuinely incomplete accounts that picked an explicit role.
+        if (isApprovedPartner) {
+          goToPartnerMain();
+          return;
+        }
         if (hasExplicitRole && partnerRole) {
           goToRegistration(partnerRole);
         } else {
