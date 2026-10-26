@@ -17,11 +17,20 @@ import {
 } from '../../services/vendor/useVendorBookingsQueries';
 import { useVendorMembershipsQuery } from '../../services/vendor/useVendorMembershipQueries';
 import { formatReadableAddress } from '../../utils/readableAddress';
-import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
+import type {
+  PartnerAccountStackParamList,
+  PartnerDriversStackParamList,
+  PartnerJobsStackParamList,
+} from '../../types/partnerNavigation';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
 import { spacing } from '../../theme';
 
-type Props = NativeStackScreenProps<PartnerJobsStackParamList, 'VendorAssignJob'>;
+type AssignJobStacks =
+  | PartnerJobsStackParamList
+  | PartnerDriversStackParamList
+  | PartnerAccountStackParamList;
+
+type Props = NativeStackScreenProps<AssignJobStacks, 'VendorAssignJob'>;
 
 const normalizeVehicleReference = (value?: string) =>
   (value ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase();
@@ -145,7 +154,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         message:
           result.message ||
           `Driver assigned to #${bookingNumber}. The trip starts once the driver accepts the job.`,
-        primaryAction: { label: 'OK', onPress: () => navigation.navigate('PartnerJobsList') },
+        primaryAction: { label: 'OK', onPress: () => navigation.goBack() },
       });
     } catch (error) {
       showAlert({
@@ -159,10 +168,34 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     }
   };
 
+  if (bookingType !== 'towing') {
+    return (
+      <View style={{ flex: 1 }}>
+        <PartnerScreenLayout
+          title="Towing jobs only"
+          onBack={() => navigation.goBack()}
+          contentTopSpacing={spacing.sm}
+          footer={
+            <Pressable style={styles.primaryButton} onPress={() => navigation.goBack()}>
+              <PartnerText style={styles.primaryButtonText}>Back to jobs</PartnerText>
+            </Pressable>
+          }>
+          <View style={styles.emptyCard}>
+            <PartnerText style={styles.emptyTitle}>This is not a towing job</PartnerText>
+            <PartnerText style={styles.emptySub}>
+              Vendor fleets receive customer towing requests only. Driver-hire jobs go to independent drivers.
+            </PartnerText>
+          </View>
+        </PartnerScreenLayout>
+        {partnerDialog}
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1 }}>
     <PartnerScreenLayout
-      title={bookingType === 'towing' ? 'Assign driver & vehicle' : 'Assign driver'}
+      title="Assign driver & vehicle"
       onBack={() => navigation.goBack()}
       contentTopSpacing={spacing.sm}
       footer={
@@ -304,10 +337,12 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
           <UserRound size={30} color={driverColors.greySoft} />
           <PartnerText style={styles.emptyTitle}>No eligible connected Drivers</PartnerText>
           <PartnerText style={styles.emptySub}>
-            Invite an approved Full-Time or Tow Driver to your fleet before assigning this job.
+            Register a driver on your fleet first. They sign in with that phone and only receive jobs you assign.
           </PartnerText>
-          <Pressable style={styles.addVehicleBtn} onPress={() => navigation.navigate('VendorDrivers')}>
-            <PartnerText style={styles.addVehicleBtnText}>Manage Drivers</PartnerText>
+          <Pressable
+            style={styles.addVehicleBtn}
+            onPress={() => navigation.navigate('VendorAddDriver')}>
+            <PartnerText style={styles.addVehicleBtnText}>Add driver</PartnerText>
           </Pressable>
         </View>
       ) : (

@@ -1084,7 +1084,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const { data: profile, isLoading: profileLoading } = useDriverProfileQuery(true);
   const verification = useMemo(() => buildDriverVerification(profile), [profile]);
-  const isApproved = verification.isApproved;
   const isOperational =
     profile?.operationalStatus !== 'SUSPENDED' &&
     profile?.operationalStatus !== 'DISABLED' &&
@@ -1445,7 +1444,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(12) }}>
           {initialLoading ? (
             <JobsSkeleton px={px} />
-          ) : !isApproved ? (
+          ) : !isOperational ? (
             <JobsApprovalState px={px} />
           ) : hasQueryError ? (
             <JobsErrorState px={px} onRetry={retryQueries} />
@@ -1619,14 +1618,14 @@ function JobsApprovalState({ px }: { px: (value: number) => number }) {
         <TriangleAlert size={px(24)} color={C.amberText} strokeWidth={2.2} />
       </View>
       <PartnerText style={[T.cardTitle, { fontSize: px(16), color: C.ink, marginTop: px(14) }]}>
-        Jobs unlock after approval
+        Account cannot take jobs
       </PartnerText>
       <PartnerText
         style={[
           T.cardSubtitle,
           { fontSize: px(13), color: C.grey, marginTop: px(6), textAlign: 'center' },
         ]}>
-        Your account is still under review. You can view the dashboard while RACE verifies your documents.
+        This account is suspended or rejected. Contact RACE support before taking jobs.
       </PartnerText>
     </View>
   );

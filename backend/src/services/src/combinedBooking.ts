@@ -157,7 +157,7 @@ export class CombinedBookingService {
           logger.warn('Failed to send completion OTP via HanuSMS', { error: smsErr });
         }
       }
-      logger.info(`[COMPLETION OTP SMS] Sent OTP ${completionOtp} to ${customer.mobileNumber} for booking #${booking.bookingNumber}`);
+      logger.info(`[COMPLETION OTP SMS] Sent completion code for booking #${booking.bookingNumber}`);
     }
 
     // Emit socket event to Driver
@@ -176,7 +176,6 @@ export class CombinedBookingService {
       paymentMode,
       paymentConfirmed: true,
       amount: fare,
-      completionOtp,
     });
 
     return {

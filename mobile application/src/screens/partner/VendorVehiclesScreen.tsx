@@ -31,7 +31,6 @@ import {
 import type {
   PartnerJobsStackParamList,
 } from '../../types/partnerNavigation';
-import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../constants/partnerCopy';
 import { colors, radius, spacing, typography } from '../../theme';
 
 const PAGE_BG = '#FFFFFF';
@@ -160,18 +159,10 @@ export default function VendorVehiclesScreen() {
   }, [vehicles, search, statusFilter]);
 
   const openForm = () => {
-    if (!isApproved) {
-      showAlert({ tone: 'warning', title: 'Approval required', message: PARTNER_WAITING_ADMIN_APPROVAL });
-      return;
-    }
     navigation.navigate('VendorVehicleRegistration');
   };
 
   const startEdit = (vehicle: FleetVehicle) => {
-    if (!isApproved) {
-      showAlert({ tone: 'warning', title: 'Approval required', message: PARTNER_WAITING_ADMIN_APPROVAL });
-      return;
-    }
     setMenuVehicle(null);
     navigation.navigate('VendorVehicleRegistration', { vehicleId: vehicle.id });
   };
@@ -266,7 +257,9 @@ export default function VendorVehiclesScreen() {
         <View style={styles.content}>
           {!isApproved ? (
             <View style={styles.pendingBanner}>
-              <PartnerText style={styles.pendingText}>{PARTNER_WAITING_ADMIN_APPROVAL}</PartnerText>
+              <PartnerText style={styles.pendingText}>
+                Document review runs in the background. You can add vehicles and take towing jobs now. Status stays on your profile.
+              </PartnerText>
             </View>
           ) : null}
 

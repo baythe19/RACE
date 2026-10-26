@@ -186,7 +186,7 @@ export default function PartnerJobsScreen() {
   const rejectMutation = useRejectDriverJobMutation();
 
   const offers: DriverJobBooking[] = isVendor
-    ? (vendorOffersQuery.data ?? []).filter(job => !job.vendorApproved)
+    ? (vendorOffersQuery.data ?? []).filter(job => job.bookingType === 'towing' && !job.vendorApproved)
     : (driverOffersQuery.data ?? []);
   const myJobs: DriverJobBooking[] = isDriver ? (driverJobsQuery.data ?? []) : [];
 
@@ -713,7 +713,7 @@ export default function PartnerJobsScreen() {
                   {offerCards.length === 0 ? (
                     <>
                       {' · '}
-                      <PartnerText style={styles.progressMeta}>Ask vendor to approve jobs first</PartnerText>
+                      <PartnerText style={styles.progressMeta}>Assigned jobs appear here</PartnerText>
                     </>
                   ) : null}
                 </PartnerText>
@@ -814,8 +814,8 @@ export default function PartnerJobsScreen() {
                   </View>
                   <PartnerText style={styles.emptyTitle}>No jobs yet</PartnerText>
                   <PartnerText style={styles.emptySubtitle}>
-                    Open customer requests appear here. Approve a job and assign a vehicle — your
-                    drivers can accept it.
+                    Customer towing requests appear here after you add an active vehicle. Assign a
+                    driver and that vehicle — your fleet drivers only receive the jobs you assign.
                   </PartnerText>
                 </View>
               ) : (

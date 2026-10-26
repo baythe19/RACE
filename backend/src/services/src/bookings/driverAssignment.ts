@@ -346,9 +346,8 @@ function mapOffer(
  * Selects which booking collections may contribute to an open-offer feed.
  *
  * Independent drivers receive driver-hire jobs only, even when a caller asks
- * for all offers or explicitly requests towing. Vendor-linked drivers retain
- * the existing vendor-routed towing compatibility; vendors can browse both
- * booking types. The internal audience preserves the legacy unscoped behavior.
+ * for all offers or explicitly requests towing. Vendors receive towing jobs
+ * only. The internal audience preserves the unscoped behavior.
  */
 export function selectOpenOfferBookingTypes(options: {
   audience: 'driver' | 'vendor' | 'internal';
@@ -361,6 +360,11 @@ export function selectOpenOfferBookingTypes(options: {
 
   if (options.audience === 'driver' && !options.vendorLinkedDriver) {
     return requestedTypes.filter((bookingType) => bookingType === 'driver');
+  }
+
+  // A towing vendor only receives vehicle jobs. Driver-hire stays with independent drivers.
+  if (options.audience === 'vendor') {
+    return requestedTypes.filter((bookingType) => bookingType === 'towing');
   }
 
   return requestedTypes;
@@ -393,6 +397,10 @@ export async function listOpenBookingOffers(options?: {
       .lean()
       .exec();
     memberVendorUserId = membership?.vendorUserId?.toString();
+  }
+  // Fleet drivers only work jobs their vendor assigns. They never browse open offers.
+  if (memberVendorUserId) {
+    return [];
   }
   const selectedBookingTypes = selectOpenOfferBookingTypes({
     audience: options?.forVendorId ? 'vendor' : options?.forDriver ? 'driver' : 'internal',

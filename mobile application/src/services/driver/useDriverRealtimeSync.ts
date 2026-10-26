@@ -8,6 +8,12 @@ import { API_BASE_URL, TOKEN_KEYS } from '../../config/env';
 import { notificationQueryKeys } from '../useNotificationQueries';
 import { driverQueryKeys } from './useDriverQueries';
 import { vendorMembershipKeys } from '../vendor/useVendorMembershipQueries';
+import {
+  alertCustomerPaymentConfirmed,
+  alertNewDispatchOffer,
+  alertTripOtpReady,
+  requestNotificationPermissions,
+} from '../notificationService';
 
 /** Authenticated driver-room sync; short polling remains the recovery fallback. */
 export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
@@ -38,8 +44,10 @@ export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
       ]);
     };
 
+    void requestNotificationPermissions();
+
     const connect = async () => {
-      if (disposed || appState !== 'active' || socket) return;
+      if (disposed || socket) return;
       const token = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
       if (disposed || !token || token.startsWith('mock-')) return;
 
@@ -58,16 +66,25 @@ export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
         // Recover changes that happened while the app was backgrounded or reconnecting.
         refreshDriverData();
       });
-      // The private OTP event refreshes booking state without copying the OTP
-      // into an extra cache.
-      socket.on('trip:otp', refreshDriverData);
-      // These events contain only invalidation signals. Private data is fetched again
-      // from authenticated REST endpoints.
-      socket.on('job:offer', refreshDriverData);
+      // The private OTP event triggers an outer-app alert + refetches state
+      socket.on('trip:otp', () => {
+        void alertTripOtpReady();
+        refreshDriverData();
+      });
+      // High-priority dispatch offer triggers outer-app lockscreen alert immediately
+      socket.on('job:offer', (data?: { serviceType?: string; estimatedFare?: number; pickupAddress?: string }) => {
+        void alertNewDispatchOffer(data);
+        refreshDriverData();
+      });
       socket.on('driver:jobs-updated', refreshDriverData);
       socket.on('notification:new', refreshDriverData);
       socket.on('booking:status', refreshDriverData);
-      socket.on('booking:payment_confirmed', refreshDriverData);
+      // Customer payment confirmation triggers outer-app alert so driver knows to ask for completion OTP
+      socket.on('booking:payment_confirmed', (data?: { fare?: number }) => {
+        void alertCustomerPaymentConfirmed(data?.fare);
+        refreshDriverData();
+      });
+      socket.on('booking:driver_arrived_dropoff', refreshDriverData);
       socket.connect();
     };
 
@@ -75,11 +92,11 @@ export function useDriverRealtimeSync(enabled: boolean, driverId?: string) {
     const subscription = AppState.addEventListener('change', next => {
       appState = next;
       if (next === 'active') {
-        if (socket) socket.connect();
-        else void connect();
-      } else {
-        socket?.disconnect();
+        if (socket && !socket.connected) socket.connect();
+        else if (!socket) void connect();
+        refreshDriverData();
       }
+      // Preserve background socket connection so driver receives urgent dispatch alerts while using navigation
     });
 
     return () => {

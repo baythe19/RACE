@@ -27,7 +27,6 @@ import VendorVehicleImage from '../../../../components/partner/VendorVehicleImag
 import { PartnerText } from '../../../../components/partner/PartnerText';
 import AppScreenLayout from '../../../../components/ui/AppScreenLayout';
 import { usePartnerDialog } from '../../../../hooks/usePartnerDialog';
-import { PARTNER_WAITING_ADMIN_APPROVAL } from '../../../../constants/partnerCopy';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import {
   useCreateVendorVehicleMutation,
@@ -119,8 +118,7 @@ export default function VendorVehicleRegistrationScreen() {
   const route = useRoute<RouteProp<PartnerAccountStackParamList, 'VendorVehicleRegistration'>>();
   const vehicleId = route.params?.vehicleId;
 
-  const { data: vendor, isLoading: vendorLoading } = useVendorStatusQuery(true);
-  const isApproved = vendor?.status === 'approved';
+  const { isLoading: vendorLoading } = useVendorStatusQuery(true);
   const {
     data: vehicles = [],
     isLoading: vehiclesLoading,
@@ -271,10 +269,6 @@ export default function VendorVehicleRegistrationScreen() {
 
   const saveVehicle = async () => {
     if (savingRef.current) return;
-    if (!isApproved) {
-      showAlert({ tone: 'warning', title: 'Approval required', message: PARTNER_WAITING_ADMIN_APPROVAL });
-      return;
-    }
     if (!validateVehicle() || !validateRegistration()) return;
     const missingDocuments = REQUIRED_VEHICLE_DOCUMENTS.filter(
       document => !vehicleDocuments.some(file => file.id === document.id),
@@ -414,26 +408,6 @@ export default function VendorVehicleRegistrationScreen() {
           </View>
         }>
         <PartnerText style={styles.emptyText}>This vehicle is no longer in your fleet.</PartnerText>
-      </AppScreenLayout>
-    );
-  }
-
-  if (!isApproved) {
-    return (
-      <AppScreenLayout
-        backgroundColor={PAGE_BG}
-        header={<View style={styles.header}><PartnerText style={styles.title}>Vehicle registration</PartnerText></View>}
-        footer={
-          <View style={styles.footer}>
-            <Pressable onPress={() => navigation.goBack()} style={styles.secondaryButton}>
-              <PartnerText style={styles.secondaryLabel}>Back to vehicles</PartnerText>
-            </Pressable>
-          </View>
-        }>
-        <View style={styles.infoBanner}>
-          <Info size={17} color={colors.primaryDark} />
-          <PartnerText style={styles.infoText}>{PARTNER_WAITING_ADMIN_APPROVAL}</PartnerText>
-        </View>
       </AppScreenLayout>
     );
   }

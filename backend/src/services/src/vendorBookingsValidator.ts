@@ -5,6 +5,13 @@ export const vendorApproveBookingSchema = z.object({
   driverId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid driver id'),
   vehicleId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid vehicle id').optional(),
 }).superRefine((value, context) => {
+  if (value.bookingType !== 'towing') {
+    context.addIssue({
+      code: 'custom',
+      path: ['bookingType'],
+      message: 'Vendors can only assign vehicle towing jobs',
+    });
+  }
   if (value.bookingType === 'towing' && !value.vehicleId) {
     context.addIssue({ code: 'custom', path: ['vehicleId'], message: 'A towing job requires a fleet vehicle' });
   }
@@ -15,6 +22,13 @@ export const vendorAssignBookingSchema = z.object({
   driverId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid driver id'),
   vehicleId: z.string().regex(/^[a-f\d]{24}$/i, 'Invalid vehicle id').optional(),
 }).superRefine((value, context) => {
+  if (value.bookingType !== 'towing') {
+    context.addIssue({
+      code: 'custom',
+      path: ['bookingType'],
+      message: 'Vendors can only assign vehicle towing jobs',
+    });
+  }
   if (value.bookingType === 'towing' && !value.vehicleId) {
     context.addIssue({ code: 'custom', path: ['vehicleId'], message: 'A towing job requires a fleet vehicle' });
   }

@@ -206,15 +206,15 @@ export class DriverVendorMembershipService {
     const vendor = await UserModel.findById(membership.vendorUserId)
       .select('fullName vendorProfile.businessName vendorProfile.ownerName vendorProfile.address vendorProfile.status')
       .lean().exec();
-    if (!vendor || vendor.vendorProfile?.status !== 'approved') return null;
+    if (!vendor || vendor.vendorProfile?.status === 'rejected') return null;
     return {
       id: membership._id.toString(),
       acceptedAt: membership.decidedAt?.toISOString(),
       vendor: {
         id: vendor._id.toString(),
-        name: vendor.vendorProfile.businessName ?? vendor.fullName ?? 'Towing Vendor',
-        ownerName: vendor.vendorProfile.ownerName ?? vendor.fullName,
-        address: vendor.vendorProfile.address,
+        name: vendor.vendorProfile?.businessName ?? vendor.fullName ?? 'Towing Vendor',
+        ownerName: vendor.vendorProfile?.ownerName ?? vendor.fullName,
+        address: vendor.vendorProfile?.address,
       },
     };
   }

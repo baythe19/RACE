@@ -16,16 +16,13 @@
 import { env } from '../../config/env';
 import { AppError, TooManyRequestsError } from '../../utils/src/errors';
 import { generateOtp } from '../../utils/src/otp';
-import { logger } from '../../utils/src/logger';
 import { createHash } from 'crypto';
 import {
   OTP_EXPIRED_USER_MESSAGE,
-  isMcConfigured,
   logDevOtp,
-  mcSendOtp,
   mcValidateOtp,
 } from '../../utils/src/sms';
-import { hanuSendOtp, isHanuConfigured, hanuRoles } from '../../utils/src/hanuSms';
+import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
 import { authRepository } from './authRepository';
 
 /** sha256(otp + pepper) — raw OTP digits are never stored for the hanu route. */
@@ -40,20 +37,11 @@ export class OtpService {
   }
 
 
-  private get useMc(): boolean {
-    if (process.env.FORCE_MOCK_OTP === 'true') {
-      return false;
-    }
-    return isMcConfigured();
-  }
-
-  /** Which SMS route handles this role? hanu → messagecentral → local-dev. */
-  private pickProvider(role?: string): 'hanu' | 'messagecentral' | 'local' {
-    if (process.env.FORCE_MOCK_OTP !== 'true' && isHanuConfigured() && role && hanuRoles().has(role)) {
+  /** Which SMS route handles this role? hanu → local-dev. */
+  private pickProvider(_role?: string): 'hanu' | 'local' {
+    if (process.env.FORCE_MOCK_OTP !== 'true' && isHanuConfigured()) {
+      // HanuSMS is the sole exclusive SMS service across customer, vendor, driver, admin
       return 'hanu';
-    }
-    if (this.useMc) {
-      return 'messagecentral';
     }
     return 'local';
   }
@@ -81,7 +69,7 @@ export class OtpService {
     const provider = this.pickProvider(role);
 
     if (provider === 'hanu') {
-      // ─── HanuOTP route (we generate the code; Hanu only delivers it) ─────
+      // ─── HanuOTP route (we generate the code; Hanu delivers it) ───────────
       const mobileOtp = generateOtp();
       await hanuSendOtp(mobileNumber, mobileOtp);
 
@@ -101,39 +89,6 @@ export class OtpService {
         expiresIn: env.OTP_EXPIRY_SECONDS,
         // No devOtp on the hanu route — production semantics.
       };
-    }
-
-    if (provider === 'messagecentral') {
-      // ─── MessageCentral production path ────────────────────────────────
-      try {
-        const { verificationId } = await mcSendOtp(mobileNumber);
-
-        const expiry = this.getExpiryDate();
-        await authRepository.createOtpLog({
-          mobileNumber,
-          mobileOtpExpiry: expiry,
-          mobileVerified: false,
-          emailVerified: false,
-          mobileAttempts: 0,
-          emailAttempts: 0,
-          mcVerificationId: verificationId,
-          provider: 'messagecentral',
-        });
-
-        return {
-          message: 'OTP sent to your mobile number',
-          expiresIn: env.OTP_EXPIRY_SECONDS,
-        };
-      } catch (err) {
-        if (env.NODE_ENV !== 'production') {
-          logger.warn('MessageCentral send-OTP unavailable in development; falling back to local dev OTP', {
-            error: (err as Error).message,
-          });
-          // Fall through to dev / mock fallback path below
-        } else {
-          throw err;
-        }
-      }
     }
 
     // ─── Dev / mock fallback path ─────────────────────────────────────────

@@ -28,6 +28,11 @@ import {
 } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../../theme';
 import { jumpToPartnerJobsScreen } from '../../navigation/partnerNavigationRef';
+import type {
+  PartnerAccountStackParamList,
+  PartnerDriversStackParamList,
+  PartnerJobsStackParamList,
+} from '../../types/partnerNavigation';
 import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQueries';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { PartnerText } from '../../components/partner/PartnerText';
@@ -40,7 +45,6 @@ import {
 import type { VendorMembership } from '../../services/vendor/vendorMembershipApi';
 import { useNavigation } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
-import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
 
 const AMBER = '#F9A602';
 const INK = '#191919';
@@ -263,7 +267,11 @@ const memberMenuStyles = StyleSheet.create({
 export default function VendorDriverMembershipsScreen() {
   const px = useScreenPx();
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
-  const navigation = useNavigation<NavigationProp<PartnerJobsStackParamList>>();
+  const navigation = useNavigation<
+    NavigationProp<
+      PartnerJobsStackParamList | PartnerDriversStackParamList | PartnerAccountStackParamList
+    >
+  >();
 
   const { data: members = [], isLoading, isError, refetch, isRefetching } = useVendorMembershipsQuery();
   const revoke = useRevokeVendorDriverMembershipMutation();
@@ -315,7 +323,7 @@ export default function VendorDriverMembershipsScreen() {
     job: (typeof vendorBookings)[number],
     driverId: string,
   ) => {
-    jumpToPartnerJobsScreen('VendorAssignJob', {
+    navigation.navigate('VendorAssignJob', {
       bookingId: job.id,
       bookingType: job.bookingType,
       bookingNumber: job.bookingNumber,

@@ -18,24 +18,22 @@ type StackScreenArgs<Params> = {
     : [screen: Screen, params: Params[Screen]];
 }[keyof Params];
 
-function childStackState(root: string, screen: string, params?: object) {
-  const routes = screen === root
-    ? [{ name: root }]
-    : [{ name: root }, { name: screen, params }];
-  return { state: { index: routes.length - 1, routes } };
-}
-
-/** Cross-tab entry always has Account underneath its child, even on a warm stack. */
+/** Params for PartnerAccount stack when switching tabs or opening a sub-screen. */
 export function partnerAccountParams(
   ...[screen, params]: StackScreenArgs<PartnerAccountStackParamList>
 ): NavigatorScreenParams<PartnerAccountStackParamList> {
-  return childStackState('PartnerAccountMain', screen, params);
+  return (params === undefined
+    ? { screen }
+    : { screen, params }) as NavigatorScreenParams<PartnerAccountStackParamList>;
 }
 
+/** Params for PartnerJobs stack when switching tabs or opening a sub-screen. */
 export function partnerJobsParams(
   ...[screen, params]: StackScreenArgs<PartnerJobsStackParamList>
 ): NavigatorScreenParams<PartnerJobsStackParamList> {
-  return childStackState('PartnerJobsList', screen, params);
+  return (params === undefined
+    ? { screen }
+    : { screen, params }) as NavigatorScreenParams<PartnerJobsStackParamList>;
 }
 
 /** Opens the focused job-cycle screen for a booking. */

@@ -198,13 +198,13 @@ export default function TripInProgressSheet({
                       { color: customerPaymentConfirmed ? '#166534' : '#B45309' },
                     ]}>
                     {customerPaymentConfirmed
-                      ? `Amount: ₹${fareAmount ?? '—'} · Ask customer for completion OTP.`
-                      : `Fare: ₹${fareAmount ?? '—'} · Customer is selecting payment mode.`}
+                      ? `Amount: ₹${fareAmount ?? '—'} · Customer shares the SMS code.`
+                      : `Fare: ₹${fareAmount ?? '—'} · Customer pays on their phone, then the SMS code unlocks.`}
                   </Text>
                 </View>
               </View>
 
-              {/* 4-digit Completion OTP input */}
+              {customerPaymentConfirmed ? (
               <View style={styles.otpCard}>
                 <View style={styles.otpHeader}>
                   <ShieldCheck size={18} color="#2563EB" strokeWidth={2.4} />
@@ -246,6 +246,28 @@ export default function TripInProgressSheet({
 
                 {otpError ? <Text style={styles.otpErrorText}>{otpError}</Text> : null}
               </View>
+              ) : (
+              <View style={styles.otpCard}>
+                <Text style={styles.otpHeaderTitle}>Customer chooses how to pay</Text>
+                <Text style={styles.otpSubtitle}>
+                  Same choices as the customer screen. The completion code stays hidden until they confirm.
+                </Text>
+                <View style={styles.payChoices}>
+                  <View style={styles.payChoice}>
+                    <Banknote size={16} color="#0F172A" />
+                    <Text style={styles.payChoiceText}>Cash to driver</Text>
+                  </View>
+                  <View style={styles.payChoice}>
+                    <Smartphone size={16} color="#0F172A" />
+                    <Text style={styles.payChoiceText}>UPI</Text>
+                  </View>
+                  <View style={styles.payChoice}>
+                    <CreditCard size={16} color="#0F172A" />
+                    <Text style={styles.payChoiceText}>In-app</Text>
+                  </View>
+                </View>
+              </View>
+              )}
 
               {/* Actions row: Call customer & Verify & Complete Job */}
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
@@ -261,8 +283,8 @@ export default function TripInProgressSheet({
                 ) : null}
 
                 <Pressable
-                  onPress={onVerifyAndComplete ?? onCompletePress}
-                  disabled={!canCompleteWithOtp || acting}
+                  onPress={customerPaymentConfirmed ? onVerifyAndComplete : undefined}
+                  disabled={!customerPaymentConfirmed || !canCompleteWithOtp || acting}
                   style={({ pressed }) => [
                     styles.verifyCompleteBtn,
                     !canCompleteWithOtp && styles.verifyCompleteBtnDisabled,
@@ -272,7 +294,11 @@ export default function TripInProgressSheet({
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <Text style={styles.verifyCompleteBtnText}>
-                      {canCompleteWithOtp ? 'Verify OTP & Complete Job' : 'Enter 4-Digit OTP'}
+                      {!customerPaymentConfirmed
+                        ? 'Waiting for payment'
+                        : canCompleteWithOtp
+                          ? 'Verify OTP & Complete Job'
+                          : 'Enter 4-Digit OTP'}
                     </Text>
                   )}
                 </Pressable>
@@ -595,6 +621,25 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 3,
     marginBottom: 12,
+  },
+  payChoices: {
+    gap: 8,
+  },
+  payChoice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  payChoiceText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   boxesRow: {
     flexDirection: 'row',

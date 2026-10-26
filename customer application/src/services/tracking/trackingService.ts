@@ -10,6 +10,14 @@ import {
   onDriverArrivedDropoff,
   trackBooking,
 } from '../socketService';
+import {
+  alertDriverAssigned,
+  alertDriverArrivedPickup,
+  alertTripStarted,
+  alertDriverArrivedDropoff,
+  alertTripCompleted,
+  requestCustomerNotificationPermissions,
+} from '../notificationService';
 
 export interface TrackingUpdate {
   bookingId: string;
@@ -48,8 +56,26 @@ class TrackingService {
   private latestUpdates = new Map<string, TrackingUpdate>();
 
   private pushUpdate(bookingId: string, update: TrackingUpdate): void {
-    const latest = { ...this.latestUpdates.get(bookingId), ...update };
+    const previous = this.latestUpdates.get(bookingId);
+    const latest = { ...previous, ...update };
     this.latestUpdates.set(bookingId, latest);
+
+    // Trigger outer-app lockscreen notifications on status transitions
+    if (update.status && update.status !== previous?.status) {
+      const s = update.status.toUpperCase();
+      if (s === 'DRIVER_ASSIGNED' || s === 'DRIVER_EN_ROUTE') {
+        void alertDriverAssigned(latest.driver?.name, latest.etaMinutes);
+      } else if (s === 'DRIVER_ARRIVED' || s === 'DRIVER_ARRIVED_PICKUP') {
+        void alertDriverArrivedPickup(latest.tripStartOtp);
+      } else if (s === 'IN_PROGRESS') {
+        void alertTripStarted();
+      } else if (s === 'DRIVER_ARRIVED_DROPOFF') {
+        void alertDriverArrivedDropoff(latest.fare);
+      } else if (s === 'COMPLETED') {
+        void alertTripCompleted();
+      }
+    }
+
     this.listeners.get(bookingId)?.forEach((cb) => cb(latest));
   }
 
@@ -92,6 +118,7 @@ class TrackingService {
   }
 
   subscribe(bookingId: string, listener: TrackingListener, bookingType?: BookingType): () => void {
+    void requestCustomerNotificationPermissions();
     if (!this.listeners.has(bookingId)) {
       this.listeners.set(bookingId, new Set());
     }

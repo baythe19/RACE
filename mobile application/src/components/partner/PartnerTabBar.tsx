@@ -69,9 +69,21 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
   const role = useAppSelector(appState => appState.auth.user?.role);
   const isDriver = role === 'driver';
   const { data: profile } = useDriverProfileQuery(isDriver);
-  const isApproved = buildDriverVerification(profile).isApproved;
-  const { data: offers = [] } = useDriverJobOffersQuery(isDriver && isApproved);
-  const pendingRequests = isDriver && isApproved ? offers.length : 0;
+  const verification = buildDriverVerification(profile);
+  const canWork =
+    verification.state !== 'rejected' &&
+    verification.state !== 'suspended' &&
+    profile?.operationalStatus !== 'SUSPENDED' &&
+    profile?.operationalStatus !== 'DISABLED' &&
+    profile?.reviewStatus !== 'REJECTED';
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.vendorUserId) ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
+  const showOfferBadge = isDriver && canWork && !isVendorStaff;
+  const { data: offers = [] } = useDriverJobOffersQuery(showOfferBadge);
+  const pendingRequests = showOfferBadge ? offers.length : 0;
   const { data: driverMembership } = useDriverVendorMembershipQuery(isDriver);
   const { data: driverInvitations = [] } = useDriverVendorInvitationsQuery(isDriver && !driverMembership);
   const pendingVendorInvites = isDriver && !driverMembership ? driverInvitations.length : 0;
@@ -117,10 +129,15 @@ export default function PartnerTabBar({ state, descriptors, navigation }: Bottom
             target: route.key,
             canPreventDefault: true,
           });
-          if (!isFocused && !event.defaultPrevented) {
+          if (!event.defaultPrevented) {
             if (routeName === 'PartnerAccount') {
-              navigation.navigate('PartnerAccount', partnerAccountParams('PartnerAccountMain'));
-            } else {
+              // Re-tapping Account always returns to the account home (standard tab behaviour).
+              navigation.navigate({
+                name: 'PartnerAccount',
+                params: partnerAccountParams('PartnerAccountMain'),
+                merge: false,
+              });
+            } else if (!isFocused) {
               navigation.navigate(route.name);
             }
           }

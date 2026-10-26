@@ -64,9 +64,8 @@ export default function PartnerAppNavigator() {
     Boolean(accessToken) && isAuthenticated && user?.role === 'customer';
 
   /**
-   * A driver whose application is still being reviewed must not land on the live
-   * dashboard: the backend blocks availability, location and job acceptance until
-   * `driverProfile.status === 'APPROVED'`.
+   * Document review does not block the dashboard. Only a suspended or rejected
+   * driver is held on the verification gate.
    */
   const { data: profile, isLoading: profileLoading } = useDriverProfileQuery(
     Boolean(enterMain) && isDriver,

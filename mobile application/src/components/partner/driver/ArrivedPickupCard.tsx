@@ -10,7 +10,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ArrowLeft, MapPin, Phone, ShieldCheck } from 'lucide-react-native';
+import { ArrowLeft, Camera, CheckCircle2, MapPin, Phone, ShieldCheck } from 'lucide-react-native';
+import VehicleDamageInspectionModal, { type InspectionData } from '../inspection/VehicleDamageInspectionModal';
 
 const OTP_LENGTH = 4;
 
@@ -69,6 +70,13 @@ export default function ArrivedPickupCard({
   const complete = tripOtp.length === OTP_LENGTH;
   const canSubmit = complete && !acting;
 
+  const [inspectionModalVisible, setInspectionModalVisible] = useState(false);
+  const [inspectionData, setInspectionData] = useState<InspectionData>({});
+
+  const inspectionPhotoCount = Object.keys(inspectionData).filter(
+    k => k.endsWith('Photo') && Boolean((inspectionData as any)[k]),
+  ).length;
+
   return (
     <>
       <View style={[styles.topBanner, { top: insetsTop + 8 }]} pointerEvents="box-none">
@@ -101,6 +109,37 @@ export default function ArrivedPickupCard({
               </Text>
             </View>
           </View>
+
+          {/* Pre-Trip Vehicle Damage Inspection Trigger */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.inspectionRow,
+              pressed && styles.inspectionRowPressed,
+            ]}
+            onPress={() => setInspectionModalVisible(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Record pre-trip damage inspection photos">
+            <View style={styles.inspectionIconWrap}>
+              {inspectionPhotoCount > 0 ? (
+                <CheckCircle2 size={20} color="#10B981" />
+              ) : (
+                <Camera size={20} color="#D97706" />
+              )}
+            </View>
+            <View style={styles.inspectionTextWrap}>
+              <Text style={styles.inspectionTitle}>Pre-Trip Damage Inspection</Text>
+              <Text style={styles.inspectionSubtitle} numberOfLines={1}>
+                {inspectionPhotoCount > 0
+                  ? `✅ ${inspectionPhotoCount}/4 photos recorded · Tap to review`
+                  : 'Capture 4 vehicle angles before towing (Protects you)'}
+              </Text>
+            </View>
+            <View style={[styles.inspectionBadge, inspectionPhotoCount > 0 && styles.inspectionBadgeSaved]}>
+              <Text style={[styles.inspectionBadgeText, inspectionPhotoCount > 0 && styles.inspectionBadgeTextSaved]}>
+                {inspectionPhotoCount > 0 ? 'Recorded' : 'Inspect'}
+              </Text>
+            </View>
+          </Pressable>
 
           <Pressable
             onPress={() => inputRef.current?.focus()}
@@ -178,6 +217,13 @@ export default function ArrivedPickupCard({
           </View>
         </View>
       </View>
+
+      <VehicleDamageInspectionModal
+        visible={inspectionModalVisible}
+        initialData={inspectionData}
+        onClose={() => setInspectionModalVisible(false)}
+        onSave={setInspectionData}
+      />
     </>
   );
 }
@@ -394,5 +440,59 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 13,
     fontWeight: '600',
+  },
+  inspectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#334155',
+    marginBottom: 14,
+  },
+  inspectionRowPressed: {
+    backgroundColor: '#273549',
+    borderColor: '#F59E0B',
+  },
+  inspectionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inspectionTextWrap: {
+    flex: 1,
+  },
+  inspectionTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  inspectionSubtitle: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  inspectionBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#F59E0B',
+  },
+  inspectionBadgeSaved: {
+    backgroundColor: '#10B981',
+  },
+  inspectionBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  inspectionBadgeTextSaved: {
+    color: '#FFFFFF',
   },
 });

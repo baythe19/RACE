@@ -36,6 +36,7 @@ import PartnerNotificationsScreen from '../screens/partner/account/PartnerNotifi
 import PartnerSettingsScreen from '../screens/partner/account/PartnerSettingsScreen';
 import PartnerHelpSupportScreen from '../screens/partner/account/PartnerHelpSupportScreen';
 import PartnerBankDetailsScreen from '../screens/partner/account/PartnerBankDetailsScreen';
+import DriverMyVendorScreen from '../screens/partner/driver/DriverMyVendorScreen';
 import type {
   PartnerAccountStackParamList,
   PartnerDriversStackParamList,
@@ -152,6 +153,11 @@ function PartnerDriversStackNavigator() {
         options={{ headerShown: false }}
       />
       <DriversStack.Screen
+        name="VendorAssignJob"
+        component={VendorAssignJobScreen}
+        options={{ headerShown: false }}
+      />
+      <DriversStack.Screen
         name="VendorVehicles"
         component={VendorVehiclesScreen}
         options={{ headerShown: false }}
@@ -216,6 +222,11 @@ function PartnerAccountStackNavigator() {
       <AccountStack.Screen
         name="VendorAddDriver"
         component={VendorAddDriverScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="VendorAssignJob"
+        component={VendorAssignJobScreen}
         options={{ headerShown: false }}
       />
       <AccountStack.Screen
@@ -284,6 +295,13 @@ export default function PartnerNavigator() {
           name="PartnerVehicles"
           component={PartnerVehiclesStackNavigator}
           options={{ title: 'Vehicles' }}
+        />
+      ) : null}
+      {showVendorTab ? (
+        <Tab.Screen
+          name="PartnerVendor"
+          component={DriverMyVendorScreen}
+          options={{ title: 'My Vendor' }}
         />
       ) : null}
       <Tab.Screen

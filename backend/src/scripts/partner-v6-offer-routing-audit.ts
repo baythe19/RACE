@@ -39,8 +39,8 @@ async function main(): Promise<void> {
   );
   assert.equal(
     vendorApproveBookingSchema.safeParse({ bookingType: 'driver', driverId }).success,
-    true,
-    'vendor driver-hire dispatch does not require a fleet vehicle',
+    false,
+    'vendors cannot dispatch driver-hire jobs',
   );
   assert.equal(
     vendorAssignBookingSchema.safeParse({ bookingType: 'towing', driverId }).success,
@@ -76,13 +76,13 @@ async function main(): Promise<void> {
   );
   assert.deepEqual(
     select({ audience: 'vendor' }),
-    ['towing', 'driver'],
-    'vendor portal default feed must keep both booking types',
+    ['towing'],
+    'vendor portal default feed contains towing jobs only',
   );
   assert.deepEqual(
     select({ audience: 'vendor', bookingType: 'driver' }),
-    ['driver'],
-    'vendor portal explicit booking type must remain respected',
+    [],
+    'a vendor must not receive driver-hire even when explicitly requested',
   );
   assert.deepEqual(
     select({ audience: 'internal' }),

@@ -104,9 +104,6 @@ export class DriverService {
       if (current.activeBookingId) {
         throw new BadRequestError('Availability cannot change while you have an active booking');
       }
-      if (dto.isAvailable && current.driverProfile?.status !== 'APPROVED') {
-        throw new ForbiddenError('Driver account pending admin approval');
-      }
       throw new BadRequestError('Availability changed; refresh and try again');
     }
 
@@ -273,6 +270,9 @@ export class DriverService {
         statusHistory?: Array<{ status: string; timestamp: Date }>;
         vendorId?: { toString(): string } | null;
         assignedFleetVehicleLabel?: string;
+        arrivedAtDropoffAt?: Date | null;
+        paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE' | null;
+        paymentConfirmedByCustomer?: boolean | null;
       },
     ) => ({
       bookingType: type,
@@ -288,6 +288,11 @@ export class DriverService {
       statusHistory: mapStatusHistory(booking.statusHistory),
       vendorId: booking.vendorId?.toString(),
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
+      arrivedAtDropoffAt: booking.arrivedAtDropoffAt
+        ? new Date(booking.arrivedAtDropoffAt).toISOString()
+        : undefined,
+      paymentCollectionMode: booking.paymentCollectionMode ?? undefined,
+      paymentConfirmedByCustomer: Boolean(booking.paymentConfirmedByCustomer),
     });
 
     if (bookingType === 'towing') {
@@ -348,17 +353,21 @@ export class DriverService {
     }
 
     if (dto.status === 'COMPLETED') {
-      if (booking.completionOtp || booking.arrivedAtDropoffAt) {
-        try {
-          assertCompletionOtp(booking, dto.completionOtp);
-        } catch (otpErr) {
-          if (dto.bookingType === 'towing') {
-            await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
-          } else {
-            await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
-          }
-          throw otpErr;
+      if (!booking.arrivedAtDropoffAt) {
+        throw new BadRequestError('Mark arrival at the drop before completing the job');
+      }
+      if (!booking.paymentConfirmedByCustomer) {
+        throw new BadRequestError('The customer must confirm payment before this job can be completed');
+      }
+      try {
+        assertCompletionOtp(booking, dto.completionOtp);
+      } catch (otpErr) {
+        if (dto.bookingType === 'towing') {
+          await TowingBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
+        } else {
+          await DriverBookingModel.findByIdAndUpdate(bookingId, { $inc: { completionOtpAttempts: 1 } });
         }
+        throw otpErr;
       }
     }
 
@@ -542,7 +551,6 @@ export class DriverService {
       bookingId,
       bookingNumber: booking.bookingNumber,
       fare,
-      completionOtp,
       arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
     });
 
@@ -553,7 +561,6 @@ export class DriverService {
       status: booking.status,
       arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
       fare,
-      completionOtp,
     };
   }
 
