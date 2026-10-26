@@ -4,7 +4,7 @@ Updated: 2026-10-26
 
 ## Current focus
 
-**2026-10-26 (partner day-one logic):** Driver and vendor can work after registration. Pending review is a home/profile status, not a wall. Only suspended or rejected accounts are blocked. Re-check fixed three gaps: fleet list/assign no longer requires admin approval; pending drivers still get realtime and marketplace alerts; an open towing job cannot be given to an independent driver, and a second vendor cannot steal a job already pinned to another vendor. A vendor with zero active vehicles gets no jobs. Vendor offers and assign are towing only. Fleet drivers get no open-offer feed. Backend and partner `tsc` clean. Not live-tested with GPS, SMS, or UPI.
+**2026-10-26 (drop pay + vendor jobs):** Vendor sees towing jobs with or without a vehicle. Assign stays locked until one vehicle is active. Drop flow: driver confirms arrival → customer popup and notification with the fare, no SMS yet → customer chooses Cash / UPI / in-app → SMS OTP to the customer and the same choice appears on the driver → driver enters that OTP → job completes and the driver is free. Backend, partner, and customer `tsc` clean. Live GPS / SMS / UPI not run.
 
 **2026-10-26 (partner navigation):** Back/stack fixes — `VendorAssignJob` on Jobs + Drivers + Account stacks; fleet assign uses in-stack `navigate` (not Jobs tab jump); assign success uses `goBack()`; `partnerJobsParams` / `partnerAccountParams` no longer replace whole stack `state`; Account tab re-tap → `PartnerAccountMain` (`merge: false`); `PartnerVendor` tab restored for drivers with fleet invite/membership. Map: `mobile application/docs/PARTNER_NAVIGATION.md`.
 

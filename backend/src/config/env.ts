@@ -41,22 +41,14 @@ const envSchema = z.object({
     .default('false')
     .transform((v) => v.trim().toLowerCase() === 'true'),
   MOCK_UNIVERSAL_OTP: z.string().default('123456'),
-  // MessageCentral VerifyNow SMS OTP service
-  MC_CUSTOMER_ID: z.string().optional(),
-  MC_AUTH_TOKEN: z.string().optional(),
-  MC_BASE_URL: z.string().default('https://cpaas.messagecentral.com'),
-  // HanuOTP SMS OTP service (non-DLT; we generate the OTP and Hanu delivers it)
+  // HanuSMS OTP service (Exclusive production SMS route: api.hanuotp.in)
   HANU_API_KEY: z.string().optional(),
   HANU_BASE_URL: z.string().default('https://api.hanuotp.in'),
   HANU_TEMPLATE_ID: z.string().default('default'),
-  /** Comma-separated app roles that use HanuOTP; everything else keeps MessageCentral. */
-  HANU_OTP_ROLES: z.string().default('customer,vendor,driver'),
+  /** Roles that route OTPs through HanuSMS */
+  HANU_OTP_ROLES: z.string().default('customer,vendor,driver,admin'),
   /** Pepper mixed into the OTP hash stored in the DB (falls back to a project constant). */
   OTP_PEPPER: z.string().optional(),
-  // Twilio (legacy / fallback — kept optional)
-  TWILIO_ACCOUNT_SID: z.string().optional(),
-  TWILIO_AUTH_TOKEN: z.string().optional(),
-  TWILIO_PHONE_NUMBER: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

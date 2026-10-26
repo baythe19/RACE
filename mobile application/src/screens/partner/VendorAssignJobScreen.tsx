@@ -22,6 +22,7 @@ import type {
   PartnerDriversStackParamList,
   PartnerJobsStackParamList,
 } from '../../types/partnerNavigation';
+import { partnerAccountParams } from '../../navigation/partnerNavigationRef';
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
 import { spacing } from '../../theme';
 
@@ -167,6 +168,36 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       void refetchDrivers();
     }
   };
+
+  const activeVehicles = vehicles.filter(vehicle => vehicle.status === 'ACTIVE');
+
+  if (!vehiclesLoading && activeVehicles.length === 0) {
+    return (
+      <View style={{ flex: 1 }}>
+        <PartnerScreenLayout
+          title="Add a vehicle first"
+          onBack={() => navigation.goBack()}
+          contentTopSpacing={spacing.sm}
+          footer={
+            <Pressable
+              style={styles.primaryButton}
+              onPress={() =>
+                navigation.getParent()?.navigate('PartnerAccount', partnerAccountParams('VendorVehicles'))
+              }>
+              <PartnerText style={styles.primaryButtonText}>Add vehicle</PartnerText>
+            </Pressable>
+          }>
+          <View style={styles.emptyCard}>
+            <PartnerText style={styles.emptyTitle}>This job is waiting</PartnerText>
+            <PartnerText style={styles.emptySub}>
+              The request stays on your jobs list. Assignment opens after one towing vehicle is active.
+            </PartnerText>
+          </View>
+        </PartnerScreenLayout>
+        {partnerDialog}
+      </View>
+    );
+  }
 
   if (bookingType !== 'towing') {
     return (

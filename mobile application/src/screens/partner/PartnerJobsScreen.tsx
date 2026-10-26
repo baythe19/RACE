@@ -814,8 +814,8 @@ export default function PartnerJobsScreen() {
                   </View>
                   <PartnerText style={styles.emptyTitle}>No jobs yet</PartnerText>
                   <PartnerText style={styles.emptySubtitle}>
-                    Customer towing requests appear here after you add an active vehicle. Assign a
-                    driver and that vehicle — your fleet drivers only receive the jobs you assign.
+                    Customer towing requests appear here. Add an active vehicle before you assign a
+                    driver — fleet drivers only receive the jobs you assign.
                   </PartnerText>
                 </View>
               ) : (

@@ -30,11 +30,8 @@ export function assertProductionConfig(): void {
   if (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'Admin@123') {
     problems.push("ADMIN_PASSWORD is unset or the default ('Admin@123')");
   }
-  const hasOtpProvider = Boolean(
-    (process.env.MC_CUSTOMER_ID && process.env.MC_AUTH_TOKEN) || process.env.HANU_API_KEY,
-  );
-  if (!hasOtpProvider) {
-    problems.push('No OTP provider credentials (MC_CUSTOMER_ID+MC_AUTH_TOKEN or HANU_API_KEY)');
+  if (!process.env.HANU_API_KEY) {
+    problems.push('HANU_API_KEY is unset — HanuSMS credentials are required for production SMS delivery');
   }
   if (process.env.HANU_API_KEY) {
     const pepper = process.env.OTP_PEPPER?.trim() ?? '';

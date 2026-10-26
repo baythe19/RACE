@@ -100,8 +100,16 @@ class TrackingService {
 
     cleanups.push(onBookingStatus((data) => {
       if (data.bookingId !== bookingId) return;
-      // Status is valid independently of GPS and may arrive before the first poll.
-      this.pushUpdate(bookingId, { bookingId, status: data.status });
+      this.pushUpdate(bookingId, {
+        bookingId,
+        status: data.status,
+        ...(data.arrivedAtDropoffAt ? { arrivedAtDropoffAt: data.arrivedAtDropoffAt } : {}),
+        ...(typeof data.fare === 'number' ? { fare: data.fare } : {}),
+        ...(data.paymentConfirmed != null
+          ? { paymentConfirmedByCustomer: data.paymentConfirmed }
+          : {}),
+        ...(data.paymentMode ? { paymentCollectionMode: data.paymentMode } : {}),
+      });
     }));
 
     cleanups.push(onDriverArrivedDropoff((data) => {

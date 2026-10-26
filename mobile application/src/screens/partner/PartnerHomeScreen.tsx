@@ -526,6 +526,22 @@ export default function PartnerHomeScreen() {
         <DriverDataSkeleton variant="vendor-dashboard" />
       ) : (
         <>
+          {activeVehicleCount === 0 && verification.tone !== 'rejected' ? (
+            <Pressable
+              onPress={() => goAccountScreen('VendorVehicles')}
+              style={styles.reviewBanner}
+              accessibilityRole="button"
+              accessibilityLabel="Add a towing vehicle">
+              <Truck size={16} color={colors.primaryDark} strokeWidth={2.2} />
+              <View style={styles.reviewBannerCopy}>
+                <PartnerText style={styles.reviewBannerTitle}>Add a vehicle to assign jobs</PartnerText>
+                <PartnerText style={styles.reviewBannerHint}>
+                  Customer towing requests still show here. Assignment stays locked until one vehicle is active.
+                </PartnerText>
+              </View>
+              <ChevronRight size={16} color={colors.grey} strokeWidth={2.4} />
+            </Pressable>
+          ) : null}
           {verification.tone !== 'completed' ? (
             <Pressable
               onPress={() => goAccountScreen('VendorVerificationStatus')}
@@ -628,6 +644,10 @@ export default function PartnerHomeScreen() {
                 <Pressable
                   style={styles.reviewLeadCta}
                   onPress={() => {
+                    if (activeVehicleCount === 0) {
+                      goAccountScreen('VendorVehicles');
+                      return;
+                    }
                     navigation.navigate('PartnerJobs', {
                       screen: 'VendorAssignJob',
                       params: {
@@ -640,7 +660,9 @@ export default function PartnerHomeScreen() {
                       },
                     } as never);
                   }}>
-                  <PartnerText style={styles.reviewLeadText}>Review lead</PartnerText>
+                  <PartnerText style={styles.reviewLeadText}>
+                    {activeVehicleCount === 0 ? 'Add vehicle' : 'Review lead'}
+                  </PartnerText>
                 </Pressable>
               </View>
               <View style={styles.leadFareCol}>
@@ -659,35 +681,23 @@ export default function PartnerHomeScreen() {
           </View>
           <View style={styles.leadsEmptyCopy}>
             <PartnerText style={styles.leadsEmptyTitle}>
-              {verification.tone === 'rejected'
-                ? 'Account rejected'
-                : activeVehicleCount === 0
-                  ? 'Add a towing vehicle first'
-                  : 'No new booking leads'}
+              {verification.tone === 'rejected' ? 'Account rejected' : 'No new booking leads'}
             </PartnerText>
             <PartnerText style={styles.leadsEmptySub}>
               {verification.tone === 'rejected'
                 ? 'This account cannot take jobs. Open verification for the review note.'
-                : activeVehicleCount === 0
-                  ? 'A vendor without an active vehicle does not receive customer jobs.'
-                  : 'Open customer towing requests will land here for your fleet.'}
+                : 'Customer towing requests show here. Assigning one needs an active vehicle.'}
             </PartnerText>
           </View>
           <Pressable
             onPress={() =>
               verification.tone === 'rejected'
                 ? goAccountScreen('VendorVerificationStatus')
-                : activeVehicleCount === 0
-                  ? goAccountScreen('VendorVehicles')
-                  : navigation.navigate('PartnerJobs')
+                : navigation.navigate('PartnerJobs')
             }
             hitSlop={8}>
             <PartnerText style={styles.leadsViewAll}>
-              {verification.tone === 'rejected'
-                ? 'View status'
-                : activeVehicleCount === 0
-                  ? 'Add vehicle'
-                  : 'View all'}
+              {verification.tone === 'rejected' ? 'View status' : 'View all'}
             </PartnerText>
           </Pressable>
         </View>

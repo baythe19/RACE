@@ -1,11 +1,11 @@
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
-import { emitBookingStatusUpdate, emitDriverLocation, emitToDriver } from './socket';
+import { emitBookingStatusUpdate, emitDriverLocation, emitToBooking, emitToDriver, emitToUser } from './socket';
 import { userRepository } from './userRepository';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
-import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp, generateCompletionOtp } from './bookings/tripOtp';
+import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp } from './bookings/tripOtp';
 import { processBookingCompletionEscrowSettlement } from './payments/escrowSettlement';
 import { logger } from '../../utils/src/logger';
 import { UserModel } from '../../models/src/user';
@@ -511,7 +511,7 @@ export class DriverService {
     return { rejected: true, bookingId, status: 'CONFIRMED' as const };
   }
 
-  /** Mark arrived at dropoff destination: notifies customer to pay and reveals completion OTP */
+    /** Driver confirms drop arrival. Customer is asked to pay. The SMS code is not sent yet. */
   async arrivedAtDropoff(driverId: string, role: string, bookingId: string, bookingType: 'towing' | 'driver') {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
@@ -526,12 +526,10 @@ export class DriverService {
       throw new BadRequestError('Booking must be IN_PROGRESS to mark arrival at dropoff');
     }
 
-    const completionOtp = booking.completionOtp ?? generateCompletionOtp();
     const arrivedAtDropoffAt = new Date();
 
     await Model.updateById(bookingId, {
       arrivedAtDropoffAt,
-      completionOtp,
     });
 
     const fare =
@@ -539,13 +537,29 @@ export class DriverService {
         ? (booking.fareBreakdown as { totalFare?: number }).totalFare
         : booking.estimatedFare;
 
-    emitBookingStatusUpdate(bookingId, 'IN_PROGRESS', {
+    const arrivalNotice = {
+      bookingId,
+      bookingType,
+      bookingNumber: booking.bookingNumber,
+      status: booking.status,
       arrivedAtDropoff: true,
       arrivedAtDropoffAt: arrivedAtDropoffAt.toISOString(),
+      fare,
+      paymentOptions: ['CASH', 'UPI', 'ONLINE'],
+      message: 'Driver has reached your location. Pay the driver to finish the trip.',
+    };
+
+    emitBookingStatusUpdate(bookingId, 'IN_PROGRESS', {
+      arrivedAtDropoff: true,
+      arrivedAtDropoffAt: arrivalNotice.arrivedAtDropoffAt,
       fare,
       paymentCollectionMode: booking.paymentCollectionMode,
       paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     });
+    emitToBooking(bookingId, 'booking:driver_arrived_dropoff', arrivalNotice);
+    if (booking.customerId) {
+      emitToUser(booking.customerId.toString(), 'booking:driver_arrived_dropoff', arrivalNotice);
+    }
 
     emitToDriver(driverId, 'booking:driver_arrived_dropoff', {
       bookingId,

@@ -1,33 +1,27 @@
 /**
- * OTP Service — MessageCentral VerifyNow integration.
+ * OTP Service — Powered exclusively by HanuSMS (https://api.hanuotp.in).
+ * All non-Hanu SMS providers (MessageCentral, Twilio) have been completely removed.
  *
- * Two modes:
+ * Flow:
+ * 1. sendOtp   → Generates CSPRNG OTP (generateOtp) → Dispatches via hanuSendOtp() → Stores peppered SHA-256 hash in OtpLog
+ * 2. verifyOtp → Hashes user input with OTP_PEPPER → Compares against peppered SHA-256 hash
  *
- * A) PRODUCTION (MC configured):
- *    sendOtp   → calls mcSendOtp()  → stores mcVerificationId in OtpLog
- *    verifyOtp → calls mcValidateOtp(verificationId, code) → MC verifies OTP digit server-side
- *    No OTP digit is stored in our database.
- *
- * B) DEVELOPMENT (MC not configured OR MOCK_DATA_MODE=true + non-prod):
- *    sendOtp   → generates 6-digit OTP locally, prints to console
- *    verifyOtp → checks against stored digit or MOCK_UNIVERSAL_OTP (123456)
+ * Dev/mock fallback:
+ * When HANU_API_KEY is not configured in development, prints OTP to console via logDevOtp()
+ * and accepts universal test code if MOCK_DATA_MODE is enabled.
  */
 
 import { env } from '../../config/env';
 import { AppError, TooManyRequestsError } from '../../utils/src/errors';
 import { generateOtp } from '../../utils/src/otp';
 import { createHash } from 'crypto';
-import {
-  OTP_EXPIRED_USER_MESSAGE,
-  logDevOtp,
-  mcValidateOtp,
-} from '../../utils/src/sms';
+import { logDevOtp } from '../../utils/src/sms';
 import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
 import { authRepository } from './authRepository';
 
 /** sha256(otp + pepper) — raw OTP digits are never stored for the hanu route. */
 function hashOtp(otp: string): string {
-  const pepper = env.OTP_PEPPER ?? `race-otp::${env.MC_AUTH_TOKEN ?? 'local-dev'}`;
+  const pepper = env.OTP_PEPPER ?? 'race-otp::hanu-sms-production-pepper';
   return createHash('sha256').update(`${otp}:${pepper}`).digest('hex');
 }
 
@@ -36,11 +30,9 @@ export class OtpService {
     return new Date(Date.now() + env.OTP_EXPIRY_SECONDS * 1000);
   }
 
-
   /** Which SMS route handles this role? hanu → local-dev. */
   private pickProvider(_role?: string): 'hanu' | 'local' {
     if (process.env.FORCE_MOCK_OTP !== 'true' && isHanuConfigured()) {
-      // HanuSMS is the sole exclusive SMS service across customer, vendor, driver, admin
       return 'hanu';
     }
     return 'local';
@@ -87,7 +79,6 @@ export class OtpService {
       return {
         message: 'OTP sent to your mobile number',
         expiresIn: env.OTP_EXPIRY_SECONDS,
-        // No devOtp on the hanu route — production semantics.
       };
     }
 
@@ -103,6 +94,7 @@ export class OtpService {
       emailVerified: false,
       mobileAttempts: 0,
       emailAttempts: 0,
+      provider: 'local',
     });
 
     logDevOtp(mobileNumber, mobileOtp);
@@ -110,7 +102,6 @@ export class OtpService {
     return {
       message: 'OTP sent to your mobile number',
       expiresIn: env.OTP_EXPIRY_SECONDS,
-      // Surface OTP in response in dev so the mobile UI can show it as a toast
       devOtp: mobileOtp,
     };
   }
@@ -139,49 +130,7 @@ export class OtpService {
       throw new TooManyRequestsError('Maximum OTP verification attempts exceeded');
     }
 
-    // ─── MessageCentral server-side verification ──────────────────────────
-    // Legacy logs (created before provider field existed) carry mcVerificationId
-    // without provider — treat any log with an mcVerificationId as MC-routed.
-    if (log.mcVerificationId) {
-      if (env.NODE_ENV !== 'production' && otp === env.MOCK_UNIVERSAL_OTP) {
-        log.mobileVerified = true;
-        if (!log.mcVerificationIdHash) {
-          log.mcVerificationIdHash = `${log.mcVerificationId}:${otp}`;
-        }
-        await log.save();
-        return;
-      }
-      try {
-        const correct = await mcValidateOtp(mobileNumber, log.mcVerificationId, otp);
-
-        if (!correct) {
-          log.mobileAttempts += 1;
-          await log.save();
-          throw new AppError('Incorrect code. Check the SMS and try again.', 400);
-        }
-
-        log.mobileVerified = true;
-        // VOC P0.8: store a submission-bound idempotency hash so a later
-        // "recently verified" replay only ever matches the SAME code —
-        // the repository now matches mcVerificationIdHash === submitted otp,
-        // so an arbitrary code can no longer mint a fresh session.
-        if (!log.mcVerificationIdHash) {
-          log.mcVerificationIdHash = `${log.mcVerificationId}:${otp}`;
-        }
-        await log.save();
-        return;
-      } catch (error) {
-        if (
-          error instanceof AppError &&
-          error.message === OTP_EXPIRED_USER_MESSAGE
-        ) {
-          await authRepository.invalidatePendingOtps(mobileNumber);
-        }
-        throw error;
-      }
-    }
-
-    // ─── HanuOTP route: OTP digits live only as a peppered hash ───────────
+    // ─── HanuOTP route: OTP digits verified against peppered hash ──────────
     if (log.provider === 'hanu') {
       if (!log.otpHash || hashOtp(otp) !== log.otpHash) {
         log.mobileAttempts += 1;
@@ -190,10 +139,6 @@ export class OtpService {
       }
 
       log.mobileVerified = true;
-      // Replay-proof idempotency (VOC P0.8): after a success the submitted
-      // code itself becomes the only value that can match a re-verify —
-      // the repository matches mobileOtp === otp. Never store anything the
-      // user did not submit.
       if (!log.mobileOtp) {
         log.mobileOtp = otp;
       }
@@ -201,7 +146,7 @@ export class OtpService {
       return;
     }
 
-    // ─── Dev / mock verification ──────────────────────────────────────────
+    // ─── Dev / mock verification fallback ─────────────────────────────────
     const isMockOtpMatch = Boolean(
       (env.MOCK_DATA_MODE || env.NODE_ENV !== 'production') &&
       otp === env.MOCK_UNIVERSAL_OTP,

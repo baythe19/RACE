@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Clock, MapPin, Navigation, Radio } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -9,6 +9,7 @@ import TripOtpCard from '../../../components/booking/TripOtpCard';
 import DropoffPaymentModal from '../../../components/booking/DropoffPaymentModal';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import { useBookingTracking } from '../../../hooks/useBookingTracking';
+import { claimDropoffPrompt } from '../../../services/dropoffPromptGate';
 import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import {
@@ -79,6 +80,8 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
     arrivedAtDropoffAt || (booking as any)?.arrivedAtDropoffAt,
   );
   const showDropoffPayment = isArrivedDropoff && !isCompleted;
+
+  useEffect(() => claimDropoffPrompt(), []);
 
   const trackParams = bookingId
     ? { bookingId, bookingType: 'towing' as const, fromBookings }

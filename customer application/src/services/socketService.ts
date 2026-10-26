@@ -74,7 +74,15 @@ export function onDriverLocation(
 }
 
 export function onBookingStatus(
-  callback: (data: { bookingId: string; status: string }) => void,
+  callback: (data: {
+    bookingId: string;
+    status: string;
+    arrivedAtDropoff?: boolean;
+    arrivedAtDropoffAt?: string;
+    fare?: number;
+    paymentConfirmed?: boolean;
+    paymentMode?: 'CASH' | 'UPI' | 'ONLINE';
+  }) => void,
 ): () => void {
   const activeSocket = connectSocket();
   activeSocket.on('booking:status', callback);

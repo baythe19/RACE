@@ -71,11 +71,6 @@ export class VendorBookingsService {
 
   async listOffers(vendorUserId: string): Promise<OpenBookingOffer[]> {
     await this.assertVendorApproved(vendorUserId);
-    const activeVehicles = await VendorVehicleModel.countDocuments({
-      vendorId: vendorUserId,
-      status: 'ACTIVE',
-    }).exec();
-    if (activeVehicles === 0) return [];
     return listOpenBookingOffers({ forVendorId: vendorUserId });
   }
 
@@ -274,6 +269,13 @@ export class VendorBookingsService {
     await this.assertVendorApproved(vendorUserId);
     if (dto.bookingType !== 'towing') {
       throw new BadRequestError('Vendors can only assign vehicle towing jobs');
+    }
+    const activeVehicles = await VendorVehicleModel.countDocuments({
+      vendorId: vendorUserId,
+      status: 'ACTIVE',
+    }).exec();
+    if (activeVehicles === 0) {
+      throw new BadRequestError('Add an active towing vehicle before assigning this job');
     }
 
     const driver = await UserModel.findOne({ _id: dto.driverId, role: 'driver' }).exec();
