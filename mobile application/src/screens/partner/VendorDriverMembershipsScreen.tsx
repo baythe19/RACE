@@ -659,7 +659,6 @@ const styles = StyleSheet.create({
   content: {
     gap: spacing.md,
     paddingBottom: spacing.xxl,
-    flexGrow: 1,
   },
   statsRow: {
     flexDirection: 'row',
@@ -748,7 +747,7 @@ const styles = StyleSheet.create({
   empty: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
+    flexGrow: 1,
     paddingVertical: spacing.xxl,
     paddingHorizontal: spacing.lg,
   },

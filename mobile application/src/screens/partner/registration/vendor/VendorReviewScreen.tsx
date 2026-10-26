@@ -29,7 +29,7 @@ import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlic
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
 import { refreshAuthSession } from '../../../../services/authService';
 import { saveTokens } from '../../../../services/api';
-import { registerVendor, uploadVendorDocument } from '../../../../services/vendor/vendorApi';
+import { getVendorStatus, registerVendor, uploadVendorDocument } from '../../../../services/vendor/vendorApi';
 import { usePartnerRegistrationStore } from '../../../../store/partnerRegistrationStore';
 import type {
   PartnerRegistrationStackParamList,
@@ -77,10 +77,10 @@ function ReviewSection({
           accessibilityRole="button"
           accessibilityState={{ expanded }}>
           <View style={[styles.checkMark, complete ? styles.checkMarkComplete : styles.checkMarkPending]}>
-            {complete ? <Check size={11} color="#15803D" strokeWidth={3} /> : null}
+            {complete ? <Check size={13} color="#15803D" strokeWidth={3} /> : null}
           </View>
           <View style={styles.sectionIcon}>
-            <Icon size={15} color="#D97706" strokeWidth={2.2} />
+            <Icon size={16} color="#D97706" strokeWidth={2.2} />
           </View>
           <View style={styles.sectionCopy}>
             <PartnerText style={styles.sectionTitle}>{title}</PartnerText>
@@ -139,6 +139,43 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
     }
     setSubmitting(true);
     try {
+      // Already submitted once? Re-open this screen (token refresh / retry)
+      // must jump to the live application status instead of re-registering.
+      try {
+        const existing = await getVendorStatus();
+        if (existing && !['draft', 'changes_requested'].includes(existing.status)) {
+          dispatch(finishPartnerSignup());
+          if (!authUser) {
+            const token = 'mock-vendor-token';
+            await saveTokens(token, token);
+          }
+          dispatch(
+            completeOnboarding(
+              authUser
+                ? { ...authUser, role: 'vendor', isProfileCompleted: true }
+                : {
+                    id: 'vendor-existing',
+                    mobileNumber: vendorBusiness.mobileNumber ?? '',
+                    role: 'vendor',
+                    fullName: vendorBusiness.ownerName || 'Vendor',
+                    email: vendorBusiness.email,
+                    isVerified: true,
+                    isProfileCompleted: true,
+                  },
+            ),
+          );
+          const rootNavigation =
+            navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
+          const routeNames = rootNavigation?.getState()?.routeNames;
+          if (routeNames?.includes('PartnerMain')) {
+            rootNavigation?.reset({ index: 0, routes: [{ name: 'PartnerMain' }] });
+          }
+          return;
+        }
+      } catch {
+        // No application yet (404) — continue with a fresh submit.
+      }
+
       const address = [
         vendorAddress.addressLine1,
         vendorAddress.addressLine2,
@@ -253,7 +290,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
       continueDisabled={!termsAccepted || submitting || missingRequiredDocs.length > 0}
       continueLoading={submitting}>
       <View style={styles.readyBanner}>
-        <View style={styles.readyIcon}><ShieldCheck size={15} color={missingRequiredDocs.length === 0 ? '#15803D' : '#B45309'} /></View>
+        <View style={styles.readyIcon}><ShieldCheck size={17} color={missingRequiredDocs.length === 0 ? '#15803D' : '#B45309'} /></View>
         <View style={styles.readyCopy}>
           <PartnerText style={styles.readyTitle}>
             {missingRequiredDocs.length === 0 ? 'Ready to submit' : 'Required documents are missing'}
@@ -338,7 +375,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         accessibilityRole="checkbox"
         accessibilityState={{ checked: termsAccepted }}>
         <View style={[styles.termsCheckbox, termsAccepted && styles.termsCheckboxChecked]}>
-          {termsAccepted ? <Check size={13} color="#FFFFFF" strokeWidth={3} /> : null}
+          {termsAccepted ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
         </View>
         <PartnerText style={styles.termsText}>
           I confirm that these details and documents are accurate and agree to the RACE Partner Terms and Verification Policy.
@@ -354,53 +391,82 @@ const styles = StyleSheet.create({
   readyBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    marginBottom: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    gap: 11,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#BBF7D0',
-    borderRadius: 9,
+    borderRadius: 14,
     backgroundColor: '#F0FDF4',
   },
-  readyIcon: { width: 25, height: 25, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#DCFCE7' },
+  readyIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#DCFCE7' },
   readyCopy: { flex: 1 },
-  readyTitle: { color: '#166534', fontSize: 12, fontWeight: '700' },
-  readySubtitle: { marginTop: 1, color: '#4B5563', fontSize: 10.5, lineHeight: 14 },
+  readyTitle: { color: '#166534', fontSize: 13.5, fontWeight: '800' },
+  readySubtitle: { marginTop: 2, color: '#4B5563', fontSize: 12, lineHeight: 16 },
   summaryCard: {
-    padding: 8,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    borderRadius: 12,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
   },
   section: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  sectionHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  sectionMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  checkMark: { width: 17, height: 17, alignItems: 'center', justifyContent: 'center', borderRadius: 9 },
+  sectionHeader: { minHeight: 60, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 },
+  sectionMain: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkMark: { width: 21, height: 21, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   checkMarkComplete: { backgroundColor: '#DCFCE7' },
   checkMarkPending: { backgroundColor: '#FEF3C7' },
-  sectionIcon: { width: 27, height: 27, alignItems: 'center', justifyContent: 'center', borderRadius: 6, backgroundColor: '#FEF3C7' },
+  sectionIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#FEF3C7' },
   sectionCopy: { flex: 1, minWidth: 0 },
-  sectionTitle: { color: '#111827', fontSize: 12.5, fontWeight: '700' },
-  sectionSummary: { marginTop: 1, color: '#6B7280', fontSize: 10, lineHeight: 13 },
-  editButton: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 3, paddingVertical: 6 },
-  editText: { color: '#2563EB', fontSize: 10.5, fontWeight: '600' },
-  expandButton: { width: 24, height: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#F3F4F6' },
-  sectionDetails: { paddingHorizontal: 30, paddingBottom: 8 },
-  detailRow: { paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
-  detailLabel: { color: '#6B7280', fontSize: 9.5, fontWeight: '500' },
-  detailValue: { marginTop: 1, color: '#111827', fontSize: 10.5, fontWeight: '600' },
-  documentRow: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  documentStatus: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 8, borderWidth: 1, borderColor: '#D1D5DB' },
+  sectionTitle: { color: '#111827', fontSize: 14, fontWeight: '800' },
+  sectionSummary: { marginTop: 2, color: '#6B7280', fontSize: 11.5, lineHeight: 15 },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 999,
+    backgroundColor: '#F0F9FF',
+  },
+  editText: { color: '#2563EB', fontSize: 11.5, fontWeight: '700' },
+  expandButton: { width: 28, height: 32, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#F3F4F6' },
+  sectionDetails: { paddingHorizontal: 34, paddingBottom: 12 },
+  detailRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  detailLabel: { color: '#6B7280', fontSize: 11, fontWeight: '500' },
+  detailValue: { marginTop: 2, color: '#111827', fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
+  documentRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 },
+  documentStatus: { width: 19, height: 19, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB' },
   documentStatusUploaded: { borderColor: '#BBF7D0', backgroundColor: '#DCFCE7' },
-  documentName: { flex: 1, color: '#374151', fontSize: 10.5 },
-  documentState: { color: '#B45309', fontSize: 9.5, fontWeight: '600' },
+  documentName: { flex: 1, color: '#374151', fontSize: 12.5 },
+  documentState: { color: '#B45309', fontSize: 11, fontWeight: '600' },
   documentStateUploaded: { color: '#15803D' },
-  payoutNote: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7 },
-  payoutText: { flex: 1, color: '#6B7280', fontSize: 10, lineHeight: 14 },
-  termsRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 10, paddingHorizontal: 2 },
-  termsCheckbox: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#D1D5DB', borderRadius: 4, backgroundColor: '#FFFFFF' },
+  payoutNote: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, marginTop: 2 },
+  payoutText: { flex: 1, color: '#6B7280', fontSize: 11.5, lineHeight: 16 },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginTop: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  termsCheckbox: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#D1D5DB',
+    borderRadius: 5,
+    backgroundColor: '#FFFFFF',
+  },
   termsCheckboxChecked: { borderColor: '#F59E0B', backgroundColor: '#F59E0B' },
-  termsText: { flex: 1, color: '#374151', fontSize: 10, lineHeight: 14 },
+  termsText: { flex: 1, color: '#374151', fontSize: 11.5, lineHeight: 16 },
 });

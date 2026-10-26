@@ -1516,11 +1516,14 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               style={[
                 styles.textInput,
                 {
-                  fontSize: px(14),
+                  fontSize: px(13.5),
                   fontWeight: '700',
                   color: '#111827',
                   letterSpacing: 0.6,
                   flex: 1,
+                  paddingVertical: 0,
+                  includeFontPadding: false,
+                  textAlignVertical: 'center',
                 },
               ]}
               placeholder="DL number (e.g. OD-0220190012345)"
@@ -2754,6 +2757,8 @@ const styles = StyleSheet.create({
     color: '#111827',
     paddingVertical: 0,
     fontWeight: '500',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   textValue: {
     flex: 1,

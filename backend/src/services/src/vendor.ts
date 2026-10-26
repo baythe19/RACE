@@ -246,8 +246,12 @@ export class VendorService {
 
   async register(userId: string, dto: RegisterVendorDto): Promise<VendorResponseDto> {
     const existing = await vendorRepository.findByUserId(userId);
+
+    // Idempotent submit: an application that is already in review (or beyond)
+    // must not 409 — the client resubmits after token refresh / retries.
+    // Return the stored application untouched instead.
     if (existing && !['draft', 'changes_requested'].includes(existing.status)) {
-      throw new ConflictError('Vendor application already submitted');
+      return mapVendor(existing);
     }
 
     const user = await userRepository.findById(userId);
