@@ -30,7 +30,6 @@ import { PartnerText } from '../../../components/partner/PartnerText';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   AppState,
   BackHandler,
   Keyboard,
@@ -76,6 +75,7 @@ import { formatEta } from '../../../services/driver/roadRoutingService';
 import { updateMockActiveJobStatus } from '../../../data/mockPartnerData';
 import { getPreviewDriverStart } from '../../../data/previewPartnerWorld';
 import { useScreenPx } from '../../../hooks/useScreenPx';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import { retryDriverLocationReport, useDriverLocationReporting } from '../../../hooks/useDriverLocationReporting';
 import { useNavigationGps, useTravelHeading } from '../../../hooks/useNavigationGps';
@@ -177,6 +177,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const px = useScreenPx();
   const insets = useSafeAreaInsets();
   const { height: screenHeight } = useWindowDimensions();
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const bookingId = route.params?.bookingId;
   const { data: activeJob, isLoading, isError, refetch } = useDriverActiveJobQuery(true);
   const statusMutation = useUpdateDriverBookingStatusMutation();
@@ -380,13 +381,13 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           setOtpError(message);
           setTripOtp('');
         } else {
-          Alert.alert('Update failed', message);
+          showAlert({ tone: 'error', title: 'Update failed', message });
         }
       } finally {
         setActing(false);
       }
     },
-    [job, refetch, statusMutation],
+    [job, refetch, statusMutation, showAlert],
   );
 
   const undoPickupArrival = useCallback(() => {
@@ -399,15 +400,14 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   const confirmUndoPickupArrival = useCallback(() => {
     if (acting || step !== 'verify_otp') return;
-    Alert.alert(
-      'Not at pickup yet?',
-      'You can go back to navigation. The customer code will stay hidden until you confirm arrival again.',
-      [
-        { text: 'Stay here', style: 'cancel' },
-        { text: 'Go back', onPress: undoPickupArrival },
-      ],
-    );
-  }, [acting, step, undoPickupArrival]);
+    showAlert({
+      tone: 'info',
+      title: 'Not at pickup yet?',
+      message: 'You can go back to navigation. The customer code will stay hidden until you confirm arrival again.',
+      primaryAction: { label: 'Go back', onPress: undoPickupArrival },
+      secondaryAction: { label: 'Stay here', onPress: () => {} },
+    });
+  }, [acting, step, undoPickupArrival, showAlert]);
 
   useEffect(() => {
     const onBackPress = () => {
@@ -448,12 +448,15 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
         onConfirm();
         return;
       }
-      Alert.alert(title, message, [
-        { text: 'Not yet', style: 'cancel' },
-        { text: confirmLabel, onPress: onConfirm },
-      ]);
+      showAlert({
+        tone: 'warning',
+        title,
+        message,
+        primaryAction: { label: confirmLabel, onPress: onConfirm },
+        secondaryAction: { label: 'Not yet', onPress: () => {} },
+      });
     },
-    [farFromDestination],
+    [farFromDestination, showAlert],
   );
 
   const arrivedAtPickup = useCallback(() => {
@@ -483,7 +486,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           setArrivedAtDrop(true);
           setNavMode('overview');
         } catch (err) {
-          Alert.alert('Arrival notice', getApiErrorMessage(err, 'Failed to update drop arrival.'));
+          showAlert({
+            tone: 'error',
+            title: 'Arrival notice',
+            message: getApiErrorMessage(err, 'Failed to update drop arrival.'),
+          });
         } finally {
           setActing(false);
         }
@@ -549,34 +556,39 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
 
   const onDeclineAssignment = useCallback(() => {
     if (acting || !job) return;
-    Alert.alert(
-      'Decline assignment?',
-      'This job will be returned to your vendor so another driver can be assigned.',
-      [
-        { text: 'Keep Job', style: 'cancel' },
-        {
-          text: 'Decline',
-          style: 'destructive',
-          onPress: async () => {
-            setActing(true);
-            try {
-              await rejectMutation.mutateAsync({
-                bookingId: job.id,
-                bookingType: job.bookingType,
-              });
-              Alert.alert('Assignment declined', 'The vendor has been notified.', [
-                { text: 'OK', onPress: goHome },
-              ]);
-            } catch (error) {
-              Alert.alert('Could not decline', getApiErrorMessage(error, 'Failed to decline assignment.'));
-            } finally {
-              setActing(false);
-            }
-          },
+    showAlert({
+      tone: 'warning',
+      title: 'Decline assignment?',
+      message: 'This job will be returned to your vendor so another driver can be assigned.',
+      primaryAction: {
+        label: 'Decline',
+        onPress: async () => {
+          setActing(true);
+          try {
+            await rejectMutation.mutateAsync({
+              bookingId: job.id,
+              bookingType: job.bookingType,
+            });
+            showAlert({
+              tone: 'success',
+              title: 'Assignment declined',
+              message: 'The vendor has been notified.',
+              primaryAction: { label: 'OK', onPress: goHome },
+            });
+          } catch (error) {
+            showAlert({
+              tone: 'error',
+              title: 'Could not decline',
+              message: getApiErrorMessage(error, 'Failed to decline assignment.'),
+            });
+          } finally {
+            setActing(false);
+          }
         },
-      ],
-    );
-  }, [acting, goHome, job, rejectMutation]);
+      },
+      secondaryAction: { label: 'Keep Job', onPress: () => {} },
+    });
+  }, [acting, goHome, job, rejectMutation, showAlert]);
 
   const recenterMap = useCallback(() => {
     setFollowUser(true);
@@ -905,6 +917,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
             <PartnerText style={[T.button, { fontSize: px(16), color: C.ink }]}>Back to jobs</PartnerText>
           </Pressable>
         </View>
+        {partnerDialog}
       </View>
     );
   }
@@ -1069,10 +1082,11 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           durationMinutes={minutesBetween(startedAt, completedAtIso)}
           onBackToHome={goHome}
           onViewJobDetails={() => {
-            Alert.alert(
-              'Job Details',
-              `Booking #${job.bookingNumber}\nStatus: COMPLETED`,
-            );
+            showAlert({
+              tone: 'info',
+              title: 'Job Details',
+              message: `Booking #${job.bookingNumber}\nStatus: COMPLETED`,
+            });
           }}
           insetsTop={insets.top}
           insetsBottom={insets.bottom}
@@ -1100,6 +1114,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
           insetsBottom={insets.bottom}
         />
       </View>
+      {partnerDialog}
 
       {/* UI QA switcher: docked to the right edge so it never covers a sheet's actions. */}
       {UI_PREVIEW_MODE || __DEV__ ? (
@@ -1214,6 +1229,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
       </Modal>
 
       {menuModal}
+      {partnerDialog}
     </View>
   );
 }

@@ -12,6 +12,7 @@ import { logger } from '../utils/src/logger';
  *  - MOCK_DATA_MODE must be false (no fabricated/universal OTP live traffic)
  *  - ADMIN_PASSWORD default ('Admin@123') must have been overridden
  *  - MC or Hanu OTP credentials must exist (someone can actually receive an OTP)
+ *  - OTP_PEPPER (≥32 chars) required when Hanu OTP is configured
  */
 export function assertProductionConfig(): void {
   if (env.NODE_ENV !== 'production') {
@@ -34,6 +35,12 @@ export function assertProductionConfig(): void {
   );
   if (!hasOtpProvider) {
     problems.push('No OTP provider credentials (MC_CUSTOMER_ID+MC_AUTH_TOKEN or HANU_API_KEY)');
+  }
+  if (process.env.HANU_API_KEY) {
+    const pepper = process.env.OTP_PEPPER?.trim() ?? '';
+    if (pepper.length < 32) {
+      problems.push('OTP_PEPPER must be set to at least 32 characters when HANU_API_KEY is configured');
+    }
   }
 
   if (problems.length) {

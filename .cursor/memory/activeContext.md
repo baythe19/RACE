@@ -4,6 +4,8 @@ Updated: 2026-10-20
 
 ## Current focus
 
+**2026-10-26:** Backend deep security/architecture review filed at `docs/reviews/backend-deep-security-architecture-review-2026-10-26.md` (P0–P3, endpoints, tests, fix order).
+
 **Handoff — 2026-10-20, branch `changes-v6-partner-role-dispatch`.** This Codespace session is stopping. Next machine: pull this branch, then reconnect tools from `docs/ops/CURSOR_MCP_SETUP.md`. Partner lock is clear.
 
 **In-app driver navigation (not finished).** Stays inside the app (no maps `Linking`). Bhopal mock: Mandideep pickup → MP Nagar drop, random start (Misrod and nearby). Peach-checked: overview, turn-by-turn both legs, green Arrived near the pin, one OTP sheet (`1234`), OTP then drop nav, at-drop sheet with timer. Drop sheet actions are **Call customer only** (Message and Share location removed). `tsc --noEmit` in `mobile application/` passed after that edit.

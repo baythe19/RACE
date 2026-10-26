@@ -1,6 +1,7 @@
 import { PartnerText, PartnerTextInput } from '../../../../components/partner/PartnerText';
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Easing, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert as SystemAlert, Animated, Easing, Image, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { usePartnerDialog } from '../../../../hooks/usePartnerDialog';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -170,6 +171,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const { width } = useWindowDimensions();
   const scale = Math.min(1.22, Math.max(0.88, width / REF_W));
   const px = (val: number) => Math.max(1, Math.round(val * scale));
+
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
   const initialStepParam = route.params?.initialStep ?? 1;
   const fromReviewParam = Boolean(route.params?.fromReview);
@@ -383,10 +386,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       setTimeout(() => setUploadProgressState(null), 700);
     } catch (error) {
       setUploadProgressState(null);
-      Alert.alert(
-        'Document upload failed',
-        getApiErrorMessage(error, 'The document was not saved. Check your connection and try again.'),
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Document upload failed',
+        message: getApiErrorMessage(error, 'The document was not saved. Check your connection and try again.'),
+      });
     }
   };
 
@@ -400,19 +404,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       if (!granted) {
         if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
-          Alert.alert(
-            'Camera Permission Required',
-            'Camera access is disabled for RACE Partner. To take clear photos of your documents (e.g. Driving License, RC, Insurance) for quick verification, please enable camera access in your device settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Open Settings',
-                onPress: () => {
-                  Linking.openSettings().catch(() => {});
-                },
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Camera Permission Required',
+            message: 'Camera access is disabled for RACE Partner. To take clear photos of your documents (e.g. Driving License, RC, Insurance) for quick verification, please enable camera access in your device settings.',
+            primaryAction: { label: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
 
@@ -420,17 +418,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         granted = requested.granted;
 
         if (!granted) {
-          Alert.alert(
-            'Camera Permission Needed',
-            'Camera access is required to take photos of your official documents for verification.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Try Again',
-                onPress: () => handlePickFromCamera(doc),
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Camera Permission Needed',
+            message: 'Camera access is required to take photos of your official documents for verification.',
+            primaryAction: { label: 'Try Again', onPress: () => { void handlePickFromCamera(doc); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
       }
@@ -457,11 +451,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
     } catch (err: any) {
       console.warn('[CameraPicker] Error launching camera:', err);
-      Alert.alert(
-        'Camera Error',
-        'Could not access the camera. You can also select a photo from your gallery or upload a PDF document.',
-        [{ text: 'OK' }],
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Camera Error',
+        message: 'Could not access the camera. You can also select a photo from your gallery or upload a PDF document.',
+      });
     }
   };
 
@@ -472,19 +466,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
       if (!granted) {
         if (!current.canAskAgain && current.status === ImagePicker.PermissionStatus.DENIED) {
-          Alert.alert(
-            'Photo Library Permission Required',
-            'Photo library access is disabled for RACE Partner. To select your document photos from your device, please allow photos access in your device settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Open Settings',
-                onPress: () => {
-                  Linking.openSettings().catch(() => {});
-                },
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Photo Library Permission Required',
+            message: 'Photo library access is disabled for RACE Partner. To select your document photos from your device, please allow photos access in your device settings.',
+            primaryAction: { label: 'Open Settings', onPress: () => { Linking.openSettings().catch(() => {}); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
 
@@ -492,17 +480,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         granted = requested.granted;
 
         if (!granted) {
-          Alert.alert(
-            'Gallery Permission Needed',
-            'Photo library access is needed to select and upload document photos.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Try Again',
-                onPress: () => handlePickFromGallery(doc),
-              },
-            ],
-          );
+          showAlert({
+            tone: 'warning',
+            title: 'Gallery Permission Needed',
+            message: 'Photo library access is needed to select and upload document photos.',
+            primaryAction: { label: 'Try Again', onPress: () => { void handlePickFromGallery(doc); } },
+            secondaryAction: { label: 'Cancel', onPress: () => {} },
+          });
           return;
         }
       }
@@ -529,11 +513,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
     } catch (err: any) {
       console.warn('[GalleryPicker] Error launching gallery:', err);
-      Alert.alert(
-        'Gallery Error',
-        'Could not open gallery. Please try again or select a PDF document.',
-        [{ text: 'OK' }],
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Gallery Error',
+        message: 'Could not open gallery. Please try again or select a PDF document.',
+      });
     }
   };
 
@@ -553,11 +537,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       const asset = result.assets[0];
       const maxBytes = 10 * 1024 * 1024; // 10MB
       if (asset.size && asset.size > maxBytes) {
-        Alert.alert(
-          'File Too Large',
-          'The selected file exceeds 10 MB. Please choose a smaller photo or compressed PDF.',
-          [{ text: 'OK' }],
-        );
+        showAlert({
+          tone: 'warning',
+          title: 'File Too Large',
+          message: 'The selected file exceeds 10 MB. Please choose a smaller photo or compressed PDF.',
+        });
         return;
       }
 
@@ -568,11 +552,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       });
     } catch (err: any) {
       console.warn('[FilePicker] Error selecting document:', err);
-      Alert.alert(
-        'File Picker Error',
-        'Could not open document picker. Please try taking a photo with the camera or choosing from gallery.',
-        [{ text: 'OK' }],
-      );
+      showAlert({
+        tone: 'error',
+        title: 'File Picker Error',
+        message: 'Could not open document picker. Please try taking a photo with the camera or choosing from gallery.',
+      });
     }
   };
 
@@ -630,28 +614,28 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
     const name = driverPersonal.fullName.trim();
     const mobile = normalizeIndianPhone(driverPersonal.mobileNumber);
     if (name.length < 2) {
-      Alert.alert('Full name required', 'Enter your full name as it appears on your driving licence.');
+      showAlert({ tone: 'warning', title: 'Full name required', message: 'Enter your full name as it appears on your driving licence.' });
       return false;
     }
     if (mobile.length !== 10) {
-      Alert.alert('Mobile number required', 'Enter the 10-digit verified mobile number.');
+      showAlert({ tone: 'warning', title: 'Mobile number required', message: 'Enter the 10-digit verified mobile number.' });
       return false;
     }
     if (!normalizeDobForApi(driverPersonal.dateOfBirth)) {
-      Alert.alert('Date of birth required', 'Enter a valid date in DD/MM/YYYY format.');
+      showAlert({ tone: 'warning', title: 'Date of birth required', message: 'Enter a valid date in DD/MM/YYYY format.' });
       return false;
     }
     if (driverPersonal.address.trim().length < 5) {
-      Alert.alert('Address required', 'Enter your current address.');
+      showAlert({ tone: 'warning', title: 'Address required', message: 'Enter your current address.' });
       return false;
     }
     if (!driverPersonal.city?.trim()) {
-      Alert.alert('City required', 'Select your operating city.');
+      showAlert({ tone: 'warning', title: 'City required', message: 'Select your operating city.' });
       return false;
     }
     const dlNumber = (driverPersonal.licenseNumber || driverVehicle.licenseNumber || '').trim();
     if (dlNumber.length < 4) {
-      Alert.alert('Driving licence required', 'Enter your driving licence number.');
+      showAlert({ tone: 'warning', title: 'Driving licence required', message: 'Enter your driving licence number.' });
       return false;
     }
     return true;
@@ -659,10 +643,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
   const validateDocumentsStep = () => {
     if (missingCoreDocs.length === 0) return true;
-    Alert.alert(
-      'Documents required',
-      `Upload ${missingCoreDocs.map(doc => doc.title).join(', ')} before continuing.`,
-    );
+    showAlert({
+      tone: 'warning',
+      title: 'Documents required',
+      message: `Upload ${missingCoreDocs.map(doc => doc.title).join(', ')} before continuing.`,
+    });
     return false;
   };
 
@@ -820,10 +805,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         mobileNumber: driverPersonal.mobileNumber,
       });
     } catch (error) {
-      Alert.alert(
-        'Submission notice',
-        getApiErrorMessage(error, 'Please check your connection and submit again.'),
-      );
+      showAlert({
+        tone: 'error',
+        title: 'Submission notice',
+        message: getApiErrorMessage(error, 'Please check your connection and submit again.'),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -1893,6 +1879,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       continueDisabled={currentStep === 3 ? !confirmAgreed || submitting : false}
       continueLoading={currentStep === 3 ? submitting : false}
       showFooter={true}>
+      {partnerDialog}
       {/* Animated Sliding Container: only form cards slide smoothly! */}
       <Animated.View
         style={{

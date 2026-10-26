@@ -17,7 +17,7 @@ import {
   type RoadRouteResult,
 } from '../../services/driver/roadRoutingService';
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+const MAP_PROVIDER = PROVIDER_GOOGLE;
 
 export type MapPoint = {
   latitude: number;

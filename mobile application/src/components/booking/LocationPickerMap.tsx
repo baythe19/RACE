@@ -11,7 +11,7 @@ import { formatLocationDisplay } from '../../utils/readableAddress';
 import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+const MAP_PROVIDER = PROVIDER_GOOGLE;
 
 export interface SelectedLocation {
   address: string;

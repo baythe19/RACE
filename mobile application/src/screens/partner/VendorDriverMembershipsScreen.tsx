@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -31,6 +31,7 @@ import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQ
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
 import { PartnerText } from '../../components/partner/PartnerText';
 import { useScreenPx } from '../../hooks/useScreenPx';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import {
   useRevokeVendorDriverMembershipMutation,
   useVendorMembershipsQuery,
@@ -60,29 +61,46 @@ function MemberCard({
 }) {
   const px = useScreenPx();
   const pending = member.status === 'PENDING';
+  const [menuVisible, setMenuVisible] = useState(false);
 
-  const openMenu = () => {
-    const name = member.driver?.name ?? 'Driver';
-    const options: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [];
-    if (!pending && member.driver?.phone) {
-      options.push({
-        text: 'Call driver',
-        onPress: () => {
-          void Linking.openURL(`tel:${member.driver?.phone}`);
-        },
-      });
-    }
-    if (!pending && onAssign) {
-      options.push({ text: 'Assign to job', onPress: onAssign });
-    }
-    options.push({
-      text: pending ? 'Cancel invitation' : 'Remove from fleet',
-      style: 'destructive',
-      onPress: onRemove,
+  const name = member.driver?.name ?? 'Driver';
+  const menuOptions: Array<{
+    key: string;
+    label: string;
+    destructive?: boolean;
+    onPress: () => void;
+  }> = [];
+  if (!pending && member.driver?.phone) {
+    menuOptions.push({
+      key: 'call',
+      label: 'Call driver',
+      onPress: () => {
+        setMenuVisible(false);
+        void Linking.openURL(`tel:${member.driver?.phone}`);
+      },
     });
-    options.push({ text: 'Close', style: 'cancel' });
-    Alert.alert(name, pending ? 'Pending fleet driver' : 'Fleet driver', options);
-  };
+  }
+  if (!pending && onAssign) {
+    menuOptions.push({
+      key: 'assign',
+      label: 'Assign to job',
+      onPress: () => {
+        setMenuVisible(false);
+        onAssign();
+      },
+    });
+  }
+  menuOptions.push({
+    key: 'remove',
+    label: pending ? 'Cancel invitation' : 'Remove from fleet',
+    destructive: true,
+    onPress: () => {
+      setMenuVisible(false);
+      onRemove();
+    },
+  });
+
+  const openMenu = () => setMenuVisible(true);
 
   return (
     <View style={[styles.card, { borderRadius: px(16), padding: px(14), marginBottom: px(10) }]}>
@@ -148,13 +166,105 @@ function MemberCard({
           </PartnerText>
         </Pressable>
       ) : null}
+
+      {/* Driver options action sheet (replaces system Alert menu) */}
+      <Modal transparent animationType="fade" visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
+        <Pressable style={memberMenuStyles.overlay} onPress={() => setMenuVisible(false)}>
+          <Pressable style={[memberMenuStyles.sheet, { paddingBottom: px(10) }]} onPress={e => e.stopPropagation()}>
+            <View style={[memberMenuStyles.handle, { marginTop: px(10) }]} />
+            <PartnerText style={[memberMenuStyles.title, { fontSize: px(15), marginTop: px(8) }]}>{name}</PartnerText>
+            <PartnerText style={[memberMenuStyles.subtitle, { fontSize: px(12) }]}>
+              {pending ? 'Pending fleet driver' : 'Fleet driver'}
+            </PartnerText>
+            {menuOptions.map(option => (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                onPress={option.onPress}
+                style={({ pressed }) => [memberMenuStyles.option, pressed && memberMenuStyles.optionPressed]}>
+                <PartnerText
+                  style={[
+                    memberMenuStyles.optionText,
+                    { fontSize: px(14) },
+                    option.destructive ? memberMenuStyles.optionDestructive : null,
+                  ]}>
+                  {option.label}
+                </PartnerText>
+              </Pressable>
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setMenuVisible(false)}
+              style={({ pressed }) => [memberMenuStyles.closeButton, pressed && memberMenuStyles.optionPressed]}>
+              <PartnerText style={[memberMenuStyles.closeText, { fontSize: px(14) }]}>Close</PartnerText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
 
+const memberMenuStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,18,25,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+  },
+  handle: {
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E4E8',
+  },
+  title: {
+    fontWeight: '800',
+    color: INK,
+  },
+  subtitle: {
+    color: MUTED,
+    marginTop: 2,
+  },
+  option: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F5F9',
+  },
+  optionPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  optionText: {
+    fontWeight: '600',
+    color: INK,
+  },
+  optionDestructive: {
+    color: '#DC2626',
+  },
+  closeButton: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  closeText: {
+    fontWeight: '700',
+    color: MUTED,
+  },
+});
+
 export default function VendorDriverMembershipsScreen() {
   const px = useScreenPx();
   const [showAddForm, setShowAddForm] = useState(false);
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
   // Form state
   const [fullName, setFullName] = useState('');
@@ -275,11 +385,12 @@ export default function VendorDriverMembershipsScreen() {
       });
 
       await refetch();
-      Alert.alert(
-        'Driver Added to Fleet! 🎉',
-        `${fullName.trim()} has been registered directly into your fleet. They can now log in via mobile number and start working immediately without filling any registration forms!`,
-        [{ text: 'Great!', onPress: resetForm }],
-      );
+      showAlert({
+        tone: 'success',
+        title: 'Driver Added to Fleet! 🎉',
+        message: `${fullName.trim()} has been registered directly into your fleet. They can now log in via mobile number and start working immediately without filling any registration forms!`,
+        primaryAction: { label: 'Great!', onPress: resetForm },
+      });
     } catch (err: unknown) {
       setSubmitting(false);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to create staff driver');
@@ -293,14 +404,13 @@ export default function VendorDriverMembershipsScreen() {
       b => (b.status === 'REQUESTED' || b.status === 'CONFIRMED') && !b.driver,
     );
     if (!openJob) {
-      Alert.alert(
-        'No open jobs',
-        'Go to Jobs → New leads and pick a customer request to assign this driver.',
-        [
-          { text: 'Go to Jobs', onPress: () => jumpToPartnerJobsScreen('PartnerJobsList') },
-          { text: 'OK', style: 'cancel' },
-        ],
-      );
+      showAlert({
+        tone: 'info',
+        title: 'No open jobs',
+        message: 'Go to Jobs → New leads and pick a customer request to assign this driver.',
+        primaryAction: { label: 'Go to Jobs', onPress: () => jumpToPartnerJobsScreen('PartnerJobsList') },
+        secondaryAction: { label: 'OK', onPress: () => {} },
+      });
       return;
     }
     jumpToPartnerJobsScreen('VendorAssignJob', {
@@ -317,33 +427,33 @@ export default function VendorDriverMembershipsScreen() {
 
   const confirmRemove = (member: VendorMembership) => {
     const isPending = member.status === 'PENDING';
-    Alert.alert(
-      isPending ? 'Cancel Invitation?' : 'Remove Driver?',
-      isPending
+    showAlert({
+      tone: isPending ? 'warning' : 'error',
+      title: isPending ? 'Cancel Invitation?' : 'Remove Driver?',
+      message: isPending
         ? 'Withdraw the pending fleet invitation sent to this Driver?'
         : 'This ends ' + (member.driver?.name ?? 'this Driver') + '’s fleet connection.',
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: isPending ? 'Cancel' : 'Remove',
-          style: 'destructive',
-          onPress: () =>
-            revoke.mutate(member.id, {
-              onError: error =>
-                Alert.alert(
-                  isPending ? 'Could not cancel' : 'Could not remove Driver',
-                  error instanceof Error ? error.message : 'Please try again.',
-                ),
-            }),
-        },
-      ],
-    );
+      primaryAction: {
+        label: isPending ? 'Cancel Invitation' : 'Remove',
+        onPress: () =>
+          revoke.mutate(member.id, {
+            onError: error =>
+              showAlert({
+                tone: 'error',
+                title: isPending ? 'Could not cancel' : 'Could not remove Driver',
+                message: error instanceof Error ? error.message : 'Please try again.',
+              }),
+          }),
+      },
+      secondaryAction: { label: 'Keep', onPress: () => {} },
+    });
   };
 
   const activeMembers = members.filter(m => m.status === 'ACTIVE');
   const pendingMembers = members.filter(m => m.status === 'PENDING');
 
   return (
+    <View style={{ flex: 1 }}>
     <AppScreenLayout
       header={
         <View style={[styles.header, { paddingHorizontal: px(18), paddingTop: px(14), paddingBottom: px(12) }]}>
@@ -681,6 +791,8 @@ export default function VendorDriverMembershipsScreen() {
         </View>
       )}
     </AppScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

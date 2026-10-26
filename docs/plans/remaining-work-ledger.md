@@ -71,6 +71,19 @@
 6. **PA-4 ड्राइवर-मैप**, **PA-5 बैकग्राउंड-लोकेशन**, **QR कैमरा**, **SOS-डिस्पैच**, **पुश-नोटिफिकेशन** (फीचर-क्लस्टर)
 7. P2 गवर्नेंस पैकेज (ऑडिट/रिटेंशन/i18n/एक्सेसिबिलिटी/साइन-आर्टिफैक्ट)
 
+## 8) Backend deep review (2026-10-26)
+
+Full register: [`docs/reviews/backend-deep-security-architecture-review-2026-10-26.md`](../reviews/backend-deep-security-architecture-review-2026-10-26.md) — branch `v7.0.0-major-update`, backend-only read-only audit.
+
+**P0 (fix before real traffic):**
+
+- **P0-1** — Trip/completion OTPs leaked via customer API, booking room, and driver events.
+- **P0-2** — Completion/trip OTP validators allow skip when fields unset; completion can bypass payment flow.
+- **P0-3** — `MOCK_DATA_MODE` defaults true; universal OTP when `NODE_ENV` is not production.
+- **P0-4** — `OTP_PEPPER` unset falls back to weak constant; not enforced in `productionGuard`.
+- **P0-5** — Admin driver create with `vendorId` breaks membership/unassign invariants.
+- **P0-6** — Client-asserted payment verify; mitigated by stub guard only.
+
 ## 7) स्रोत
 
 - `docs/audit/2026-10-12-deep-audit/21-PARTNER-APP-AUDIT.md` (PA-1..7)

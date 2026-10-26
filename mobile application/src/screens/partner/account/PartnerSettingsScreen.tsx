@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   User,
@@ -19,6 +19,7 @@ import {
 
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import PartnerLogoutDialog from '../../../components/partner/dialogs/PartnerLogoutDialog';
 import PartnerLanguageSheet from '../../../components/partner/dialogs/PartnerLanguageSheet';
@@ -30,6 +31,7 @@ import { usePartnerOnboardingStore } from '../../../store/partnerOnboardingStore
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerSettings'>;
 
 export default function PartnerSettingsScreen({ navigation }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const { logout } = useAuthActions();
   const [loggingOut, setLoggingOut] = useState(false);
   const [logoutVisible, setLogoutVisible] = useState(false);
@@ -45,7 +47,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
       usePartnerOnboardingStore.getState().clearSelectedRole();
       await logout();
     } catch {
-      Alert.alert('Logout failed', 'Please try again.');
+      showAlert({ tone: 'error', title: 'Logout failed', message: 'Please try again.' });
     } finally {
       setLoggingOut(false);
       setLogoutVisible(false);
@@ -53,6 +55,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title="Settings"
       onBack={() => navigation.goBack()}>
@@ -107,7 +110,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
 
           <Pressable
             style={({ pressed }) => [styles.rowItem, getPressableFeedback(pressed)]}
-            onPress={() => Alert.alert('Password', 'Account authentication is managed via secure OTP.')}>
+            onPress={() => showAlert({ tone: 'info', title: 'Password', message: 'Account authentication is managed via secure OTP.' })}>
             <View style={[styles.iconCircle, { backgroundColor: '#FEF2F2' }]}>
               <Lock size={18} color="#DC2626" strokeWidth={2.2} />
             </View>
@@ -261,7 +264,7 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
         visible={locationSheetVisible}
         onAllow={() => {
           setLocationSheetVisible(false);
-          Alert.alert('Location Access', 'Location permissions granted.');
+          showAlert({ tone: 'success', title: 'Location Access', message: 'Location permissions granted.' });
         }}
         onDeny={() => setLocationSheetVisible(false)}
       />
@@ -271,6 +274,8 @@ export default function PartnerSettingsScreen({ navigation }: Props) {
         onClose={() => setNotifPrefsVisible(false)}
       />
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

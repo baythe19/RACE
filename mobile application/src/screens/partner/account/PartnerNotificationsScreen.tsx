@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Truck,
@@ -16,6 +16,7 @@ import { spacing } from '../../../theme';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import { openDriverJobsDone } from '../../../navigation/partnerNavigationRef';
 import {
@@ -31,6 +32,7 @@ type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerNotifi
 type CategoryFilter = 'All' | 'Job Updates' | 'Drivers & Vehicles' | 'Account' | 'Earnings';
 
 export default function PartnerNotificationsScreen({ navigation }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
   const { data, isLoading, isError, refetch } = useNotificationsQuery();
   const markAllReadMutation = useMarkAllNotificationsReadMutation();
@@ -89,18 +91,13 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
 
   const confirmDeleteAll = () => {
     if (notifications.length === 0) return;
-    Alert.alert(
-      'Delete all notifications?',
-      'This removes every notification from your inbox. You cannot undo this.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete all',
-          style: 'destructive',
-          onPress: () => deleteAllMutation.mutate(),
-        },
-      ],
-    );
+    showAlert({
+      tone: 'error',
+      title: 'Delete all notifications?',
+      message: 'This removes every notification from your inbox. You cannot undo this.',
+      primaryAction: { label: 'Delete all', onPress: () => deleteAllMutation.mutate() },
+      secondaryAction: { label: 'Cancel', onPress: () => {} },
+    });
   };
 
   const handleItemPress = (item: PartnerNotificationItem) => {
@@ -211,6 +208,7 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title={unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications'}
       onBack={() => navigation.goBack()}
@@ -277,6 +275,8 @@ export default function PartnerNotificationsScreen({ navigation }: Props) {
         </View>
       )}
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

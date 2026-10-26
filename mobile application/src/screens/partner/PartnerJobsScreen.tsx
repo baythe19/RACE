@@ -1,6 +1,6 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import {
   Bell,
   Briefcase,
@@ -21,6 +21,7 @@ import { openPartnerNotifications } from '../../navigation/partnerNavigationRef'
 
 import GlassCard from '../../components/ui/GlassCard';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useAppSelector } from '../../redux/hooks';
@@ -171,6 +172,7 @@ export default function PartnerJobsScreen() {
   const user = useAppSelector(state => state.auth.user);
   const isDriver = user?.role === 'driver';
   const isVendor = user?.role === 'vendor';
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
   const [filter, setFilter] = useState<JobTab>('all');
   const [actingId, setActingId] = useState<string | null>(null);
@@ -316,10 +318,11 @@ export default function PartnerJobsScreen() {
 
   const onAccept = async (job: DriverJobBooking) => {
     if (counts.in_progress > 0) {
-      Alert.alert(
-        'Active Trip in Progress',
-        'You already have an active trip in progress. Please complete or cancel your current trip before accepting a new job.',
-      );
+      showAlert({
+        tone: 'warning',
+        title: 'Active Trip in Progress',
+        message: 'You already have an active trip in progress. Please complete or cancel your current trip before accepting a new job.',
+      });
       return;
     }
     setActingId(job.id);
@@ -330,7 +333,11 @@ export default function PartnerJobsScreen() {
         bookingType: job.bookingType,
       });
     } catch (error) {
-      Alert.alert('Accept failed', getApiErrorMessage(error, 'Could not accept job'));
+      showAlert({
+        tone: 'error',
+        title: 'Accept failed',
+        message: getApiErrorMessage(error, 'Could not accept job'),
+      });
       refetchAll();
     } finally {
       setActingId(null);
@@ -338,11 +345,12 @@ export default function PartnerJobsScreen() {
   };
 
   const onReject = (job: DriverJobBooking) => {
-    Alert.alert('Reject job?', 'This booking will go back to the open pool.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject',
-        style: 'destructive',
+    showAlert({
+      tone: 'warning',
+      title: 'Reject job?',
+      message: 'This booking will go back to the open pool.',
+      primaryAction: {
+        label: 'Reject',
         onPress: () => {
           void (async () => {
             setActingId(job.id);
@@ -352,14 +360,19 @@ export default function PartnerJobsScreen() {
                 bookingType: job.bookingType,
               });
             } catch (error) {
-              Alert.alert('Reject failed', getApiErrorMessage(error, 'Could not reject job'));
+              showAlert({
+                tone: 'error',
+                title: 'Reject failed',
+                message: getApiErrorMessage(error, 'Could not reject job'),
+              });
             } finally {
               setActingId(null);
             }
           })();
         },
       },
-    ]);
+      secondaryAction: { label: 'Cancel', onPress: () => {} },
+    });
   };
 
   const driverIsEmpty = driverAvailableCards.length === 0 && driverMyCards.length === 0;
@@ -621,6 +634,7 @@ export default function PartnerJobsScreen() {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <AppScreenLayout
       header={
         <View style={styles.headerPad}>
@@ -812,6 +826,8 @@ export default function PartnerJobsScreen() {
         </>
       )}
     </AppScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

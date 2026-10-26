@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   CheckCircle,
@@ -14,6 +14,7 @@ import {
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import PartnerUploadSheet from '../../../components/partner/dialogs/PartnerUploadSheet';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'PartnerDocuments'>;
@@ -38,6 +39,7 @@ const OPTIONAL_DOCS: DocumentItem[] = [
 ];
 
 export default function PartnerDocumentsScreen({ navigation }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const [activeTab, setActiveTab] = useState<'required' | 'optional'>('required');
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
   const [uploadSheetVisible, setUploadSheetVisible] = useState(false);
@@ -155,18 +157,19 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
         subtitle={selectedDoc?.name}
         onTakePhoto={() => {
           setUploadSheetVisible(false);
-          Alert.alert('Upload', `${selectedDoc?.name} photo updated.`);
+          showAlert({ tone: 'success', title: 'Upload', message: `${selectedDoc?.name} photo updated.` });
         }}
         onPickGallery={() => {
           setUploadSheetVisible(false);
-          Alert.alert('Upload', `${selectedDoc?.name} document file uploaded.`);
+          showAlert({ tone: 'success', title: 'Upload', message: `${selectedDoc?.name} document file uploaded.` });
         }}
         onPreview={() => {
           setUploadSheetVisible(false);
-          Alert.alert('Document Preview', `${selectedDoc?.name} is verified on file.`);
+          showAlert({ tone: 'info', title: 'Document Preview', message: `${selectedDoc?.name} is verified on file.` });
         }}
         onClose={() => setUploadSheetVisible(false)}
       />
+      {partnerDialog}
     </PartnerScreenLayout>
   );
 }

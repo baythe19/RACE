@@ -38,7 +38,7 @@ const envSchema = z.object({
   // Parse real booleans so MOCK_DATA_MODE=false in env actually disables it.
   MOCK_DATA_MODE: z
     .string()
-    .default('true')
+    .default('false')
     .transform((v) => v.trim().toLowerCase() === 'true'),
   MOCK_UNIVERSAL_OTP: z.string().default('123456'),
   // MessageCentral VerifyNow SMS OTP service

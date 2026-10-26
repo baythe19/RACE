@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import {
   Building2,
   Check,
@@ -14,6 +14,7 @@ import type { LucideIcon } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import DriverRegistrationLayout from '../../../../components/partner/DriverRegistrationLayout';
+import { usePartnerDialog } from '../../../../hooks/usePartnerDialog';
 import { PartnerText } from '../../../../components/partner/PartnerText';
 import { VENDOR_REGISTRATION_STEPS } from '../../../../constants/partnerRegistration';
 import { getVendorDocumentTypeLabel } from '../../../../constants/partnerRegistrationDocuments';
@@ -105,6 +106,7 @@ function ReviewSection({
 }
 
 export default function VendorReviewScreen({ navigation, route }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector((state) => state.auth.user);
   const { vendorBusiness, vendorAddress, vendorDocuments } = usePartnerRegistrationStore();
@@ -128,10 +130,11 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
   const submit = async () => {
     if (!termsAccepted || submitting) return;
     if (missingRequiredDocs.length > 0) {
-      Alert.alert(
-        'Documents required',
-        `Return to Documents and add ${missingRequiredDocs.join(' and ')} before submitting.`,
-      );
+      showAlert({
+        tone: 'warning',
+        title: 'Documents required',
+        message: `Return to Documents and add ${missingRequiredDocs.join(' and ')} before submitting.`,
+      });
       return;
     }
     setSubmitting(true);
@@ -221,7 +224,11 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         rootNavigation?.reset({ index: 0, routes: [{ name: 'PartnerMain' }] });
       }
     } catch (error) {
-      Alert.alert('Submit failed', getApiErrorMessage(error, 'Could not submit vendor application'));
+      showAlert({
+        tone: 'error',
+        title: 'Submit failed',
+        message: getApiErrorMessage(error, 'Could not submit vendor application'),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -234,6 +241,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
     : 'Missing: ' + missingRequiredDocs.join(', ');
 
   return (
+    <View style={{ flex: 1 }}>
     <DriverRegistrationLayout
       step={4}
       stepLabels={VENDOR_REGISTRATION_STEPS}
@@ -337,6 +345,8 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         </PartnerText>
       </Pressable>
     </DriverRegistrationLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

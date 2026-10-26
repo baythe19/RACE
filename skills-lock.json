@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "skills": {
+    "subagent-driven-development": {
+      "source": "NeoLabHQ/context-engineering-kit",
+      "ref": "master",
+      "sourceType": "github",
+      "skillPath": "antigravity/skills/subagent-driven-development/SKILL.md",
+      "computedHash": "d5b7b82d2d0f8132c574a4bbdcd5856e9e99e7edfebc30b8b8e4f64158b88535"
+    }
+  }
+}

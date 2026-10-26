@@ -1,10 +1,11 @@
 import { PartnerText } from '../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 import { Check, Info, MapPin, Truck, UserRound } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import PartnerScreenLayout from '../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { images } from '../../assets';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
@@ -36,6 +37,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     estimatedFare,
     preferredDriverId,
   } = route.params;
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
   const {
     data: vehicles = [],
@@ -114,11 +116,19 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
   const onApprove = async () => {
     if (!driverId || !selectedDriverIsAvailable) {
-      Alert.alert('Select an available Driver', 'Choose a connected Driver who is currently available.');
+      showAlert({
+        tone: 'warning',
+        title: 'Select an available Driver',
+        message: 'Choose a connected Driver who is currently available.',
+      });
       return;
     }
     if (bookingType === 'towing' && (!vehicleId || !selectedVehicleIsAvailable)) {
-      Alert.alert('Select an available vehicle', 'Towing work requires an active fleet vehicle.');
+      showAlert({
+        tone: 'warning',
+        title: 'Select an available vehicle',
+        message: 'Towing work requires an active fleet vehicle.',
+      });
       return;
     }
     if (approveMutation.isPending) return;
@@ -129,14 +139,20 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         driverId,
         ...(bookingType === 'towing' && vehicleId ? { vehicleId } : {}),
       });
-      Alert.alert(
-        'Job assigned',
-        result.message ||
+      showAlert({
+        tone: 'success',
+        title: 'Job assigned',
+        message:
+          result.message ||
           `Driver assigned to #${bookingNumber}. The trip starts once the driver accepts the job.`,
-        [{ text: 'OK', onPress: () => navigation.navigate('PartnerJobsList') }],
-      );
+        primaryAction: { label: 'OK', onPress: () => navigation.navigate('PartnerJobsList') },
+      });
     } catch (error) {
-      Alert.alert('Assignment failed', getApiErrorMessage(error, 'Could not assign this job'));
+      showAlert({
+        tone: 'error',
+        title: 'Assignment failed',
+        message: getApiErrorMessage(error, 'Could not assign this job'),
+      });
       void refetchOffers();
       void refetchVehicles();
       void refetchDrivers();
@@ -144,6 +160,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
   };
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title={bookingType === 'towing' ? 'Assign driver & vehicle' : 'Assign driver'}
       onBack={() => navigation.goBack()}
@@ -339,6 +356,8 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         </View>
       )}
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 

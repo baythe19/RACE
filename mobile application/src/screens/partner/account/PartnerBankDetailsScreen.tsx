@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   User,
@@ -18,6 +18,7 @@ import { colors } from '../../../theme';
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
 import type { PartnerAccountStackParamList } from '../../../types/partnerNavigation';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
+import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import PartnerSuccessDialog from '../../../components/partner/dialogs/PartnerSuccessDialog';
 import { useAppDispatch } from '../../../redux/hooks';
@@ -48,6 +49,7 @@ const POPULAR_UPI_SUFFIXES = [
 ];
 
 export default function PartnerBankDetailsScreen({ navigation }: Props) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const dispatch = useAppDispatch();
   const user = useAppSelector(state => state.auth.user);
   const query = usePayoutAccountQuery(true);
@@ -213,6 +215,7 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
   const updatedAt = savedAccount?.updatedAt ? new Date(savedAccount.updatedAt) : null;
 
   return (
+    <View style={{ flex: 1 }}>
     <PartnerScreenLayout
       title="Bank & Payouts"
       onBack={() => navigation.goBack()}
@@ -375,10 +378,11 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
               <Pressable
                 hitSlop={8}
                 onPress={() =>
-                  Alert.alert(
-                    'Find IFSC',
-                    'Check your cheque book or bank passbook for the 11-character IFSC code printed near the branch address.',
-                  )
+                  showAlert({
+                    tone: 'info',
+                    title: 'Find IFSC',
+                    message: 'Check your cheque book or bank passbook for the 11-character IFSC code printed near the branch address.',
+                  })
                 }>
                 <PartnerText style={styles.findIfscText}>Find IFSC</PartnerText>
               </Pressable>
@@ -492,6 +496,8 @@ export default function PartnerBankDetailsScreen({ navigation }: Props) {
         }}
       />
     </PartnerScreenLayout>
+    {partnerDialog}
+    </View>
   );
 }
 
