@@ -887,9 +887,8 @@ export default function DriverDashboardScreen() {
   const user = useAppSelector(state => state.auth.user);
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
-  /* Approval state first — everything else is gated on it. The backend rejects
-     jobs, offers, availability and location for an unapproved driver, so asking
-     for them would only produce failures. */
+  /* Review status is shown on this screen. Queries stay open while review is
+     pending. Only a suspended, disabled, or rejected account stops them. */
   const {
     data: profile,
     isLoading: loadingProfile,

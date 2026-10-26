@@ -5,7 +5,33 @@
 
 ---
 
-## Latest session — Phase 4 Dynamic KYC Binding, Tiered Cancellation Refund Modal & Master Audit Checklist Sync (2026-10-26, branch v7.0.0-major-update)
+## Latest session — Universal HanuSMS Routing, Outer-App Lockscreen Notifications, Pre-Trip Vehicle Damage Inspection & Production Runbooks (2026-10-26, branch v7.0.0-major-update)
+
+- **Universal HanuSMS Routing Across All Surfaces:**
+  - Configured `backend/src/services/src/otp.ts` so HanuSMS (`https://api.hanuotp.in/sms-otp.php`) is strictly and exclusively the sole external SMS route across all roles (`customer`, `vendor`, `driver`, `admin`).
+  - Completely deactivated MessageCentral in production; local-dev fallback retained only when unconfigured in local development.
+  - Added `admin` to default `hanuRoles` (`customer,vendor,driver,admin`).
+- **Outer-App & Lock-Screen Notifications (`expo-notifications`):**
+  - Installed `expo-notifications@~57.0.21` across both `mobile application/` and `customer application/`.
+  - Configured Android high-priority notification channels (`dispatch_urgent` with `AndroidImportance.MAX`, `lockscreenVisibility: AndroidNotificationVisibility.PUBLIC`, vibration pattern, sound, bypassDnd).
+  - Configured notification handler (`shouldShowAlert`, `shouldPlaySound`, `shouldSetBadge`, `shouldShowBanner`, `shouldShowList`).
+  - Partner Mobile: Wired urgent dispatch job alerts (`job:offer`), trip OTP alerts, and customer payment confirmed alerts into `useDriverRealtimeSync` and `useVendorRealtimeSync`.
+  - Preserved background socket connection so drivers navigating with external Google Maps or with screen locked receive heads-up pop-up alerts on lockscreen.
+  - Customer Mobile: Wired milestone alerts (`DRIVER_ASSIGNED`, `DRIVER_ARRIVED_PICKUP` with OTP, `IN_PROGRESS`, `DRIVER_ARRIVED_DROPOFF`, `COMPLETED`) into `trackingService.ts`.
+- **Pre-Trip Vehicle Damage Inspection:**
+  - Implemented [VehicleDamageInspectionModal.tsx](file:///workspaces/RACE/mobile%20application/src/components/partner/inspection/VehicleDamageInspectionModal.tsx) with 4-angle photo slots (Front, Rear, Driver Side, Passenger Side) + pre-existing damage notes.
+  - Wired into [ArrivedPickupCard.tsx](file:///workspaces/RACE/mobile%20application/src/components/partner/driver/ArrivedPickupCard.tsx) before OTP verification to protect towing drivers from false damage claims.
+- **Payment Prioritization & Documentation:**
+  - Prioritized **UPI / QR Code** (Priority #1) and **Cash to Driver** (Priority #2) across checkout and dropoff payment modals.
+  - Authored comprehensive [GOOGLE_MAPS_PRODUCTION_GUIDE.md](file:///workspaces/RACE/docs/ops/GOOGLE_MAPS_PRODUCTION_GUIDE.md) detailing API keys, SHA-1 / bundle ID restrictions, cost optimization, and high-volume driver navigation.
+  - Authored comprehensive [PAYMENT_ARCHITECTURE_AND_RAZORPAY_GUIDE.md](file:///workspaces/RACE/docs/ops/PAYMENT_ARCHITECTURE_AND_RAZORPAY_GUIDE.md) detailing current zero-MDR UPI/Cash modes and future Razorpay order creation, webhooks, and refunds.
+- **Verification Across All 4 Surfaces:**
+  - `backend/`: `npm run lint` -> **0 errors (Exit 0)**.
+  - `mobile application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `customer application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `race-admin/apps/admin-web/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+
+## Previous session — Phase 4 Dynamic KYC Binding, Tiered Cancellation Refund Modal & Master Audit Checklist Sync (2026-10-26, branch v7.0.0-major-update)
 
 - **Phase 4 Implementation Completed & 100% Verified:**
   1. **Dynamic Document KYC Status Binding ([PartnerDocumentsScreen.tsx](file:///workspaces/RACE/mobile%20application/src/screens/partner/account/PartnerDocumentsScreen.tsx)):**

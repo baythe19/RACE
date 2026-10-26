@@ -23,8 +23,13 @@ export class DriverVendorMembershipService {
     if (!vendor || !hasUserCapability(vendor, 'vendor')) {
       throw new ForbiddenError('Towing Vendor access only');
     }
-    if (vendor.vendorProfile?.status !== 'approved') {
-      throw new ForbiddenError('Your Towing Vendor account must be approved before managing Drivers.');
+    // Review stays in the background. A vendor can list, add, and assign drivers
+    // the same day they register. Only a suspended or rejected account is blocked.
+    if (vendor.accountStatus === 'SUSPENDED' || vendor.operationalStatus === 'SUSPENDED') {
+      throw new ForbiddenError('Your Towing Vendor account is suspended.');
+    }
+    if (vendor.vendorProfile?.status === 'rejected' || vendor.reviewStatus === 'REJECTED') {
+      throw new ForbiddenError('Your Towing Vendor account was rejected.');
     }
     return vendor;
   }
@@ -247,7 +252,13 @@ export class DriverVendorMembershipService {
     if (driver.activeBookingId) throw new ConflictError('Finish your active job before joining a vendor fleet');
 
     const vendor = await UserModel.findById(membership.vendorUserId).exec();
-    if (!vendor || vendor.vendorProfile?.status !== 'approved') {
+    if (
+      !vendor ||
+      vendor.accountStatus === 'SUSPENDED' ||
+      vendor.operationalStatus === 'SUSPENDED' ||
+      vendor.vendorProfile?.status === 'rejected' ||
+      vendor.reviewStatus === 'REJECTED'
+    ) {
       throw new ConflictError('This Towing Vendor is no longer eligible for fleet invitations');
     }
 
