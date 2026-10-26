@@ -1032,12 +1032,6 @@ const styles = StyleSheet.create({
   optionCopy: {
     flex: 1,
   },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
   optionPlate: {
     fontSize: 14,
     fontWeight: '800',

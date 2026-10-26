@@ -1,5 +1,5 @@
 import { PartnerText } from '../../components/partner/PartnerText';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -12,61 +12,24 @@ import {
 import {
   ArrowLeft,
   BadgeCheck,
-  Calendar,
   Check,
-  ChevronDown,
-  ChevronUp,
   Clock,
-  CloudUpload,
-  FileSearch,
-  Headphones,
-  MessageCircle,
-  Phone,
+  FileText,
   ShieldCheck,
+  Truck,
   XCircle,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
-import { brand } from '../../theme';
 import { useVendorStatusQuery } from '../../services/vendor/useVendorMutations';
 import type { PartnerAccountStackParamList } from '../../types/partnerNavigation';
-import type { VerificationStage, VendorProfileResponse } from '../../types/vendor';
+import type { VendorProfileResponse } from '../../types/vendor';
+import { brand } from '../../theme';
 import { colors, spacing, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<PartnerAccountStackParamList, 'VendorVerificationStatus'>;
-
-/**
- * Real vendor verification pipeline (what the backend actually sets):
- *   submitted → document_review → approved | rejected
- * `background_check` / `selfie_match` exist in the shared type but no vendor
- * service ever writes them — showing them as permanently "Pending" rows was
- * misleading, so the timeline now derives from the live stage history.
- */
-const STAGES: Array<{ key: VerificationStage; label: string; hint: string }> = [
-  {
-    key: 'submitted',
-    label: 'Application submitted',
-    hint: 'Your registration was received successfully.',
-  },
-  {
-    key: 'document_review',
-    label: 'Document review',
-    hint: 'Our team is reviewing your documents. This usually takes up to 24 hours.',
-  },
-  {
-    key: 'background_check',
-    label: 'Background check',
-    hint: 'Business and document verification completed.',
-  },
-  {
-    key: 'approved',
-    label: 'Approved',
-    hint: 'Your partner account is approved and ready for jobs.',
-  },
-];
 
 const PAGE_BG = '#FFFFFF';
 const SUCCESS_GREEN = '#22C55E';
@@ -79,10 +42,76 @@ function formatDateTime(value?: string) {
   return date.toLocaleString([], {
     day: '2-digit',
     month: 'short',
-    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });
+}
+
+/** Short, neutral label for any status string the backend writes. */
+function labelForStatus(status: string): string {
+  const map: Record<string, string> = {
+    draft: 'Draft',
+    pending: 'Submitted',
+    under_review: 'Under review',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    changes_requested: 'Changes requested',
+    submitted: 'Application submitted',
+    document_review: 'Document review',
+    background_check: 'Verification',
+    selfie_match: 'Verification',
+  };
+  return map[status] ?? status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+}
+
+type TimelineStep = {
+  key: string;
+  label: string;
+  at?: string;
+  done: boolean;
+  failed?: boolean;
+};
+
+/**
+ * Derive the timeline from what the backend ACTUALLY records:
+ * pending/submitted → document_review → approved | rejected.
+ * No invented stages — a pending application shows "Under review" only.
+ */
+function buildTimeline(vendor: VendorProfileResponse): TimelineStep[] {
+  const history = vendor.statusHistory ?? [];
+  const at = (status: string) =>
+    history
+      .filter(item => item.status === status)
+      .map(item => item.changedAt)
+      .sort((a, b) => +new Date(b) - +new Date(a))[0];
+
+  const rejected = vendor.status === 'rejected';
+  const approved = vendor.status === 'approved';
+
+  const submittedAt = vendor.submittedAt ?? at('pending') ?? at('submitted');
+  const reviewDoneAt = at('approved') ?? at('rejected');
+
+  return [
+    {
+      key: 'submitted',
+      label: 'Application submitted',
+      at: submittedAt,
+      done: Boolean(submittedAt),
+    },
+    {
+      key: 'document_review',
+      label: 'Document review',
+      at: reviewDoneAt,
+      done: Boolean(reviewDoneAt) || approved || rejected,
+    },
+    {
+      key: 'decision',
+      label: rejected ? labelForStatus('rejected') : labelForStatus('approved'),
+      at: vendor.approvedAt ?? reviewDoneAt,
+      done: approved || rejected,
+      failed: rejected,
+    },
+  ];
 }
 
 function referenceId(vendor: VendorProfileResponse) {
@@ -90,86 +119,11 @@ function referenceId(vendor: VendorProfileResponse) {
   return `RACE-VEN-${suffix}`;
 }
 
-/**
- * Map the backend stage onto the visible timeline. `background_check` and
- * `selfie_match` are treated as part of document review, since neither is ever
- * persisted by the vendor service.
- */
-function timelineIndex(stage: VerificationStage): number {
-  if (stage === 'submitted') return 0;
-  if (stage === 'document_review' || stage === 'background_check' || stage === 'selfie_match') {
-    return 1;
-  }
-  if (stage === 'approved') return 3;
-  return 0;
-}
-
-type RowState = 'completed' | 'in_progress' | 'pending' | 'rejected';
-
-function rowState(index: number, current: number, approved: boolean, rejected: boolean): RowState {
-  if (rejected) {
-    return index <= current ? 'completed' : 'pending';
-  }
-  if (approved) return 'completed';
-  if (index < current) return 'completed';
-  if (index === current) return 'in_progress';
-  return 'pending';
-}
-
-type HistoryItem = {
-  id: string;
-  title: string;
-  description: string;
-  at?: string;
-  tone: 'green' | 'yellow' | 'grey';
-  Icon: typeof CloudUpload;
-};
-
-function buildHistory(vendor: VendorProfileResponse): HistoryItem[] {
-  const stageLabel = (status: string) =>
-    STAGES.find(stage => stage.key === status)?.label ??
-    status.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
-
-  return (vendor.statusHistory ?? [])
-    .slice()
-    .sort((a, b) => +new Date(b.changedAt) - +new Date(a.changedAt))
-    .map((item, index) => ({
-      id: `hist-${index}-${item.status}-${item.changedAt}`,
-      title: stageLabel(item.status),
-      description: item.note?.trim() || 'Status updated.',
-      at: item.changedAt,
-      tone:
-        item.status === 'approved'
-          ? ('green' as const)
-          : item.status === 'rejected'
-            ? ('grey' as const)
-            : item.status === 'document_review' || item.status === 'pending'
-              ? ('yellow' as const)
-              : ('grey' as const),
-      Icon:
-        item.status === 'approved'
-          ? BadgeCheck
-          : item.status === 'submitted' || item.status === 'pending'
-            ? CloudUpload
-            : item.status === 'rejected'
-              ? XCircle
-              : FileSearch,
-    }));
-}
-
-function historyTone(tone: HistoryItem['tone']) {
-  if (tone === 'green') return { bg: '#DCFCE7', color: SUCCESS_GREEN };
-  if (tone === 'yellow') return { bg: colors.goldLight, color: colors.primaryDark };
-  return { bg: colors.lightGrey, color: colors.grey };
-}
-
 export default function PartnerVerificationStatusScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { data: vendor, isLoading, refetch, isRefetching } = useVendorStatusQuery();
-  const [historyExpanded, setHistoryExpanded] = useState(true);
 
-  const history = useMemo(() => (vendor ? buildHistory(vendor) : []), [vendor]);
-  const visibleHistory = historyExpanded ? history : history.slice(0, 3);
+  const timeline = useMemo(() => (vendor ? buildTimeline(vendor) : []), [vendor]);
 
   if (isLoading) {
     return (
@@ -206,37 +160,35 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
     );
   }
 
-  const rejected = vendor.verificationStage === 'rejected' || vendor.status === 'rejected';
-  const approved = !rejected && vendor.status === 'approved' && vendor.verificationStage === 'approved';
-  const current = timelineIndex(vendor.verificationStage);
-  const submittedLabel = formatDateTime(vendor.submittedAt || vendor.createdAt);
+  const rejected = vendor.status === 'rejected';
+  const approved = !rejected && vendor.status === 'approved';
   const refId = referenceId(vendor);
-  const currentLabel = rejected
-    ? 'Rejected'
-    : approved
-      ? 'Approved'
-      : STAGES[Math.min(current, STAGES.length - 1)].label;
+  const statusNote = rejected ? vendor.reviewNotes : undefined;
+
+  const businessRows = [
+    { label: 'Business', value: vendor.businessName },
+    { label: 'Owner', value: vendor.ownerName },
+    { label: 'Type', value: vendor.vendorType?.replace(/_/g, ' ') },
+  ].filter(row => Boolean(row.value));
+
+  const vehicle = vendor.towVehicle;
+  const documents = (vendor.documents ?? []).slice(0, 6);
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="dark-content" backgroundColor={PAGE_BG} />
 
-      {/* Header — identical pattern to Home / Jobs / Drivers. */}
-      <View style={styles.headerPad}>
-        <View style={styles.titleRow}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-            style={styles.listBackButton}
-            accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
-          </Pressable>
-          <View style={styles.headerCenter}>
-            <PartnerHeaderLogo width={84} />
-          </View>
-          <View style={styles.headerSpacer} />
-        </View>
+      <View style={styles.topBar}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+          style={styles.backButton}
+          accessibilityRole="button"
+          accessibilityLabel="Go back">
+          <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
+        </Pressable>
+        <PartnerText style={styles.topTitle}>Verification status</PartnerText>
+        <View style={styles.backButton} />
       </View>
 
       <ScrollView
@@ -247,12 +199,7 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
           styles.scrollContent,
           { paddingBottom: insets.bottom + spacing.xl },
         ]}>
-        <PartnerText style={styles.pageTitle}>Verification status</PartnerText>
-        <PartnerText style={styles.pageSubtitle}>
-          Track your registration progress. We'll notify you as you move forward.
-        </PartnerText>
-
-        {/* Current stage summary */}
+        {/* Current status — headline */}
         <View
           style={[
             styles.stageCard,
@@ -275,174 +222,141 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
               )}
             </View>
             <View style={styles.stageCopy}>
-              <PartnerText style={styles.stageEyebrow}>Current stage</PartnerText>
-              <PartnerText style={styles.stageTitle}>{currentLabel}</PartnerText>
-            </View>
-            <View
-              style={[
-                styles.stagePill,
-                approved && styles.stagePillApproved,
-                rejected && styles.stagePillRejected,
-              ]}>
-              <PartnerText
-                style={[
-                  styles.stagePillText,
-                  approved && { color: '#15803D' },
-                  rejected && { color: DANGER_RED },
-                ]}>
-                {rejected ? 'Action needed' : approved ? 'Completed' : 'In progress'}
+              <PartnerText style={styles.stageEyebrow}>
+                {approved
+                  ? 'Verified partner'
+                  : rejected
+                    ? 'Application rejected'
+                    : 'Verification in progress'}
               </PartnerText>
-            </View>
-          </View>
-
-          <PartnerText style={styles.stageHint}>
-            {rejected
-              ? vendor.reviewNotes || 'Contact RACE support if you need help.'
-              : STAGES[Math.min(current, STAGES.length - 1)].hint}
-          </PartnerText>
-
-          <View style={styles.stageFooter}>
-            <View style={styles.metaItem}>
-              <Calendar size={13} color={colors.grey} strokeWidth={2.2} />
-              <PartnerText style={styles.metaText}>
-                Submitted {submittedLabel || '—'}
+              <PartnerText style={styles.stageTitle}>
+                {approved ? 'Approved' : rejected ? 'Rejected' : 'Under review'}
               </PartnerText>
             </View>
             <View style={styles.refPill}>
               <PartnerText style={styles.refText}>{refId}</PartnerText>
             </View>
           </View>
+
+          <PartnerText style={styles.stageNote}>
+            {statusNote
+              ? statusNote
+              : approved
+                ? 'Aap ab jobs accept kar sakte ho.'
+                : rejected
+                  ? 'Support se contact karo next steps ke liye.'
+                  : 'Aapke documents review ho rahe hain. Update jaldi milega.'}
+          </PartnerText>
         </View>
 
-        {/* Progress timeline */}
+        {/* Timeline — only real backend stages */}
         <View style={styles.card}>
-          {STAGES.map((stage, index) => {
-            const state = rowState(index, current, approved, rejected);
-            const completed = state === 'completed';
-            const active = state === 'in_progress';
-            const historyItem = vendor.statusHistory?.find(item => item.status === stage.key);
-            const when = completed
-              ? formatDateTime(historyItem?.changedAt) ||
-                (index === 0 ? submittedLabel : '')
-              : active
-                ? 'In progress'
-                : 'Pending';
+          {timeline.map((step, index) => (
+            <View key={step.key} style={styles.timelineRow}>
+              <View style={styles.timelineRail}>
+                <View
+                  style={[
+                    styles.timelineDot,
+                    (step.done || step.failed) &&
+                      (step.failed ? styles.timelineDotFailed : styles.timelineDotDone),
+                  ]}>
+                  {step.failed ? (
+                    <XCircle size={12} color="#FFFFFF" strokeWidth={2.6} />
+                  ) : step.done ? (
+                    <Check size={12} color="#FFFFFF" strokeWidth={3} />
+                  ) : (
+                    <PartnerText style={styles.timelineNum}>{index + 1}</PartnerText>
+                  )}
+                </View>
+                {index < timeline.length - 1 ? (
+                  <View style={[styles.timelineLine, step.done && styles.timelineLineDone]} />
+                ) : null}
+              </View>
+              <View style={styles.timelineContent}>
+                <PartnerText
+                  style={[
+                    styles.timelineLabel,
+                    !step.done && !step.failed && styles.timelineLabelPending,
+                  ]}>
+                  {step.label}
+                </PartnerText>
+                <PartnerText style={styles.timelineWhen}>
+                  {step.at ? formatDateTime(step.at) : step.failed ? '—' : 'Pending'}
+                </PartnerText>
+              </View>
+            </View>
+          ))}
+        </View>
 
-            return (
-              <View key={stage.key} style={styles.timelineRow}>
-                <View style={styles.timelineRail}>
-                  <View
-                    style={[
-                      styles.timelineDot,
-                      completed && styles.timelineDotDone,
-                      active && styles.timelineDotActive,
-                    ]}>
-                    {completed ? (
-                      <Check size={12} color="#FFFFFF" strokeWidth={3} />
-                    ) : (
-                      <PartnerText style={[styles.timelineNum, active && styles.timelineNumActive]}>
-                        {index + 1}
-                      </PartnerText>
-                    )}
-                  </View>
-                  {index < STAGES.length - 1 ? (
-                    <View
-                      style={[styles.timelineLine, completed && styles.timelineLineDone]}
-                    />
+        {/* Application details — real stored data */}
+        {businessRows.length > 0 ? (
+          <View style={styles.card}>
+            <PartnerText style={styles.sectionHeading}>Application details</PartnerText>
+            <View style={styles.detailList}>
+              {businessRows.map(row => (
+                <View key={row.label} style={styles.detailRow}>
+                  <PartnerText style={styles.detailLabel}>{row.label}</PartnerText>
+                  <PartnerText style={styles.detailValue} numberOfLines={2}>
+                    {row.value}
+                  </PartnerText>
+                </View>
+              ))}
+            </View>
+
+            {vehicle?.registrationNumber ? (
+              <View style={styles.vehicleRow}>
+                <View style={styles.vehicleIcon}>
+                  <Truck size={16} color={colors.primaryDark} strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <PartnerText style={styles.vehicleTitle}>{vehicle.registrationNumber}</PartnerText>
+                  {vehicle.vehicleType ? (
+                    <PartnerText style={styles.vehicleMeta} numberOfLines={1}>
+                      {vehicle.vehicleType.replace(/_/g, ' ')}
+                    </PartnerText>
                   ) : null}
                 </View>
-
-                <View style={styles.timelineContent}>
-                  <View style={styles.timelineHeader}>
-                    <View style={styles.timelineCopy}>
-                      <PartnerText
-                        style={[
-                          styles.timelineLabel,
-                          state === 'pending' && styles.timelineLabelPending,
-                        ]}>
-                        {stage.label}
-                      </PartnerText>
-                      <PartnerText style={styles.timelineWhen}>{when}</PartnerText>
-                    </View>
-                    <View
-                      style={[
-                        styles.badge,
-                        completed && styles.badgeCompleted,
-                        active && styles.badgeProgress,
-                      ]}>
-                      <PartnerText
-                        style={[
-                          styles.badgeText,
-                          completed && styles.badgeCompletedText,
-                          active && styles.badgeProgressText,
-                        ]}>
-                        {completed ? 'Completed' : active ? 'In progress' : 'Pending'}
-                      </PartnerText>
-                    </View>
-                  </View>
-                </View>
               </View>
-            );
-          })}
-
-          <View style={styles.notifyBox}>
-            <ShieldCheck size={14} color={colors.grey} strokeWidth={2.2} />
-            <PartnerText style={styles.notifyText}>
-              You'll be notified at each step via SMS and email.
-            </PartnerText>
+            ) : null}
           </View>
-        </View>
+        ) : null}
 
-        {/* Activity history (no shadow — border only, per user) */}
-        <View style={styles.card}>
-          <View style={styles.historyHeader}>
-            <PartnerText style={styles.sectionHeading}>History</PartnerText>
-            <View style={styles.filterPill}>
-              <Calendar size={13} color={colors.grey} strokeWidth={2.2} />
-              <PartnerText style={styles.filterText}>All events</PartnerText>
+        {/* Documents — real upload/review state only */}
+        {documents.length > 0 ? (
+          <View style={styles.card}>
+            <PartnerText style={styles.sectionHeading}>
+              Documents · {documents.length} uploaded
+            </PartnerText>
+            <View style={styles.detailList}>
+              {documents.map(doc => (
+                <View key={doc.id} style={styles.docRow}>
+                  <View style={styles.docIcon}>
+                    <FileText size={14} color={colors.grey} strokeWidth={2.2} />
+                  </View>
+                  <PartnerText style={styles.docName} numberOfLines={1}>
+                    {doc.documentType.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())}
+                  </PartnerText>
+                  <PartnerText
+                    style={[
+                      styles.docState,
+                      doc.verificationStatus === 'approved' && styles.docStateVerified,
+                      doc.verificationStatus === 'rejected' && styles.docStateRejected,
+                    ]}>
+                    {doc.verificationStatus === 'approved'
+                      ? 'Verified'
+                      : doc.verificationStatus === 'rejected'
+                        ? 'Rejected'
+                        : 'Uploaded'}
+                  </PartnerText>
+                </View>
+              ))}
             </View>
           </View>
+        ) : null}
 
-          {visibleHistory.length === 0 ? (
-            <PartnerText style={styles.emptyText}>No activity recorded yet.</PartnerText>
-          ) : (
-            visibleHistory.map(item => {
-              const tone = historyTone(item.tone);
-              const Icon = item.Icon;
-              return (
-                <View key={item.id} style={styles.historyRow}>
-                  <View style={[styles.historyIcon, { backgroundColor: tone.bg }]}>
-                    <Icon size={16} color={tone.color} strokeWidth={2.2} />
-                  </View>
-                  <View style={styles.historyCopy}>
-                    <PartnerText style={styles.historyTitle}>{item.title}</PartnerText>
-                    <PartnerText style={styles.historyDesc} numberOfLines={2}>
-                      {item.description}
-                    </PartnerText>
-                    <PartnerText style={styles.historyTime}>
-                      {formatDateTime(item.at) || '—'}
-                    </PartnerText>
-                  </View>
-                </View>
-              );
-            })
-          )}
-
-          {history.length > 3 ? (
-            <Pressable
-              onPress={() => setHistoryExpanded(value => !value)}
-              style={({ pressed }) => [styles.viewToggle, pressed && styles.pressed]}>
-              <PartnerText style={styles.viewToggleText}>
-                {historyExpanded ? 'View less' : 'View more'}
-              </PartnerText>
-              {historyExpanded ? (
-                <ChevronUp size={16} color={colors.primaryDark} strokeWidth={2.4} />
-              ) : (
-                <ChevronDown size={16} color={colors.primaryDark} strokeWidth={2.4} />
-              )}
-            </Pressable>
-          ) : null}
-        </View>
+        <PartnerText style={styles.submittedLine}>
+          Submitted {formatDateTime(vendor.submittedAt || vendor.createdAt) || '—'}
+        </PartnerText>
 
         <Pressable
           onPress={() => void refetch()}
@@ -455,28 +369,14 @@ export default function PartnerVerificationStatusScreen({ navigation }: Props) {
           )}
         </Pressable>
 
-        <View style={styles.supportBar}>
-          <View style={styles.supportLeft}>
-            <Headphones size={18} color={colors.primaryDark} strokeWidth={2.2} />
-            <PartnerText style={styles.supportCopy}>
-              Need help? Our support team is here for you.
-            </PartnerText>
-          </View>
-          <View style={styles.supportActions}>
-            <Pressable
-              onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-              style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}>
-              <Phone size={14} color={colors.primaryDark} strokeWidth={2.4} />
-              <PartnerText style={styles.supportLinkText}>{brand.phone}</PartnerText>
-            </Pressable>
-            <Pressable
-              onPress={() => void Linking.openURL(`mailto:${brand.email}`)}
-              style={({ pressed }) => [styles.supportLink, pressed && styles.pressed]}>
-              <MessageCircle size={14} color={colors.primaryDark} strokeWidth={2.4} />
-              <PartnerText style={styles.supportLinkText}>Chat with support</PartnerText>
-            </Pressable>
-          </View>
-        </View>
+        <Pressable
+          onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
+          style={({ pressed }) => [styles.supportRow, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Call support">
+          <ShieldCheck size={15} color={colors.primaryDark} strokeWidth={2.2} />
+          <PartnerText style={styles.supportText}>Help chahiye? Call {brand.phone}</PartnerText>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -487,40 +387,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: PAGE_BG,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  headerPad: {
-    paddingHorizontal: 16,
-    paddingTop: spacing.xs,
-    paddingBottom: 6,
-    backgroundColor: PAGE_BG,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 44,
-  },
-  listBackButton: {
-    width: 44,
-    alignItems: 'flex-start',
-    paddingLeft: 2,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerSpacer: {
-    width: 44,
-  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: spacing.sm,
   },
   backButton: {
@@ -538,19 +409,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: spacing.sm,
-  },
-  pageTitle: {
-    color: colors.dark,
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.extrabold,
-  },
-  pageSubtitle: {
-    marginTop: 4,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
-    maxWidth: 340,
+    paddingTop: spacing.xs,
   },
   emptyTitle: {
     color: colors.dark,
@@ -565,28 +424,30 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  emptyText: {
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    paddingVertical: spacing.sm,
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
 
-  /* Current stage card */
+  /* Status card */
   stageCard: {
-    marginTop: spacing.lg,
-    borderRadius: 18,
-    backgroundColor: '#FFFBEB',
     borderWidth: 1,
-    borderColor: '#F5D98A',
-    padding: spacing.lg,
+    borderColor: colors.border,
+    borderRadius: 16,
+    backgroundColor: '#FFFDF6',
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginBottom: spacing.md,
   },
   stageCardApproved: {
-    backgroundColor: '#F0FDF4',
     borderColor: '#BBF7D0',
+    backgroundColor: '#F0FDF4',
   },
   stageCardRejected: {
-    backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
+    backgroundColor: '#FEF2F2',
   },
   stageHead: {
     flexDirection: 'row',
@@ -594,9 +455,9 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   stageIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: colors.goldLight,
     alignItems: 'center',
     justifyContent: 'center',
@@ -607,104 +468,70 @@ const styles = StyleSheet.create({
   stageIconRejected: {
     backgroundColor: '#FEE2E2',
   },
-  stageCopy: { flex: 1, minWidth: 0 },
+  stageCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
   stageEyebrow: {
     color: colors.grey,
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: typography.weights.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
   },
   stageTitle: {
-    marginTop: 1,
     color: colors.dark,
-    fontSize: typography.sizes.lg,
+    fontSize: 20,
     fontWeight: typography.weights.extrabold,
-  },
-  stagePill: {
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: colors.goldLight,
-  },
-  stagePillApproved: {
-    backgroundColor: '#DCFCE7',
-  },
-  stagePillRejected: {
-    backgroundColor: '#FEE2E2',
-  },
-  stagePillText: {
-    fontSize: 10.5,
-    fontWeight: typography.weights.bold,
-    color: colors.primaryDark,
-  },
-  stageHint: {
-    marginTop: spacing.sm + 2,
-    color: colors.grey,
-    fontSize: typography.sizes.sm,
-    lineHeight: 18,
-  },
-  stageFooter: {
-    marginTop: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    flexWrap: 'wrap',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
-    color: colors.grey,
-    fontSize: typography.sizes.xs,
-    fontWeight: typography.weights.semibold,
+    marginTop: 1,
   },
   refPill: {
-    backgroundColor: colors.primary,
-    borderRadius: 7,
+    backgroundColor: colors.goldLight,
+    borderRadius: 8,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   refText: {
-    color: colors.dark,
+    color: colors.primaryDark,
     fontSize: 10.5,
     fontWeight: typography.weights.bold,
   },
+  stageNote: {
+    color: colors.grey,
+    fontSize: 13,
+    lineHeight: 18,
+  },
 
-  /* Cards — border only, no shadow (user rule) */
+  /* Generic card + sections */
   card: {
-    marginTop: spacing.md,
-    backgroundColor: PAGE_BG,
-    borderRadius: 18,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   sectionHeading: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.md,
+    marginBottom: spacing.sm,
   },
 
   /* Timeline */
   timelineRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    minHeight: 52,
   },
   timelineRail: {
-    width: 28,
+    width: 26,
     alignItems: 'center',
   },
   timelineDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#F3F4F6',
     borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: PAGE_BG,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -712,24 +539,20 @@ const styles = StyleSheet.create({
     backgroundColor: SUCCESS_GREEN,
     borderColor: SUCCESS_GREEN,
   },
-  timelineDotActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  timelineDotFailed: {
+    backgroundColor: DANGER_RED,
+    borderColor: DANGER_RED,
   },
   timelineNum: {
     color: colors.grey,
-    fontSize: typography.sizes.xs,
+    fontSize: 10,
     fontWeight: typography.weights.bold,
   },
-  timelineNumActive: {
-    color: colors.dark,
-  },
   timelineLine: {
-    width: 2,
     flex: 1,
-    minHeight: 26,
+    width: 2,
     backgroundColor: colors.border,
-    marginVertical: 4,
+    marginVertical: 2,
   },
   timelineLineDone: {
     backgroundColor: SUCCESS_GREEN,
@@ -737,14 +560,8 @@ const styles = StyleSheet.create({
   timelineContent: {
     flex: 1,
     paddingBottom: spacing.md,
+    marginLeft: spacing.sm,
   },
-  timelineHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingTop: 4,
-  },
-  timelineCopy: { flex: 1, minWidth: 0 },
   timelineLabel: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
@@ -752,164 +569,137 @@ const styles = StyleSheet.create({
   },
   timelineLabelPending: {
     color: colors.grey,
+    fontWeight: typography.weights.semibold,
   },
   timelineWhen: {
     marginTop: 2,
-    color: colors.textMuted,
-    fontSize: typography.sizes.xs,
-  },
-  badge: {
-    borderRadius: 7,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: colors.lightGrey,
-  },
-  badgeCompleted: {
-    backgroundColor: '#DCFCE7',
-  },
-  badgeProgress: {
-    backgroundColor: colors.goldLight,
-  },
-  badgeText: {
-    color: colors.grey,
-    fontSize: 10.5,
-    fontWeight: typography.weights.bold,
-  },
-  badgeCompletedText: {
-    color: '#15803D',
-  },
-  badgeProgressText: {
-    color: colors.primaryDark,
-  },
-  notifyBox: {
-    marginTop: spacing.xs,
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    backgroundColor: colors.lightGrey,
-    borderRadius: 12,
-    padding: spacing.sm + 2,
-  },
-  notifyText: {
-    flex: 1,
     color: colors.grey,
     fontSize: typography.sizes.xs,
-    lineHeight: 16,
   },
 
-  /* History */
-  historyHeader: {
+  /* Application details */
+  detailList: {},
+  detailRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    gap: spacing.md,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
   },
-  filterPill: {
+  detailLabel: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    minWidth: 72,
+  },
+  detailValue: {
+    flex: 1,
+    color: colors.dark,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    textAlign: 'right',
+    lineHeight: 17,
+  },
+  vehicleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.sm,
+    marginTop: spacing.sm,
+    padding: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 7,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    backgroundColor: PAGE_BG,
+    borderRadius: 12,
+    backgroundColor: '#FFFBEB',
   },
-  filterText: {
-    color: colors.grey,
-    fontSize: 10.5,
-    fontWeight: typography.weights.semibold,
-  },
-  historyRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.md,
-  },
-  historyIcon: {
+  vehicleIcon: {
     width: 34,
     height: 34,
-    borderRadius: 17,
+    borderRadius: 10,
+    backgroundColor: colors.goldLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  historyCopy: { flex: 1, minWidth: 0 },
-  historyTitle: {
+  vehicleTitle: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.sm,
   },
-  historyDesc: {
-    marginTop: 2,
+  vehicleMeta: {
     color: colors.grey,
     fontSize: typography.sizes.xs,
-    lineHeight: 17,
-  },
-  historyTime: {
-    marginTop: 3,
-    color: colors.textMuted,
-    fontSize: 10.5,
-  },
-  viewToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingTop: spacing.xs,
-  },
-  viewToggleText: {
-    color: colors.primaryDark,
-    fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.sm,
+    marginTop: 1,
   },
 
-  /* Footer actions */
-  refreshBtn: {
-    marginTop: spacing.md,
-    minHeight: 48,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+  /* Documents */
+  docRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  docIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: PAGE_BG,
+  },
+  docName: {
+    flex: 1,
+    color: colors.dark,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+  },
+  docState: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+  },
+  docStateVerified: {
+    color: '#15803D',
+  },
+  docStateRejected: {
+    color: DANGER_RED,
+  },
+
+  submittedLine: {
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+
+  refreshBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    marginBottom: spacing.md,
   },
   refreshLabel: {
     color: colors.primaryDark,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.sm,
   },
-  supportBar: {
-    marginTop: spacing.md,
-    borderRadius: 14,
-    backgroundColor: '#FFFBEB',
-    borderWidth: 1,
-    borderColor: '#F5D98A',
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  supportLeft: {
+
+  supportRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: spacing.sm,
+    paddingVertical: spacing.md,
   },
-  supportCopy: {
-    flex: 1,
-    color: colors.dark,
+  supportText: {
+    color: colors.grey,
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
-  },
-  supportActions: {
-    gap: spacing.sm,
-  },
-  supportLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  supportLinkText: {
-    color: colors.primaryDark,
-    fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.sm,
   },
   pressed: { opacity: 0.9 },
 });
