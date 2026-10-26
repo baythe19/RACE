@@ -199,6 +199,11 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const [staffDevOtp, setStaffDevOtp] = useState('');
   const [staffOtpBusy, setStaffOtpBusy] = useState(false);
 
+  /** Step-1 inline validationErrors — red outline + red helper text under each field. */
+  const [personalErrors, setPersonalErrors] = useState<Record<string, string>>({});
+  const clearPersonalError = (key: string) =>
+    setPersonalErrors((prev) => (prev[key] ? { ...prev, [key]: '' } : prev));
+
   // Flow Step State (1: Personal & Driver Details, 2: Documents, 3: Review)
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(
     initialStepParam >= 1 && initialStepParam <= 3 ? (initialStepParam as any) : 1,
@@ -674,40 +679,31 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
   const validatePersonalStep = () => {
     const name = driverPersonal.fullName.trim();
     const mobile = normalizeIndianPhone(driverPersonal.mobileNumber);
+    const next: Record<string, string> = {};
     if (name.length < 2) {
-      showAlert({ tone: 'warning', title: 'Full name required', message: 'Enter your full name as it appears on your driving licence.' });
-      return false;
+      next.fullName = 'Enter your full name as it appears on your driving licence';
     }
     if (mobile.length !== 10) {
-      showAlert({ tone: 'warning', title: 'Mobile number required', message: 'Enter the 10-digit verified mobile number.' });
-      return false;
+      next.mobileNumber = 'Enter the 10-digit verified mobile number';
     }
-    if (vendorStaffOnboarding && !staffPhoneVerified) {
-      showAlert({
-        tone: 'warning',
-        title: 'Verify mobile number',
-        message: 'Send an OTP to this driver and confirm it before continuing.',
-      });
-      return false;
+    if (vendorStaffOnboarding && !staffPhoneVerified && mobile.length === 10) {
+      next.mobileNumber = "Send the OTP and verify this driver's mobile number";
     }
     if (!normalizeDobForApi(driverPersonal.dateOfBirth)) {
-      showAlert({ tone: 'warning', title: 'Date of birth required', message: 'Enter a valid date in DD/MM/YYYY format.' });
-      return false;
+      next.dateOfBirth = 'Enter a valid date in DD/MM/YYYY format';
     }
     if (driverPersonal.address.trim().length < 5) {
-      showAlert({ tone: 'warning', title: 'Address required', message: 'Enter your current address.' });
-      return false;
+      next.address = 'Enter your current address';
     }
     if (!driverPersonal.city?.trim()) {
-      showAlert({ tone: 'warning', title: 'City required', message: 'Select your operating city.' });
-      return false;
+      next.city = 'Select your operating city';
     }
     const dlNumber = (driverPersonal.licenseNumber || driverVehicle.licenseNumber || '').trim();
     if (dlNumber.length < 4) {
-      showAlert({ tone: 'warning', title: 'Driving licence required', message: 'Enter your driving licence number.' });
-      return false;
+      next.licenseNumber = 'Enter your driving licence number';
     }
-    return true;
+    setPersonalErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const validateDocumentsStep = () => {
@@ -1021,8 +1017,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               </PartnerText>
             ) : null}
           </View>
-          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-            <User size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <View style={[styles.inputContainer, personalErrors.fullName && styles.inputContainerError, { height: px(44), paddingHorizontal: px(10) }]}>
+            <User size={px(16)} color={personalErrors.fullName ? '#DC2626' : '#9CA3AF'} strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerTextInput
               style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
               placeholder="Enter full name (as on DL)"
@@ -1034,9 +1030,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               onChangeText={(text) => {
                 const sanitized = text.replace(/[^a-zA-Z\s.-]/g, '');
                 setDriverPersonal({ fullName: sanitized });
+                clearPersonalError('fullName');
               }}
             />
           </View>
+          {personalErrors.fullName ? (
+            <PartnerText style={[styles.errorText, { fontSize: px(11) }]}>{personalErrors.fullName}</PartnerText>
+          ) : null}
         </View>
 
         {/* Mobile Number. Self-registration is locked after login OTP.
@@ -1049,6 +1049,7 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             style={[
               styles.inputContainer,
               !vendorStaffOnboarding || staffPhoneVerified ? styles.lockedInputContainer : null,
+              personalErrors.mobileNumber && (vendorStaffOnboarding ? styles.inputContainerError : null),
               { height: px(44), paddingHorizontal: px(10) },
             ]}>
             <Phone size={px(16)} color="#6B7280" strokeWidth={2} style={styles.leftInputIcon} />
@@ -1192,6 +1193,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               </Pressable>
             </View>
           ) : null}
+          {vendorStaffOnboarding && personalErrors.mobileNumber ? (
+            <PartnerText style={[styles.errorText, { fontSize: px(11) }]}>{personalErrors.mobileNumber}</PartnerText>
+          ) : null}
         </View>
 
         {/* Date of Birth (DD/MM/YYYY) */}
@@ -1200,8 +1204,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             Date of birth <PartnerText style={styles.requiredAsterisk}>*</PartnerText>{' '}
             <PartnerText style={[styles.optionalText, { fontSize: px(11) }]}>[DD/MM/YYYY]</PartnerText>
           </PartnerText>
-          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-            <Calendar size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <View style={[styles.inputContainer, personalErrors.dateOfBirth && styles.inputContainerError, { height: px(44), paddingHorizontal: px(10) }]}>
+            <Calendar size={px(16)} color={personalErrors.dateOfBirth ? '#DC2626' : '#9CA3AF'} strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerTextInput
               style={[styles.textInput, { fontSize: px(13.5), fontWeight: '600', flex: 1 }]}
               placeholder="15/05/1995"
@@ -1218,12 +1222,16 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   formatted = `${cleaned.slice(0, 2)}/${cleaned.slice(2, 4)}/${cleaned.slice(4, 8)}`;
                 }
                 setDriverPersonal({ dateOfBirth: formatted });
+                clearPersonalError('dateOfBirth');
               }}
             />
             <Pressable hitSlop={10} onPress={openCalendarModal} style={styles.calendarIconButton}>
               <Calendar size={px(18)} color="#D97706" strokeWidth={2.4} />
             </Pressable>
           </View>
+          {personalErrors.dateOfBirth ? (
+            <PartnerText style={[styles.errorText, { fontSize: px(11) }]}>{personalErrors.dateOfBirth}</PartnerText>
+          ) : null}
         </View>
 
         {/* Current Address */}
@@ -1236,8 +1244,8 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               {driverPersonal.address.length}/120
             </PartnerText>
           </View>
-          <View style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+          <View style={[styles.inputContainer, personalErrors.address && styles.inputContainerError, { height: px(44), paddingHorizontal: px(10) }]}>
+            <MapPin size={px(16)} color={personalErrors.address ? '#DC2626' : '#9CA3AF'} strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerTextInput
               style={[styles.textInput, { fontSize: px(13.5), flex: 1 }]}
               placeholder="House, street, landmark, area"
@@ -1249,9 +1257,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
               }}
               onChangeText={(address) => {
                 setDriverPersonal({ address });
+                clearPersonalError('address');
               }}
             />
           </View>
+          {personalErrors.address ? (
+            <PartnerText style={[styles.errorText, { fontSize: px(11) }]}>{personalErrors.address}</PartnerText>
+          ) : null}
         </View>
 
         {/* Pincode & State Auto-fill */}
@@ -1300,9 +1312,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             Operating city <PartnerText style={styles.requiredAsterisk}>*</PartnerText>
           </PartnerText>
           <Pressable
-            onPress={() => setCityModalVisible(true)}
-            style={[styles.inputContainer, { height: px(44), paddingHorizontal: px(10) }]}>
-            <MapPin size={px(16)} color="#9CA3AF" strokeWidth={2} style={styles.leftInputIcon} />
+            onPress={() => { setCityModalVisible(true); clearPersonalError('city'); }}
+            style={[styles.inputContainer, personalErrors.city && styles.inputContainerError, { height: px(44), paddingHorizontal: px(10) }]}>
+            <MapPin size={px(16)} color={personalErrors.city ? '#DC2626' : '#9CA3AF'} strokeWidth={2} style={styles.leftInputIcon} />
             <PartnerText
               style={[
                 styles.textValue,
@@ -1313,6 +1325,9 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
             </PartnerText>
             <ChevronDown size={px(18)} color="#6B7280" strokeWidth={2} />
           </Pressable>
+          {personalErrors.city ? (
+            <PartnerText style={[styles.errorText, { fontSize: px(11) }]}>{personalErrors.city}</PartnerText>
+          ) : null}
         </View>
 
         {/* Emergency Contact — inline fields, no sheet */}
@@ -1503,12 +1518,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
           <View
             style={[
               styles.inputContainer,
+              personalErrors.licenseNumber && styles.inputContainerError,
               { height: px(48), paddingHorizontal: px(12) },
               licenceFocused && styles.inputContainerFocused,
             ]}>
             <FileText
               size={px(18)}
-              color={licenceFocused ? '#D97706' : '#9CA3AF'}
+              color={personalErrors.licenseNumber ? '#DC2626' : licenceFocused ? '#D97706' : '#9CA3AF'}
               strokeWidth={2.2}
               style={styles.leftInputIcon}
             />
@@ -1538,9 +1554,13 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                 const val = text.replace(/[^A-Za-z0-9-]/g, '').toUpperCase();
                 setDriverPersonal({ licenseNumber: val });
                 setDriverVehicle({ licenseNumber: val });
+                clearPersonalError('licenseNumber');
               }}
             />
           </View>
+          {personalErrors.licenseNumber ? (
+            <PartnerText style={[styles.errorText, { fontSize: px(11) }]}>{personalErrors.licenseNumber}</PartnerText>
+          ) : null}
         </View>
 
         {/* Driving Experience Chips */}
@@ -2733,6 +2753,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
+  },
+  inputContainerError: {
+    borderColor: '#EF4444',
+    borderWidth: 1.4,
+    backgroundColor: '#FFF7F7',
+  },
+  errorText: {
+    color: '#DC2626',
+    marginTop: 5,
+    fontSize: 11,
+    lineHeight: 15,
   },
   inputContainerFocused: {
     borderColor: '#D97706',
