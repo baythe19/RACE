@@ -1,6 +1,7 @@
 import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -38,6 +39,7 @@ export default function LocationPickerMap({
   initialLocation,
   accentColor = colors.primary,
 }: LocationPickerMapProps) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const mapRef = useRef<MapView>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const regionRef = useRef<Region>({
@@ -117,31 +119,32 @@ export default function LocationPickerMap({
         animateTo(result.latitude, result.longitude);
         setAddress(result.address);
       } else {
-        Alert.alert('Not found', 'Could not find that location. Try a different search.');
+        showAlert({ tone: 'warning', title: 'Not found', message: 'Could not find that location. Try a different search.' });
       }
     } finally {
       setIsSearching(false);
     }
-  }, [animateTo, searchQuery]);
+  }, [animateTo, searchQuery, showAlert]);
 
   const handleCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
       const position = await getCurrentPositionWhenAllowed(Location.Accuracy.High);
       if (!position) {
-        Alert.alert(
-          'Location access denied',
-          'Location access denied. Please search or move map manually.',
-        );
+        showAlert({
+          tone: 'warning',
+          title: 'Location access denied',
+          message: 'Location access denied. Please search or move map manually.',
+        });
         return;
       }
       animateTo(position.coords.latitude, position.coords.longitude);
     } catch {
-      Alert.alert('Location error', 'Unable to get your location. Please search or move the map.');
+      showAlert({ tone: 'error', title: 'Location error', message: 'Unable to get your location. Please search or move the map.' });
     } finally {
       setIsLocating(false);
     }
-  }, [animateTo]);
+  }, [animateTo, showAlert]);
 
   const handleConfirm = useCallback(() => {
     const region = regionRef.current;
@@ -236,6 +239,7 @@ export default function LocationPickerMap({
           </Pressable>
         </View>
       </SafeAreaView>
+      {partnerDialog}
     </Modal>
   );
 }

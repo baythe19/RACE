@@ -392,6 +392,7 @@ export default function PartnerJobsScreen() {
 
     return (
       <Pressable
+        key={`${isOffer ? 'o' : 'm'}-${job.bookingType}-${job.id}`}
         disabled={!canTrackVendorJob}
         onPress={() => {
           if (!canTrackVendorJob) return;
@@ -407,7 +408,6 @@ export default function PartnerJobsScreen() {
             : undefined
         }>
       <GlassCard
-        key={`${isOffer ? 'o' : 'm'}-${job.bookingType}-${job.id}`}
         flat
         style={[
           styles.jobCard,

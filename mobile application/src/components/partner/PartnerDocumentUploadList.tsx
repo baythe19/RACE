@@ -1,4 +1,5 @@
 import { PartnerText } from './PartnerText';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, InteractionManager, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';

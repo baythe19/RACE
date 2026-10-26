@@ -9,13 +9,15 @@
 
 - **Comprehensive 360-Degree Platform Audit & Artifact Generation:**
   - Evaluated entire RACE ecosystem across 4 surfaces: Partner App (`mobile application/`), Customer App (`customer application/`), Admin Console (`race-admin/apps/admin-web/`), and Backend Core (`backend/`).
-  - Executed audit across 5 distinct POVs:
-    1. **System Architect & Code Auditor:** Identified Admin Booking Duality (Admin Create Booking creates legacy `BookingModel` instead of `TowingBooking`/`DriverBooking`), unpaginated memory hazards (`BookingModel.find().lean()` leading to OOM crash under PM2 512M heap limit), and N+1 query patterns in vendor/customer booking listings.
-    2. **Product Designer & UX Specialist:** Uncovered 3 customer app dead ends (`DriverEnquiryScreen` raises enquiry without saving to MongoDB; `QRScanScreen` mocks camera barcode scan; `RoadsideHelpOnWayScreen` has non-functional "Share Live Location" button and lacks exit CTA).
-    3. **Security & Compliance Engineer:** Flagged P0 completion OTP leakage in customer booking creation response DTO, client-asserted payment verification, public unmasked PII harvesting on `GET /api/v1/vehicles/:id/verify`, and SSRF risk in `/api/v1/documents`.
-    4. **QA & Reliability Engineer:** Analyzed cancellation vs assignment race condition leading to orphan fleet vehicle locks, absence of background GPS tracking (Expo TaskManager), and trip completion prior to customer payment mode confirmation.
-    5. **Client & Business Strategist:** Documented gaps against `clintdoc.md` regarding real payment gateway integration (Razorpay/Cashfree), automated vendor commission split payouts, free subscription activation bypass, and physical QR sticker fulfillment.
-  - Published master report to artifact directory: `RACE_PLATFORM_360_MASTER_AUDIT_REPORT.md` and repository docs: `docs/audit/RACE_PLATFORM_360_MASTER_AUDIT_REPORT.md`.
+  - Executed audit across 5 distinct POVs with app-by-app breakdowns:
+    1. **System Architect & Code Auditor:** Identified Admin Booking Duality (Admin Create Booking creates legacy `BookingModel` instead of `TowingBooking`/`DriverBooking`), unpaginated memory hazards (`BookingModel.find().lean()` leading to OOM crash under PM2 512M heap limit), N+1 query patterns in vendor/customer booking listings, dual transaction ledgers (`TransactionModel` vs `PaymentTransactionModel`), and Socket.IO single-node in-memory adapter cluster limitation.
+    2. **Product Designer & UX Specialist:** Uncovered 3 customer app dead ends (`DriverEnquiryScreen` raises enquiry without saving to MongoDB; `QRScanScreen` mocks camera barcode scan; `RoadsideHelpOnWayScreen` has non-functional "Share Live Location" button and lacks exit CTA), hardcoded document approvals in Partner app, decoupled dark mode toggle, and missing tactile haptics.
+    3. **Security & Compliance Engineer:** Flagged P0 completion OTP leakage in customer booking creation response DTO (`tripOtp.ts:87-94`), client-asserted payment verification, public unmasked PII harvesting on `GET /api/v1/vehicles/:id/verify`, unthrottled admin login brute force (`adminAuthRoutes.ts:15`), timing attack vulnerabilities on admin password comparison, and SSRF risk in `/api/v1/documents`.
+    4. **QA & Reliability Engineer:** Analyzed cancellation vs assignment race condition leading to orphan fleet vehicle locks, absence of background GPS tracking (Expo TaskManager), driver payout 403 Forbidden, socket reconnection room subscription drops, and dispatch deadlock when drivers remain stationary.
+    5. **Client & Business Strategist:** Documented gaps against `clintdoc.md` regarding real payment gateway integration (Razorpay/Cashfree), automated vendor commission split payouts (85/15), free subscription activation bypass, vehicle damage liability policies, and admin reports service distribution blindness.
+  - Expanded and published master report with 12 concrete POCs, 40-point verification matrix, anti-patterns vs polish recommendations, and phased roadmap to:
+    - Repo: `docs/audit/RACE_PLATFORM_360_MASTER_AUDIT_REPORT.md`
+    - Artifact: `RACE_PLATFORM_360_MASTER_AUDIT_REPORT.md`.
   - Installed and integrated `.agents/skills/subagent-driven-development` into workspace.
 
 ## Previous session — Customer App APK Crash Fixes, High-Concurrency 100-User Simulation (100% Pass) & Dead Code Elimination (2026-10-24, branch v7.0.0-major-update)

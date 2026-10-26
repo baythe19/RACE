@@ -1,10 +1,11 @@
 import { PartnerText } from '../partner/PartnerText';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Crosshair, Map as MapIcon, MapPin, Search } from 'lucide-react-native';
 
 import { images } from '../../assets';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import LocationPickerMap from '../booking/LocationPickerMap';
 import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
 import { useLocationStore } from '../../store/locationStore';
@@ -26,6 +27,7 @@ export default function LocationSelectorSheet({
   dismissible = false,
   onRequestClose,
 }: LocationSelectorSheetProps) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const setLocation = useLocationStore(state => state.setLocation);
   const selectedLocation = useLocationStore(state => state.selectedLocation);
 
@@ -46,21 +48,22 @@ export default function LocationSelectorSheet({
     try {
       const position = await getCurrentPositionWhenAllowed();
       if (!position) {
-        Alert.alert(
-          'Permission needed',
-          'Allow location access to use your current location, or search on the map.',
-        );
+        showAlert({
+          tone: 'warning',
+          title: 'Permission needed',
+          message: 'Allow location access to use your current location, or search on the map.',
+        });
         return;
       }
       const { latitude, longitude } = position.coords;
       const address = await reverseGeocode(latitude, longitude);
       applyLocation({ address, latitude, longitude });
     } catch {
-      Alert.alert('Location error', 'Unable to get your current location. Try the map picker.');
+      showAlert({ tone: 'error', title: 'Location error', message: 'Unable to get your current location. Try the map picker.' });
     } finally {
       setIsLocating(false);
     }
-  }, [applyLocation]);
+  }, [applyLocation, showAlert]);
 
   const handleCityChip = useCallback(
     (cityName: string) => {
@@ -68,10 +71,11 @@ export default function LocationSelectorSheet({
       if (!city) return;
 
       if (city.comingSoon) {
-        Alert.alert(
-          'Coming soon',
-          `${city.displayName} is coming soon! We'll notify you when we launch there.`,
-        );
+        showAlert({
+          tone: 'info',
+          title: 'Coming soon',
+          message: `${city.displayName} is coming soon! We'll notify you when we launch there.`,
+        });
         return;
       }
 
@@ -191,6 +195,7 @@ export default function LocationSelectorSheet({
         onClose={() => setShowMapPicker(false)}
         onLocationSelected={location => applyLocation(location)}
       />
+      {partnerDialog}
     </>
   );
 }
