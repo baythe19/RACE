@@ -15,13 +15,10 @@ export function humanizeApiErrorMessage(message: string, fallback = 'Something w
   }
 
   if (
-    lower.includes('messagecentral') ||
+    lower.includes('hanu') ||
     lower.includes('verify-otp error') ||
     lower.includes('send-otp failed') ||
-    lower.includes('verificationid') ||
-    lower.includes('unknown_error') ||
-    lower.includes('mc_customer') ||
-    lower.includes('mc_auth')
+    lower.includes('unknown_error')
   ) {
     if (lower.includes('wrong') || lower.includes('invalid otp')) {
       return 'Incorrect code. Check the SMS and try again.';
