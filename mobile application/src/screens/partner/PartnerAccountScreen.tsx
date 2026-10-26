@@ -19,9 +19,7 @@ import {
   Edit2,
   AlertCircle,
   MapPin,
-  Globe,
   Info,
-  Settings,
 } from 'lucide-react-native';
 
 import { useAuthActions } from '../../hooks/useAuth';
@@ -38,9 +36,7 @@ import type { PartnerAccountStackParamList } from '../../types/partnerNavigation
 import { driverColors, driverRadius, getPressableFeedback } from '../../theme/driverUi';
 import { buildDriverVerification } from '../../utils/driverVerification';
 import PartnerLogoutDialog from '../../components/partner/dialogs/PartnerLogoutDialog';
-import PartnerLanguageSheet from '../../components/partner/dialogs/PartnerLanguageSheet';
 import PartnerLocationSheet from '../../components/partner/dialogs/PartnerLocationSheet';
-import PartnerNotificationPreferencesModal from '../../components/partner/dialogs/PartnerNotificationPreferencesModal';
 import { useNotificationsQuery } from '../../services/useNotificationQueries';
 import { openLocationSettings } from '../../hooks/useDriverLocationReporting';
 import { openDriverJobsDone } from '../../navigation/partnerNavigationRef';
@@ -63,10 +59,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
   const [logoutVisible, setLogoutVisible] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  const [langSheetVisible, setLangSheetVisible] = useState(false);
   const [locationSheetVisible, setLocationSheetVisible] = useState(false);
-  const [notifPrefsVisible, setNotifPrefsVisible] = useState(false);
-  const [selectedLang, setSelectedLang] = useState('en');
   const avatarUri = usePartnerPayoutStore(state => state.avatarUri);
 
   const unreadNotifs = notifData?.unreadCount ?? 0;
@@ -109,9 +102,6 @@ export default function PartnerAccountScreen({ navigation }: Props) {
     setLocationSheetVisible(false);
     void openLocationSettings();
   };
-
-  const languageDisplayName =
-    selectedLang === 'hi' ? 'हिंदी' : selectedLang === 'or' ? 'ଓଡ଼ିଆ' : 'English';
 
   return (
     <View style={styles.root}>
@@ -397,7 +387,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           )}
         </View>
 
-        {/* Section 2: Preferences (Location, Language, Notifications - moved directly into Profile) */}
+        {/* Section 2: Preferences */}
         <PartnerText style={styles.sectionHeader}>Preferences</PartnerText>
         <View style={styles.menuCard}>
           <Pressable
@@ -409,36 +399,6 @@ export default function PartnerAccountScreen({ navigation }: Props) {
             <View style={styles.menuTextCol}>
               <PartnerText style={styles.menuTitle}>Location Settings</PartnerText>
               <PartnerText style={styles.menuSubtitle}>Manage GPS & location permissions</PartnerText>
-            </View>
-            <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-          </Pressable>
-
-          <View style={styles.divider} />
-
-          <Pressable
-            style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-            onPress={() => setLangSheetVisible(true)}>
-            <View style={[styles.menuIconCircle, { backgroundColor: '#EFF6FF' }]}>
-              <Globe size={18} color="#2563EB" strokeWidth={2.2} />
-            </View>
-            <View style={styles.menuTextCol}>
-              <PartnerText style={styles.menuTitle}>Language</PartnerText>
-              <PartnerText style={styles.menuSubtitle}>{languageDisplayName}</PartnerText>
-            </View>
-            <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
-          </Pressable>
-
-          <View style={styles.divider} />
-
-          <Pressable
-            style={({ pressed }) => [styles.menuRow, getPressableFeedback(pressed)]}
-            onPress={() => setNotifPrefsVisible(true)}>
-            <View style={[styles.menuIconCircle, { backgroundColor: '#FFF7ED' }]}>
-              <Bell size={18} color="#EA580C" strokeWidth={2.2} />
-            </View>
-            <View style={styles.menuTextCol}>
-              <PartnerText style={styles.menuTitle}>Notification Preferences</PartnerText>
-              <PartnerText style={styles.menuSubtitle}>Sound alerts, trip requests & reminders</PartnerText>
             </View>
             <ChevronRight size={18} color="#C4C7D0" strokeWidth={2.2} />
           </Pressable>
@@ -509,22 +469,10 @@ export default function PartnerAccountScreen({ navigation }: Props) {
         onConfirm={performLogout}
       />
 
-      <PartnerLanguageSheet
-        visible={langSheetVisible}
-        selectedLanguage={selectedLang}
-        onSelect={setSelectedLang}
-        onClose={() => setLangSheetVisible(false)}
-      />
-
       <PartnerLocationSheet
         visible={locationSheetVisible}
         onAllow={handleAllowLocation}
         onDeny={() => setLocationSheetVisible(false)}
-      />
-
-      <PartnerNotificationPreferencesModal
-        visible={notifPrefsVisible}
-        onClose={() => setNotifPrefsVisible(false)}
       />
       {partnerDialog}
     </View>
