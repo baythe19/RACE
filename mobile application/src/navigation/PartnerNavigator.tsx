@@ -28,6 +28,7 @@ import VendorDriverMembershipsScreen from '../screens/partner/VendorDriverMember
 import VendorVehiclesScreen from '../screens/partner/VendorVehiclesScreen';
 import VendorVehicleRegistrationScreen from '../screens/partner/registration/vehicle/VendorVehicleRegistrationScreen';
 import VendorAssignJobScreen from '../screens/partner/VendorAssignJobScreen';
+import VendorAddDriverScreen from '../screens/partner/VendorAddDriverScreen';
 import PartnerEditProfileScreen from '../screens/partner/account/PartnerEditProfileScreen';
 import PartnerDocumentsScreen from '../screens/partner/account/PartnerDocumentsScreen';
 import PartnerEarningsScreen from '../screens/partner/account/PartnerEarningsScreen';
@@ -107,6 +108,11 @@ function PartnerJobsStackNavigator() {
         options={{ headerTitle: 'Vendor drivers' }}
       />
       <JobsStack.Screen
+        name="VendorAddDriver"
+        component={VendorAddDriverScreen}
+        options={{ headerShown: false }}
+      />
+      <JobsStack.Screen
         name="VendorAssignJob"
         component={VendorAssignJobScreen}
         options={{ headerShown: false }}
@@ -138,6 +144,11 @@ function PartnerDriversStackNavigator() {
       <DriversStack.Screen
         name="VendorDriversList"
         component={VendorDriverMembershipsScreen}
+        options={{ headerShown: false }}
+      />
+      <DriversStack.Screen
+        name="VendorAddDriver"
+        component={VendorAddDriverScreen}
         options={{ headerShown: false }}
       />
       <DriversStack.Screen
@@ -200,6 +211,11 @@ function PartnerAccountStackNavigator() {
       <AccountStack.Screen
         name="VendorDrivers"
         component={VendorDriverMembershipsScreen}
+        options={{ headerShown: false }}
+      />
+      <AccountStack.Screen
+        name="VendorAddDriver"
+        component={VendorAddDriverScreen}
         options={{ headerShown: false }}
       />
       <AccountStack.Screen

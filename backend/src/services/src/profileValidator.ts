@@ -60,6 +60,7 @@ export interface ProfileDriverSummaryDto {
   state?: string;
   vehicleRegistration?: string;
   fleetSource?: 'vendor' | 'admin';
+  vendorUserId?: string;
   policeVerificationStatus?: DriverDocumentStatus;
   documents: Array<{
     type: string;
@@ -95,5 +96,7 @@ export interface ProfileResponseDto {
   isProfileCompleted: boolean;
   role: string;
   isAvailable?: boolean;
+  driverContext?: 'VENDOR_MANAGED' | 'INDEPENDENT';
+  vendorUserId?: string;
   driverProfile?: ProfileDriverSummaryDto;
 }

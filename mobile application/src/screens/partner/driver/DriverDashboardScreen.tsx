@@ -903,6 +903,11 @@ export default function DriverDashboardScreen() {
     profile?.reviewStatus !== 'REJECTED' &&
     verification.state !== 'rejected' &&
     verification.state !== 'suspended';
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    Boolean(profile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
 
   const {
     data: jobs = [],
@@ -915,7 +920,7 @@ export default function DriverDashboardScreen() {
     isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
-  } = useDriverJobOffersQuery(isOperational);
+  } = useDriverJobOffersQuery(isOperational && !isVendorStaff);
   const {
     data: activeJob,
     isLoading: activeLoading,

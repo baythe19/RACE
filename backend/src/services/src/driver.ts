@@ -6,6 +6,8 @@ import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
 import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp, generateCompletionOtp } from './bookings/tripOtp';
+import { processBookingCompletionEscrowSettlement } from './payments/escrowSettlement';
+import { logger } from '../../utils/src/logger';
 import { UserModel } from '../../models/src/user';
 import { TowingBookingModel } from '../../models/src/towingBooking';
 import { DriverBookingModel } from '../../models/src/driverBooking';
@@ -185,7 +187,7 @@ export class DriverService {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
 
-    const driver = await UserModel.findById(driverId).select('driverProfile currentLocation role').exec();
+    const driver = await UserModel.findById(driverId).select('driverProfile currentLocation role driverContext').exec();
     if (!driver) throw new NotFoundError('Driver not found');
 
     return listOpenBookingOffers({ forDriver: driver });
@@ -422,6 +424,21 @@ export class DriverService {
 
     if (dto.status === 'COMPLETED') {
       await releaseDriver(driverId, bookingId);
+      // Automated escrow settlement disbursement (85% vendor payout / 15% platform commission)
+      const finalFare = updated.finalFare ?? updated.estimatedFare ?? 0;
+      void processBookingCompletionEscrowSettlement({
+        bookingId: updated._id.toString(),
+        bookingNumber: updated.bookingNumber,
+        finalFare,
+        vendorId: updated.vendorId,
+        driverId: updated.driverId,
+        customerId: updated.customerId,
+      }).catch((err) => {
+        logger.error('Failed to disburse automated escrow settlement', {
+          bookingId: updated._id.toString(),
+          error: err,
+        });
+      });
     }
 
     emitBookingStatusUpdate(bookingId, dto.status, {
@@ -440,7 +457,7 @@ export class DriverService {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
 
-    const driver = await UserModel.findById(driverId).select('activeBookingId isAvailable driverProfile').exec();
+    const driver = await UserModel.findById(driverId).select('activeBookingId isAvailable driverProfile driverContext').exec();
     if (driver?.activeBookingId && driver.activeBookingId.toString() !== bookingId) {
       throw new BadRequestError('You already have an active booking in progress');
     }
@@ -450,6 +467,9 @@ export class DriverService {
     if (!booking) throw new NotFoundError('Booking not found');
 
     if (booking.status === 'CONFIRMED' && !booking.driverId) {
+      if (driver?.driverContext === 'VENDOR_MANAGED') {
+        throw new ForbiddenError('Your vendor assigns your jobs. Open requests are not available.');
+      }
       return claimOpenBookingOffer(bookingId, bookingType, driverId);
     }
 

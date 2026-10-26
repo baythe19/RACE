@@ -1,10 +1,83 @@
 import { useEffect } from 'react';
 import { AppState, Linking, Platform } from 'react-native';
 import * as Location from 'expo-location';
+import * as TaskManager from 'expo-task-manager';
 
 import { updateDriverLocation } from '../services/driver/driverApi';
 import { ensureForegroundLocationPermission } from '../utils/locationPermission';
 import { useDriverPresenceStore, type DriverLocationHealth } from '../store/driverPresenceStore';
+
+export const BACKGROUND_DRIVER_LOCATION_TASK = 'RACE_BACKGROUND_DRIVER_LOCATION_TASK';
+
+// Define the background location task globally at top-level.
+TaskManager.defineTask(BACKGROUND_DRIVER_LOCATION_TASK, async ({ data, error }) => {
+  if (error) return;
+  if (!data) return;
+
+  const { locations } = data as { locations: Location.LocationObject[] };
+  const latest = locations?.[locations.length - 1];
+  if (!latest?.coords) return;
+
+  const { latitude, longitude, heading, accuracy } = latest.coords;
+  if (!useDriverPresenceStore.getState().simulationActive) {
+    useDriverPresenceStore.getState().setDriverLocation({
+      latitude,
+      longitude,
+      updatedAt: Date.now(),
+      heading,
+      accuracy,
+    });
+  }
+
+  try {
+    await updateDriverLocation(latitude, longitude);
+    useDriverPresenceStore.getState().setLocationHealth('ok', {
+      lastLocationAt: Date.now(),
+      isReporting: false,
+    });
+  } catch {
+    // Non-fatal, retried on next background tick
+  }
+});
+
+async function startBackgroundTracking(): Promise<void> {
+  try {
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_DRIVER_LOCATION_TASK);
+    if (!isRegistered) {
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      if (status !== 'granted') return;
+    }
+
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_DRIVER_LOCATION_TASK);
+    if (!hasStarted) {
+      await Location.startLocationUpdatesAsync(BACKGROUND_DRIVER_LOCATION_TASK, {
+        accuracy: Location.Accuracy.Balanced,
+        timeInterval: REPORT_INTERVAL_MS,
+        distanceInterval: 10,
+        foregroundService: {
+          notificationTitle: 'RACE Partner Active Service',
+          notificationBody: 'Transmitting live GPS coordinates to customer and dispatch',
+          notificationColor: '#F5A623',
+        },
+        pausesUpdatesAutomatically: false,
+        showsBackgroundLocationIndicator: true,
+      });
+    }
+  } catch {
+    // Non-fatal: foreground polling timer serves as seamless fallback
+  }
+}
+
+async function stopBackgroundTracking(): Promise<void> {
+  try {
+    const hasStarted = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_DRIVER_LOCATION_TASK);
+    if (hasStarted) {
+      await Location.stopLocationUpdatesAsync(BACKGROUND_DRIVER_LOCATION_TASK);
+    }
+  } catch {
+    // ignore
+  }
+}
 
 const REPORT_INTERVAL_MS = 12_000;
 /** Guards against two mounted screens pushing the same fix twice. */
@@ -81,6 +154,7 @@ async function runReport(): Promise<void> {
 function startReporter() {
   if (interval) return;
   void runReport();
+  void startBackgroundTracking();
   interval = setInterval(() => {
     void runReport();
   }, REPORT_INTERVAL_MS);
@@ -95,6 +169,7 @@ function stopReporter() {
     clearInterval(interval);
     interval = null;
   }
+  void stopBackgroundTracking();
   appStateSub?.remove();
   appStateSub = null;
   useDriverPresenceStore

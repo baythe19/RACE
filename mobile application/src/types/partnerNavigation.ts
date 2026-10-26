@@ -43,6 +43,7 @@ export type PartnerRootStackParamList = {
 
 export type PartnerDriversStackParamList = {
   VendorDriversList: { fullScreen?: boolean } | undefined;
+  VendorAddDriver: undefined;
   VendorVehicles: undefined;
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
 };
@@ -76,6 +77,8 @@ export type PartnerJobsStackParamList = {
   VendorVehicles: undefined;
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
   VendorDrivers: { fullScreen?: boolean } | undefined;
+  /** Vendor-side staff-driver onboarding: the full 3-step driver registration flow. */
+  VendorAddDriver: undefined;
   VendorAssignJob: {
     bookingId: string;
     bookingType: 'towing' | 'driver';
@@ -100,6 +103,8 @@ export type PartnerAccountStackParamList = {
   PartnerBankDetails: undefined;
   VendorVerificationStatus: undefined;
   VendorDrivers: { fullScreen?: boolean } | undefined;
+  /** Vendor-side staff-driver onboarding (same flow as the Jobs-stack copy). */
+  VendorAddDriver: undefined;
   VendorVehicles: undefined;
   VendorVehicleRegistration: { vehicleId?: string } | undefined;
 };

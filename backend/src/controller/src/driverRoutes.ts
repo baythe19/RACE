@@ -5,7 +5,9 @@ import { requireRole } from '../../middleware/src/role';
 import { validate } from '../../middleware/src/validation';
 import { driverDocumentUpload } from '../../middleware/src/upload';
 import { driverController } from './driver';
+import { vendorController } from './vendor';
 import { registerDriverSelfSchema } from '../../services/src/driverSelf';
+import { savePayoutAccountSchema } from '../../services/src/vendorValidator';
 import { z } from 'zod';
 import {
   driverBookingsQuerySchema,
@@ -40,6 +42,14 @@ router.post(
 );
 
 router.use(requireRole('driver'));
+
+/** Payout account — real persistence on the driver's user profile. */
+router.get('/payout-account', vendorController.getPayoutAccount);
+router.put(
+  '/payout-account',
+  validate(savePayoutAccountSchema),
+  vendorController.savePayoutAccount,
+);
 
 router.get('/vendor-invitations', driverController.listVendorInvitations);
 router.get('/vendor-membership', driverController.getVendorMembership);

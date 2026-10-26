@@ -9,6 +9,7 @@ import {
   createVendorStaffDriverSchema,
   inviteVendorDriverSchema,
   revokeVendorDriverMembershipSchema,
+  uploadVendorDriverDocumentSchema,
   vendorDriverOnboardingSendOtpSchema,
   vendorDriverOnboardingVerifyOtpSchema,
 } from '../../services/src/vendorDriversValidator';
@@ -57,11 +58,11 @@ router.post(
   vendorController.createStaffDriver,
 );
 
-/** Payout account — real persistence on the vendor's user profile. */
-router.get('/payout-account', requireRole('vendor'), vendorController.getPayoutAccount);
+/** Payout account — real persistence on the partner's (vendor or independent driver) user profile. */
+router.get('/payout-account', requireRole('vendor', 'driver'), vendorController.getPayoutAccount);
 router.put(
   '/payout-account',
-  requireRole('vendor'),
+  requireRole('vendor', 'driver'),
   validate(savePayoutAccountSchema),
   vendorController.savePayoutAccount,
 );
@@ -91,6 +92,14 @@ router.delete(
   requireRole('vendor'),
   validate(revokeVendorDriverMembershipSchema),
   vendorController.revokeDriverMembership,
+);
+/** Vendor uploads a document for their staff driver (registration/docs step). */
+router.post(
+  '/drivers/:id/upload-document',
+  requireRole('vendor'),
+  vendorDocumentUpload.single('file'),
+  validate(uploadVendorDriverDocumentSchema),
+  vendorController.uploadDriverDocument,
 );
 router.get('/vehicles', requireRole('vendor'), vendorController.listVehicles);
 router.post(

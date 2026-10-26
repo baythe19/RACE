@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   },
   optionCardSelected: {
     borderColor: driverColors.amber,
-    backgroundColor: '#FFFDF5',
+    backgroundColor: driverColors.white,
   },
   optionCardUnavailable: {
     opacity: 0.58,

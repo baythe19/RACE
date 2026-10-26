@@ -14,6 +14,8 @@ import { createNotification } from './notificationService';
 import { mapLocationPoint } from './responseMappers';
 import { generateBookingFinancials, generateRefund } from './transactionEngine';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
+import { generatePrefixedBookingNumber } from '../bookings/booking';
+import { generateTripStartOtp, generateCompletionOtp } from '../bookings/tripOtp';
 import { BadRequestError, NotFoundError } from '../../../utils/src/errors';
 
 const LEGACY_ADMIN_TRANSITIONS: Record<string, string[]> = {
@@ -68,43 +70,6 @@ type ServiceBookingRecord = {
   createdAt: Date;
 };
 
-function statusMatches(status: string, filter?: string): boolean {
-  if (!filter || filter === 'ALL') return true;
-  if (filter === 'COMPLETED') {
-    return ['COMPLETED', 'RATED', 'SERVICE_COMPLETED', 'PAID'].includes(status);
-  }
-  if (filter === 'ACTIVE') {
-    return [
-      'ASSIGNED',
-      'ACCEPTED',
-      'EN_ROUTE',
-      'ARRIVED',
-      'SERVICE_STARTED',
-      'PAYMENT_PENDING',
-      'DRIVER_EN_ROUTE',
-      'DRIVER_ARRIVED',
-      'IN_PROGRESS',
-    ].includes(status);
-  }
-  if (filter === 'PENDING') {
-    return ['CREATED', 'PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED'].includes(status);
-  }
-  return status === filter;
-}
-function inDateRange(date: Date, from?: string, to?: string): boolean {
-  if (from && date < new Date(from)) return false;
-  if (to) {
-    const end = new Date(to);
-    end.setHours(23, 59, 59, 999);
-    if (date > end) return false;
-  }
-  return true;
-}
-
-function toRegex(search?: string): RegExp | null {
-  if (!search?.trim()) return null;
-  return new RegExp(escapeRegex(search.trim()), 'i');
-}
 
 async function mapBookingListItem(booking: {
   _id: Types.ObjectId;
@@ -146,12 +111,82 @@ async function pushStatus(
   booking.statusHistory.push({ status, timestamp: new Date() });
 }
 
+function buildBookingQuery(
+  modelKind: 'towing' | 'driver' | 'legacy',
+  filters: {
+    search?: string;
+    status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    serviceType?: string;
+  },
+): Record<string, unknown> {
+  const query: Record<string, unknown> = {};
+
+  if (filters.search?.trim()) {
+    const esc = escapeRegex(filters.search.trim());
+    if (modelKind === 'legacy') {
+      query.$or = [
+        { bookingNumber: { $regex: esc, $options: 'i' } },
+        { serviceLabel: { $regex: esc, $options: 'i' } },
+      ];
+    } else {
+      query.bookingNumber = { $regex: esc, $options: 'i' };
+    }
+  }
+
+  if (filters.dateFrom || filters.dateTo) {
+    const dateQuery: Record<string, Date> = {};
+    if (filters.dateFrom) dateQuery.$gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const end = new Date(filters.dateTo);
+      end.setHours(23, 59, 59, 999);
+      dateQuery.$lte = end;
+    }
+    query.createdAt = dateQuery;
+  }
+
+  if (filters.status && filters.status !== 'ALL') {
+    if (modelKind === 'legacy') {
+      if (filters.status === 'COMPLETED') {
+        query.status = { $in: ['COMPLETED', 'SERVICE_COMPLETED', 'PAID'] };
+      } else if (filters.status === 'ACTIVE') {
+        query.status = { $in: ['ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'SERVICE_STARTED', 'PAYMENT_PENDING'] };
+      } else if (filters.status === 'PENDING') {
+        query.status = { $in: ['CREATED', 'PENDING'] };
+      } else {
+        query.status = filters.status;
+      }
+    } else {
+      if (filters.status === 'COMPLETED') {
+        query.status = { $in: ['COMPLETED', 'RATED'] };
+      } else if (filters.status === 'ACTIVE') {
+        query.status = { $in: ['DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'] };
+      } else if (filters.status === 'PENDING') {
+        query.status = { $in: ['PENDING', 'CONFIRMED', 'DRIVER_ASSIGNED'] };
+      } else {
+        query.status = filters.status;
+      }
+    }
+  }
+
+  if (filters.serviceType && filters.serviceType !== 'ALL') {
+    if (modelKind === 'legacy') {
+      query.categoryId = filters.serviceType;
+    } else if (modelKind !== filters.serviceType) {
+      return { _id: null };
+    }
+  }
+
+  return query;
+}
+
 export const adminBookingsService = {
   async list(filters: {
     search?: string;
     status?: string;
     serviceType?: string;
-    type?: 'towing' | 'driver' | 'all';
+    type?: 'towing' | 'driver' | 'legacy' | 'all';
     dateFrom?: string;
     dateTo?: string;
     page?: number;
@@ -159,47 +194,47 @@ export const adminBookingsService = {
   }) {
     const page = Math.max(1, Number(filters.page ?? 1));
     const pageSize = Math.min(100, Math.max(1, Number(filters.pageSize ?? 10)));
-    const regex = toRegex(filters.search);
     const type = filters.type ?? 'all';
+    const limit = page * pageSize;
 
-    const [legacyBookings, towingBookings, driverBookings] = await Promise.all([
-      type === 'all'
-        ? BookingModel.find().lean()
+    const legacyQuery = buildBookingQuery('legacy', filters);
+    const towingQuery = buildBookingQuery('towing', filters);
+    const driverQuery = buildBookingQuery('driver', filters);
+
+    const [
+      legacyCount,
+      towingCount,
+      driverCount,
+      legacyRows,
+      towingRows,
+      driverRows,
+    ] = await Promise.all([
+      type === 'all' || (type as string) === 'legacy' ? BookingModel.countDocuments(legacyQuery) : Promise.resolve(0),
+      type === 'all' || type === 'towing' ? TowingBookingModel.countDocuments(towingQuery) : Promise.resolve(0),
+      type === 'all' || type === 'driver' ? DriverBookingModel.countDocuments(driverQuery) : Promise.resolve(0),
+      type === 'all' || (type as string) === 'legacy'
+        ? BookingModel.find(legacyQuery).sort({ createdAt: -1 }).limit(limit).lean()
         : Promise.resolve([]),
-      type === 'driver'
-        ? Promise.resolve([])
-        : TowingBookingModel.find().lean(),
-      type === 'towing'
-        ? Promise.resolve([])
-        : DriverBookingModel.find().lean(),
+      type === 'all' || type === 'towing'
+        ? TowingBookingModel.find(towingQuery).sort({ createdAt: -1 }).limit(limit).lean()
+        : Promise.resolve([]),
+      type === 'all' || type === 'driver'
+        ? DriverBookingModel.find(driverQuery).sort({ createdAt: -1 }).limit(limit).lean()
+        : Promise.resolve([]),
     ]);
 
-    const serviceItems = [
-      ...towingBookings.map((b) => ({ bookingType: 'towing' as const, booking: b as unknown as ServiceBookingRecord })),
-      ...driverBookings.map((b) => ({ bookingType: 'driver' as const, booking: b as unknown as ServiceBookingRecord })),
-    ].filter(({ bookingType, booking }) => {
-      if (filters.serviceType && filters.serviceType !== 'ALL' && filters.serviceType !== bookingType) return false;
-      if (!statusMatches(booking.status, filters.status)) return false;
-      if (!inDateRange(new Date(booking.createdAt), filters.dateFrom, filters.dateTo)) return false;
-      if (regex && !regex.test(booking.bookingNumber)) return false;
-      return true;
-    });
+    const total = legacyCount + towingCount + driverCount;
 
-    const legacyItems = legacyBookings
-      .filter((b) => {
-        if (filters.serviceType && filters.serviceType !== 'ALL' && filters.serviceType !== b.categoryId) return false;
-        if (!statusMatches(b.status, filters.status)) return false;
-        if (!inDateRange(new Date(b.createdAt), filters.dateFrom, filters.dateTo)) return false;
-        if (regex && !(regex.test(b.bookingNumber) || regex.test(b.serviceLabel))) return false;
-        return true;
-      })
-      .map((booking) => ({ bookingType: 'legacy' as const, booking }));
-
-    const merged = [...serviceItems, ...legacyItems].sort(
+    const merged = [
+      ...towingRows.map((b) => ({ bookingType: 'towing' as const, booking: b as unknown as ServiceBookingRecord })),
+      ...driverRows.map((b) => ({ bookingType: 'driver' as const, booking: b as unknown as ServiceBookingRecord })),
+      ...legacyRows.map((b) => ({ bookingType: 'legacy' as const, booking: b as any })),
+    ].sort(
       (a, b) => new Date(b.booking.createdAt).getTime() - new Date(a.booking.createdAt).getTime(),
     );
 
     const paged = merged.slice((page - 1) * pageSize, page * pageSize);
+
     const customerIds = [
       ...new Set(
         paged
@@ -218,19 +253,38 @@ export const adminBookingsService = {
           .filter((v): v is string => Boolean(v)),
       ),
     ];
-    const [customers, drivers] = await Promise.all([
+    const vendorIds = [
+      ...new Set(
+        paged
+          .map((row) => row.booking.vendorId?.toString())
+          .filter((v): v is string => Boolean(v)),
+      ),
+    ];
+
+    const [customers, drivers, vendors] = await Promise.all([
       UserModel.find({ _id: { $in: customerIds } }).lean(),
       UserModel.find({ _id: { $in: driverIds } }).lean(),
+      UserModel.find({ _id: { $in: vendorIds } }).lean(),
     ]);
     const customerMap = new Map(customers.map((c) => [c._id.toString(), c]));
     const driverMap = new Map(drivers.map((d) => [d._id.toString(), d]));
+    const vendorMap = new Map(vendors.map((v) => [v._id.toString(), v]));
 
     const items = paged.map((row) => {
+      const vendor = row.booking.vendorId ? vendorMap.get(row.booking.vendorId.toString()) : undefined;
+      const vendorName =
+        vendor?.vendorProfile?.businessName ??
+        vendor?.vendorProfile?.ownerName ??
+        vendor?.fullName ??
+        '—';
+      const vendorId = row.booking.vendorId?.toString() ?? '';
+
       if (row.bookingType === 'legacy') {
         const booking = row.booking as unknown as {
           _id: Types.ObjectId;
           bookingNumber: string;
           customerId: Types.ObjectId;
+          vendorId?: Types.ObjectId;
           categoryId: string;
           serviceLabel: string;
           status: string;
@@ -241,12 +295,12 @@ export const adminBookingsService = {
         const customer = customerMap.get(booking.customerId.toString());
         return {
           id: booking._id.toString(),
-          bookingType: 'legacy',
+          bookingType: 'legacy' as const,
           bookingNumber: booking.bookingNumber,
           customerId: booking.customerId.toString(),
           customerName: customer?.fullName ?? 'Customer',
-          vendorId: '',
-          vendorName: '—',
+          vendorId,
+          vendorName,
           driverId: booking.driver?.id,
           driverName: booking.driver?.name,
           driverAssignment: booking.driver?.id ? 'Assigned' : 'Unassigned',
@@ -270,8 +324,8 @@ export const adminBookingsService = {
         bookingNumber: booking.bookingNumber,
         customerId: booking.customerId.toString(),
         customerName: customer?.fullName ?? 'Customer',
-        vendorId: '',
-        vendorName: '—',
+        vendorId,
+        vendorName,
         driverId,
         driverName: driver?.fullName,
         driverAssignment:
@@ -297,11 +351,11 @@ export const adminBookingsService = {
     return {
       items,
       bookings: items,
-      total: merged.length,
+      total,
       page,
       pageSize,
       limit: pageSize,
-      totalPages: Math.max(1, Math.ceil(merged.length / pageSize)),
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
     };
   },
 
@@ -542,12 +596,13 @@ export const adminBookingsService = {
   },
 
   async create(input: Record<string, string | number>, actor: { id: string; name: string }) {
-    const count = await BookingModel.countDocuments();
+    const isDriverService = String(input.serviceType ?? '').toLowerCase() === 'driver';
     const customer = await UserModel.findOne({ fullName: input.customerName as string, role: 'customer' });
     if (!customer) throw new NotFoundError('Customer not found');
 
     let vehicle = await VehicleModel.findOne({ customerId: customer._id });
     if (!vehicle) {
+      const count = await VehicleModel.countDocuments();
       vehicle = await VehicleModel.create({
         customerId: customer._id,
         vehicleNumber: `OD-TEMP-${count + 1}`,
@@ -560,39 +615,109 @@ export const adminBookingsService = {
       });
     }
 
-    const booking = await BookingModel.create({
-      customerId: customer._id,
-      vendorId: input.vendorId ? new Types.ObjectId(String(input.vendorId)) : undefined,
-      bookingNumber: `BK${String(count + 1000)}${String.fromCharCode(65 + (count % 26))}`,
-      categoryId: String(input.serviceType ?? 'towing'),
-      serviceId: String(input.serviceType ?? 'towing'),
-      serviceLabel: String(input.service ?? 'Towing Service'),
-      status: String(input.status ?? 'CREATED'),
-      vehicleId: vehicle._id,
-      vehicleNumber: vehicle.vehicleNumber,
-      pickup: { label: String(input.city ?? 'Pickup'), address: String(input.city ?? 'Pickup') },
-      invoice: { baseFare: Number(input.amount ?? 0), total: Number(input.amount ?? 0), currency: 'INR' },
-      statusHistory: [{ status: 'CREATED', timestamp: new Date() }],
-    });
+    const city = String(input.city ?? 'Bhubaneswar');
+    const amount = Number(input.amount ?? 500);
+    const vendorId = input.vendorId ? new Types.ObjectId(String(input.vendorId)) : undefined;
+
+    let createdBooking: any;
+    let serviceLabel = '';
+    let categoryId = '';
+
+    if (isDriverService) {
+      categoryId = 'driver';
+      serviceLabel = String(input.service ?? 'Driver Service');
+      const bookingNumber = await generatePrefixedBookingNumber('DRV', () =>
+        DriverBookingModel.countDocuments(),
+      );
+      createdBooking = await DriverBookingModel.create({
+        customerId: customer._id,
+        bookingNumber,
+        vehicleId: vehicle._id,
+        driverServiceType: 'part_time',
+        pickup: { address: `${city} Central`, latitude: 20.2961, longitude: 85.8245 },
+        dropoff: { address: `${city} Outskirts`, latitude: 20.3150, longitude: 85.8450 },
+        estimatedFare: amount,
+        advanceAmount: Math.round(amount * 0.3),
+        advancePaid: false,
+        remainingAmount: amount - Math.round(amount * 0.3),
+        remainingPaid: false,
+        paymentStatus: 'PENDING',
+        status: vendorId ? 'DRIVER_ASSIGNED' : 'CONFIRMED',
+        vendorId,
+        tripStartOtp: generateTripStartOtp(),
+        completionOtp: generateCompletionOtp(),
+        statusHistory: [
+          {
+            status: vendorId ? 'DRIVER_ASSIGNED' : 'CONFIRMED',
+            timestamp: new Date(),
+            note: 'Created by Admin',
+          },
+        ],
+      });
+    } else {
+      categoryId = 'towing';
+      serviceLabel = String(input.service ?? 'Towing Service');
+      const bookingNumber = await generatePrefixedBookingNumber('TOW', () =>
+        TowingBookingModel.countDocuments(),
+      );
+      createdBooking = await TowingBookingModel.create({
+        customerId: customer._id,
+        bookingNumber,
+        vehicleId: vehicle._id,
+        towingMode: 'instant',
+        pickup: { address: `${city} Breakdown Point`, latitude: 20.2961, longitude: 85.8245 },
+        dropoff: { address: `${city} Service Workshop`, latitude: 20.3150, longitude: 85.8450 },
+        distanceKm: 8,
+        estimatedFare: amount,
+        advanceAmount: Math.round(amount * 0.3),
+        advancePaid: false,
+        remainingAmount: amount - Math.round(amount * 0.3),
+        remainingPaid: false,
+        paymentStatus: 'PENDING',
+        status: vendorId ? 'CONFIRMED' : 'PENDING',
+        vendorId,
+        tripStartOtp: generateTripStartOtp(),
+        completionOtp: generateCompletionOtp(),
+        statusHistory: [
+          {
+            status: vendorId ? 'CONFIRMED' : 'PENDING',
+            timestamp: new Date(),
+            note: 'Created by Admin',
+          },
+        ],
+      });
+    }
 
     await logActivity({
       actorId: actor.id,
       actorName: actor.name,
       action: 'BOOKING_CREATED',
       entityType: 'booking',
-      entityId: booking._id.toString(),
-      title: `Booking ${booking.bookingNumber} created`,
+      entityId: createdBooking._id.toString(),
+      title: `Booking ${createdBooking.bookingNumber} created`,
     });
 
     await createNotification({
       title: 'New booking created',
-      message: `Booking ${booking.bookingNumber} created by admin`,
+      message: `Booking ${createdBooking.bookingNumber} created by admin`,
       category: 'booking',
       entityType: 'booking',
-      entityId: booking._id.toString(),
+      entityId: createdBooking._id.toString(),
     });
 
-    return mapBookingListItem(booking);
+    return {
+      id: createdBooking._id.toString(),
+      bookingNumber: createdBooking.bookingNumber,
+      customerName: customer.fullName ?? 'Customer',
+      vendorName: '—',
+      driverName: undefined,
+      service: serviceLabel,
+      serviceType: categoryId,
+      amount: createdBooking.estimatedFare,
+      city,
+      status: mapAdminBookingStatus(createdBooking.status),
+      date: createdBooking.createdAt.toISOString(),
+    };
   },
 
   async assignVendor(id: string, vendorId: string, actor: { id: string; name: string }) {

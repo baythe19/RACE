@@ -90,6 +90,11 @@ export function customerCompletionOtp(
   if (booking.status === 'COMPLETED' || booking.status === 'RATED' || booking.status === 'CANCELLED') {
     return undefined;
   }
+  // BUG-SEC-01 / P0: Never disclose completion OTP before dropoff arrival and customer payment confirmation.
+  if (!booking.arrivedAtDropoffAt || !booking.paymentConfirmedByCustomer) {
+    return undefined;
+  }
   return booking.completionOtp;
 }
+
 

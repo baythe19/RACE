@@ -186,7 +186,7 @@ export class VendorDriversService {
           licenseNo: dto.licenseNo,
           vendorUserId: new Types.ObjectId(vendorUserId),
           fleetSource: 'vendor',
-          driverType: dto.driverType ?? 'Tow Driver',
+          driverType: 'Full-Time',
           city: dto.city ?? 'Bhubaneswar',
           state: dto.state ?? 'Odisha',
           rating: 5.0,
@@ -213,7 +213,7 @@ export class VendorDriversService {
       } else {
         driver.driverProfile.vendorUserId = new Types.ObjectId(vendorUserId);
         driver.driverProfile.fleetSource = 'vendor';
-        driver.driverProfile.driverType = dto.driverType ?? driver.driverProfile.driverType ?? 'Tow Driver';
+        driver.driverProfile.driverType = 'Full-Time';
         if (dto.licenseNo) driver.driverProfile.licenseNo = dto.licenseNo;
         if (dto.city) driver.driverProfile.city = dto.city;
         if (dto.experienceYears != null) driver.driverProfile.experienceYears = dto.experienceYears;
@@ -258,7 +258,7 @@ export class VendorDriversService {
           licenseNo: dto.licenseNo,
           vendorUserId: new Types.ObjectId(vendorUserId),
           fleetSource: 'vendor',
-          driverType: dto.driverType ?? 'Tow Driver',
+          driverType: 'Full-Time',
           city: dto.city ?? 'Bhubaneswar',
           state: dto.state ?? 'Odisha',
           rating: 5.0,

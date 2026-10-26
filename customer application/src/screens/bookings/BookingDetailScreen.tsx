@@ -24,6 +24,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import DriverAvatar from '../../components/bookings/DriverAvatar';
 import TripOtpCard from '../../components/booking/TripOtpCard';
+import CancellationRefundPolicyModal from '../../components/booking/CancellationRefundPolicyModal';
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import GoldButton from '../../components/auth/GoldButton';
 import { useBookingQuery } from '../../services/bookings/useBookingQueries';
@@ -393,109 +394,17 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
         />
       ) : null}
 
-      <Modal
+      <CancellationRefundPolicyModal
         visible={showCancelModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCancelModal(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            justifyContent: 'center',
-            padding: px(20),
-          }}>
-          <View
-            style={{
-              backgroundColor: colors.background,
-              borderRadius: px(14),
-              padding: px(16),
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}>
-            <Text style={{ fontSize: px(18), fontWeight: typography.weights.bold, color: colors.dark }}>
-              Cancel Booking?
-            </Text>
-            {policy ? (
-              <>
-                <Text style={{ marginTop: px(10), color: colors.grey }}>
-                  Cancellation Policy: {policy.reason}
-                </Text>
-                <Text style={{ marginTop: px(8), color: colors.dark }}>
-                  Refund: ₹{policy.refundAmount} ({policy.refundPercent}%)
-                </Text>
-                <Text style={{ color: colors.dark }}>
-                  Cancellation fee: ₹{policy.cancellationFee}
-                </Text>
-              </>
-            ) : null}
-            <Text style={{ marginTop: px(10), color: colors.grey }}>
-              Refund will be processed within 5-7 business days.
-            </Text>
-            <TextInput
-              value={cancelReason}
-              onChangeText={setCancelReason}
-              placeholder="Why are you cancelling? (optional)"
-              placeholderTextColor={colors.grey}
-              style={{
-                marginTop: px(10),
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: px(10),
-                paddingHorizontal: px(10),
-                paddingVertical: px(8),
-                color: colors.dark,
-              }}
-            />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(8), marginTop: px(8) }}>
-              {['Changed my mind', 'Found another service', 'Emergency', 'Other'].map((chip) => (
-                <Pressable
-                  key={chip}
-                  onPress={() => setCancelReason(chip)}
-                  style={{
-                    paddingHorizontal: px(10),
-                    paddingVertical: px(6),
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: px(14),
-                  }}>
-                  <Text style={{ color: colors.dark, fontSize: px(11) }}>{chip}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={{ flexDirection: 'row', gap: px(10), marginTop: px(14) }}>
-              <Pressable
-                onPress={() => setShowCancelModal(false)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingVertical: px(10),
-                  borderRadius: px(10),
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}>
-                <Text style={{ color: colors.dark, fontWeight: typography.weights.semibold }}>
-                  Keep Booking
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void confirmCancel()}
-                disabled={cancelSubmitting || (policy ? !policy.canCancel : true)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingVertical: px(10),
-                  borderRadius: px(10),
-                  backgroundColor: cancelSubmitting ? colors.lightGrey : colors.error,
-                }}>
-                <Text style={{ color: '#fff', fontWeight: typography.weights.bold }}>
-                  {cancelSubmitting ? 'Cancelling...' : 'Cancel Anyway'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        policy={policy}
+        isLoadingPolicy={policyLoading}
+        isSubmitting={cancelSubmitting}
+        bookingStatus={booking.unifiedStatus}
+        cancelReason={cancelReason}
+        onReasonChange={setCancelReason}
+        onConfirmCancel={() => void confirmCancel()}
+        onClose={() => setShowCancelModal(false)}
+      />
     </ProfileSubScreenLayout>
   );
 }

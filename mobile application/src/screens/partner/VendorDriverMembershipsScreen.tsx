@@ -11,21 +11,22 @@ import {
   View,
 } from 'react-native';
 import {
+  ArrowLeft,
   Check,
   CheckCircle2,
   Clock3,
   Info,
   Phone,
+  Plus,
   ShieldCheck,
   Star,
-  UserCheck,
   ClipboardList,
   MoreVertical,
   UserRound,
   UserRoundPlus,
   X,
-  Sparkles,
 } from 'lucide-react-native';
+import { colors, radius, spacing, typography } from '../../theme';
 import { jumpToPartnerJobsScreen } from '../../navigation/partnerNavigationRef';
 import { useVendorBookingsQuery } from '../../services/vendor/useVendorBookingsQueries';
 import AppScreenLayout from '../../components/ui/AppScreenLayout';
@@ -36,12 +37,10 @@ import {
   useRevokeVendorDriverMembershipMutation,
   useVendorMembershipsQuery,
 } from '../../services/vendor/useVendorMembershipQueries';
-import {
-  sendVendorDriverOnboardingOtp,
-  verifyVendorDriverOnboardingOtp,
-  createVendorStaffDriver,
-} from '../../services/vendor/vendorDriversApi';
 import type { VendorMembership } from '../../services/vendor/vendorMembershipApi';
+import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import type { PartnerJobsStackParamList } from '../../types/partnerNavigation';
 
 const AMBER = '#F9A602';
 const INK = '#191919';
@@ -263,147 +262,37 @@ const memberMenuStyles = StyleSheet.create({
 
 export default function VendorDriverMembershipsScreen() {
   const px = useScreenPx();
-  const [showAddForm, setShowAddForm] = useState(false);
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
-
-  // Form state
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [licenseNo, setLicenseNo] = useState('');
-  const [driverType, setDriverType] = useState<'Tow Driver' | 'Full-Time' | 'Part-Time'>('Tow Driver');
-  const [city, setCity] = useState('Bhubaneswar');
-
-  // Inline OTP state
-  const [otpState, setOtpState] = useState<'IDLE' | 'SENDING' | 'SENT' | 'VERIFYING' | 'VERIFIED'>('IDLE');
-  const [otpCode, setOtpCode] = useState('');
-  const [devOtp, setDevOtp] = useState<string | null>(null);
-  const [onboardingProofToken, setOnboardingProofToken] = useState<string | null>(null);
-  const [otpSecondsLeft, setOtpSecondsLeft] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const navigation = useNavigation<NavigationProp<PartnerJobsStackParamList>>();
 
   const { data: members = [], isLoading, isError, refetch, isRefetching } = useVendorMembershipsQuery();
   const revoke = useRevokeVendorDriverMembershipMutation();
   const { data: vendorBookings = [] } = useVendorBookingsQuery(true);
 
-  // Resend OTP countdown timer
-  useEffect(() => {
-    if (otpSecondsLeft <= 0) return;
-    const interval = setInterval(() => {
-      setOtpSecondsLeft(prev => prev - 1);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [otpSecondsLeft]);
+  /** Multiple open jobs: vendor picks which job to assign the driver to. */
+  const [assignPickerVisible, setAssignPickerVisible] = useState(false);
+  const [assignPickerDriver, setAssignPickerDriver] = useState<{ driverId: string; driverName: string } | null>(null);
+  const assignPickerJobs = useMemo(
+    () =>
+      assignPickerDriver
+        ? vendorBookings.filter(b => (b.status === 'REQUESTED' || b.status === 'CONFIRMED') && !b.driver)
+        : [],
+    [assignPickerDriver, vendorBookings],
+  );
 
-  const cleanPhone = useMemo(() => phone.replace(/\D/g, '').slice(-10), [phone]);
-
-  const resetForm = () => {
-    setFullName('');
-    setPhone('');
-    setLicenseNo('');
-    setDriverType('Tow Driver');
-    setCity('Bhubaneswar');
-    setOtpState('IDLE');
-    setOtpCode('');
-    setDevOtp(null);
-    setOnboardingProofToken(null);
-    setOtpSecondsLeft(0);
-    setErrorMessage('');
-    setShowAddForm(false);
-  };
-
-  const handleSendOtp = async () => {
-    if (cleanPhone.length < 10) {
-      setErrorMessage('Enter a valid 10-digit driver mobile number');
-      return;
-    }
-    setErrorMessage('');
-    setOtpState('SENDING');
-    try {
-      const res = await sendVendorDriverOnboardingOtp(cleanPhone, fullName);
-      setOtpState('SENT');
-      setOtpSecondsLeft(60);
-      if (res.devOtp) {
-        setDevOtp(res.devOtp);
-      }
-    } catch (err: unknown) {
-      setOtpState('IDLE');
-      setErrorMessage(err instanceof Error ? err.message : 'Could not send OTP');
-    }
-  };
-
-  const handleVerifyOtp = async () => {
-    if (otpCode.length < 4) {
-      setErrorMessage('Enter the OTP code received by the driver');
-      return;
-    }
-    setErrorMessage('');
-    setOtpState('VERIFYING');
-    try {
-      const res = await verifyVendorDriverOnboardingOtp(cleanPhone, otpCode);
-      if (res.verified && (res.onboardingProofToken || res.proofToken)) {
-        setOnboardingProofToken(res.onboardingProofToken || res.proofToken);
-        setOtpState('VERIFIED');
-      } else {
-        setOtpState('SENT');
-        setErrorMessage('Verification failed. Please re-enter the code.');
-      }
-    } catch (err: unknown) {
-      setOtpState('SENT');
-      setErrorMessage(err instanceof Error ? err.message : 'Invalid verification code');
-    }
-  };
-
-  const handleSubmitStaffDriver = async () => {
-    if (!fullName.trim() || fullName.trim().length < 2) {
-      setErrorMessage('Please enter driver’s full name');
-      return;
-    }
-    if (cleanPhone.length !== 10) {
-      setErrorMessage('Please enter a valid 10-digit mobile number');
-      return;
-    }
-    if (!licenseNo.trim() || licenseNo.trim().length < 4) {
-      setErrorMessage('Please enter a valid driving license number');
-      return;
-    }
-    if (!onboardingProofToken) {
-      setErrorMessage('Please verify the driver’s mobile number first');
-      return;
-    }
-
-    setSubmitting(true);
-    setErrorMessage('');
-    try {
-      await createVendorStaffDriver({
-        name: fullName.trim(),
-        phone: cleanPhone,
-        licenseNo: licenseNo.trim().toUpperCase(),
-        driverType,
-        city: city.trim() || 'Bhubaneswar',
-        onboardingProofToken,
-      });
-
-      await refetch();
-      showAlert({
-        tone: 'success',
-        title: 'Driver Added to Fleet! 🎉',
-        message: `${fullName.trim()} has been registered directly into your fleet. They can now log in via mobile number and start working immediately without filling any registration forms!`,
-        primaryAction: { label: 'Great!', onPress: resetForm },
-      });
-    } catch (err: unknown) {
-      setSubmitting(false);
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to create staff driver');
-    }
+  /** + Add Driver → full driver registration flow (same 3 steps the driver
+   * self-registration uses), launched from the vendor side. */
+  const openAddDriverFlow = () => {
+    navigation.navigate('VendorAddDriver');
   };
 
   const openAssignForMember = (member: VendorMembership) => {
     const driverId = member.driver?.id;
     if (!driverId) return;
-    const openJob = vendorBookings.find(
+    const openJobs = vendorBookings.filter(
       b => (b.status === 'REQUESTED' || b.status === 'CONFIRMED') && !b.driver,
     );
-    if (!openJob) {
+    if (openJobs.length === 0) {
       showAlert({
         tone: 'info',
         title: 'No open jobs',
@@ -413,14 +302,27 @@ export default function VendorDriverMembershipsScreen() {
       });
       return;
     }
+    if (openJobs.length === 1) {
+      jumpToAssignJob(openJobs[0]!, driverId);
+      return;
+    }
+    // Multiple open jobs — the vendor picks which one (no auto-select).
+    setAssignPickerDriver({ driverId, driverName: member.driver?.name ?? 'Driver' });
+    setAssignPickerVisible(true);
+  };
+
+  const jumpToAssignJob = (
+    job: (typeof vendorBookings)[number],
+    driverId: string,
+  ) => {
     jumpToPartnerJobsScreen('VendorAssignJob', {
-      bookingId: openJob.id,
-      bookingType: openJob.bookingType,
-      bookingNumber: openJob.bookingNumber,
-      serviceLabel: openJob.serviceLabel,
-      pickupAddress: openJob.pickup?.address,
-      dropoffAddress: openJob.dropoff?.address ?? undefined,
-      estimatedFare: openJob.estimatedFare,
+      bookingId: job.id,
+      bookingType: job.bookingType,
+      bookingNumber: job.bookingNumber,
+      serviceLabel: job.serviceLabel,
+      pickupAddress: job.pickup?.address,
+      dropoffAddress: job.dropoff?.address ?? undefined,
+      estimatedFare: job.estimatedFare,
       preferredDriverId: driverId,
     });
   };
@@ -456,44 +358,37 @@ export default function VendorDriverMembershipsScreen() {
     <View style={{ flex: 1 }}>
     <AppScreenLayout
       header={
-        <View style={[styles.header, { paddingHorizontal: px(18), paddingTop: px(14), paddingBottom: px(12) }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View>
-              <PartnerText style={[styles.title, { fontSize: px(22) }]}>Fleet Drivers</PartnerText>
-              <PartnerText style={[styles.subtitle, { fontSize: px(12.5) }]}>
-                {activeMembers.length} active driver{activeMembers.length === 1 ? '' : 's'} in your fleet
-              </PartnerText>
+        <View style={styles.headerPad}>
+          <View style={styles.titleRow}>
+            {navigation.canGoBack() ? (
+              <Pressable
+                onPress={() => navigation.goBack()}
+                hitSlop={10}
+                style={styles.listBackButton}
+                accessibilityRole="button"
+                accessibilityLabel="Back">
+                <ArrowLeft size={20} color={colors.dark} strokeWidth={2.3} />
+              </Pressable>
+            ) : null}
+            <View style={{ flex: 1 }}>
+              <PartnerText style={styles.title}>Fleet Drivers</PartnerText>
+              {!navigation.canGoBack() ? (
+                <PartnerText style={styles.subtitle}>
+                  {activeMembers.length} active driver{activeMembers.length === 1 ? '' : 's'} in your fleet
+                </PartnerText>
+              ) : null}
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Add staff driver"
-              onPress={() => setShowAddForm(prev => !prev)}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(5),
-                height: px(38),
-                paddingHorizontal: px(14),
-                borderRadius: px(19),
-                backgroundColor: showAddForm ? '#1F2937' : AMBER,
-                opacity: pressed ? 0.88 : 1,
-              })}>
-              {showAddForm ? (
-                <>
-                  <X size={px(15)} color="#FFFFFF" strokeWidth={2.4} />
-                  <PartnerText style={{ color: '#FFFFFF', fontSize: px(13), fontWeight: '700' }}>
-                    Cancel
-                  </PartnerText>
-                </>
-              ) : (
-                <>
-                  <UserRoundPlus size={px(16)} color={INK} strokeWidth={2.4} />
-                  <PartnerText style={{ color: INK, fontSize: px(13), fontWeight: '700' }}>
-                    + Add Driver
-                  </PartnerText>
-                </>
-              )}
-            </Pressable>
+            <View style={styles.headerRightActions}>
+              <Pressable
+                testID="vendorDriversAddBtn"
+                accessibilityRole="button"
+                accessibilityLabel="Add driver"
+                onPress={openAddDriverFlow}
+                style={({ pressed }) => [styles.registerBtn, pressed && { opacity: 0.88 }]}>
+                <Plus size={15} color={colors.dark} strokeWidth={2.8} />
+                <PartnerText style={styles.registerLabel}>Add driver</PartnerText>
+              </Pressable>
+            </View>
           </View>
         </View>
       }
@@ -502,239 +397,6 @@ export default function VendorDriverMembershipsScreen() {
         void refetch();
       }}
       contentStyle={{ paddingTop: px(12) }}>
-      {/* Direct Staff Onboarding Card */}
-      {showAddForm ? (
-        <View style={[styles.formCard, { borderRadius: px(18), padding: px(16), marginBottom: px(18) }]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: px(12) }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(8) }}>
-              <View style={[styles.avatar, { width: px(36), height: px(36), borderRadius: px(12), backgroundColor: '#EFF6FF' }]}>
-                <Sparkles size={px(18)} color="#2563EB" />
-              </View>
-              <View>
-                <PartnerText style={{ color: INK, fontSize: px(15), fontWeight: '800' }}>
-                  Onboard Staff Driver
-                </PartnerText>
-                <PartnerText style={{ color: MUTED, fontSize: px(11) }}>
-                  Inline OTP verification · Instant fleet activation
-                </PartnerText>
-              </View>
-            </View>
-          </View>
-
-          {errorMessage ? (
-            <View style={[styles.errorBanner, { padding: px(10), borderRadius: px(10), marginBottom: px(12) }]}>
-              <PartnerText style={{ color: '#DC2626', fontSize: px(12), fontWeight: '600' }}>
-                {errorMessage}
-              </PartnerText>
-            </View>
-          ) : null}
-
-          {/* Full Name */}
-          <View style={{ marginBottom: px(12) }}>
-            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Driver Full Name *</PartnerText>
-            <View style={[styles.textInputWrap, { borderRadius: px(12), height: px(46) }]}>
-              <TextInput
-                value={fullName}
-                onChangeText={setFullName}
-                placeholder="e.g. Ramesh Kumar"
-                placeholderTextColor="#9CA3AF"
-                style={[styles.input, { fontSize: px(14) }]}
-              />
-            </View>
-          </View>
-
-          {/* Mobile Number & Inline OTP */}
-          <View style={{ marginBottom: px(12) }}>
-            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Driver Mobile Number *</PartnerText>
-            <View style={[styles.phoneInputRow, { borderRadius: px(12), height: px(46) }]}>
-              <PartnerText style={{ color: INK, fontSize: px(14), fontWeight: '700' }}>+91</PartnerText>
-              <TextInput
-                value={phone}
-                onChangeText={val => {
-                  setPhone(val.replace(/\D/g, '').slice(0, 10));
-                  if (otpState === 'VERIFIED') {
-                    setOtpState('IDLE');
-                    setOnboardingProofToken(null);
-                  }
-                }}
-                keyboardType="phone-pad"
-                maxLength={10}
-                placeholder="10-digit mobile number"
-                placeholderTextColor="#9CA3AF"
-                editable={otpState !== 'VERIFIED'}
-                style={[styles.input, { fontSize: px(14) }]}
-              />
-              {otpState === 'IDLE' && cleanPhone.length === 10 ? (
-                <Pressable
-                  onPress={handleSendOtp}
-                  style={[styles.smallActionBtn, { paddingHorizontal: px(10), paddingVertical: px(6), borderRadius: px(8) }]}>
-                  <PartnerText style={{ color: '#FFFFFF', fontSize: px(12), fontWeight: '700' }}>
-                    Send Code
-                  </PartnerText>
-                </Pressable>
-              ) : null}
-            </View>
-
-            {/* Inline OTP Widget */}
-            {otpState === 'SENDING' ? (
-              <View style={[styles.inlineOtpBox, { padding: px(12), borderRadius: px(12), marginTop: px(8) }]}>
-                <ActivityIndicator size="small" color={AMBER} />
-                <PartnerText style={{ color: MUTED, fontSize: px(12), marginLeft: px(8) }}>
-                  Sending verification SMS code to +91 {cleanPhone}...
-                </PartnerText>
-              </View>
-            ) : null}
-
-            {otpState === 'SENT' || otpState === 'VERIFYING' ? (
-              <View style={[styles.inlineOtpBox, { padding: px(12), borderRadius: px(12), marginTop: px(8) }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: px(8) }}>
-                  <PartnerText style={{ color: INK, fontSize: px(12.5), fontWeight: '700' }}>
-                    Enter 6-digit Code sent to +91 {cleanPhone}
-                  </PartnerText>
-                  {otpSecondsLeft > 0 ? (
-                    <PartnerText style={{ color: MUTED, fontSize: px(11) }}>
-                      Resend in {otpSecondsLeft}s
-                    </PartnerText>
-                  ) : (
-                    <Pressable onPress={handleSendOtp}>
-                      <PartnerText style={{ color: '#2563EB', fontSize: px(11.5), fontWeight: '700' }}>
-                        Resend Code
-                      </PartnerText>
-                    </Pressable>
-                  )}
-                </View>
-
-                {devOtp ? (
-                  <Pressable
-                    onPress={() => setOtpCode(devOtp)}
-                    style={[styles.devOtpChip, { paddingHorizontal: px(8), paddingVertical: px(4), borderRadius: px(6), marginBottom: px(8) }]}>
-                    <PartnerText style={{ color: '#1E40AF', fontSize: px(11), fontWeight: '700' }}>
-                      ⚡ Dev Auto-Fill Code: {devOtp} (tap to paste)
-                    </PartnerText>
-                  </Pressable>
-                ) : null}
-
-                <View style={{ flexDirection: 'row', gap: px(8), alignItems: 'center' }}>
-                  <TextInput
-                    value={otpCode}
-                    onChangeText={setOtpCode}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    placeholder="6-digit code"
-                    placeholderTextColor="#9CA3AF"
-                    style={[styles.otpInput, { flex: 1, height: px(42), borderRadius: px(10), fontSize: px(16) }]}
-                  />
-                  <Pressable
-                    disabled={otpCode.length < 4 || otpState === 'VERIFYING'}
-                    onPress={handleVerifyOtp}
-                    style={[
-                      styles.verifyBtn,
-                      {
-                        height: px(42),
-                        paddingHorizontal: px(16),
-                        borderRadius: px(10),
-                        opacity: otpCode.length >= 4 ? 1 : 0.6,
-                      },
-                    ]}>
-                    {otpState === 'VERIFYING' ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <PartnerText style={{ color: '#FFFFFF', fontSize: px(13), fontWeight: '700' }}>
-                        Verify
-                      </PartnerText>
-                    )}
-                  </Pressable>
-                </View>
-              </View>
-            ) : null}
-
-            {otpState === 'VERIFIED' ? (
-              <View style={[styles.verifiedBanner, { padding: px(10), borderRadius: px(10), marginTop: px(8) }]}>
-                <CheckCircle2 size={px(18)} color="#059669" />
-                <PartnerText style={{ color: '#065F46', fontSize: px(12.5), fontWeight: '700', marginLeft: px(6) }}>
-                  Mobile Verified (+91 {cleanPhone}) ✓
-                </PartnerText>
-              </View>
-            ) : null}
-          </View>
-
-          {/* License Number */}
-          <View style={{ marginBottom: px(12) }}>
-            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Driving License Number *</PartnerText>
-            <View style={[styles.textInputWrap, { borderRadius: px(12), height: px(46) }]}>
-              <TextInput
-                value={licenseNo}
-                onChangeText={val => setLicenseNo(val.toUpperCase())}
-                placeholder="e.g. OD02 20230012345"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="characters"
-                style={[styles.input, { fontSize: px(14) }]}
-              />
-            </View>
-          </View>
-
-          {/* Driver Type Picker */}
-          <View style={{ marginBottom: px(16) }}>
-            <PartnerText style={[styles.inputLabel, { fontSize: px(12) }]}>Fleet Role / Driver Type *</PartnerText>
-            <View style={{ flexDirection: 'row', gap: px(8) }}>
-              {(['Tow Driver', 'Full-Time', 'Part-Time'] as const).map(type => {
-                const selected = driverType === type;
-                return (
-                  <Pressable
-                    key={type}
-                    onPress={() => setDriverType(type)}
-                    style={[
-                      styles.typePill,
-                      {
-                        flex: 1,
-                        paddingVertical: px(9),
-                        borderRadius: px(10),
-                        backgroundColor: selected ? AMBER : '#F3F4F6',
-                        borderColor: selected ? AMBER : '#E5E7EB',
-                      },
-                    ]}>
-                    <PartnerText
-                      style={{
-                        textAlign: 'center',
-                        fontSize: px(12),
-                        fontWeight: selected ? '800' : '600',
-                        color: selected ? INK : '#4B5563',
-                      }}>
-                      {type}
-                    </PartnerText>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Submit Action */}
-          <Pressable
-            disabled={submitting || !onboardingProofToken || !fullName.trim() || !licenseNo.trim()}
-            onPress={handleSubmitStaffDriver}
-            style={[
-              styles.primaryButton,
-              {
-                height: px(48),
-                borderRadius: px(12),
-                backgroundColor: onboardingProofToken && fullName.trim() && licenseNo.trim() ? AMBER : '#E5E7EB',
-                opacity: submitting ? 0.7 : 1,
-              },
-            ]}>
-            {submitting ? (
-              <ActivityIndicator color={INK} />
-            ) : (
-              <>
-                <UserCheck size={px(18)} color={INK} strokeWidth={2.4} />
-                <PartnerText style={{ color: INK, fontSize: px(14), fontWeight: '800', marginLeft: px(8) }}>
-                  Add Driver to Fleet
-                </PartnerText>
-              </>
-            )}
-          </Pressable>
-        </View>
-      ) : null}
-
       {/* Pending Drivers Section if any */}
       {pendingMembers.length > 0 ? (
         <View style={{ marginBottom: px(16) }}>
@@ -792,18 +454,103 @@ export default function VendorDriverMembershipsScreen() {
       )}
     </AppScreenLayout>
     {partnerDialog}
+
+    {/* Job picker sheet — multiple open jobs, vendor chooses (no auto-select) */}
+    <Modal transparent animationType="slide" visible={assignPickerVisible} onRequestClose={() => setAssignPickerVisible(false)}>
+      <Pressable style={memberMenuStyles.overlay} onPress={() => setAssignPickerVisible(false)}>
+        <Pressable style={[memberMenuStyles.sheet, { paddingBottom: px(14) }]} onPress={e => e.stopPropagation()}>
+          <View style={[memberMenuStyles.handle, { marginTop: px(10) }]} />
+          <PartnerText style={[memberMenuStyles.title, { fontSize: px(16), marginTop: px(10) }]}>
+            Assign {assignPickerDriver?.driverName ?? 'driver'} to which job?
+          </PartnerText>
+          <PartnerText style={[memberMenuStyles.subtitle, { fontSize: px(12), marginBottom: px(6) }]}>
+            {assignPickerJobs.length} open job{assignPickerJobs.length === 1 ? '' : 's'} — tap to choose
+          </PartnerText>
+          <ScrollView style={{ maxHeight: px(380), width: '100%' }}>
+            {assignPickerJobs.map(job => (
+              <Pressable
+                key={job.id}
+                accessibilityRole="button"
+                onPress={() => {
+                  setAssignPickerVisible(false);
+                  if (assignPickerDriver) jumpToAssignJob(job, assignPickerDriver.driverId);
+                }}
+                style={({ pressed }) => [memberMenuStyles.option, pressed && memberMenuStyles.optionPressed, { alignItems: 'flex-start' }]}>
+                <PartnerText style={{ fontSize: px(13.5), fontWeight: '800', color: INK }}>
+                  #{job.bookingNumber || job.id.slice(-6)} · {job.serviceLabel || (job.bookingType === 'towing' ? 'Towing' : 'Driver hire')}
+                </PartnerText>
+                <PartnerText style={{ fontSize: px(11.5), color: MUTED, marginTop: px(2) }} numberOfLines={1}>
+                  {job.pickup?.address ?? 'Pickup'} → {job.dropoff?.address ?? 'Drop'}
+                </PartnerText>
+                {job.estimatedFare != null ? (
+                  <PartnerText style={{ fontSize: px(11.5), color: '#D97706', fontWeight: '800', marginTop: px(2) }}>
+                    ₹{job.estimatedFare.toLocaleString('en-IN')}
+                  </PartnerText>
+                ) : null}
+              </Pressable>
+            ))}
+          </ScrollView>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setAssignPickerVisible(false)}
+            style={({ pressed }) => [memberMenuStyles.closeButton, pressed && memberMenuStyles.optionPressed]}>
+            <PartnerText style={[memberMenuStyles.closeText, { fontSize: px(14) }]}>Cancel</PartnerText>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
+  headerPad: {
+    paddingHorizontal: 12,
+    paddingTop: spacing.xs,
+    paddingBottom: 10,
     backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8E8E8',
   },
-  title: { color: INK, fontWeight: '800' },
-  subtitle: { color: MUTED, marginTop: 2 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
+  },
+  listBackButton: {
+    width: 36,
+    alignItems: 'flex-start',
+    paddingLeft: 6,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  title: {
+    textAlign: 'left',
+    fontSize: 18,
+    fontWeight: typography.weights.extrabold,
+    color: colors.dark,
+  },
+  subtitle: {
+    marginTop: 2,
+    color: colors.grey,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
+  },
+  registerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  registerLabel: {
+    color: colors.dark,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.sm,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   grow: { flex: 1 },
   avatar: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF7E5' },

@@ -1091,6 +1091,11 @@ export default function DriverJobsScreen({ navigation }: Props) {
     profile?.reviewStatus !== 'REJECTED' &&
     verification.state !== 'rejected' &&
     verification.state !== 'suspended';
+  const isVendorStaff =
+    profile?.driverContext === 'VENDOR_MANAGED' ||
+    Boolean(profile?.driverProfile?.vendorUserId) ||
+    Boolean(profile?.vendorUserId) ||
+    profile?.driverProfile?.fleetSource === 'vendor';
   const {
     data: jobs = [],
     isLoading: jobsLoading,
@@ -1102,7 +1107,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
     isLoading: offersLoading,
     isError: offersError,
     refetch: refetchOffers,
-  } = useDriverJobOffersQuery(isOperational);
+  } = useDriverJobOffersQuery(isOperational && !isVendorStaff);
   const {
     data: activeJob,
     isLoading: activeLoading,
@@ -1115,12 +1120,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const unreadNotifCount = notifData?.unreadCount ?? 0;
 
   const [segment, setSegment] = useState<Segment>('available');
-
-  const isVendorStaff =
-    profile?.driverContext === 'VENDOR_MANAGED' ||
-    Boolean(profile?.driverProfile?.vendorUserId) ||
-    Boolean(profile?.vendorUserId) ||
-    profile?.driverProfile?.fleetSource === 'vendor';
 
   useEffect(() => {
     if (isVendorStaff && segment === 'available') {

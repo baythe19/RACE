@@ -87,6 +87,42 @@ router.get(
 
     // Remote (GCS) URL: allowed only for authorised callers. Proxy with a
     // server-side fetch so the raw object URL/ACL never has to be public.
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      throw new AppError('Invalid document URL format', 400);
+    }
+
+    if (parsedUrl.protocol !== 'https:' && parsedUrl.protocol !== 'http:') {
+      throw new AppError('Only HTTP/HTTPS document URLs are supported', 400);
+    }
+
+    const host = parsedUrl.hostname.toLowerCase();
+    if (
+      host === 'localhost' ||
+      host === '127.0.0.1' ||
+      host === '::1' ||
+      host === '169.254.169.254' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(host)
+    ) {
+      throw new AppError('Requests to internal network hosts are forbidden', 403);
+    }
+
+    const allowedDomains = [
+      'storage.googleapis.com',
+      'storage.cloud.google.com',
+      'amazonaws.com',
+      'render.com',
+      'onrender.com',
+      'raceservice.in',
+    ];
+    if (!allowedDomains.some((d) => host === d || host.endsWith(`.${d}`))) {
+      throw new AppError('Untrusted remote document host', 403);
+    }
+
     const res2 = await fetch(url, { signal: AbortSignal.timeout(15_000) });
     if (!res2.ok) throw new AppError('Document not reachable', 404);
     res.setHeader('Content-Type', res2.headers.get('content-type') ?? 'application/octet-stream');

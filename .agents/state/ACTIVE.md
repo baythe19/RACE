@@ -5,7 +5,116 @@
 
 ---
 
-## Latest session — RACE Platform 360° Multi-Perspective Master Audit across Partner, Customer, Admin & Backend (2026-10-26, branch v7.0.0-major-update)
+## Latest session — Phase 4 Dynamic KYC Binding, Tiered Cancellation Refund Modal & Master Audit Checklist Sync (2026-10-26, branch v7.0.0-major-update)
+
+- **Phase 4 Implementation Completed & 100% Verified:**
+  1. **Dynamic Document KYC Status Binding ([PartnerDocumentsScreen.tsx](file:///workspaces/RACE/mobile%20application/src/screens/partner/account/PartnerDocumentsScreen.tsx)):**
+     - Replaced hardcoded `'Approved'` states in `REQUIRED_DOCS` with live dynamic binding to partner user profile documents (`user.driverProfile?.documents`, `user.driverProfile?.policeVerificationStatus`, or vendor profile documents).
+     - Dynamically computes document badges: `Approved` (`VERIFIED`), `Under Review` (`PENDING`), or `Action Required` (`REJECTED` or missing required).
+     - Added dynamic, high-contrast banner variants (`bannerApproved`, `bannerReview`, `bannerAction`) providing clear compliance status while preserving non-blocking partner operations.
+  2. **Multi-Tier Cancellation Refund Policy Modal ([CancellationRefundPolicyModal.tsx](file:///workspaces/RACE/customer%20application/src/components/booking/CancellationRefundPolicyModal.tsx)):**
+     - Designed and implemented a dedicated customer cancellation modal featuring transparent 3-stage refund schedule:
+       - Tier 1: Free cancellation within 5 minutes or before driver assignment (100% full refund).
+       - Tier 2: Driver dispatched/en-route (50% refund / nominal dispatch deduction).
+       - Tier 3: Driver arrived at pickup / trip in-progress (Non-refundable advance).
+     - Automatically highlights the active tier corresponding to the booking's current status and policy preview.
+     - Provides clear breakdown calculation (Advance Paid, Cancellation Fee, Net Refund Due), reason selection chips, and non-destructive "Keep Booking" primary action.
+     - Integrated into [BookingDetailScreen.tsx](file:///workspaces/RACE/customer%20application/src/screens/bookings/BookingDetailScreen.tsx).
+  3. **Master Audit Report Final Sync ([RACE_PLATFORM_360_MASTER_AUDIT_REPORT.md](file:///workspaces/RACE/docs/audit/RACE_PLATFORM_360_MASTER_AUDIT_REPORT.md)):**
+     - Updated Section 5 Granular Verification Checklist marking all 32 core capabilities and remediated items as `VERIFIED [x]` with exact implementation and verification references.
+     - Updated Section 7 Roadmap and Mermaid Gantt timeline to reflect 100% completion across all 4 remediation phases.
+- **Surface Health & Verification:**
+  - `backend/`: `npm run lint` -> **0 errors (Exit 0)**.
+  - `mobile application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `customer application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `race-admin/apps/admin-web/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - Test Suite: [verify-phase4-kyc-binding-and-tiered-cancellation.ts](file:///workspaces/RACE/backend/src/scripts/verify-phase4-kyc-binding-and-tiered-cancellation.ts) -> **100% PASS**.
+
+## Previous session — Phase 3 Commercial Gateway Architecture, Automated Escrow Split & Multi-Node Sockets (2026-10-26, branch v7.0.0-major-update)
+
+- **Phase 3 Implementation Completed & 100% Verified:**
+  1. **Cryptographic Payment Gateway Webhook Engine ([paymentWebhook.ts](file:///workspaces/RACE/backend/src/services/src/payments/paymentWebhook.ts)):**
+     - Implemented HMAC SHA256 signature verification (`verifyWebhookSignature`) preventing client-side payment forgery.
+     - Handled server-to-server gateway webhooks (Razorpay, Cashfree, Stub) for advance (`CONFIRMED`) and final (`FULLY_PAID`) transitions.
+     - Mounted unauthenticated, HMAC-verified webhook endpoint at `POST /api/v1/payments/webhook` ([bookingPaymentRoutes.ts](file:///workspaces/RACE/backend/src/controller/src/bookingPaymentRoutes.ts)).
+  2. **Automated Vendor Payout Disbursement Engine (85/15 Escrow Split) ([escrowSettlement.ts](file:///workspaces/RACE/backend/src/services/src/payments/escrowSettlement.ts)):**
+     - Implemented automated 85% vendor payout / 15% platform commission settlement upon trip completion OTP verification and webhook confirmation.
+     - Automatically creates `VENDOR_PAYOUT` and `COMMISSION` ledger records in `TransactionModel`.
+     - Guaranteed strictly idempotent against duplicate disbursements via `bookingId` + `type: 'VENDOR_PAYOUT'` lookups.
+     - Integrated directly into driver trip completion lifecycle in [driver.ts](file:///workspaces/RACE/backend/src/services/src/driver.ts).
+  3. **Multi-Node Socket.IO Redis Adapter ([socket.ts](file:///workspaces/RACE/backend/src/services/src/socket.ts)):**
+     - Installed and integrated `@socket.io/redis-adapter` with `ioredis` in backend.
+     - Configured automatic multi-node clustering for PM2 cluster mode (`instances: 2`) with graceful fallback to in-memory adapter when Redis is offline or during local development.
+- **Surface Health & Verification:**
+  - `backend/`: `npm run lint` -> **0 errors (Exit 0)**.
+  - `mobile application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `customer application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `race-admin/apps/admin-web/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - Regression Suites Verified:
+    - [verify-phase3-gateway-escrow-and-sockets.ts](file:///workspaces/RACE/backend/src/scripts/verify-phase3-gateway-escrow-and-sockets.ts): **100% PASS**
+    - [verify-phase2-security-and-reports.ts](file:///workspaces/RACE/backend/src/scripts/verify-phase2-security-and-reports.ts): **100% PASS**
+    - [verify-driver-payout-account.ts](file:///workspaces/RACE/backend/src/scripts/verify-driver-payout-account.ts): **100% PASS**
+    - [verify-dropoff-payment-and-completion-otp-e2e.ts](file:///workspaces/RACE/backend/src/scripts/verify-dropoff-payment-and-completion-otp-e2e.ts): **100% PASS**
+    - [verify-audit-security-and-cancellation-fixes-e2e.ts](file:///workspaces/RACE/backend/src/scripts/verify-audit-security-and-cancellation-fixes-e2e.ts): **100% PASS**
+
+## Previous session — Phase 2 Feature Polish, UX Dead-End Elimination, Security & Reliability (2026-10-26, branch v7.0.0-major-update)
+
+- **Phase 2 Implementation Completed & 100% Verified:**
+  1. **Expo Camera Barcode Scanning Integration ([QRScanScreen.tsx](file:///workspaces/RACE/customer%20application/src/screens/call/QRScanScreen.tsx)):**
+     - Replaced static demo button with real `CameraView` from `expo-camera`.
+     - Added permission gating (`useCameraPermissions`), permission prompt card, animated viewfinder targeting reticle, `extractVehicleId` payload/URL parser, and demo fallback for headless testing.
+  2. **System Share Sheet & Navigation Exit ([RoadsideHelpOnWayScreen.tsx](file:///workspaces/RACE/customer%20application/src/screens/booking/roadside/RoadsideHelpOnWayScreen.tsx)):**
+     - Wired previously dead "Share Live Location" button with React Native's `Share.share(...)` containing mechanic name, ETA, and emergency helpline.
+     - Added "Done · Go to Bookings" exit action button to prevent customer trap in completed roadside booking screens.
+  3. **Background GPS Tracking Task Registration ([useDriverLocationReporting.ts](file:///workspaces/RACE/mobile%20application/src/hooks/useDriverLocationReporting.ts)):**
+     - Registered background location task `RACE_BACKGROUND_DRIVER_LOCATION_TASK` via Expo `TaskManager` and `expo-location`.
+     - Configured continuous background reporting with Android Foreground Service notification (`notificationTitle`, `notificationColor`) so tracking does not freeze when drivers switch apps or lock screens.
+     - Added required Android permissions (`ACCESS_BACKGROUND_LOCATION`, `FOREGROUND_SERVICE_LOCATION`) and iOS background modes (`location`, `fetch`) in [app.config.js](file:///workspaces/RACE/mobile%20application/app.config.js).
+  4. **Admin Reports & Dashboard Service Distribution ([adminReports.ts](file:///workspaces/RACE/backend/src/services/src/admin/adminReports.ts)):**
+     - Added multi-collection aggregation across `TowingBookingModel` (by `towingMode`: instant, emergency, scheduled) and `DriverBookingModel` (by `driverServiceType`: full_time, part_time, outstation, night).
+     - Formatted and merged service distributions dynamically, resolving empty charts for modern bookings.
+  5. **Security Hardening (PII Masking, SSRF Prevention & Admin Brute-Force):**
+     - Masked cleartext owner and emergency phone numbers in public unauthenticated `GET /api/v1/vehicles/:id/verify` JSON responses ([vehicle.ts](file:///workspaces/RACE/backend/src/controller/src/vehicle.ts)).
+     - Applied `qrRateLimiter` to vehicle verify routes in [vehicleRoutes.ts](file:///workspaces/RACE/backend/src/controller/src/vehicleRoutes.ts).
+     - Protected `/api/v1/documents` proxy against blind SSRF by validating URL protocol and enforcing domain whitelist against cloud metadata and loopback hosts ([documentRoutes.ts](file:///workspaces/RACE/backend/src/controller/src/documentRoutes.ts)).
+     - Implemented `adminAuthRateLimiter` on `/api/v1/admin/auth/login` and upgraded credential verification in [hardcoded-admin.ts](file:///workspaces/RACE/backend/src/config/hardcoded-admin.ts) to `crypto.timingSafeEqual`.
+- **Surface Health & Verification:**
+  - `backend/`: `npm run lint` -> **0 errors (Exit 0)**.
+  - `mobile application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `customer application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `race-admin/apps/admin-web/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - Test Suite: [verify-phase2-security-and-reports.ts](file:///workspaces/RACE/backend/src/scripts/verify-phase2-security-and-reports.ts) -> **100% PASS**.
+
+## Previous session — Phase 1 Critical P0/P1 Remediations Executed & Verified (2026-10-26, branch v7.0.0-major-update)
+
+- **Phase 1 Implementation Completed & 100% Verified:**
+  1. **Item 1 (P0 Security — Completion OTP Gating):**
+     - Eliminated premature completion OTP disclosure in customer response DTOs in [tripOtp.ts](file:///workspaces/RACE/backend/src/services/src/bookings/tripOtp.ts).
+     - Customer completion OTP is strictly hidden until `arrivedAtDropoffAt && paymentConfirmedByCustomer`.
+     - Verified with `verify-dropoff-payment-and-completion-otp-e2e.ts` (100% green).
+  2. **Item 2 (UX / Revenue — Full-Time Driver Lead Capture):**
+     - Created Mongoose model [enquiry.ts](file:///workspaces/RACE/backend/src/models/src/enquiry.ts) with `enquiryNumber`, `serviceType`, and audit history.
+     - Created [enquiry.ts](file:///workspaces/RACE/backend/src/services/src/enquiry.ts) and controller [enquiry.ts](file:///workspaces/RACE/backend/src/controller/src/enquiry.ts) mounted at `/api/v1/enquiries`.
+     - Created [enquiryService.ts](file:///workspaces/RACE/customer%20application/src/services/enquiryService.ts) and wired [DriverEnquiryScreen.tsx](file:///workspaces/RACE/customer%20application/src/screens/booking/driver/DriverEnquiryScreen.tsx) with live backend persistence, reference badge (`Ref #ENQ-...`), and error retry handling.
+  3. **Item 3 (Architectural Duality — Admin Booking Creation):**
+     - Updated `adminBookingsService.create()` in [adminBookings.ts](file:///workspaces/RACE/backend/src/services/src/admin/adminBookings.ts) to instantiate real dispatchable `DriverBookingModel` or `TowingBookingModel` with OTP generation and state management instead of orphaned legacy `BookingModel`.
+  4. **Item 4 (Availability / Scalability — Admin Bookings OOM Memory Elimination):**
+     - Eliminated unbounded `.find().lean()` memory hazard in [adminBookings.ts](file:///workspaces/RACE/backend/src/services/src/admin/adminBookings.ts).
+     - Implemented database-level `buildBookingQuery` with `$limit`, `$skip`, and index-backed `countDocuments()`.
+     - Resolved vendor lookup (`vendorMap`) to populate real `vendorId` and `vendorName` for both booking types.
+  5. **Item 5 (Partner Onboarding — Driver Payout Account 403 Forbidden Fix):**
+     - Added `bankDetails?: VendorBankDetails` to `IDriverProfile` and `DriverProfileSchema` in [userProfileSchema.ts](file:///workspaces/RACE/backend/src/models/src/userProfileSchema.ts).
+     - Updated `vendorService.ts` (`savePayoutAccount` / `getPayoutAccount`) to support both `driver` and `vendor` roles.
+     - Updated [vendorRoutes.ts](file:///workspaces/RACE/backend/src/controller/src/vendorRoutes.ts) to `requireRole('vendor', 'driver')` and added `/payout-account` routes in [driverRoutes.ts](file:///workspaces/RACE/backend/src/controller/src/driverRoutes.ts).
+     - Created and verified with [verify-driver-payout-account.ts](file:///workspaces/RACE/backend/src/scripts/verify-driver-payout-account.ts) (100% green).
+- **Surface Health & Verification:**
+  - `backend/`: `npm run lint` -> **0 errors (Exit 0)**.
+  - `mobile application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `customer application/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - `race-admin/apps/admin-web/`: `npx tsc --noEmit` -> **0 errors (Exit 0)**.
+  - E2E Tests: `verify-dropoff-payment-and-completion-otp-e2e.ts` (100% PASS), `verify-audit-security-and-cancellation-fixes-e2e.ts` (100% PASS).
+
+## Previous session — RACE Platform 360° Multi-Perspective Master Audit across Partner, Customer, Admin & Backend (2026-10-26, branch v7.0.0-major-update)
 
 - **Comprehensive 360-Degree Platform Audit & Artifact Generation:**
   - Evaluated entire RACE ecosystem across 4 surfaces: Partner App (`mobile application/`), Customer App (`customer application/`), Admin Console (`race-admin/apps/admin-web/`), and Backend Core (`backend/`).

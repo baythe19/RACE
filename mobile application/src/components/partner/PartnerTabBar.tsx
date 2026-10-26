@@ -52,7 +52,7 @@ type TabRouteName = keyof PartnerTabParamList;
  * Screens that own the whole viewport: while one of them is focused the bar is
  * hidden so the map and the single primary action keep the full height.
  */
-const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob', 'VendorAssignJob']);
+const FULLSCREEN_ROUTES = new Set(['PartnerActiveJob', 'VendorAssignJob', 'VendorAddDriver']);
 
 const TAB_CONFIG: Record<TabRouteName, { label: string; Icon: LucideIcon }> = {
   PartnerHome: { label: 'Home', Icon: House },
