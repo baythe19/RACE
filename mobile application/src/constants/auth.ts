@@ -14,7 +14,7 @@ export const PARTNER_DEMO_DRIVER_PHONE = '9876543210';
 /** @deprecated Use PARTNER_DEMO_DRIVER_PHONE */
 export const PARTNER_DEMO_PHONE = PARTNER_DEMO_DRIVER_PHONE;
 
-/** @deprecated Fixed OTP removed — backend sends real Twilio SMS OTP. */
+/** @deprecated Fixed OTP removed — backend sends real HanuSMS OTP. */
 export const DEMO_OTP = '';
 
 export const PARTNER_DEMO_DRIVERS = [
