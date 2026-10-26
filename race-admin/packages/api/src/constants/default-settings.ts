@@ -44,7 +44,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     smtpHost: 'smtp.raceservice.com',
     smtpPort: 587,
     smtpUser: 'noreply@raceservice.com',
-    smsProvider: 'Twilio',
+    smsProvider: 'HanuSMS',
     smsApiKey: '••••••••••••',
   },
   appearance: {
