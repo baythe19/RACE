@@ -4,6 +4,7 @@
   "main": "index.ts",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/patch-expo-notifications.js",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",

@@ -1342,7 +1342,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: px(24) }}>
+        contentContainerStyle={{ paddingBottom: px(24), flexGrow: 1 }}>
         {/* counts ------------------------------------------------------- */}
         <View
           style={{
@@ -1441,7 +1441,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         </View>
 
         {/* list --------------------------------------------------------- */}
-        <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(12) }}>
+        <View style={{ paddingHorizontal: px(M.pagePadding), marginTop: px(12), flex: 1 }}>
           {initialLoading ? (
             <JobsSkeleton px={px} />
           ) : !isOperational ? (
@@ -1652,6 +1652,8 @@ function EmptyState({
     <View
       style={{
         alignItems: 'center',
+        justifyContent: 'center',
+        flex: 1,
         paddingVertical: px(36),
         paddingHorizontal: px(20),
         marginTop: px(8),

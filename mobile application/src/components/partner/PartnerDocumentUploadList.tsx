@@ -6,6 +6,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Check, CloudUpload, FileText, MoreHorizontal, type LucideIcon } from 'lucide-react-native';
 import PartnerUploadSheet from './dialogs/PartnerUploadSheet';
+import PartnerCameraPrimerSheet from './dialogs/PartnerCameraPrimerSheet';
 import { colors, radius, spacing, typography } from '../../theme';
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -57,6 +58,7 @@ export default function PartnerDocumentUploadList({
     options: Array<{ label: string; onPress: () => void }>;
   } | null>(null);
   const [activeDoc, setActiveDoc] = useState<PartnerDocumentFieldConfig | null>(null);
+  const [cameraPrimerVisible, setCameraPrimerVisible] = useState(false);
   const [preview, setPreview] = useState<PartnerDocumentSelection | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(false);
@@ -127,6 +129,12 @@ export default function PartnerDocumentUploadList({
   const chooseSource = (source: PickerSource) => {
     if (!activeDoc) return;
     const doc = activeDoc;
+    // Camera gets a branded primer first; the OS permission dialog follows it.
+    if (source === 'camera') {
+      setActiveDoc(null);
+      setCameraPrimerVisible(true);
+      return;
+    }
     pendingAction.current = () => {
       if (doc.alternatives?.length) {
         setAltDialog({
@@ -236,6 +244,18 @@ export default function PartnerDocumentUploadList({
         onPreview={() => {
           const file = activeDoc && selectedFor(activeDoc);
           if (file) pendingAction.current = () => showPreview(file);
+        }}
+      />
+      <PartnerCameraPrimerSheet
+        visible={cameraPrimerVisible}
+        forLabel={activeDoc?.label}
+        onAllow={() => {
+          setCameraPrimerVisible(false);
+          flushAction();
+        }}
+        onClose={() => {
+          setCameraPrimerVisible(false);
+          pendingAction.current = null;
         }}
       />
       <Modal visible={Boolean(preview)} transparent animationType="fade" onRequestClose={() => setPreview(null)}>

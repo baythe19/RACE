@@ -28,6 +28,12 @@ type Props = {
   edges?: Edge[];
   refreshing?: boolean;
   onRefresh?: () => void;
+  /**
+   * Let the scroll content stretch to at least the full height
+   * (`contentContainerStyle.flexGrow = 1`) so sparse content — e.g. empty
+   * states — can center itself vertically with `justifyContent`.
+   */
+  growContent?: boolean;
 };
 
 export default function AppScreenLayout({
@@ -43,6 +49,7 @@ export default function AppScreenLayout({
   edges = ['top'],
   refreshing = false,
   onRefresh,
+  growContent = false,
 }: Props) {
   const insets = useSafeAreaInsets();
   const px = useScreenPx();
@@ -69,6 +76,7 @@ export default function AppScreenLayout({
           paddingHorizontal: paddingX,
           paddingBottom: px(20) + insets.bottom,
         },
+        growContent && styles.growContent,
         contentStyle,
       ]}>
       {children}
@@ -116,5 +124,8 @@ const styles = StyleSheet.create({
   },
   flex: {
     flex: 1,
+  },
+  growContent: {
+    flexGrow: 1,
   },
 });

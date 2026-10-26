@@ -7,10 +7,14 @@
 
 ## Latest session — Universal HanuSMS Routing, Outer-App Lockscreen Notifications, Pre-Trip Vehicle Damage Inspection & Production Runbooks (2026-10-26, branch v7.0.0-major-update)
 
-- **Universal HanuSMS Routing Across All Surfaces:**
-  - Configured `backend/src/services/src/otp.ts` so HanuSMS (`https://api.hanuotp.in/sms-otp.php`) is strictly and exclusively the sole external SMS route across all roles (`customer`, `vendor`, `driver`, `admin`).
-  - Completely deactivated MessageCentral in production; local-dev fallback retained only when unconfigured in local development.
-  - Added `admin` to default `hanuRoles` (`customer,vendor,driver,admin`).
+- **Complete Purge of MessageCentral & Legacy SMS Services (Solely HanuSMS):**
+  - Completely removed all MessageCentral code (`mcSendOtp`, `mcValidateOtp`, `isMcConfigured`, `getMcConfig`, `isMcExpiredSignal`) from `backend/src/utils/src/sms.ts`.
+  - Wiped MessageCentral verification logic and `mcVerificationId` checks from `backend/src/services/src/otp.ts` and `backend/src/services/src/authRepository.ts`.
+  - Purged `mcVerificationId`, `mcVerificationIdHash`, and `'messagecentral'` enum from `backend/src/models/src/otpLog.ts`.
+  - Removed `MC_CUSTOMER_ID`, `MC_AUTH_TOKEN`, `MC_BASE_URL`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` from `backend/src/config/env.ts`, `backend/.env`, and `backend/.env.example`.
+  - Enforced `HANU_API_KEY` strictly in `backend/src/config/productionGuard.ts`.
+  - Cleaned MessageCentral error identifiers from `customer application/src/utils/humanizeApiError.ts`.
+  - Updated admin default SMS settings provider to `'HanuSMS'`.
 - **Outer-App & Lock-Screen Notifications (`expo-notifications`):**
   - Installed `expo-notifications@~57.0.21` across both `mobile application/` and `customer application/`.
   - Configured Android high-priority notification channels (`dispatch_urgent` with `AndroidImportance.MAX`, `lockscreenVisibility: AndroidNotificationVisibility.PUBLIC`, vibration pattern, sound, bypassDnd).

@@ -13,12 +13,12 @@ module.exports = {
     owner: 'webstarts',
     version: '1.0.0',
     orientation: 'portrait',
-    icon: './src/assets/images/logo.png',
+    icon: './src/assets/images/icon-1024.png',
     userInterfaceStyle: 'light',
     splash: {
-      image: './src/assets/images/logo.png',
+      image: './src/assets/images/splash-icon.png',
       resizeMode: 'contain',
-      backgroundColor: '#232323',
+      backgroundColor: '#FFFFFF',
     },
     ios: {
       bundleIdentifier: 'com.racecar.customer',
@@ -33,8 +33,8 @@ module.exports = {
       versionCode: 5,
       softwareKeyboardLayoutMode: 'resize',
       adaptiveIcon: {
-        foregroundImage: './src/assets/images/logo.png',
-        backgroundColor: '#232323',
+        foregroundImage: './src/assets/images/icon-1024.png',
+        backgroundColor: '#F5A800',
       },
       config: {
         googleMaps: {

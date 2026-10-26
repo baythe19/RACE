@@ -8,4 +8,3 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|----------------|
-

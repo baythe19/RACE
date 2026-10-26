@@ -30,7 +30,10 @@ export default function BrandLogo({ size = 'medium', style }: BrandLogoProps) {
     <View style={[styles.wrap, style]}>
       <Image
         source={images.logo}
-        style={{ width: dimension, height: dimension } as ImageStyle}
+        style={{
+          width: dimension,
+          height: dimension * (230 / 480),
+        } as ImageStyle}
         resizeMode="contain"
         accessibilityLabel="RACE Service logo"
       />

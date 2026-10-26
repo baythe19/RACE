@@ -884,9 +884,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   summaryTileIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -895,17 +895,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   summaryTileCount: {
-    fontSize: typography.sizes.lg,
+    fontSize: typography.sizes.md,
     fontWeight: typography.weights.extrabold,
   },
   summaryTileTitle: {
     color: colors.dark,
     fontWeight: typography.weights.bold,
-    fontSize: typography.sizes.sm,
+    fontSize: 12.5,
   },
   summaryTileMeta: {
     color: colors.grey,
-    fontSize: 10,
+    fontSize: 9,
     marginTop: 1,
   },
   summaryCard: {
@@ -961,6 +961,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
     gap: spacing.md,
     backgroundColor: PAGE_BG,
+    /** Empty list: stretch to full height so flexGrow can center the empty state. */
+    flexGrow: 1,
   },
   tab: {
     height: 30,
@@ -1271,7 +1273,8 @@ const styles = StyleSheet.create({
   },
   emptyInline: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    justifyContent: 'center',
+    flex: 1,
     paddingHorizontal: spacing.md,
   },
   iconWrap: {
