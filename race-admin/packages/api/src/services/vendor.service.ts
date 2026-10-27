@@ -50,11 +50,11 @@ export async function exportVendorsCsv(filters: VendorListFilters = {}) {
   return result.items;
 }
 
-export async function createVendor(input: Record<string, string>) {
+export async function createVendor(input: Record<string, string | undefined>) {
   return apiPost<VendorListItem>('/vendors', input);
 }
 
-export async function updateVendor(id: string, input: Record<string, string>) {
+export async function updateVendor(id: string, input: Record<string, string | undefined>) {
   return apiPatch<VendorListItem>(`/vendors/${id}`, input);
 }
 
