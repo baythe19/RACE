@@ -4,12 +4,29 @@ import type { VendorProfileResponse, VendorRegistrationRequest } from '../../typ
 import { apiClient } from '../api/apiClient';
 import { store } from '../../redux/store';
 
+/** driverProfile.dateOfBirth arrives as DD/MM/YYYY from the wizard; the API wants ISO. */
+function normalizeDriverProfile<T extends { driverProfile?: { dateOfBirth?: string } }>(
+  payload: T,
+): T {
+  const dob = payload.driverProfile?.dateOfBirth;
+  if (!dob || /^\d{4}-\d{2}-\d{2}$/.test(dob)) return payload;
+  const dmy = dob.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+  if (!dmy) return payload;
+  return {
+    ...payload,
+    driverProfile: {
+      ...payload.driverProfile,
+      dateOfBirth: `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`,
+    },
+  };
+}
+
 export async function saveVendorDraft(
   payload: Partial<VendorRegistrationRequest> & { vendorType: VendorRegistrationRequest['vendorType'] },
 ): Promise<VendorProfileResponse> {
   const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
     `${API_ENDPOINTS.vendorDraft}`,
-    payload,
+    normalizeDriverProfile(payload),
   );
   return data.data;
 }
@@ -19,7 +36,7 @@ export async function registerVendor(
 ): Promise<VendorProfileResponse> {
   const { data } = await apiClient.post<ApiSuccessResponse<VendorProfileResponse>>(
     API_ENDPOINTS.vendorRegister,
-    payload,
+    normalizeDriverProfile(payload),
   );
   return data.data;
 }

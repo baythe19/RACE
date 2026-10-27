@@ -37,7 +37,7 @@ import { setCustomerOnboardingStep } from '../../store/customerOnboarding';
 import { useSignupDraftStore } from '../../store/signupDraftStore';
 import type { AuthStackParamList } from '../../types/navigation';
 import { getApiErrorMessage } from '../../services/api';
-import { buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
+import { apiDateToDisplay, buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
 import { colors, shadows, typography } from '../../theme';
 
 const REF_W = 390;
@@ -87,7 +87,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
 
     if (!profile) return;
 
-    setDob(profile.dateOfBirth ?? '');
+    setDob(apiDateToDisplay(profile.dateOfBirth));
     if (profile.gender) {
       const label = profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1);
       setGender(label === 'Prefer_not_to_say' ? 'Other' : label);

@@ -68,7 +68,7 @@ export default function BusinessInfoStep({ draft, onChange, isCompany }: Props) 
                 driverProfile: { ...draft.driverProfile, dateOfBirth: v },
               })
             }
-            placeholder="YYYY-MM-DD"
+            placeholder="DD/MM/YYYY"
           />
           <FormField
             dark

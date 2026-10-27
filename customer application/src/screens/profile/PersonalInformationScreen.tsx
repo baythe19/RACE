@@ -21,7 +21,7 @@ import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/P
 import { EMERGENCY_RELATIONSHIP_OPTIONS } from '../../constants/profileForm';
 import { useProfileStore } from '../../store/profileStore';
 import { getApiErrorMessage } from '../../services/api';
-import { buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
+import { apiDateToDisplay, buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
 import { colors, shadows, typography } from '../../theme';
 
 function formatRelationship(value?: string): string {
@@ -61,7 +61,7 @@ export default function PersonalInformationScreen() {
     if (!profile) return;
     setName(profile.fullName ?? '');
     setEmail(profile.email ?? '');
-    setDob(profile.dateOfBirth ?? '');
+    setDob(apiDateToDisplay(profile.dateOfBirth));
     setGender(profile.gender ?? '');
     setEmergency({
       name: profile.emergencyContact?.name ?? '',

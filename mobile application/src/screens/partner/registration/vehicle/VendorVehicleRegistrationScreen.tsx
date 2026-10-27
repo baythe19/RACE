@@ -98,18 +98,25 @@ function readNoteValue(note: string | undefined, key: string) {
   );
 }
 
-function isValidDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
+/** User types DD/MM/YYYY; returns true when the masked input is a real date. */
+function isValidDdMmYyyy(value: string) {
+  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return false;
+  const [day, month, year] = value.split('/').map(Number);
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
 }
 
+function ddMmYyyyToApi(value: string) {
+  const [day, month, year] = value.split('/');
+  return `${year}-${month}-${day}`;
+}
+
+/** Mask input as DD/MM/YYYY while typing */
 function maskDate(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 4) return digits;
-  if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
 }
 
 export default function VendorVehicleRegistrationScreen() {
@@ -169,7 +176,10 @@ export default function VendorVehicleRegistrationScreen() {
     setRcNumber(readNoteValue(editingVehicle.maintenanceNote, 'RC'));
     setInsuranceProvider(readNoteValue(editingVehicle.maintenanceNote, 'Insurer'));
     setInsurancePolicyNumber(readNoteValue(editingVehicle.maintenanceNote, 'Policy'));
-    setInsuranceExpiry(editingVehicle.insuranceExpiry?.slice(0, 10) ?? '');
+    const apiExpiry = editingVehicle.insuranceExpiry?.slice(0, 10) ?? '';
+    // API date is YYYY-MM-DD; the form shows DD/MM/YYYY
+    const [ey, em, ed] = apiExpiry.split('-');
+    setInsuranceExpiry(ey && em && ed ? `${ed}/${em}/${ey}` : '');
     const existingDocuments = (editingVehicle.documents ?? []).map(document => ({
       id: document.type as VendorVehicleDocumentType,
       uri: document.url,
@@ -187,8 +197,10 @@ export default function VendorVehicleRegistrationScreen() {
   }, [drivers, editingVehicle, initializedVehicleId, vehicleId]);
 
   const assignedDriverName = drivers.find(driver => driver.id === assignedDriverId)?.name ?? '';
+  /** RACE policy: vehicles older than 15 years are not allowed on the platform. */
+  const OLDEST_VEHICLE_YEAR = THIS_YEAR - 15;
   const yearOptions = useMemo(
-    () => Array.from({ length: THIS_YEAR - 1979 }, (_, index) => String(THIS_YEAR - index)),
+    () => Array.from({ length: THIS_YEAR - OLDEST_VEHICLE_YEAR + 1 }, (_, index) => String(THIS_YEAR - index)),
     [],
   );
   const availableDrivers = drivers.filter(
@@ -224,8 +236,8 @@ export default function VendorVehicleRegistrationScreen() {
     if (model.trim() && model.trim().length < 2) {
       next.model = 'Model name looks too short';
     }
-    if (year && (!/^\d{4}$/.test(year) || Number(year) < 1980 || Number(year) > THIS_YEAR)) {
-      next.year = `Enter a year between 1980 and ${THIS_YEAR}`;
+    if (year && (!/^\d{4}$/.test(year) || Number(year) < OLDEST_VEHICLE_YEAR || Number(year) > THIS_YEAR)) {
+      next.year = `Vehicle must be ${THIS_YEAR - OLDEST_VEHICLE_YEAR} years old or newer (year ${OLDEST_VEHICLE_YEAR} onwards)`;
     }
     setErrors(current => ({
       ...current,
@@ -239,8 +251,8 @@ export default function VendorVehicleRegistrationScreen() {
 
   const validateRegistration = () => {
     const next: Record<string, string> = {};
-    if (insuranceExpiry && !isValidDate(insuranceExpiry)) {
-      next.insuranceExpiry = 'Enter a real date in YYYY-MM-DD format (e.g. 2027-03-31)';
+    if (insuranceExpiry && !isValidDdMmYyyy(insuranceExpiry)) {
+      next.insuranceExpiry = 'Enter a real date in DD/MM/YYYY format (e.g. 31/03/2027)';
     }
     setErrors(current => ({ ...current, insuranceExpiry: next.insuranceExpiry ?? '' }));
     return Object.keys(next).length === 0;
@@ -294,7 +306,7 @@ export default function VendorVehicleRegistrationScreen() {
             type,
             model: model.trim(),
             year: year ? Number(year) : null,
-            insuranceExpiry: insuranceExpiry || null,
+            insuranceExpiry: insuranceExpiry ? ddMmYyyyToApi(insuranceExpiry) : null,
             maintenanceNote: insuranceMeta(),
           },
         });
@@ -309,7 +321,7 @@ export default function VendorVehicleRegistrationScreen() {
           rcNumber: rcNumber.trim().toUpperCase() || undefined,
           insuranceProvider: insuranceProvider.trim() || undefined,
           insurancePolicyNumber: insurancePolicyNumber.trim() || undefined,
-          insuranceExpiry: insuranceExpiry || undefined,
+          insuranceExpiry: insuranceExpiry ? ddMmYyyyToApi(insuranceExpiry) : undefined,
         });
         savedVehicleId = created.id;
         setCreatedVehicleId(created.id);
@@ -637,7 +649,7 @@ export default function VendorVehicleRegistrationScreen() {
               onChangeText={text => setInsuranceExpiry(maskDate(text))}
               keyboardType="number-pad"
               error={errors.insuranceExpiry}
-              placeholder="YYYY-MM-DD"
+              placeholder="DD/MM/YYYY"
               Icon={Calendar}
               variant="outlined"
             />
@@ -675,7 +687,9 @@ export default function VendorVehicleRegistrationScreen() {
             <View style={styles.sheetHeader}>
               <View>
                 <PartnerText style={styles.sheetTitle}>Manufacturing year</PartnerText>
-                <PartnerText style={styles.documentGroupHint}>Choose the year printed on the vehicle papers.</PartnerText>
+                <PartnerText style={styles.documentGroupHint}>
+                  Vehicles older than {THIS_YEAR - OLDEST_VEHICLE_YEAR} years ({OLDEST_VEHICLE_YEAR} se pehle) are not allowed.
+                </PartnerText>
               </View>
               <Pressable hitSlop={8} onPress={() => setYearPickerOpen(false)} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close year picker">
                 <X size={18} color={colors.grey} strokeWidth={2.3} />

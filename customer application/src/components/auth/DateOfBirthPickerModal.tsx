@@ -9,7 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 
-import { DOB_MIN_DATE, formatDateApi, getDobMaxDate, parseDob } from '../../utils/date';
+import { DOB_MIN_DATE, getDobMaxDate, parseDob } from '../../utils/date';
 import { typography } from '../../theme';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -243,7 +243,10 @@ export default function DateOfBirthPickerModal({
       return;
     }
 
-    onConfirm(formatDateApi(nextDate));
+    // Emit DD/MM/YYYY — the user-facing date format across the app.
+    const dd = String(clamped.day).padStart(2, '0');
+    const mm = String(clamped.month).padStart(2, '0');
+    onConfirm(`${dd}/${mm}/${clamped.year}`);
     onClose();
   };
 

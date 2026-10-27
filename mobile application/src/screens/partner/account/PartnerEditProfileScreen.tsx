@@ -32,7 +32,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
 
   const [fullName, setFullName] = useState(profile?.fullName || user?.fullName || 'Partner');
   const [email, setEmail] = useState(profile?.email || user?.email || '');
-  const [dob, setDob] = useState('29 Jun 1998');
+  const [dob, setDob] = useState('');
   const [city, setCity] = useState(profile?.address?.city || 'Bhubaneswar');
   const [address, setAddress] = useState(
     profile?.address?.line1 || 'Station Square, Bhubaneswar, Odisha',
@@ -151,6 +151,11 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
     if (profile?.address?.line1) {
       setAddress(profile.address.line1);
     }
+    if (profile?.dateOfBirth) {
+      // API date (YYYY-MM-DD) shown as DD/MM/YYYY
+      const [y, m, d] = profile.dateOfBirth.slice(0, 10).split('-');
+      if (y && m && d) setDob(`${d}/${m}/${y}`);
+    }
   }, [profile, user]);
 
   const handleAddLanguage = () => {
@@ -177,7 +182,12 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
         fullName: fullName.trim(),
         email: email.trim() || undefined,
         gender: profile?.gender ?? 'male',
-        dateOfBirth: '1998-06-29',
+        dateOfBirth: (() => {
+          // Typed DD/MM/YYYY → API ISO; keep prior value when untouched/invalid
+          const m = dob.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+          return /^\d{4}-\d{2}-\d{2}$/.test(dob.trim()) ? dob.trim() : profile?.dateOfBirth ?? '1998-06-29';
+        })(),
         emergencyContact: profile?.emergencyContact ?? {
           name: 'Emergency Contact',
           mobileNumber: '9988776655',
@@ -315,7 +325,7 @@ export default function PartnerEditProfileScreen({ navigation }: Props) {
               style={styles.inputIconText}
               value={dob}
               onChangeText={setDob}
-              placeholder="DD MMM YYYY"
+              placeholder="DD/MM/YYYY"
               placeholderTextColor={driverColors.greySoft}
             />
           </View>
