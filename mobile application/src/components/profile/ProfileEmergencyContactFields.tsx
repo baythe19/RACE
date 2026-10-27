@@ -1,5 +1,7 @@
-import React from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
+import { PartnerText } from '../partner/PartnerText';
+import React, { useState } from 'react';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { ChevronDown, Phone, User } from 'lucide-react-native';
 
 import FormField from '../auth/FormField';
@@ -29,35 +31,24 @@ export default function ProfileEmergencyContactFields({
   scale = 1,
 }: ProfileEmergencyContactFieldsProps) {
   const px = (n: number) => Math.round(n * scale);
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
+  const [relDialogOpen, setRelDialogOpen] = useState(false);
 
   const handleRelationshipPress = () => {
-    Alert.alert(
-      'Select Relationship',
-      '',
-      [
-        ...EMERGENCY_RELATIONSHIP_OPTIONS.map(option => ({
-          text: option,
-          onPress: () => {
-            onChange({ relationship: option });
-            onClearError?.('emergencyRelationship');
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-    );
+    setRelDialogOpen(true);
   };
 
   return (
     <View>
       <View style={{ marginBottom: px(12) }}>
-        <Text
+        <PartnerText
           style={{
             fontSize: px(14),
             fontWeight: typography.weights.bold,
             color: colors.dark,
           }}>
           Emergency Contact
-        </Text>
+        </PartnerText>
       </View>
 
       <FormField
@@ -114,6 +105,81 @@ export default function ProfileEmergencyContactFields({
           </Pressable>
         }
       />
+
+      {/* Relationship chooser (replaces system Alert options) */}
+      <Modal transparent animationType="fade" visible={relDialogOpen} onRequestClose={() => setRelDialogOpen(false)}>
+        <Pressable style={relStyles.overlay} onPress={() => setRelDialogOpen(false)}>
+          <Pressable style={relStyles.sheet} onPress={e => e.stopPropagation()}>
+            <PartnerText style={relStyles.title}>Select Relationship</PartnerText>
+            {EMERGENCY_RELATIONSHIP_OPTIONS.map(option => (
+              <Pressable
+                key={option}
+                accessibilityRole="button"
+                onPress={() => {
+                  setRelDialogOpen(false);
+                  onChange({ relationship: option });
+                  onClearError?.('emergencyRelationship');
+                }}
+                style={({ pressed }) => [relStyles.option, pressed && relStyles.optionPressed]}>
+                <PartnerText style={relStyles.optionText}>{option}</PartnerText>
+              </Pressable>
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setRelDialogOpen(false)}
+              style={({ pressed }) => [relStyles.option, relStyles.closeRow, pressed && relStyles.optionPressed]}>
+              <PartnerText style={relStyles.closeText}>Cancel</PartnerText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      {partnerDialog}
     </View>
   );
 }
+
+const relStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,18,25,0.45)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#191919',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  option: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F5F9',
+  },
+  optionPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  optionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#191919',
+  },
+  closeRow: {
+    marginTop: 4,
+  },
+  closeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+});

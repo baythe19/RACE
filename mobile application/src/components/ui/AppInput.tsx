@@ -1,14 +1,6 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type StyleProp,
-  type TextInputProps,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type TextInputProps, type ViewStyle } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -27,13 +19,13 @@ export default function AppInput({
 }: AppInputProps) {
   return (
     <View style={[styles.container, containerStyle]}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
-      <TextInput
+      {label ? <PartnerText style={styles.label}>{label}</PartnerText> : null}
+      <PartnerTextInput
         placeholderTextColor={colors.grey}
         style={[styles.input, error ? styles.inputError : null, style]}
         {...inputProps}
       />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <PartnerText style={styles.error}>{error}</PartnerText> : null}
     </View>
   );
 }

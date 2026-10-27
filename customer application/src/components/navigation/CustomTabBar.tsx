@@ -39,10 +39,9 @@ export default function CustomTabBar({
   const insets = useSafeAreaInsets();
   const activeRoute = state.routes[state.index];
 
-  // Hide tab bar entirely on SOS / Call flow
-  if (activeRoute.name === 'Call') {
-    return null;
-  }
+  // v6 SOS redesign: the SOS screen now uses the standard light chrome, so
+  // the tab bar stays visible. Users keep an always-visible escape hatch out
+  // of an emergency screen (the old hidden-bar fullscreen felt like a trap).
 
   const handleEmergencyCall = () => {
     navigation.navigate('Call', { screen: 'CallMain' });
@@ -81,8 +80,12 @@ export default function CustomTabBar({
             canPreventDefault: true,
           });
 
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
+          if (!event.defaultPrevented) {
+            if (route.name === 'Services') {
+              (navigation as any).navigate('Services', { screen: 'ServicesMain' });
+            } else if (!isFocused) {
+              navigation.navigate(route.name, route.params);
+            }
           }
         };
 
@@ -101,7 +104,6 @@ export default function CustomTabBar({
               fill={isFocused ? tint : 'transparent'}
             />
             <Text style={[styles.tabLabel, { color: tint }]}>{label}</Text>
-            {isFocused ? <View style={styles.activeDot} /> : <View style={styles.dotSpacer} />}
           </Pressable>
         );
       })}

@@ -7,6 +7,7 @@ import type {
   UpdateNotificationPrefsDto,
 } from './notificationValidator';
 import type { NotificationType } from '../../models/src/notification';
+import { emitToUser } from './socket';
 
 function mapNotification(n: INotification): NotificationResponseDto {
   return {
@@ -57,6 +58,10 @@ export class NotificationService {
       message: data.message,
       metadata: data.metadata,
     });
+    emitToUser(userId, 'notification:new', {
+      notificationId: notification.id,
+      createdAt: notification.createdAt.toISOString(),
+    });
     return mapNotification(notification);
   }
 
@@ -68,6 +73,11 @@ export class NotificationService {
   async markAllRead(userId: string): Promise<{ updated: number }> {
     const updated = await notificationRepository.markAllRead(userId);
     return { updated };
+  }
+
+  async deleteAllForUser(userId: string): Promise<{ deleted: number }> {
+    const deleted = await notificationRepository.deleteAllForUser(userId);
+    return { deleted };
   }
 
   async getUnreadCount(userId: string): Promise<number> {
@@ -94,32 +104,6 @@ export class NotificationService {
     return mapPrefs(prefs!);
   }
 
-  async seedWelcomeNotifications(userId: string): Promise<void> {
-    const existing = await notificationRepository.findByUserId(userId);
-    if (existing.length > 0) return;
-
-    const samples = [
-      {
-        type: 'PROMOTION' as NotificationType,
-        title: 'Special Offer!',
-        message: 'Get 20% off your first towing service. Use code RACE20.',
-      },
-      {
-        type: 'SERVICE_RATING' as NotificationType,
-        title: 'Rate Your Experience',
-        message: 'How was your recent service? Share your feedback.',
-      },
-      {
-        type: 'PAYMENT_SUCCESS' as NotificationType,
-        title: 'Payment Successful',
-        message: '₹899 paid for booking #RACE78291 via UPI.',
-      },
-    ];
-
-    for (const sample of samples) {
-      await this.createForUser(userId, sample);
-    }
-  }
 }
 
 export const notificationService = new NotificationService();

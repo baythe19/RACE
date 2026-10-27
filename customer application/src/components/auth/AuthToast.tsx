@@ -31,8 +31,10 @@ export function AuthLoadingOverlay({ visible, label = 'Please wait...' }: { visi
 
   return (
     <View style={styles.overlay}>
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.overlayText}>{label}</Text>
+      <View style={styles.overlayCard}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.overlayText}>{label}</Text>
+      </View>
     </View>
   );
 }
@@ -56,7 +58,8 @@ const styles = StyleSheet.create({
   text: {
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.semibold,
-    textAlign: 'center',
+    textAlign: 'left',
+    lineHeight: 20,
   },
   errorText: {
     color: colors.accentRed,
@@ -64,17 +67,27 @@ const styles = StyleSheet.create({
   successText: {
     color: colors.success,
   },
+  overlayCard: {
+    minWidth: 220,
+    maxWidth: 280,
+    paddingVertical: 28,
+    paddingHorizontal: 22,
+    borderRadius: 18,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+  },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(23, 25, 30, 0.28)',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
   },
   overlayText: {
     marginTop: spacing.md,
-    color: colors.textLight,
+    color: colors.dark,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.semibold,
+    textAlign: 'center',
   },
 });

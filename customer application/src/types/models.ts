@@ -101,9 +101,9 @@ export interface Vehicle {
 
 export interface BookingDriver {
   name: string;
-  rating: number;
+  rating?: number;
   photo: string | null;
-  experience: string;
+  experience?: string;
 }
 
 export interface ActiveBooking {

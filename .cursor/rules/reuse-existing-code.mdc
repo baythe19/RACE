@@ -1,0 +1,12 @@
+---
+description: Reuse existing RACE code; do not add parallel implementations
+alwaysApply: true
+---
+
+# Reuse before rewrite
+
+- Search the repo first. If a service, screen, hook, or validator already exists, **use it, fix it, or extend it**. Do not add a second copy.
+- Do not add unused helpers, extra folders, or “just in case” abstractions that grow the tree.
+- Do not reintroduce deleted apps: `customerweb/`, `partnerweb/`, `web application/`, `race-service/`.
+- Do not delete files just because they look unused. Leftover screens may still be on a live navigator. Removing them can break `expo start` / admin `npm run dev`. Flag leftovers; delete only when the user asks and imports are proven unused.
+- Match existing patterns: backend `controller → service → model`; mobile React Navigation + existing API clients; admin `@race/api` + Zustand.

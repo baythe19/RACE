@@ -1,17 +1,17 @@
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../../utils/src/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../../utils/src/errors';
 import { getDistanceAndDuration } from '../googleMaps';
 import { emitBookingStatusUpdate } from '../socket';
+import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { vehicleRepository } from '../vehicleRepository';
 import { UserModel } from '../../../models/src/user';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import {
-  appendStatusHistory,
   assertValidStatusTransition,
   calculateTowingFare,
   createInitialStatusHistory,
   generatePrefixedBookingNumber,
 } from './booking';
-import { canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
+import { assertActorMayTransition, canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
 import { towingBookingRepository } from '../towingBookingRepository';
 import type { ITowingBooking } from '../../../models/src/towingBooking';
 import type {
@@ -22,13 +22,13 @@ import type {
 import type { SubmitServiceBookingRatingDto } from '../bookingRatingValidator';
 import { buildServiceBookingRatingUpdate } from './bookingRating';
 import { getCancellationPolicy, type CancellationResult } from './cancellation';
-import { releaseDriver } from './driverAssignment';
+import { releaseDriver, releaseFleetVehicleFromBooking } from './driverAssignment';
 import { resolveAssignedDriver } from './assignedDriver';
 import {
   isDriverVisibleToCustomer,
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
-import { customerTripOtp } from './tripOtp';
+import { customerTripOtp, customerCompletionOtp } from './tripOtp';
 
 function mapTowingBooking(
   booking: ITowingBooking,
@@ -41,6 +41,7 @@ function mapTowingBooking(
     vehicleId: booking.vehicleId.toString(),
     pickup: booking.pickup,
     dropoff: booking.dropoff,
+    towingMode: booking.towingMode,
     distanceKm: booking.distanceKm,
     estimatedFare: booking.estimatedFare,
     fareBreakdown: booking.fareBreakdown,
@@ -55,6 +56,11 @@ function mapTowingBooking(
     driverId: booking.driverId?.toString(),
     driver,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
+    tripStartOtp: customerTripOtp(booking),
+    completionOtp: customerCompletionOtp(booking),
+    arrivedAtDropoffAt: booking.arrivedAtDropoffAt?.toISOString(),
+    paymentCollectionMode: booking.paymentCollectionMode,
+    paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     scheduledAt: booking.scheduledAt?.toISOString(),
     statusHistory: booking.statusHistory.map((entry) => ({
       status: entry.status,
@@ -109,6 +115,7 @@ export class TowingBookingService {
       vehicleId: vehicle.id as unknown as ITowingBooking['vehicleId'],
       pickup: dto.pickup,
       dropoff: dto.dropoff,
+      towingMode: dto.towingMode ?? (scheduledAt ? 'scheduled' : 'instant'),
       distanceKm,
       estimatedFare: fare,
       fareBreakdown: breakdown,
@@ -171,23 +178,32 @@ export class TowingBookingService {
       throw new ForbiddenError('You do not have access to this booking');
     }
 
+    if (newStatus === 'CANCELLED' && actor.role !== 'admin') {
+      throw new BadRequestError(
+        'Use the cancellation endpoint so the cancellation policy and refund state are applied',
+      );
+    }
+
+    // VOC P0.9: forbid customers from confirming/starting/completing jobs —
+    // only cancellation is theirs (via the dedicated cancel endpoint too).
+    assertActorMayTransition(actor.role, booking.status, newStatus);
     assertValidStatusTransition(booking.status, newStatus);
 
     const updated = await towingBookingRepository.updateStatus(
       bookingId,
+      booking.status,
       newStatus,
-      appendStatusHistory(booking.statusHistory, newStatus),
     );
 
     if (!updated) {
-      throw new NotFoundError('Towing booking not found');
+      throw new ConflictError('Booking changed before the status update was saved');
     }
 
-    if (
-      (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') &&
-      booking.driverId
-    ) {
-      await releaseDriver(booking.driverId.toString());
+    if (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') {
+      if (booking.driverId) {
+        await releaseDriver(booking.driverId.toString(), bookingId);
+      }
+      await releaseFleetVehicleFromBooking(bookingId);
     }
 
     emitBookingStatusUpdate(bookingId, newStatus, {
@@ -251,6 +267,12 @@ export class TowingBookingService {
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
       tripStartOtp:
         requestingUser.role === 'customer' ? customerTripOtp(booking) : undefined,
+      completionOtp:
+        requestingUser.role === 'customer' ? customerCompletionOtp(booking) : undefined,
+      arrivedAtDropoffAt: booking.arrivedAtDropoffAt?.toISOString(),
+      paymentCollectionMode: booking.paymentCollectionMode,
+      paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
+      fare: booking.finalFare ?? booking.estimatedFare,
     };
   }
 
@@ -283,7 +305,7 @@ export class TowingBookingService {
     refundStatus: string;
     policy: CancellationResult;
   }> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    let booking = await towingBookingRepository.findById(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -307,22 +329,42 @@ export class TowingBookingService {
       throw new BadRequestError(policy.reason);
     }
 
-    booking.status = 'CANCELLED';
-    booking.cancelledAt = new Date();
-    booking.cancelledBy = 'customer';
-    booking.cancellationReason = reason?.trim() || 'Customer requested';
-    booking.refundAmount = policy.refundAmount;
-    booking.refundStatus = policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE';
-    booking.statusHistory.push({
-      status: 'CANCELLED',
-      timestamp: new Date(),
-      note: policy.reason,
-    });
-    await booking.save();
+    const cancelledAt = new Date();
+    const cancelledBooking = await TowingBookingModel.findOneAndUpdate(
+      {
+        _id: booking._id,
+        status: booking.status,
+        advancePaid: booking.advancePaid,
+        advanceAmount: booking.advanceAmount,
+      },
+      {
+        $set: {
+          status: 'CANCELLED',
+          cancelledAt,
+          cancelledBy: 'customer',
+          cancellationReason: reason?.trim() || 'Customer requested',
+          refundAmount: policy.refundAmount,
+          refundStatus: policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE',
+        },
+        $push: {
+          statusHistory: {
+            status: 'CANCELLED',
+            timestamp: cancelledAt,
+            note: policy.reason,
+          },
+        },
+      },
+      { new: true, runValidators: true },
+    ).exec();
+    if (!cancelledBooking) {
+      throw new ConflictError('Booking changed while cancellation was being processed');
+    }
+    booking = cancelledBooking;
 
     if (booking.driverId) {
-      await releaseDriver(booking.driverId.toString());
+      await releaseDriver(booking.driverId.toString(), booking._id.toString());
     }
+    await releaseFleetVehicleFromBooking(booking._id.toString());
 
     if (policy.refundAmount > 0) {
       await PaymentTransactionModel.create({
@@ -364,19 +406,43 @@ export class TowingBookingService {
       throw new NotFoundError('Towing booking not found');
     }
 
-    let statusHistory = booking.statusHistory;
-    if (update.status && update.status !== booking.status) {
-      statusHistory = appendStatusHistory(statusHistory, update.status);
+    const expectedFields: Record<string, unknown> = {};
+    if (update.advancePaid === true) expectedFields.advancePaid = { $ne: true };
+    if (update.remainingPaid === true) expectedFields.remainingPaid = { $ne: true };
+    if (update.remainingPaid === true && booking.status !== 'COMPLETED') {
+      throw new ConflictError('Booking is no longer eligible for final payment');
     }
 
-    const updated = await towingBookingRepository.updateById(bookingId, {
-      ...update,
-      statusHistory,
-    });
+    const updateFields = { ...update };
+    delete updateFields.statusHistory;
+    delete updateFields.status;
+
+    const updateOperation: Record<string, unknown> = { $set: updateFields };
+    if (update.status) updateFields.status = update.status;
+    if (update.status && update.status !== booking.status) {
+      updateOperation.$push = {
+        statusHistory: { status: update.status, timestamp: new Date() },
+      };
+    }
+
+    const updated = await TowingBookingModel.findOneAndUpdate(
+      { _id: bookingId, status: booking.status, ...expectedFields },
+      updateOperation,
+      { new: true, runValidators: true },
+    ).exec();
 
     if (!updated) {
-      throw new NotFoundError('Towing booking not found');
+      throw new ConflictError('Booking payment state changed before the payment was applied');
     }
+
+    emitBookingStatusUpdate(bookingId, updated.status, {
+      paymentStatus: updated.paymentStatus,
+      statusHistory: updated.statusHistory.map((entry) => ({
+        status: entry.status,
+        timestamp: entry.timestamp.toISOString(),
+        note: entry.note,
+      })),
+    });
 
     return mapTowingBookingWithDriver(updated);
   }

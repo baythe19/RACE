@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 
 import { useScreenPx } from '../../hooks/useScreenPx';
@@ -33,7 +34,7 @@ export default function AppStackHeader({
           <View style={{ width: px(32) }} />
         )}
         {title ? (
-          <Text
+          <PartnerText
             numberOfLines={1}
             style={{
               flex: 1,
@@ -43,7 +44,7 @@ export default function AppStackHeader({
               color: colors.dark,
             }}>
             {title}
-          </Text>
+          </PartnerText>
         ) : (
           <View style={{ flex: 1 }} />
         )}
@@ -54,7 +55,7 @@ export default function AppStackHeader({
         )}
       </View>
       {subtitle ? (
-        <Text
+        <PartnerText
           style={{
             textAlign: 'center',
             fontSize: px(12),
@@ -63,7 +64,7 @@ export default function AppStackHeader({
             paddingHorizontal: px(20),
           }}>
           {subtitle}
-        </Text>
+        </PartnerText>
       ) : (
         <View style={{ height: px(12) }} />
       )}

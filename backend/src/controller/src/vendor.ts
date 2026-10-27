@@ -8,6 +8,7 @@ import { vendorDriversService } from '../../services/src/vendorDrivers';
 import { vendorVehiclesService } from '../../services/src/vendorVehicles';
 import { vendorBookingsService } from '../../services/src/vendorBookings';
 import { vendorService } from '../../services/src/vendor';
+import { driverVendorMembershipService } from '../../services/src/driverVendorMembership';
 
 export class VendorController {
   saveDraft = asyncHandler(async (req: Request, res: Response) => {
@@ -44,6 +45,24 @@ export class VendorController {
     const user = getAuthUser(req);
     const stats = await vendorService.getDashboardStats(user.id);
     return sendSuccess(res, stats);
+  });
+
+  getPayoutAccount = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const account = await vendorService.getPayoutAccount(user.id);
+    return sendSuccess(res, account);
+  });
+
+  savePayoutAccount = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const account = await vendorService.savePayoutAccount(user.id, req.body);
+    return sendSuccess(res, account);
+  });
+
+  getEarnings = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const earnings = await vendorService.getEarningsHistory(user.id);
+    return sendSuccess(res, earnings);
   });
 
   uploadDocument = asyncHandler(async (req: Request, res: Response) => {
@@ -116,10 +135,54 @@ export class VendorController {
     return sendSuccess(res, vendor);
   });
 
+  listDriverMemberships = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    return sendSuccess(res, await driverVendorMembershipService.listVendor(user.id));
+  });
+
+  searchDrivers = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const query = String(req.query.q ?? '');
+    return sendSuccess(res, await driverVendorMembershipService.searchDrivers(user.id, query));
+  });
+
+  inviteDriver = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    return sendSuccess(res, await driverVendorMembershipService.invite(user.id, req.body.phone), 202);
+  });
+
+  revokeDriverMembership = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverVendorMembershipService.revoke(
+      user.id,
+      getParamId(req.params.id),
+      req.body.reason,
+    );
+    return sendSuccess(res, result);
+  });
+
   listDrivers = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const drivers = await vendorDriversService.list(user.id);
     return sendSuccess(res, drivers);
+  });
+
+  sendDriverOnboardingOtp = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await vendorDriversService.sendOnboardingOtp(user.id, req.body);
+    return sendSuccess(res, result);
+  });
+
+  verifyDriverOnboardingOtp = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await vendorDriversService.verifyOnboardingOtp(user.id, req.body);
+    return sendSuccess(res, result);
+  });
+
+  createStaffDriver = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const driver = await vendorDriversService.createStaffDriver(user.id, req.body);
+    return sendSuccess(res, driver, 201);
   });
 
   createDriver = asyncHandler(async (req: Request, res: Response) => {
@@ -137,6 +200,16 @@ export class VendorController {
   removeDriver = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await vendorDriversService.remove(user.id, getParamId(req.params.id));
+    return sendSuccess(res, result);
+  });
+
+  resetDriverPassword = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await vendorDriversService.resetDriverPassword(
+      user.id,
+      getParamId(req.params.id),
+      req.body,
+    );
     return sendSuccess(res, result);
   });
 
@@ -186,10 +259,53 @@ export class VendorController {
     return sendSuccess(res, result);
   });
 
+  uploadVehicleDocument = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const file = req.file;
+    if (!file) throw new AppError('No file uploaded', 400);
+    const vehicle = await vendorVehiclesService.uploadDocument(
+      user.id,
+      getParamId(req.params.id),
+      req.body.documentType,
+      { buffer: file.buffer, mimetype: file.mimetype, originalname: file.originalname },
+    );
+    return sendSuccess(res, vehicle, 201);
+  });
+
   listBookingOffers = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const offers = await vendorBookingsService.listOffers(user.id);
     return sendSuccess(res, offers);
+  });
+
+  getBookingTracking = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const bookingType = req.query.bookingType;
+    if (bookingType !== 'towing' && bookingType !== 'driver') {
+      throw new AppError('bookingType must be towing or driver', 400);
+    }
+    const tracking = await vendorBookingsService.getBookingTracking(
+      user.id,
+      getParamId(req.params.id),
+      bookingType,
+    );
+    return sendSuccess(res, tracking);
+  });
+
+  listBookings = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const bookings = await vendorBookingsService.listBookings(user.id);
+    return sendSuccess(res, bookings);
+  });
+
+  assignDriverVehicle = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const driver = await vendorDriversService.assignVehicle(
+      user.id,
+      getParamId(req.params.id),
+      req.body,
+    );
+    return sendSuccess(res, driver);
   });
 
   approveBooking = asyncHandler(async (req: Request, res: Response) => {

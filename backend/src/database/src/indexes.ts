@@ -13,6 +13,7 @@ import { ActivityLogModel } from '../../models/src/activityLog';
 import { NotificationModel } from '../../models/src/notification';
 import { VehicleModel } from '../../models/src/vehicle';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
+import { DriverVendorMembershipModel } from '../../models/src/driverVendorMembership';
 
 const MODELS = [
   UserModel,
@@ -27,6 +28,7 @@ const MODELS = [
   NotificationModel,
   VehicleModel,
   VendorVehicleModel,
+  DriverVendorMembershipModel,
 ];
 
 export async function ensureDatabaseIndexes(): Promise<void> {

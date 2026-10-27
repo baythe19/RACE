@@ -20,7 +20,7 @@ export const radius = {
 } as const;
 
 export const layout = {
-  screenPadding: 20,
+  screenPadding: 12,
   cardGap: 12,
   sectionGap: 24,
   buttonHeight: 54,

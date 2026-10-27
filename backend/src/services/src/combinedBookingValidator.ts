@@ -47,6 +47,10 @@ export interface CombinedBookingListItemDto {
   vendorId?: string;
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
   scheduledAt?: string;
   statusHistory: Array<{ status: string; timestamp: string }>;
   createdAt: string;

@@ -20,9 +20,11 @@ import {
   Truck,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useQueryClient } from '@tanstack/react-query';
 
 import DriverAvatar from '../../components/bookings/DriverAvatar';
 import TripOtpCard from '../../components/booking/TripOtpCard';
+import CancellationRefundPolicyModal from '../../components/booking/CancellationRefundPolicyModal';
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import GoldButton from '../../components/auth/GoldButton';
 import { useBookingQuery } from '../../services/bookings/useBookingQueries';
@@ -84,7 +86,8 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
-  const booking = useBookingQuery(route.params.bookingId);
+  const booking = useBookingQuery(route.params.bookingId, route.params.bookingType);
+  const queryClient = useQueryClient();
 
   const isCompleted = booking ? isBookingCompleted(booking) : false;
   const isOngoing = booking ? isBookingOngoing(booking) : false;
@@ -152,12 +155,13 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
     try {
       setCancelSubmitting(true);
       const result = await cancelServiceBooking(booking.id, bookingType, cancelReason);
+      await queryClient.invalidateQueries({ queryKey: ['bookings'] });
       setShowCancelModal(false);
       setCancelReason('');
       Alert.alert(
         'Booking Cancelled',
         result.refundAmount > 0
-          ? `Refund ₹${result.refundAmount} will be processed in 5-7 business days.`
+          ? `Refund ₹${result.refundAmount} is pending. It has not been processed yet.`
           : 'No refund applicable for this cancellation.',
       );
       navigation.navigate('BookingsMain');
@@ -270,12 +274,19 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
             <Text style={{ fontSize: px(15), fontWeight: typography.weights.bold, color: colors.dark }}>
               {booking.driver?.name ?? 'Assigning soon'}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4), marginTop: px(2) }}>
-              <Star size={px(12)} color={colors.primary} fill={colors.primary} />
-              <Text style={{ fontSize: px(12), color: colors.grey }}>
-                {booking.driver?.rating ?? 4.8} · {booking.driver?.experience ?? 'RACE verified'}
+            {booking.driver?.rating != null ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4), marginTop: px(2) }}>
+                <Star size={px(12)} color={colors.primary} fill={colors.primary} />
+                <Text style={{ fontSize: px(12), color: colors.grey }}>
+                  {booking.driver.rating.toFixed(1)}
+                </Text>
+              </View>
+            ) : null}
+            {booking.driver?.experience ? (
+              <Text style={{ fontSize: px(12), color: colors.grey, marginTop: px(2) }}>
+                {booking.driver.experience}
               </Text>
-            </View>
+            ) : null}
             {booking.assignedFleetVehicleLabel ? (
               <Text style={{ fontSize: px(12), color: colors.grey, marginTop: px(4) }}>
                 Vehicle: {booking.assignedFleetVehicleLabel}
@@ -383,109 +394,17 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
         />
       ) : null}
 
-      <Modal
+      <CancellationRefundPolicyModal
         visible={showCancelModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowCancelModal(false)}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(0,0,0,0.4)',
-            justifyContent: 'center',
-            padding: px(20),
-          }}>
-          <View
-            style={{
-              backgroundColor: colors.background,
-              borderRadius: px(14),
-              padding: px(16),
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}>
-            <Text style={{ fontSize: px(18), fontWeight: typography.weights.bold, color: colors.dark }}>
-              Cancel Booking?
-            </Text>
-            {policy ? (
-              <>
-                <Text style={{ marginTop: px(10), color: colors.grey }}>
-                  Cancellation Policy: {policy.reason}
-                </Text>
-                <Text style={{ marginTop: px(8), color: colors.dark }}>
-                  Refund: ₹{policy.refundAmount} ({policy.refundPercent}%)
-                </Text>
-                <Text style={{ color: colors.dark }}>
-                  Cancellation fee: ₹{policy.cancellationFee}
-                </Text>
-              </>
-            ) : null}
-            <Text style={{ marginTop: px(10), color: colors.grey }}>
-              Refund will be processed within 5-7 business days.
-            </Text>
-            <TextInput
-              value={cancelReason}
-              onChangeText={setCancelReason}
-              placeholder="Why are you cancelling? (optional)"
-              placeholderTextColor={colors.grey}
-              style={{
-                marginTop: px(10),
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderRadius: px(10),
-                paddingHorizontal: px(10),
-                paddingVertical: px(8),
-                color: colors.dark,
-              }}
-            />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(8), marginTop: px(8) }}>
-              {['Changed my mind', 'Found another service', 'Emergency', 'Other'].map((chip) => (
-                <Pressable
-                  key={chip}
-                  onPress={() => setCancelReason(chip)}
-                  style={{
-                    paddingHorizontal: px(10),
-                    paddingVertical: px(6),
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: px(14),
-                  }}>
-                  <Text style={{ color: colors.dark, fontSize: px(11) }}>{chip}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <View style={{ flexDirection: 'row', gap: px(10), marginTop: px(14) }}>
-              <Pressable
-                onPress={() => setShowCancelModal(false)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingVertical: px(10),
-                  borderRadius: px(10),
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}>
-                <Text style={{ color: colors.dark, fontWeight: typography.weights.semibold }}>
-                  Keep Booking
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => void confirmCancel()}
-                disabled={cancelSubmitting || (policy ? !policy.canCancel : true)}
-                style={{
-                  flex: 1,
-                  alignItems: 'center',
-                  paddingVertical: px(10),
-                  borderRadius: px(10),
-                  backgroundColor: cancelSubmitting ? colors.lightGrey : colors.error,
-                }}>
-                <Text style={{ color: '#fff', fontWeight: typography.weights.bold }}>
-                  {cancelSubmitting ? 'Cancelling...' : 'Cancel Anyway'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        policy={policy}
+        isLoadingPolicy={policyLoading}
+        isSubmitting={cancelSubmitting}
+        bookingStatus={booking.unifiedStatus}
+        cancelReason={cancelReason}
+        onReasonChange={setCancelReason}
+        onConfirmCancel={() => void confirmCancel()}
+        onClose={() => setShowCancelModal(false)}
+      />
     </ProfileSubScreenLayout>
   );
 }

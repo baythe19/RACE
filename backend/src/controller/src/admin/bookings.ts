@@ -57,6 +57,7 @@ export const adminBookingsController = {
     sendSuccess(res, await adminServiceBookingsService.assignDriver(
       routeParam(req.params.id),
       req.body,
+      getAdminActor(req),
     ));
   }),
 
@@ -64,6 +65,7 @@ export const adminBookingsController = {
     sendSuccess(res, await adminServiceBookingsService.cancelBooking(
       routeParam(req.params.id),
       req.body,
+      getAdminActor(req),
     ));
   }),
 

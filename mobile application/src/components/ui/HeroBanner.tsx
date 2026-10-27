@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 import type { Brand } from '../../types/models';
@@ -13,13 +14,13 @@ export default function HeroBanner({ brand }: HeroBannerProps) {
     <View style={styles.hero}>
       <View style={styles.topRow}>
         <View style={styles.badge}>
-          <Text style={styles.badgeText}>24/7 {brand.productName}</Text>
+          <PartnerText style={styles.badgeText}>24/7 {brand.productName}</PartnerText>
         </View>
       </View>
 
-      <Text style={styles.brand}>{brand.name}</Text>
-      <Text style={styles.tagline}>{brand.tagline}</Text>
-      <Text style={styles.description}>{brand.description}</Text>
+      <PartnerText style={styles.brand}>{brand.name}</PartnerText>
+      <PartnerText style={styles.tagline}>{brand.tagline}</PartnerText>
+      <PartnerText style={styles.description}>{brand.description}</PartnerText>
 
       <View style={styles.accentLine} />
     </View>

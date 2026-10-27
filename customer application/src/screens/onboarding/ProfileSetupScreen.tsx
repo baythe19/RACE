@@ -320,7 +320,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
             variant="outlined"
             compact
             scale={s}
-            label="Email"
+            label="Email (optional)"
             Icon={Mail}
             value={email}
             placeholder="you@example.com"

@@ -6,106 +6,82 @@
 
 ## What is RACE?
 
-RACE is a multi-sided platform that connects **vehicle owners** (customers) who need help on the road with a network of **verified partners** — drivers, towing vendors, and roadside assistance providers. The platform runs on three coordinated applications plus a unified backend, plus an admin dashboard for operations.
+RACE connects **vehicle owners** (customers) who need help on the road with a network of **verified partners** — drivers, towing vendors, and roadside assistance providers.
+
+**Product surfaces in v2 (this branch):** two mobile apps, one admin panel, one backend. Customer/partner **web portals were removed** — they were incomplete Phase-1 copies, never deployed, and not required.
 
 ## Who Uses RACE?
 
-| Audience | Their App | Platform |
+| Audience | App | Platform |
 |---|---|---|
-| **Vehicle owners** (customers) | `customer application` (mobile, Expo RN) + `customerweb` (React) | iOS, Android, Web |
-| **Towing vendors & on-road drivers** (partners) | `mobile application` (mobile, Expo RN) + `partnerweb` (React) | iOS, Android, Web |
-| **Operations team** | `race-admin` (React + Turborepo) | Web |
-| **Platform engineering** | `backend` (Node + Express + MongoDB) | Server |
+| **Vehicle owners** (customers) | `customer application/` (Expo React Native) | iOS, Android |
+| **Towing vendors & on-road drivers** (partners) | `mobile application/` (Expo React Native) | iOS, Android |
+| **Operations team** | `race-admin/` (React + Turborepo) | Web |
+| **Platform engineering** | `backend/` (Node + Express + MongoDB) | Server |
 
-All four UIs talk to the same `race-backend` API (REST + JWT auth, MongoDB persistence, Redis cache, real-time Socket.IO, file storage on Google Cloud Storage, OTP via Twilio).
+All three UIs talk to the same `backend/` API (REST + JWT, MongoDB, Redis, Socket.IO, GCS uploads, Twilio OTP).
 
 ---
 
 ## Core Services Offered
 
-The platform covers the full spectrum of in-the-moment vehicle help:
-
 1. **Towing** — long-distance, flatbed, accident-recovery towing
-2. **On-demand driver** — when the owner can't drive (fatigue, injury, intoxication)
-3. **Roadside assistance** — jump-start, tyre change, fuel delivery, lockout help
-4. **Subscription plans** — monthly / annual packages for customer & vendor audiences, across towing / driver / partner categories
-5. **SOS / Emergency** — single-tap alert with live location context, configurable per region
-6. **Vehicle QR** — every saved vehicle gets a scannable QR for fast identification & SOS trigger
+2. **On-demand driver** — when the owner can't drive
+3. **Roadside assistance** — jump-start, tyre change, fuel delivery, lockout (catalog exists; some types still “coming soon” on the API)
+4. **Subscription plans** — customer and partner packages
+5. **SOS / Emergency** — alert with live location context
+6. **Vehicle QR** — scannable QR per saved vehicle
 
 ---
 
-## Why RACE?
+## What's Already Built
 
-- **For vehicle owners**: predictable pricing via fare-preview before booking, multiple service categories in one app, subscription savings, real-time tracking, transparent driver profiles.
-- **For partners**: a steady pipeline of jobs, in-app navigation, instant earnings, multi-driver vendor fleet management, document compliance handled in-app.
-- **For operations**: end-to-end visibility — every booking, every payment, every document, every vendor — with role-based access for finance / reporting / customer support.
+- **Backend API** — REST endpoints, MongoDB models, JWT + refresh tokens, RBAC (customer / driver / vendor / admin), Socket.IO rooms, Twilio OTP, GCS or local uploads, Mongoose + Redis (in-memory fallback in dev).
+- **Customer mobile** — onboarding, OTP login, vehicles + QR, SOS, services catalog, towing/driver booking wizards, profile, subscriptions.
+- **Partner mobile** — vendor & driver registration, documents, jobs, active-job workflow, fleet (drivers/vehicles), verification status.
+- **Admin web** — dashboard, customers, vendors, drivers, bookings, finance, reports, notifications, subscriptions, settings, RBAC.
+- **Postman collection** — `backend/postman/RACE-Backend.postman_collection.json`
+- **Seed data** — `npm run seed`
 
----
+## What's Pending / Not Production-Ready
 
-## What's Already Built (release4Aug2026)
-
-- **Backend API** — 70+ REST endpoints across 41 route files, 27 MongoDB models, 25 service modules, JWT + refresh tokens, RBAC for 4 user roles (customer / driver / vendor / admin), Socket.IO for live tracking, Twilio OTP, Google Cloud Storage for uploads, Mongoose + Redis caching.
-- **Customer mobile app** — 24 screens covering onboarding, OTP login, vehicle registration, QR generation, SOS, services catalog, towing booking, driver booking, profile management, subscriptions, support.
-- **Customer web** — 25 pages mirroring the mobile flows (auth, services, bookings, profile, SOS, home, locations).
-- **Partner mobile app** — 23 screens with multi-step vendor & driver registration, document upload, job acceptance, active-job workflow, account management, verification status.
-- **Partner web** — 22 pages mirroring the partner flows (registration wizard, dashboard, jobs, account, subscriptions).
-- **Admin web** — 18 pages covering dashboard, customers, vendors, drivers, bookings, finance, reports, notifications, subscriptions, settings, with RBAC and role-scoped permissions.
-- **Postman collection** — `RACE-Backend.postman_collection.json` for end-to-end API exercise without writing client code.
-- **Seed data** — `npm run seed` populates demo customers, drivers, vendors, bookings, plans.
+- Payment gateway (Razorpay / Stripe) — `/api/v1/payments/*` is stubbed
+- Automated tests — `backend/src/__tests__` is empty
+- Full live map tracking (Socket.IO rooms exist; tracking is still a scaffold)
+- Real push (FCM) — event notifications mostly log in dev
 
 ---
 
-## What's Pending / Not Production-Ready Yet
-
-- `race-service/` — a new monorepo skeleton (apps: `api-server`, `admin-web`; packages: `shared-types`, `shared-utils`). Mostly empty — appears to be an incomplete refactor target. Not used.
-- `web application/` — a legacy marketing-style site (React 19, Vite, hello-world). Not deployed.
-- Payment integration — backend has `/api/v1/payments/*` stubs (advance/final, advance-verify, final-verify). Real gateway wiring (Razorpay, Stripe) is **not** in this release.
-- Tests — backend has the `__tests__` folder but it's empty. Coverage relies on manual Postman exercises.
-
----
-
-## Quick Local Start (for the client team)
+## Quick Local Start
 
 ```bash
 # 1. Backend (port 3000)
 cd backend
-cp .env.example .env        # add MONGODB_URI, REDIS_URL, JWT_SECRET, GOOGLE_*, TWILIO_*
+cp .env.example .env        # MONGODB_URI, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, GOOGLE_*, TWILIO_*
 npm install
-npm run seed                 # populate demo data
-npm run dev                  # http://localhost:3000
+npm run seed
+npm run dev                 # http://localhost:3000
 
-# 2. Customer web (port 5173)
-cd ../customerweb
-npm install
-npm run dev
-
-# 3. Partner web (port 5174)
-cd ../partnerweb
-npm install
-npm run dev
-
-# 4. Admin web (port 3001)
+# 2. Admin web (port 3001)
 cd ../race-admin
 npm install
 npm run dev
 
-# 5. Customer mobile (Expo Go on phone)
-cd '../customer application'
+# 3. Customer mobile
+cd "../customer application"
 npm install
 npx expo start
 
-# 6. Partner mobile (Expo Go on phone)
-cd '../mobile application'
+# 4. Partner mobile
+cd "../mobile application"
 npm install
 npx expo start
 ```
-
-**Time to first end-to-end happy path**: ~15 minutes if MongoDB + Redis are already running locally. ~45 minutes if you need to install those too.
 
 ---
 
 ## Repository & Branch Notes
 
-- **Default branch `main` is empty** — `release4Aug2026` is the actual working release.
-- 14 remote branches exist; the rest are feature/working branches. New contributors should clone `release4Aug2026` first.
-- All apps share a top-level `package.json` (lockfile present) — root `npm install` does **not** install everything; you must `cd` into each app and install there.
+- Active work: `v2.0.1-cleanup` (branched from `release4Aug2026`).
+- Kept for history: `release4Aug2026`, `release/13July26`, `main`.
+- Root `npm install` does **not** install the apps; `cd` into each folder.

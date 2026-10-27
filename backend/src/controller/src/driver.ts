@@ -2,13 +2,33 @@ import type { Request, Response } from 'express';
 
 import { asyncHandler } from '../../utils/src/asyncHandler';
 import { sendSuccess } from '../../utils/src/apiResponse';
-import { emitDriverLocation } from '../../services/src/socket';
+import { AppError } from '../../utils/src/errors';
 import { getAuthUser, getParamId } from '../../utils/src/request';
-import { UserModel } from '../../models/src/user';
 import { driverSelfService } from '../../services/src/driverSelf';
 import { driverService } from '../../services/src/driver';
+import { driverVendorMembershipService } from '../../services/src/driverVendorMembership';
 
 export class DriverController {
+  listVendorInvitations = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    return sendSuccess(res, await driverVendorMembershipService.listDriverInvitations(user.id));
+  });
+
+  getVendorMembership = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    return sendSuccess(res, await driverVendorMembershipService.getDriverMembership(user.id));
+  });
+
+  respondVendorInvitation = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverVendorMembershipService.respond(
+      user.id,
+      getParamId(req.params.id),
+      req.body.decision,
+    );
+    return sendSuccess(res, result);
+  });
+
   updateAvailability = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await driverService.updateAvailability(user.id, user.role, req.body);
@@ -18,17 +38,6 @@ export class DriverController {
   updateLocation = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await driverService.updateLocation(user.id, user.role, req.body);
-
-    const driver = await UserModel.findById(user.id).select('_id activeBookingId').exec();
-    if (driver?.activeBookingId) {
-      emitDriverLocation(
-        driver.activeBookingId.toString(),
-        user.id,
-        result.location.latitude,
-        result.location.longitude,
-      );
-    }
-
     return sendSuccess(res, result);
   });
 
@@ -83,9 +92,45 @@ export class DriverController {
     return sendSuccess(res, result);
   });
 
+  arrivedAtDropoff = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverService.arrivedAtDropoff(
+      user.id,
+      user.role,
+      getParamId(req.params.id),
+      req.body.bookingType,
+    );
+    return sendSuccess(res, result);
+  });
+
+  completeBooking = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const result = await driverService.completeBooking(
+      user.id,
+      user.role,
+      getParamId(req.params.id),
+      req.body.bookingType,
+      req.body.completionOtp,
+    );
+    return sendSuccess(res, result);
+  });
+
   registerSelf = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const result = await driverSelfService.register(user.id, req.body);
+    return sendSuccess(res, result, 201);
+  });
+
+  uploadSelfDocument = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const file = req.file;
+    if (!file) throw new AppError('No file uploaded', 400);
+
+    const result = await driverSelfService.uploadSelfDocument(user.id, req.body.documentType, {
+      buffer: file.buffer,
+      mimetype: file.mimetype,
+      originalname: file.originalname,
+    });
     return sendSuccess(res, result, 201);
   });
 }

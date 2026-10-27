@@ -22,7 +22,7 @@ export default function DriverOnWayScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const { booking: draftBooking } = useDriverBooking();
   const bookingId = route.params?.bookingId;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'driver');
   const {
     etaLabel,
     etaMinutes,
@@ -116,17 +116,19 @@ export default function DriverOnWayScreen({ navigation, route }: Props) {
               </Text>
               {hasDriver ? (
                 <>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
-                    <Star size={t.px(16)} color={colors.primary} fill={colors.primary} />
-                    <Text
-                      style={{
-                        fontSize: t.body,
-                        fontWeight: typography.weights.semibold,
-                        color: colors.grey,
-                      }}>
-                      {rating.toFixed(1)}
-                    </Text>
-                  </View>
+                  {rating != null ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
+                      <Star size={t.px(16)} color={colors.primary} fill={colors.primary} />
+                      <Text
+                        style={{
+                          fontSize: t.body,
+                          fontWeight: typography.weights.semibold,
+                          color: colors.grey,
+                        }}>
+                        {rating.toFixed(1)}
+                      </Text>
+                    </View>
+                  ) : null}
                   <Text
                     style={{
                       marginTop: t.px(4),
@@ -161,7 +163,11 @@ export default function DriverOnWayScreen({ navigation, route }: Props) {
               color: colors.primary,
               textAlign: 'center',
             }}>
-            {hasDriver ? `Arriving in ${etaMinutes} min` : `ETA: ${etaLabel}`}
+            {hasDriver
+              ? etaMinutes == null
+                ? 'ETA updating'
+                : 'Arriving in ' + etaMinutes + ' min'
+              : 'ETA: ' + etaLabel}
           </Text>
 
           <View style={{ flexDirection: 'row', gap: t.px(10), marginTop: t.px(16) }}>

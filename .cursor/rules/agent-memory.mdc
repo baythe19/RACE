@@ -1,0 +1,16 @@
+---
+description: Read and update git-tracked agent memory; claim a surface before parallel work
+alwaysApply: true
+---
+
+# Shared agent memory
+
+Chat does not remember other sessions. Before a non-trivial task:
+
+1. Read `.cursor/memory/activeContext.md`, `agents-lock.md`, and `learnings.md`.
+2. If you will edit code, **claim a surface** in `agents-lock.md`. If that surface is already claimed, stop and tell the user.
+3. After the task: update `activeContext.md` (current focus + last done). Append to `progress.md` / `decisions.md` / `learnings.md` only if something durable changed. **Clear your lock row.**
+
+Keep memory short and dated. No secrets. If memory disagrees with code, code wins — then fix memory.
+
+Full layout: `.cursor/memory/README.md`.

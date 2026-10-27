@@ -48,7 +48,9 @@ export const adminDashboardService = {
       totalCustomers,
       totalVendors,
       totalDrivers,
-      completedBookings,
+      legacyCompleted,
+      towingCompleted,
+      driverCompleted,
       pendingVendors,
       pendingDrivers,
       revenueAgg,
@@ -56,19 +58,27 @@ export const adminDashboardService = {
       prevCustomers,
       prevVendors,
       prevDrivers,
-      prevBookings,
+      prevLegacy,
+      prevTowing,
+      prevDriver,
       prevRevenueAgg,
       revenueByWeek,
-      bookingsByWeek,
-      serviceDistribution,
+      legacyBookingsByWeek,
+      towingBookingsByWeek,
+      driverBookingsByWeek,
+      legacyServiceDistribution,
       recentActivities,
-      recentBookings,
+      recentLegacyBookings,
+      recentTowingBookings,
+      recentDriverBookings,
       recentVendors,
     ] = await Promise.all([
       UserModel.countDocuments({ role: 'customer' }),
       UserModel.countDocuments({ role: 'vendor', vendorProfile: { $exists: true } }),
       UserModel.countDocuments({ role: 'driver', driverProfile: { $exists: true } }),
       BookingModel.countDocuments({ status: { $in: ['SERVICE_COMPLETED', 'PAID'] } }),
+      TowingBookingModel.countDocuments({ status: { $in: ['COMPLETED', 'RATED'] } }),
+      DriverBookingModel.countDocuments({ status: { $in: ['COMPLETED', 'RATED'] } }),
       UserModel.countDocuments({ role: 'vendor', 'vendorProfile.status': { $in: ['pending', 'under_review'] } }),
       UserModel.countDocuments({ role: 'driver', 'driverProfile.status': 'PENDING' }),
       TransactionModel.aggregate([
@@ -92,6 +102,12 @@ export const adminDashboardService = {
         createdAt: { $gte: previousMonth.start, $lte: previousMonth.end },
       }),
       BookingModel.countDocuments({
+        createdAt: { $gte: previousMonth.start, $lte: previousMonth.end },
+      }),
+      TowingBookingModel.countDocuments({
+        createdAt: { $gte: previousMonth.start, $lte: previousMonth.end },
+      }),
+      DriverBookingModel.countDocuments({
         createdAt: { $gte: previousMonth.start, $lte: previousMonth.end },
       }),
       TransactionModel.aggregate([
@@ -127,6 +143,18 @@ export const adminDashboardService = {
         { $sort: { _id: 1 } },
         { $limit: 4 },
       ]),
+      TowingBookingModel.aggregate([
+        { $match: { createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } } },
+        { $group: { _id: { $week: '$createdAt' }, total: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+        { $limit: 4 },
+      ]),
+      DriverBookingModel.aggregate([
+        { $match: { createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } } },
+        { $group: { _id: { $week: '$createdAt' }, total: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+        { $limit: 4 },
+      ]),
       BookingModel.aggregate([
         { $group: { _id: '$serviceLabel', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -134,8 +162,13 @@ export const adminDashboardService = {
       ]),
       ActivityLogModel.find().sort({ createdAt: -1 }).limit(8).lean(),
       BookingModel.find().sort({ createdAt: -1 }).limit(6).populate('customerId', 'fullName').lean(),
+      TowingBookingModel.find().sort({ createdAt: -1 }).limit(6).populate('customerId', 'fullName').lean(),
+      DriverBookingModel.find().sort({ createdAt: -1 }).limit(6).populate('customerId', 'fullName').lean(),
       UserModel.find({ role: 'vendor' }).sort({ createdAt: -1 }).limit(5).lean(),
     ]);
+
+    const completedBookings = legacyCompleted + towingCompleted + driverCompleted;
+    const prevBookings = prevLegacy + prevTowing + prevDriver;
 
     const [
       legacyBookings,
@@ -185,9 +218,13 @@ export const adminDashboardService = {
       role: 'driver',
       createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
     });
-    const currentMonthBookings = await BookingModel.countDocuments({
-      createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
-    });
+    const [currLegacy, currTowing, currDriver] = await Promise.all([
+      BookingModel.countDocuments({ createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } }),
+      TowingBookingModel.countDocuments({ createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } }),
+      DriverBookingModel.countDocuments({ createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } }),
+    ]);
+    const currentMonthBookings = currLegacy + currTowing + currDriver;
+
     const currentMonthRevenueAgg = await TransactionModel.aggregate([
       {
         $match: {
@@ -199,6 +236,23 @@ export const adminDashboardService = {
       { $group: { _id: null, total: { $sum: '$amount' } } },
     ]);
     const currentMonthRevenue = currentMonthRevenueAgg[0]?.total ?? 0;
+
+    const weekMap = new Map<number, number>();
+    for (const row of [...legacyBookingsByWeek, ...towingBookingsByWeek, ...driverBookingsByWeek]) {
+      if (typeof row._id === 'number') {
+        weekMap.set(row._id, (weekMap.get(row._id) ?? 0) + row.total);
+      }
+    }
+    const bookingsByWeek = Array.from(weekMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .slice(0, 4)
+      .map(([week, total]) => ({ _id: week, total }));
+
+    const serviceDistribution = [
+      ...(towingCount > 0 ? [{ _id: 'Towing Service', count: towingCount }] : []),
+      ...(driverCount > 0 ? [{ _id: 'Driver Service', count: driverCount }] : []),
+      ...legacyServiceDistribution,
+    ];
 
     const colors = ['#F5A623', '#2563EB', '#16A34A', '#DC2626', '#7C3AED'];
 
@@ -306,24 +360,62 @@ export const adminDashboardService = {
         timestamp: log.createdAt.toISOString(),
         type: mapActivityType(log.entityType),
       })),
-      recentBookings: await Promise.all(
-        recentBookings.map(async (booking) => {
-          const customer = booking.customerId as { fullName?: string } | Types.ObjectId;
+      recentBookings: [
+        ...recentLegacyBookings.map((b) => {
+          const customer = b.customerId as { fullName?: string } | Types.ObjectId;
           const customerName =
             customer && typeof customer === 'object' && 'fullName' in customer
               ? customer.fullName ?? 'Customer'
               : 'Customer';
           return {
-            id: booking._id.toString(),
-            bookingNumber: booking.bookingNumber,
+            id: b._id.toString(),
+            bookingNumber: b.bookingNumber,
             customerName,
-            service: booking.serviceLabel,
-            status: booking.status,
-            amount: booking.invoice?.total ?? 0,
-            createdAt: booking.createdAt.toISOString(),
+            service: b.serviceLabel ?? 'Roadside Service',
+            status: b.status,
+            amount: b.invoice?.total ?? 0,
+            createdAt: new Date(b.createdAt),
           };
         }),
-      ),
+        ...recentTowingBookings.map((b) => {
+          const customer = b.customerId as { fullName?: string } | Types.ObjectId;
+          const customerName =
+            customer && typeof customer === 'object' && 'fullName' in customer
+              ? customer.fullName ?? 'Customer'
+              : 'Customer';
+          return {
+            id: b._id.toString(),
+            bookingNumber: b.bookingNumber,
+            customerName,
+            service: 'Towing Service',
+            status: b.status,
+            amount: b.estimatedFare ?? 0,
+            createdAt: new Date(b.createdAt),
+          };
+        }),
+        ...recentDriverBookings.map((b) => {
+          const customer = b.customerId as { fullName?: string } | Types.ObjectId;
+          const customerName =
+            customer && typeof customer === 'object' && 'fullName' in customer
+              ? customer.fullName ?? 'Customer'
+              : 'Customer';
+          return {
+            id: b._id.toString(),
+            bookingNumber: b.bookingNumber,
+            customerName,
+            service: 'Driver Service',
+            status: b.status,
+            amount: b.estimatedFare ?? 0,
+            createdAt: new Date(b.createdAt),
+          };
+        }),
+      ]
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, 6)
+        .map((b) => ({
+          ...b,
+          createdAt: b.createdAt.toISOString(),
+        })),
       recentVendors: recentVendors.map((vendor) => ({
         id: vendor._id.toString(),
         name: vendor.vendorProfile?.businessName ?? vendor.vendorProfile?.ownerName ?? vendor.fullName ?? 'Vendor',

@@ -273,7 +273,7 @@ function DriverListCard({
           <CardTitle>{title}</CardTitle>
           {description ? <p className="mt-1 text-xs text-[#9CA3AF]">{description}</p> : null}
         </div>
-        {actionLabel && onAction ? (
+        {!readOnly && actionLabel && onAction ? (
           <button
             type="button"
             onClick={onAction}

@@ -1,0 +1,20 @@
+---
+description: Plan, research, and verify before implementing. No guesses as facts.
+alwaysApply: true
+---
+
+# How to work on RACE
+
+Before coding a non-trivial task:
+
+0. **Memory** — read `.cursor/memory/activeContext.md` + `agents-lock.md`; claim a surface.
+1. **Review** the existing code paths that already do this job.
+2. **Research** — use the web for current library/API docs (match the versions in this repo: Expo 54, Express 5, React 19). Do not invent APIs.
+3. **Plan** — name files you will touch, reuse vs new, and risks. Wait for a go-ahead if the task is large or ambiguous.
+4. **Implement** only the plan. Prefer a small POC over a wide rewrite. For a long multi-part task, follow `.cursor/skills/unlazy/SKILL.md` (gates before “done”). Bugs: systematic-debugging. Auth/payments: security-and-hardening. Before “done”: verification-before-completion.
+
+Accuracy over speed. If unsure, read the code or docs; say what you could not verify. No generic filler, no false “already done” claims.
+
+Every task: think through edge cases (auth role, empty state, offline, stub payments) before writing.
+
+After the task: update `.cursor/memory/` and clear the lock.

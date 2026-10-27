@@ -2,7 +2,10 @@ import { Types } from 'mongoose';
 
 import { ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
+import { storageService } from '../../storage/src/index';
 import { UserModel } from '../../models/src/user';
+import { TowingBookingModel } from '../../models/src/towingBooking';
+import { DriverBookingModel } from '../../models/src/driverBooking';
 import type { CreateVendorVehicleDto, UpdateVendorVehicleDto } from './vendorVehiclesValidator';
 
 function mapVehicle(doc: {
@@ -15,6 +18,13 @@ function mapVehicle(doc: {
   status: string;
   insuranceExpiry?: Date;
   maintenanceNote?: string;
+  documents?: Array<{
+    type: string;
+    url: string;
+    fileName: string;
+    status: string;
+    uploadedAt?: Date;
+  }>;
   createdAt?: Date;
   updatedAt?: Date;
 }) {
@@ -28,6 +38,13 @@ function mapVehicle(doc: {
     status: doc.status,
     insuranceExpiry: doc.insuranceExpiry?.toISOString(),
     maintenanceNote: doc.maintenanceNote,
+    documents: doc.documents?.map(document => ({
+      type: document.type,
+      url: document.url,
+      fileName: document.fileName,
+      status: document.status,
+      uploadedAt: document.uploadedAt?.toISOString(),
+    })) ?? [],
     createdAt: doc.createdAt?.toISOString(),
     updatedAt: doc.updatedAt?.toISOString(),
   };
@@ -43,6 +60,24 @@ function buildMaintenanceNote(dto: CreateVendorVehicleDto): string | undefined {
 }
 
 export class VendorVehiclesService {
+  private async assertVehicleHasNoOpenAssignments(vehicleId: Types.ObjectId) {
+    const filter = {
+      assignedFleetVehicleId: vehicleId,
+      status: {
+        $in: ['CONFIRMED', 'DRIVER_ASSIGNED', 'DRIVER_EN_ROUTE', 'DRIVER_ARRIVED', 'IN_PROGRESS'],
+      },
+    };
+    const [towingBooking, driverBooking] = await Promise.all([
+      TowingBookingModel.exists(filter).exec(),
+      DriverBookingModel.exists(filter).exec(),
+    ]);
+    if (towingBooking || driverBooking) {
+      throw new ConflictError(
+        'This vehicle is assigned to an open job. Complete or cancel the job before changing its status or removing it.',
+      );
+    }
+  }
+
   private async assertVendor(userId: string) {
     const user = await UserModel.findById(userId).exec();
     if (!user || user.role !== 'vendor') {
@@ -53,11 +88,11 @@ export class VendorVehiclesService {
 
   private async assertVendorApproved(userId: string) {
     const user = await this.assertVendor(userId);
-    const status = user.vendorProfile?.status;
-    if (status !== 'approved') {
-      throw new ForbiddenError(
-        'Your vendor account must be approved by admin before you can register vehicles.',
-      );
+    if (user.accountStatus === 'SUSPENDED' || user.operationalStatus === 'SUSPENDED') {
+      throw new ForbiddenError('Your vendor account is suspended.');
+    }
+    if (user.vendorProfile?.status === 'rejected' || user.reviewStatus === 'REJECTED') {
+      throw new ForbiddenError('Your vendor account was rejected by administrator.');
     }
     return user;
   }
@@ -105,14 +140,57 @@ export class VendorVehiclesService {
       throw new ForbiddenError('Vehicle is not in your fleet');
     }
 
+    if (dto.status && dto.status !== 'ACTIVE') {
+      await this.assertVehicleHasNoOpenAssignments(vehicle._id);
+    }
     if (dto.type) vehicle.type = dto.type;
     if (dto.model) vehicle.vehicleModel = dto.model;
-    if (dto.year !== undefined) vehicle.year = dto.year;
+    if (dto.year !== undefined) vehicle.year = dto.year ?? undefined;
     if (dto.status) vehicle.status = dto.status;
-    if (dto.insuranceExpiry) vehicle.insuranceExpiry = new Date(dto.insuranceExpiry);
+    if (dto.insuranceExpiry !== undefined) {
+      vehicle.insuranceExpiry = dto.insuranceExpiry ? new Date(dto.insuranceExpiry) : undefined;
+    }
     if (dto.maintenanceNote !== undefined) vehicle.maintenanceNote = dto.maintenanceNote;
     await vehicle.save();
 
+    return mapVehicle(vehicle);
+  }
+
+  async uploadDocument(
+    vendorUserId: string,
+    vehicleId: string,
+    documentType: string,
+    file: { buffer: Buffer; mimetype: string; originalname: string },
+  ) {
+    await this.assertVendorApproved(vendorUserId);
+    const vehicle = await VendorVehicleModel.findById(vehicleId).exec();
+    if (!vehicle) throw new NotFoundError('Vehicle not found');
+    if (vehicle.vendorId.toString() !== vendorUserId) {
+      throw new ForbiddenError('Vehicle is not in your fleet');
+    }
+
+    const upload = await storageService.uploadVendorVehicleDocument({
+      vendorId: vendorUserId,
+      vehicleId,
+      vendorType: 'towing_company',
+      documentType,
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      originalName: file.originalname,
+    });
+    const document = {
+      type: documentType,
+      url: upload.fileUrl,
+      fileName: upload.fileName,
+      status: 'PENDING' as const,
+      uploadedAt: new Date(),
+    };
+    if (!vehicle.documents) vehicle.documents = [];
+    const existingIndex = vehicle.documents.findIndex(item => item.type === documentType);
+    if (existingIndex >= 0) vehicle.documents[existingIndex] = document;
+    else vehicle.documents.push(document);
+
+    await vehicle.save();
     return mapVehicle(vehicle);
   }
 
@@ -123,6 +201,7 @@ export class VendorVehiclesService {
     if (vehicle.vendorId.toString() !== vendorUserId) {
       throw new ForbiddenError('Vehicle is not in your fleet');
     }
+    await this.assertVehicleHasNoOpenAssignments(vehicle._id);
     await vehicle.deleteOne();
     return { removed: true, vehicleId };
   }

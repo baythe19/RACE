@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -19,7 +20,7 @@ export default function ProgressStepper({ currentStep, totalSteps, labels }: Pro
           return (
             <View key={step} style={styles.stepItem}>
               <View style={[styles.dot, active && styles.dotActive]}>
-                <Text style={[styles.dotText, active && styles.dotTextActive]}>{step}</Text>
+                <PartnerText style={[styles.dotText, active && styles.dotTextActive]}>{step}</PartnerText>
               </View>
               {step < totalSteps ? <View style={[styles.line, step < currentStep && styles.lineActive]} /> : null}
             </View>
@@ -27,11 +28,11 @@ export default function ProgressStepper({ currentStep, totalSteps, labels }: Pro
         })}
       </View>
       {labels?.[currentStep - 1] ? (
-        <Text style={styles.label}>{labels[currentStep - 1]}</Text>
+        <PartnerText style={styles.label}>{labels[currentStep - 1]}</PartnerText>
       ) : (
-        <Text style={styles.label}>
+        <PartnerText style={styles.label}>
           Step {currentStep} of {totalSteps}
-        </Text>
+        </PartnerText>
       )}
     </View>
   );

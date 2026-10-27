@@ -1,259 +1,522 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
+  BackHandler,
+  FlatList,
   Image,
   ImageSourcePropType,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   StatusBar,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
+  type ListRenderItemInfo,
+  type ViewToken,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { AuthStackParamList } from '../../types/navigation';
+import SoftScreenFade from '../../components/auth/SoftScreenFade';
 import { images } from '../../assets';
-import { colors, layout, radius, typography } from '../../theme';
+import { useAppDispatch } from '../../redux/hooks';
+import { setSignupPath } from '../../redux/onboarding/onboardingSlice';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Onboarding'>;
 
-const REF_W = 390;
-const HERO_W = 800;
-const HERO_H = 886;
+const CANVAS_W = 375;
+const CANVAS_H = 812;
+
+const PALETTE = {
+  amber: '#F7B500',
+  orange: '#F5A011',
+  ink: '#151519',
+  gray: '#9A9AA0',
+  label: '#2A2B2F',
+  dotInactive: '#DCDCDC',
+  white: '#FFFFFF',
+};
+
+type Feature = {
+  lib: 'mci' | 'io';
+  icon: string;
+  label: string;
+};
+
+/** Left-high → right-low (slides 1 and 3). */
+const SWOOSH_DOWN =
+  'M0 52 C 110 46, 210 88, 285 102 C 315 108, 348 112, 375 113 L 375 120 L 0 120 Z';
+/** Left-low → right-high (slides 2 and 4). */
+const SWOOSH_UP =
+  'M0 113 C 27 112, 60 108, 90 102 C 165 88, 265 46, 375 52 L 375 120 L 0 120 Z';
 
 type Slide = {
   id: string;
   title: string;
   subtitle: string;
-  image?: ImageSourcePropType;
-  heroBg?: string;
+  image: ImageSourcePropType;
+  /** Shift photo up (negative) so the hero frames the subject, not the bottom. */
+  imageShift: number;
+  /** Flip the image/text wave so consecutive slides flow opposite directions. */
+  waveFlip: boolean;
+  badge: Feature;
+  features: Feature[];
 };
 
 const SLIDES: Slide[] = [
   {
     id: '1',
     image: images.onboarding1,
-    heroBg: '#DCE7F1',
+    imageShift: -0.08,
+    waveFlip: false,
     title: '24/7 Roadside\nAssistance',
-    subtitle: 'Fast, reliable and professional help\nwhen you need it most.',
+    subtitle:
+      'Fast, reliable and professional\nhelp whenever you need it most,\nanywhere on the road.',
+    badge: { lib: 'mci', icon: 'car', label: 'Car' },
+    features: [
+      { lib: 'mci', icon: 'tow-truck', label: 'Towing' },
+      { lib: 'mci', icon: 'account', label: 'Drivers' },
+      { lib: 'io', icon: 'construct', label: 'Quick Fix' },
+    ],
   },
   {
     id: '2',
     image: images.onboarding2,
-    heroBg: '#FEFDFD',
-    title: 'Trusted & Verified\nExperts',
-    subtitle: 'Our professionals are verified, trained\nand ready to assist.',
+    imageShift: -0.04,
+    waveFlip: true,
+    title: 'Trusted &\nVerified Experts',
+    subtitle:
+      'Our professionals are verified,\ntrained and ready to assist you\nwhenever help is needed.',
+    badge: { lib: 'mci', icon: 'shield-check', label: 'Verified' },
+    features: [
+      { lib: 'mci', icon: 'check-decagram', label: 'Verified' },
+      { lib: 'mci', icon: 'shield-account', label: 'Trained' },
+      { lib: 'mci', icon: 'account-tie', label: 'Professional' },
+    ],
   },
   {
     id: '3',
     image: images.onboarding3,
-    heroBg: '#FEFDFD',
+    imageShift: -0.06,
+    waveFlip: false,
     title: 'Quick Response\nNear You',
-    subtitle: 'We reach you quickly with our\nnearby service network.',
+    subtitle:
+      'We reach you quickly with our\ntrusted nearby service network\nso help is always close by.',
+    badge: { lib: 'mci', icon: 'map-marker', label: 'Nearby' },
+    features: [
+      { lib: 'mci', icon: 'map-marker-path', label: 'Live Tracking' },
+      { lib: 'mci', icon: 'map-marker-radius', label: 'Nearby Support' },
+      { lib: 'mci', icon: 'clock-outline', label: 'Estimated Time' },
+    ],
   },
   {
     id: '4',
     image: images.onboarding4,
-    heroBg: '#FEFDFD',
-    title: '24/7 Support Always\nAvailable',
-    subtitle: "We're here for you\nanytime, anywhere.",
+    imageShift: -0.05,
+    waveFlip: true,
+    title: '24/7 Support\nAlways Available',
+    subtitle:
+      "We're here for you anytime,\nanywhere you need our help,\nday or night.",
+    badge: { lib: 'mci', icon: 'headset', label: 'Support' },
+    features: [
+      { lib: 'mci', icon: 'phone', label: 'Call' },
+      { lib: 'io', icon: 'chatbubble-ellipses', label: 'Chat' },
+      { lib: 'mci', icon: 'map-marker', label: 'Track' },
+    ],
   },
 ];
 
-export default function OnboardingScreen({ navigation }: Props) {
-  const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const s = width / REF_W;
-  const px = (n: number) => Math.round(n * s);
+function FeatureIcon({
+  feature,
+  size,
+  color,
+}: {
+  feature: Feature;
+  size: number;
+  color: string;
+}) {
+  if (feature.lib === 'mci') {
+    return (
+      <MaterialCommunityIcons
+        name={feature.icon as keyof typeof MaterialCommunityIcons.glyphMap}
+        size={size}
+        color={color}
+      />
+    );
+  }
+  return (
+    <Ionicons
+      name={feature.icon as keyof typeof Ionicons.glyphMap}
+      size={size}
+      color={color}
+    />
+  );
+}
 
+export default function OnboardingScreen({ navigation }: Props) {
+  const dispatch = useAppDispatch();
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const s = Math.min(screenW / CANVAS_W, screenH / CANVAS_H);
+  const heroH = Math.min(420 * s, screenH * 0.53);
+
+  const listRef = useRef<FlatList<Slide>>(null);
+  const activeIndexRef = useRef(0);
   const [activeIndex, setActiveIndex] = useState(0);
-  const slide = SLIDES[activeIndex];
   const isLast = activeIndex === SLIDES.length - 1;
 
-  const heroH = Math.round((width * HERO_H) / HERO_W);
-  const heroTotalH = heroH + insets.top;
-  const heroClipL = px(8);
+  const setIndex = useCallback((index: number) => {
+    const next = Math.max(0, Math.min(index, SLIDES.length - 1));
+    activeIndexRef.current = next;
+    setActiveIndex(next);
+  }, []);
+
+  const scrollTo = useCallback(
+    (index: number, animated = true) => {
+      const next = Math.max(0, Math.min(index, SLIDES.length - 1));
+      listRef.current?.scrollToIndex({ index: next, animated });
+      setIndex(next);
+    },
+    [setIndex],
+  );
+
+  const leaveOnboarding = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const parent = navigation.getParent();
+    if (parent?.canGoBack()) {
+      parent.goBack();
+      return;
+    }
+    dispatch(setSignupPath({ accountType: 'customer', vendorType: null }));
+    navigation.navigate('MobileNumber');
+  }, [dispatch, navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const onHardwareBack = () => {
+        if (activeIndexRef.current > 0) {
+          scrollTo(activeIndexRef.current - 1);
+          return true;
+        }
+        leaveOnboarding();
+        return true;
+      };
+      const sub = BackHandler.addEventListener('hardwareBackPress', onHardwareBack);
+      return () => sub.remove();
+    }, [leaveOnboarding, scrollTo]),
+  );
 
   const goNext = () => {
     if (!isLast) {
-      setActiveIndex(index => index + 1);
+      scrollTo(activeIndex + 1);
       return;
     }
-    navigation.navigate('AccountType');
+    dispatch(setSignupPath({ accountType: 'customer', vendorType: null }));
+    navigation.navigate('MobileNumber');
   };
 
-  const skip = () => navigation.navigate('AccountType');
+  const skip = () => {
+    dispatch(setSignupPath({ accountType: 'customer', vendorType: null }));
+    navigation.navigate('MobileNumber');
+  };
 
-  return (
-    <View style={styles.root}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+  const onMomentumScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / screenW);
+    if (index !== activeIndexRef.current) {
+      setIndex(index);
+    }
+  };
 
-      <View style={[styles.heroWrap, { width, height: heroTotalH, backgroundColor: slide.heroBg ?? '#DCE7F1' }]}>
-        {slide.image ? (
-          <Image
-            source={slide.image}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: -heroClipL,
-              width: width + heroClipL,
-              height: heroTotalH,
-            }}
-            resizeMode="stretch"
-            resizeMethod="scale"
-            fadeDuration={0}
-          />
-        ) : (
-          <View style={styles.heroPlaceholder} />
-        )}
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const index = viewableItems[0]?.index;
+      if (typeof index === 'number') {
+        setIndex(index);
+      }
+    },
+  ).current;
+
+  const viewabilityConfig = useRef({
+    viewAreaCoveragePercentThreshold: 60,
+  }).current;
+
+  const renderSlide = ({ item }: ListRenderItemInfo<Slide>) => (
+    <View style={[styles.slide, { width: screenW }]}>
+      <View style={[styles.hero, { height: heroH }]}>
+        <Image
+          source={item.image}
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: screenW,
+            height: heroH * 1.22,
+            top: heroH * item.imageShift,
+          }}
+          resizeMode="cover"
+          fadeDuration={0}
+        />
+
+        <Svg
+          style={styles.swoosh}
+          width={screenW}
+          height={120 * s}
+          viewBox="0 0 375 120"
+          preserveAspectRatio="none">
+          <Path d={item.waveFlip ? SWOOSH_UP : SWOOSH_DOWN} fill={PALETTE.white} />
+        </Svg>
+
+        <View
+          style={[
+            styles.badge,
+            {
+              ...(item.waveFlip ? { right: 22 * s } : { left: 22 * s }),
+              bottom: 18 * s,
+              width: 60 * s,
+              height: 60 * s,
+              borderRadius: 20 * s,
+            },
+          ]}>
+          <FeatureIcon feature={item.badge} size={30 * s} color={PALETTE.orange} />
+        </View>
 
         {!isLast ? (
           <Pressable
             onPress={skip}
-            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Skip onboarding"
             style={({ pressed }) => [
               styles.skipBtn,
               {
-                top: insets.top + px(6),
-                right: px(20),
-                paddingHorizontal: px(14),
-                paddingVertical: px(7),
-                borderRadius: px(20),
+                top: 54 * s,
+                right: 22 * s,
+                paddingHorizontal: 18 * s,
+                paddingVertical: 9 * s,
+                borderRadius: 19 * s,
               },
-              pressed && styles.skipPressed,
+              pressed && styles.pressed,
             ]}>
-            <Text style={[styles.skipText, { fontSize: px(14) }]}>Skip</Text>
+            <Text style={[styles.skipTxt, { fontSize: 15 * s }]} allowFontScaling={false}>
+              Skip
+            </Text>
           </Pressable>
         ) : null}
       </View>
 
-      <View style={[styles.panel, { paddingHorizontal: px(24), paddingBottom: insets.bottom + px(12) }]}>
-        <View style={{ paddingTop: px(34) }}>
-          <Text style={[styles.title, { fontSize: px(28), lineHeight: px(36) }]}>
-            {slide.title}
+      <View
+        style={[
+          styles.content,
+          {
+            paddingHorizontal: 24 * s,
+            paddingTop: 4 * s,
+            paddingBottom: 8 * s,
+            backgroundColor: PALETTE.white,
+          },
+        ]}>
+        <View>
+          <Text
+            style={[styles.title, { fontSize: 32 * s, lineHeight: 40 * s }]}
+            numberOfLines={2}
+            allowFontScaling={false}>
+            {item.title}
           </Text>
           <Text
             style={[
               styles.subtitle,
-              { fontSize: px(19), lineHeight: px(28), marginTop: px(22) },
-            ]}>
-            {slide.subtitle}
+              { marginTop: 14 * s, fontSize: 17 * s, lineHeight: 25 * s },
+            ]}
+            numberOfLines={3}
+            allowFontScaling={false}>
+            {item.subtitle}
           </Text>
         </View>
 
-        <View>
-          <View style={[styles.dots, { gap: px(8) }]}>
-            {SLIDES.map((_, index) => (
+        <View style={[styles.features, { marginTop: 20 * s }]}>
+          {item.features.map(feature => (
+            <View key={feature.label} style={styles.feature}>
               <View
-                key={index}
                 style={[
-                  styles.dot,
-                  { height: px(10), borderRadius: px(5) },
-                  index === activeIndex
-                    ? { width: px(10), backgroundColor: colors.primary }
-                    : { width: px(10), backgroundColor: colors.border },
-                ]}
-              />
-            ))}
-          </View>
-
-          <Pressable
-            onPress={goNext}
-            style={({ pressed }) => [
-              styles.button,
-              {
-                height: px(layout.buttonHeight),
-                borderRadius: px(radius.button),
-                marginTop: px(14),
-              },
-              isLast ? styles.buttonFilled : styles.buttonOutline,
-              pressed && styles.buttonPressed,
-            ]}>
-            <Text
-              style={[
-                styles.buttonLabel,
-                { fontSize: px(17) },
-                isLast ? styles.buttonLabelFilled : styles.buttonLabelOutline,
-              ]}>
-              {isLast ? "Let's Go" : 'Next'}
-            </Text>
-          </Pressable>
+                  styles.featureIcon,
+                  {
+                    width: 56 * s,
+                    height: 56 * s,
+                    borderRadius: 16 * s,
+                  },
+                ]}>
+                <FeatureIcon feature={feature} size={26 * s} color={PALETTE.orange} />
+              </View>
+              <Text
+                style={[styles.featureLabel, { marginTop: 8 * s, fontSize: 13 * s }]}
+                numberOfLines={1}
+                allowFontScaling={false}>
+                {feature.label}
+              </Text>
+            </View>
+          ))}
         </View>
+        <View style={styles.contentSpacer} />
       </View>
     </View>
+  );
+
+  return (
+    <SoftScreenFade duration={200} style={styles.screen}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+
+      <FlatList
+        style={styles.list}
+        ref={listRef}
+        data={SLIDES}
+        keyExtractor={item => item.id}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        renderItem={renderSlide}
+        onMomentumScrollEnd={onMomentumScrollEnd}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, index) => ({
+          length: screenW,
+          offset: screenW * index,
+          index,
+        })}
+        initialNumToRender={1}
+        windowSize={3}
+      />
+
+      <View
+        style={[
+          styles.footer,
+          {
+            paddingHorizontal: 24 * s,
+            paddingBottom: 22 * s,
+          },
+        ]}>
+        <View style={styles.dots}>
+          {SLIDES.map((_, index) => (
+            <Pressable
+              key={index}
+              onPress={() => scrollTo(index)}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to slide ${index + 1}`}
+              style={[
+                styles.dot,
+                {
+                  width: 8 * s,
+                  height: 8 * s,
+                  borderRadius: 4 * s,
+                  marginHorizontal: 4.5 * s,
+                },
+                index === activeIndex ? styles.dotActive : null,
+              ]}
+            />
+          ))}
+        </View>
+
+        <Pressable
+          onPress={goNext}
+          accessibilityRole="button"
+          accessibilityLabel={isLast ? "Let's Go" : 'Next'}
+          style={({ pressed }) => [
+            styles.nextBtn,
+            {
+              marginTop: 28 * s,
+              height: 50 * s,
+              borderRadius: 25 * s,
+            },
+            pressed && styles.pressed,
+          ]}>
+          <Text style={[styles.nextTxt, { fontSize: 17 * s }]} allowFontScaling={false}>
+            {isLast ? "Let's Go" : 'Next'}
+          </Text>
+          <Ionicons
+            name="arrow-forward"
+            size={18 * s}
+            color={PALETTE.ink}
+            style={styles.nextArrow}
+          />
+        </Pressable>
+      </View>
+    </SoftScreenFade>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.pageBg,
-  },
-  heroWrap: {
+  screen: { flex: 1, backgroundColor: PALETTE.white },
+  list: { flex: 1 },
+  slide: { flex: 1, backgroundColor: PALETTE.white },
+  hero: {
+    width: '100%',
     overflow: 'hidden',
     backgroundColor: '#DCE7F1',
   },
-  heroPlaceholder: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.lightGrey,
-  },
+  swoosh: { position: 'absolute', left: 0, bottom: 0 },
   skipBtn: {
     position: 'absolute',
-    zIndex: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  skipPressed: {
-    opacity: 0.8,
-    backgroundColor: colors.lightGrey,
+  skipTxt: { fontWeight: '600', color: '#1B1C1E' },
+  badge: {
+    position: 'absolute',
+    backgroundColor: PALETTE.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6B5A23',
+    shadowOpacity: 0.14,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
-  skipText: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  panel: {
+  content: {
     flex: 1,
-    justifyContent: 'space-between',
-    backgroundColor: colors.pageBg,
+    backgroundColor: PALETTE.white,
+    zIndex: 2,
   },
+  contentSpacer: { flex: 1 },
   title: {
-    fontWeight: typography.weights.extrabold,
-    color: colors.dark,
-    textAlign: 'center',
+    fontWeight: '900',
+    color: PALETTE.ink,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    color: colors.grey,
-    textAlign: 'center',
+    fontWeight: '400',
+    color: PALETTE.gray,
   },
-  dots: {
+  features: { flexDirection: 'row', alignItems: 'flex-start' },
+  feature: { flex: 1, alignItems: 'center' },
+  featureIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF6E0',
+  },
+  featureLabel: { fontWeight: '600', color: PALETTE.label, textAlign: 'center' },
+  footer: { backgroundColor: PALETTE.white },
+  dots: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  dot: { backgroundColor: PALETTE.dotInactive },
+  dotActive: { backgroundColor: PALETTE.amber },
+  nextBtn: {
+    backgroundColor: PALETTE.amber,
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dot: {},
-  button: {
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: PALETTE.amber,
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  buttonFilled: {
-    backgroundColor: colors.primary,
-  },
-  buttonOutline: {
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-  },
-  buttonPressed: {
-    opacity: 0.88,
-  },
-  buttonLabel: {
-    fontWeight: typography.weights.bold,
-  },
-  buttonLabelFilled: {
-    color: colors.dark,
-  },
-  buttonLabelOutline: {
-    color: colors.dark,
-  },
+  nextTxt: { fontWeight: '700', color: PALETTE.ink },
+  nextArrow: { marginLeft: 8 },
+  pressed: { opacity: 0.88 },
 });

@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React, { type ReactNode } from 'react';
-import { StyleSheet, Text } from 'react-native';
+import { StyleSheet } from 'react-native';
 
 import PartnerRegistrationStepper from './PartnerRegistrationStepper';
 import PartnerScreenLayout from './PartnerScreenLayout';
@@ -31,7 +32,7 @@ export default function PartnerRegistrationLayout({
       footer={footer}
       headerExtra={
         <>
-          <Text style={styles.stepLabel}>{stepLabel}</Text>
+          <PartnerText style={styles.stepLabel}>{stepLabel}</PartnerText>
           <PartnerRegistrationStepper steps={steps} activeStep={activeStep} />
         </>
       }>

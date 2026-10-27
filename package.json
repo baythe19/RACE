@@ -1,17 +1,17 @@
 {
   "name": "race",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "private": true,
-  "description": "RACE Service — mobile + web + backend",
+  "description": "RACE Service — customer app, partner app, admin, backend",
   "scripts": {
-    "dev:mobile": "cd \"mobile application\" && npm start",
-    "dev:web": "cd \"web application\" && npm run dev",
     "dev:backend": "cd backend && npm run dev",
-    "dev:admin": "cd race-admin/apps/admin-web && npm run dev",
-    "dev:platform": "cd race-service && npm run dev",
+    "dev:admin": "cd race-admin && npm run dev",
+    "dev:customer": "cd \"customer application\" && npm start",
+    "dev:partner": "cd \"mobile application\" && npm start",
     "seed": "cd backend && npm run seed",
     "seed:backend": "cd backend && npm run seed",
-    "ios": "cd \"mobile application\" && npm run ios",
-    "android": "cd \"mobile application\" && npm run android"
+    "test:ui-on": "bash scripts/toggle-ui-test-mode.sh on",
+    "test:ui-off": "bash scripts/toggle-ui-test-mode.sh off",
+    "test:ui-status": "bash scripts/toggle-ui-test-mode.sh status"
   }
 }

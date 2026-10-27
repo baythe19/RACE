@@ -10,6 +10,15 @@
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
+      "env": {
+        "EXPO_PUBLIC_UI_PREVIEW_MODE": "true",
+        "EXPO_PUBLIC_UI_PREVIEW_MUTATIONS": "true",
+        "EXPO_PUBLIC_UI_PREVIEW_RELEASE": "true",
+        "EXPO_PUBLIC_UI_QA_NAVIGATOR": "true",
+        "EXPO_PUBLIC_UI_TEST_PERMISSIVE_MODE": "true",
+        "EXPO_PUBLIC_API_URL": "http://127.0.0.1:9"
+      },
       "android": {
         "buildType": "apk"
       }

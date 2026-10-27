@@ -19,7 +19,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const { booking: draftBooking } = useDriverBooking();
   const bookingId = route.params?.bookingId;
-  const booking = useBookingQuery(bookingId ?? '');
+  const booking = useBookingQuery(bookingId ?? '', 'driver');
   const { etaMinutes, driverName, driverPhone, driverRating, status } = useBookingTracking(
     bookingId,
     'driver',
@@ -128,7 +128,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
                     }}>
                     {name}
                   </Text>
-                  {hasDriver ? (
+                  {hasDriver && rating != null ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
                       <Star size={t.px(14)} color={colors.primary} fill={colors.primary} />
                       <Text
@@ -180,7 +180,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
                   fontWeight: typography.weights.extrabold,
                   color: colors.primary,
                 }}>
-                {etaMinutes} min
+                {etaMinutes != null ? etaMinutes + ' min' : 'Updating'}
               </Text>
             </View>
           </View>

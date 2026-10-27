@@ -24,6 +24,7 @@ export const createDriverBookingSchema = z
     dropoff: locationSchema.optional(),
     packageHours: packageHoursSchema.optional(),
     estimatedDurationHours: z.number().positive().optional(),
+    driverServiceType: z.enum(['part_time', 'full_time', 'outstation', 'night']).optional(),
     scheduledAt: z.string().datetime().optional(),
   })
   .superRefine((data, ctx) => {
@@ -66,6 +67,7 @@ export interface DriverBookingResponseDto {
   vehicleId?: string;
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
+  driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   estimatedDurationHours?: number;
   packageHours: number;
   vehicleCategory?: string;
@@ -89,6 +91,10 @@ export interface DriverBookingResponseDto {
   };
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  completionOtp?: string;
+  arrivedAtDropoffAt?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
   scheduledAt?: string;
   statusHistory: Array<{ status: string; timestamp: string; note?: string }>;
   cancelledAt?: string;
@@ -127,4 +133,9 @@ export interface DriverTrackingResponseDto {
   dropoff?: { address: string; latitude: number; longitude: number };
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  completionOtp?: string;
+  arrivedAtDropoffAt?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }

@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 import type { DocumentVerificationStatus } from '../../types/vendor';
@@ -28,9 +29,9 @@ export default function DocumentStatusChip({ status }: DocumentStatusChipProps) 
   return (
     <View style={[styles.chip, { borderColor: STATUS_COLORS[status] }]}>
       <View style={[styles.dot, { backgroundColor: STATUS_COLORS[status] }]} />
-      <Text style={[styles.label, { color: STATUS_COLORS[status] }]}>
+      <PartnerText style={[styles.label, { color: STATUS_COLORS[status] }]}>
         {STATUS_LABELS[status]}
-      </Text>
+      </PartnerText>
     </View>
   );
 }

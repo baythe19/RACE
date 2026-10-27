@@ -1,4 +1,5 @@
 import { env } from '../../config/env';
+import { getCache } from '../../config/cache';
 import { logger } from '../../utils/src/logger';
 
 export interface LatLng {
@@ -20,12 +21,32 @@ interface DistanceMatrixResponse {
   error_message?: string;
 }
 
+export function fallbackRoadDistanceAndDuration(
+  origin: LatLng,
+  destination: LatLng,
+): { distanceKm: number; durationMinutes: number } {
+  const R = 6371;
+  const dLat = ((destination.latitude - origin.latitude) * Math.PI) / 180;
+  const dLon = ((destination.longitude - origin.longitude) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((origin.latitude * Math.PI) / 180) *
+      Math.cos((destination.latitude * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const straightKm = R * c;
+  const distanceKm = Math.max(1, Math.round(straightKm * 1.28 * 10) / 10);
+  const durationMinutes = Math.max(2, Math.round((distanceKm / 22) * 60));
+  return { distanceKm, durationMinutes };
+}
+
 export async function getDistanceAndDuration(
   origin: LatLng,
   destination: LatLng,
-): Promise<{ distanceKm: number; durationMinutes: number } | null> {
+): Promise<{ distanceKm: number; durationMinutes: number }> {
   if (!env.GOOGLE_MAPS_API_KEY?.trim()) {
-    return null;
+    return fallbackRoadDistanceAndDuration(origin, destination);
   }
 
   const params = new URLSearchParams({
@@ -39,44 +60,68 @@ export async function getDistanceAndDuration(
 
   const url = `https://maps.googleapis.com/maps/api/distancematrix/json?${params.toString()}`;
 
+  // BUG-18: Distance Matrix is a billed API and /fare is public — identical
+  // origin/destination pairs are served from a 10-minute cache so a client
+  // cannot burn quota by replaying the same request. Rounding to 3 decimals
+  // makes the key stable across trivial GPS jitter.
+  const round = (n: number) => Math.round(n * 1000) / 1000;
+  const cacheKey = `dm:${round(origin.latitude)},${round(origin.longitude)}:${round(destination.latitude)},${round(destination.longitude)}`;
+  try {
+    const cache = getCache();
+    const hit = await cache.get(cacheKey);
+    if (hit) {
+      const parsed = JSON.parse(hit) as { distanceKm: number; durationMinutes: number };
+      return parsed;
+    }
+  } catch {
+    // cache unavailable — fall through to the live call
+  }
+
   try {
     const response = await fetch(url);
 
     if (!response.ok) {
-      logger.warn('Google Distance Matrix request failed', {
+      logger.warn('Google Distance Matrix request failed, using road fallback', {
         status: response.status,
         statusText: response.statusText,
       });
-      return null;
+      return fallbackRoadDistanceAndDuration(origin, destination);
     }
 
     const data = (await response.json()) as DistanceMatrixResponse;
 
     if (data.status !== 'OK') {
-      logger.warn('Google Distance Matrix API error', {
+      logger.warn('Google Distance Matrix API error, using road fallback', {
         status: data.status,
         errorMessage: data.error_message,
       });
-      return null;
+      return fallbackRoadDistanceAndDuration(origin, destination);
     }
 
     const element = data.rows?.[0]?.elements?.[0];
 
     if (!element || element.status !== 'OK' || !element.distance || !element.duration) {
-      logger.warn('Google Distance Matrix element not OK', {
+      logger.warn('Google Distance Matrix element not OK, using road fallback', {
         elementStatus: element?.status ?? 'missing',
       });
-      return null;
+      return fallbackRoadDistanceAndDuration(origin, destination);
     }
 
-    return {
+    const result = {
       distanceKm: element.distance.value / 1000,
       durationMinutes: element.duration.value / 60,
     };
+
+    // Cache-aside write: 10 minutes (600 s). Best-effort; failures are ignored.
+    void getCache()
+      .set(cacheKey, JSON.stringify(result), 'EX', 600)
+      .catch(() => undefined);
+
+    return result;
   } catch (error) {
-    logger.warn('Google Distance Matrix request threw', {
+    logger.warn('Google Distance Matrix request threw, using road fallback', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return null;
+    return fallbackRoadDistanceAndDuration(origin, destination);
   }
 }

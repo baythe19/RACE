@@ -8,6 +8,8 @@ export interface PartnerUploadedDocument {
   uri: string;
   name: string;
   mimeType?: string;
+  /** Durable URL returned by the backend after a successful upload. */
+  remoteUrl?: string;
 }
 
 export interface DriverPersonalInfo {
@@ -16,15 +18,26 @@ export interface DriverPersonalInfo {
   email: string;
   dateOfBirth: string;
   address: string;
+  city?: string;
+  state?: string;
+  pincode?: string;
+  licenseNumber?: string;
+  driverType?: 'Full-Time' | 'Part-Time';
+  emergencyContactName?: string;
+  emergencyContactNumber?: string;
+  yearsOfExperience?: string;
+  languages?: string;
 }
 
 export interface DriverVehicleInfo {
   vehicleType: string;
   vehicleNumber: string;
   rcNumber: string;
+  licenseNumber: string;
   insuranceProvider: string;
   insurancePolicyNumber: string;
   vehicleModel: string;
+  registeredTo?: 'me' | 'someone_else';
 }
 
 export interface VendorBusinessInfo {
@@ -33,6 +46,10 @@ export interface VendorBusinessInfo {
   mobileNumber: string;
   email: string;
   businessType: string;
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  acceptTerms?: boolean;
 }
 
 export interface VendorBusinessAddress {
@@ -64,32 +81,52 @@ interface PartnerRegistrationState {
   reset: () => void;
 }
 
-const emptyDriverPersonal: DriverPersonalInfo = {
+// P1 (v6 audit): registration forms start EMPTY. The old pre-filled mock PII
+// ("Rajesh Kumar", 9876543210, fabricated bank details, Unsplash document
+// URIs) could reach the real register APIs when a user skipped a field.
+// Permissive QA prefill lives in the UI QA navigator, not in production state.
+export const defaultDriverPersonal: DriverPersonalInfo = {
   fullName: '',
   mobileNumber: '',
   email: '',
   dateOfBirth: '',
   address: '',
+  city: '',
+  state: '',
+  pincode: '',
+  licenseNumber: '',
+  driverType: 'Full-Time',
+  emergencyContactName: '',
+  emergencyContactNumber: '',
+  yearsOfExperience: '',
+  languages: '',
 };
 
-const emptyDriverVehicle: DriverVehicleInfo = {
-  vehicleType: '',
+export const defaultDriverVehicle: DriverVehicleInfo = {
+  vehicleType: 'Tow Driver',
   vehicleNumber: '',
   rcNumber: '',
+  licenseNumber: '',
   insuranceProvider: '',
   insurancePolicyNumber: '',
   vehicleModel: '',
 };
 
-const emptyVendorBusiness: VendorBusinessInfo = {
+export const defaultDriverDocuments: PartnerUploadedDocument[] = [];
+
+export const defaultVendorBusiness: VendorBusinessInfo = {
   businessName: '',
   ownerName: '',
   mobileNumber: '',
   email: '',
-  businessType: '',
+  businessType: 'Towing Company',
+  accountHolderName: '',
+  accountNumber: '',
+  ifsc: '',
+  acceptTerms: false,
 };
 
-const emptyVendorAddress: VendorBusinessAddress = {
+export const defaultVendorAddress: VendorBusinessAddress = {
   addressLine1: '',
   addressLine2: '',
   city: '',
@@ -98,14 +135,16 @@ const emptyVendorAddress: VendorBusinessAddress = {
   landmark: '',
 };
 
+export const defaultVendorDocuments: PartnerUploadedDocument[] = [];
+
 export const usePartnerRegistrationStore = create<PartnerRegistrationState>((set) => ({
   role: null,
-  driverPersonal: emptyDriverPersonal,
-  driverVehicle: emptyDriverVehicle,
-  driverDocuments: [],
-  vendorBusiness: emptyVendorBusiness,
-  vendorAddress: emptyVendorAddress,
-  vendorDocuments: [],
+  driverPersonal: defaultDriverPersonal,
+  driverVehicle: defaultDriverVehicle,
+  driverDocuments: defaultDriverDocuments,
+  vendorBusiness: defaultVendorBusiness,
+  vendorAddress: defaultVendorAddress,
+  vendorDocuments: defaultVendorDocuments,
   setRole: (role) => set({ role }),
   setDriverPersonal: (data) =>
     set((state) => ({ driverPersonal: { ...state.driverPersonal, ...data } })),
@@ -140,11 +179,11 @@ export const usePartnerRegistrationStore = create<PartnerRegistrationState>((set
   reset: () =>
     set({
       role: null,
-      driverPersonal: emptyDriverPersonal,
-      driverVehicle: emptyDriverVehicle,
-      driverDocuments: [],
-      vendorBusiness: emptyVendorBusiness,
-      vendorAddress: emptyVendorAddress,
-      vendorDocuments: [],
+      driverPersonal: defaultDriverPersonal,
+      driverVehicle: defaultDriverVehicle,
+      driverDocuments: defaultDriverDocuments,
+      vendorBusiness: defaultVendorBusiness,
+      vendorAddress: defaultVendorAddress,
+      vendorDocuments: defaultVendorDocuments,
     }),
 }));

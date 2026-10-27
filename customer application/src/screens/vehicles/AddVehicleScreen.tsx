@@ -33,11 +33,17 @@ import { colors, shadows, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'AddVehicle'>;
 
+// LayoutAnimation is enabled by default in the React Native New Architecture
 if (
   Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
+  !('nativeFabricUIManager' in globalThis) &&
+  typeof UIManager.setLayoutAnimationEnabledExperimental === 'function'
 ) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
+  try {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+  } catch {
+    // Ignore in modern RN architectures
+  }
 }
 
 export default function AddVehicleScreen({ navigation }: Props) {

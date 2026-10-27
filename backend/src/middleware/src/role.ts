@@ -1,31 +1,36 @@
 import type { NextFunction, Request, Response } from 'express';
 
 import { ForbiddenError } from '../../utils/src/errors';
+import { hasUserCapability } from '../../auth/src/roles';
 import { getAuthUser } from '../../utils/src/request';
 import { userRepository } from '../../services/src/userRepository';
 
 export function requireRole(...roles: string[]) {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     try {
-      const user = getAuthUser(req);
-      if (roles.includes(user.role)) {
-        next();
+      const tokenUser = getAuthUser(req);
+      // Resolve against persisted capabilities on every protected request. The JWT role
+      // selects the active app surface; it never grants a capability by itself.
+      const dbUser = await userRepository.findById(tokenUser.id);
+      if (!dbUser || dbUser.accountStatus === 'SUSPENDED' || dbUser.accountStatus === 'INACTIVE') {
+        next(new ForbiddenError('Insufficient permissions'));
         return;
       }
 
-      // JWT role can lag after vendor registration or admin approval — trust DB role.
-      const dbUser = await userRepository.findById(user.id);
-      if (dbUser && roles.includes(dbUser.role)) {
-        req.user = {
-          id: user.id,
-          role: dbUser.role,
-          mobileNumber: dbUser.mobileNumber,
-        };
-        next();
+      const activeRole =
+        roles.find((role) => role === tokenUser.role && hasUserCapability(dbUser, role)) ??
+        roles.find((role) => hasUserCapability(dbUser, role));
+      if (!activeRole) {
+        next(new ForbiddenError('Insufficient permissions'));
         return;
       }
 
-      next(new ForbiddenError('Insufficient permissions'));
+      req.user = {
+        id: tokenUser.id,
+        role: activeRole,
+        mobileNumber: dbUser.mobileNumber,
+      };
+      next();
     } catch (error) {
       next(error);
     }

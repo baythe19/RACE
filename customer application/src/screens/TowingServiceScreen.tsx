@@ -1,226 +1,315 @@
 import React from 'react';
 import {
-  Image,
   Linking,
   Pressable,
+  ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { ArrowRight, Check, Phone } from 'lucide-react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-
-import ServiceDetailScreenLayout, {
-  useServiceDetailMetrics,
-} from '../components/services/ServiceDetailScreenLayout';
-import { images } from '../assets';
 import {
-  TOWING_SERVICE_LIST,
-  TOWING_WHY_CHOOSE_US,
-} from '../constants/towingBooking';
+  AlertTriangle,
+  ArrowRight,
+  Calendar,
+  Car,
+  Clock,
+  Phone,
+  Shield,
+  ShieldCheck,
+} from 'lucide-react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import { useTowingBooking } from '../context/TowingBookingContext';
+import { useCatalogStore } from '../store/catalogStore';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import type { TowingServiceModeId } from '../types/towingBooking';
 import { colors, shadows, typography } from '../theme';
 
+const REF_W = 390;
+
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingService'>;
 
+const TOWING_OPTIONS = [
+  {
+    id: 'instant' as TowingServiceModeId,
+    title: 'Instant Towing',
+    subtitle: 'Dispatched immediately',
+    price: 'From ₹499',
+    Icon: Car,
+  },
+  {
+    id: 'scheduled' as TowingServiceModeId,
+    title: 'Scheduled Towing',
+    subtitle: 'Book in advance',
+    price: 'From ₹399',
+    Icon: Calendar,
+  },
+  {
+    id: 'emergency' as TowingServiceModeId,
+    title: 'Emergency Towing',
+    subtitle: 'Priority response',
+    price: 'From ₹699',
+    Icon: AlertTriangle,
+  },
+];
+
 export default function TowingServiceScreen({ navigation }: Props) {
-  const { px } = useServiceDetailMetrics();
+  const { width } = useWindowDimensions();
+  const s = width / REF_W;
+  const px = (n: number) => Math.round(n * s);
+  const insets = useSafeAreaInsets();
+  const heroCard = getServiceCategoryCard('towing');
+
   const { updateBooking } = useTowingBooking();
+  const apiBrand = useCatalogStore(state => state.brand);
 
   const bookTowing = (serviceMode: TowingServiceModeId) => {
     updateBooking({ serviceMode });
     navigation.navigate('TowingChooseVehicle');
   };
 
+  const callSupport = () => {
+    const phone = apiBrand?.phoneRaw ?? brand.phoneRaw;
+    void Linking.openURL(`tel:${phone}`);
+  };
+
   return (
-    <ServiceDetailScreenLayout>
-      <View
-        style={[
-          {
-            borderRadius: px(18),
-            overflow: 'hidden',
-            marginBottom: px(16),
-            height: px(168),
-          },
-          shadows.card,
-        ]}>
-        <Image
-          source={images.towingHeroBanner}
-          style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
-        />
-      </View>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <ServiceNavHeader title="Towing Service" onBack={() => navigation.goBack()} />
 
-      <View style={{ gap: px(12), marginBottom: px(18) }}>
-        {TOWING_SERVICE_LIST.map(service => (
-          <Pressable
-            key={service.id}
-            onPress={() => bookTowing(service.id)}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: px(10),
-              borderRadius: px(16),
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderLeftWidth: px(4),
-              borderLeftColor: colors.primary,
-              backgroundColor: colors.background,
-              paddingVertical: px(14),
-              paddingRight: px(12),
-              paddingLeft: px(10),
-            }}>
-            <View
-              style={{
-                width: px(48),
-                height: px(48),
-                borderRadius: px(24),
-                backgroundColor: colors.goldLight,
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-              <service.Icon
-                size={px(22)}
-                color={service.iconColor ?? colors.primary}
-                strokeWidth={2.5}
-              />
-            </View>
+      <ScrollView
+        style={{ backgroundColor: colors.pageBg }}
+        contentContainerStyle={{
+          paddingHorizontal: px(14),
+          paddingTop: px(12),
+          paddingBottom: px(100),
+          gap: px(12),
+        }}
+        showsVerticalScrollIndicator={false}>
+        <View style={{ marginBottom: px(4) }}>
+          <ServiceCategoryArtCard card={heroCard} />
 
-            <View style={{ flex: 1, minWidth: 0, flexShrink: 1 }}>
+          {/* Quick Trust Bar — attached to the bottom of the hero card */}
+          <View
+            style={[
+              shadows.cardSoft,
+              {
+                marginHorizontal: px(10),
+                marginTop: -px(24),
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                backgroundColor: colors.background,
+                borderRadius: px(16),
+                paddingVertical: px(14),
+                paddingHorizontal: px(10),
+                borderWidth: 1,
+                borderColor: '#F0EFEA',
+              },
+            ]}>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Clock size={px(18)} color={colors.primary} strokeWidth={2.5} />
               <Text
-                numberOfLines={1}
                 style={{
-                  fontSize: px(15),
+                  marginTop: px(4),
+                  fontSize: px(11),
                   fontWeight: typography.weights.bold,
                   color: colors.dark,
-                  marginBottom: px(3),
+                  textAlign: 'center',
                 }}>
-                {service.label}
-              </Text>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: px(12),
-                  color: colors.grey,
-                  marginBottom: px(4),
-                }}>
-                {service.description}
-              </Text>
-              <Text
-                style={{
-                  fontSize: px(13),
-                  fontWeight: typography.weights.bold,
-                  color: colors.primary,
-                }}>
-                {service.priceLabel}
+                30 min{'\n'}
+                <Text style={{ fontWeight: typography.weights.regular, color: colors.grey }}>
+                  arrival
+                </Text>
               </Text>
             </View>
-
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(2),
-                flexShrink: 0,
-              }}>
+            <View style={{ width: 1, backgroundColor: '#EEEEEE', marginVertical: px(4) }} />
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <ShieldCheck size={px(18)} color={colors.primary} strokeWidth={2.5} />
               <Text
                 style={{
-                  fontSize: px(12),
+                  marginTop: px(4),
+                  fontSize: px(11),
                   fontWeight: typography.weights.bold,
-                  color: colors.primary,
+                  color: colors.dark,
+                  textAlign: 'center',
                 }}>
-                Book Now
+                Verified{'\n'}
+                <Text style={{ fontWeight: typography.weights.regular, color: colors.grey }}>
+                  drivers
+                </Text>
               </Text>
-              <ArrowRight size={px(14)} color={colors.primary} strokeWidth={2.5} />
             </View>
-          </Pressable>
-        ))}
-      </View>
+            <View style={{ width: 1, backgroundColor: '#EEEEEE', marginVertical: px(4) }} />
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Shield size={px(18)} color={colors.primary} strokeWidth={2.5} />
+              <Text
+                style={{
+                  marginTop: px(4),
+                  fontSize: px(11),
+                  fontWeight: typography.weights.bold,
+                  color: colors.dark,
+                  textAlign: 'center',
+                }}>
+                Safe &{'\n'}
+                <Text style={{ fontWeight: typography.weights.regular, color: colors.grey }}>
+                  insured
+                </Text>
+              </Text>
+            </View>
+          </View>
+        </View>
 
-      <View
-        style={{
-          backgroundColor: colors.goldLight,
-          borderRadius: px(16),
-          padding: px(16),
-          marginBottom: px(16),
-        }}>
-        <Text
-          style={{
-            fontSize: px(16),
-            fontWeight: typography.weights.bold,
-            color: colors.dark,
-            marginBottom: px(14),
-          }}>
-          Why Choose Us?
-        </Text>
-        <View
-          style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: px(10),
-          }}>
-          {TOWING_WHY_CHOOSE_US.map(item => (
+        {/* Towing Options List */}
+        <View style={{ gap: px(10) }}>
+          {TOWING_OPTIONS.map(opt => (
             <View
-              key={item}
-              style={{
-                width: '47%',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(8),
-              }}>
+              key={opt.id}
+              style={[
+                shadows.cardSoft,
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.background,
+                  borderRadius: px(16),
+                  padding: px(14),
+                  borderWidth: 1,
+                  borderColor: '#F0EFEA',
+                  gap: px(12),
+                },
+              ]}>
               <View
                 style={{
-                  width: px(22),
-                  height: px(22),
-                  borderRadius: px(11),
-                  backgroundColor: colors.primary,
+                  width: px(44),
+                  height: px(44),
+                  borderRadius: px(22),
+                  backgroundColor: colors.goldLight,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0,
                 }}>
-                <Check size={px(12)} color={colors.background} strokeWidth={3} />
+                <opt.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
               </View>
-              <Text
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: px(14),
+                    fontWeight: typography.weights.bold,
+                    color: colors.dark,
+                  }}>
+                  {opt.title}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: px(11),
+                    color: colors.grey,
+                    marginTop: px(2),
+                  }}>
+                  {opt.subtitle}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: px(12),
+                    fontWeight: typography.weights.bold,
+                    color: colors.primary,
+                    marginTop: px(3),
+                  }}>
+                  {opt.price}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() => bookTowing(opt.id)}
                 style={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: px(12),
-                  color: colors.dark,
-                  lineHeight: px(16),
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: px(14),
+                  height: px(32),
+                  borderRadius: px(8),
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                {item}
-              </Text>
+                <Text
+                  style={{
+                    fontSize: px(12),
+                    fontWeight: typography.weights.bold,
+                    color: colors.dark,
+                  }}>
+                  Book Now
+                </Text>
+              </Pressable>
             </View>
           ))}
         </View>
-      </View>
+      </ScrollView>
 
-      <Pressable
-        onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
+      {/* Bottom Sticky Action Bar */}
+      <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: px(8),
-          borderRadius: px(14),
-          borderWidth: 1.5,
-          borderColor: colors.primary,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
           backgroundColor: colors.background,
-          paddingVertical: px(16),
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          paddingHorizontal: px(20),
+          paddingTop: px(10),
+          paddingBottom: Math.max(insets.bottom, px(12)),
+          flexDirection: 'row',
+          gap: px(12),
         }}>
-        <Phone size={px(20)} color={colors.primary} strokeWidth={2.5} />
-        <Text
+        <Pressable
+          onPress={callSupport}
           style={{
-            fontSize: px(16),
-            fontWeight: typography.weights.bold,
-            color: colors.primary,
+            flex: 1,
+            height: px(46),
+            borderRadius: px(14),
+            borderWidth: 1.5,
+            borderColor: colors.primary,
+            backgroundColor: colors.background,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: px(6),
           }}>
-          Call Directly
-        </Text>
-      </Pressable>
-    </ServiceDetailScreenLayout>
+          <Phone size={px(16)} color={colors.primary} strokeWidth={2.4} />
+          <Text
+            style={{
+              fontSize: px(14),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            Call Now
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => bookTowing('instant')}
+          style={{
+            flex: 1.5,
+            height: px(46),
+            borderRadius: px(14),
+            backgroundColor: colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: px(8),
+          }}>
+          <Text
+            style={{
+              fontSize: px(14),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            Book Towing
+          </Text>
+          <ArrowRight size={px(16)} color={colors.dark} strokeWidth={2.5} />
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }

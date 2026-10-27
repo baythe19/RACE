@@ -6,13 +6,18 @@ import { vendorDocumentUpload } from '../../middleware/src/upload';
 import { validate } from '../../middleware/src/validation';
 import { vendorController } from './vendor';
 import {
-  claimVendorDriverSchema,
-  createVendorDriverSchema,
+  createVendorStaffDriverSchema,
+  inviteVendorDriverSchema,
+  revokeVendorDriverMembershipSchema,
   uploadVendorDriverDocumentSchema,
+  vendorDriverOnboardingSendOtpSchema,
+  vendorDriverOnboardingVerifyOtpSchema,
 } from '../../services/src/vendorDriversValidator';
+import { savePayoutAccountSchema } from '../../services/src/vendorValidator';
 import {
   createVendorVehicleSchema,
   updateVendorVehicleSchema,
+  uploadVendorVehicleDocumentSchema,
 } from '../../services/src/vendorVehiclesValidator';
 import { vendorApproveBookingSchema, vendorAssignBookingSchema, vendorVerifyTripOtpSchema } from '../../services/src/vendorBookingsValidator';
 import {
@@ -33,6 +38,37 @@ router.get('/profile', vendorController.getProfile);
 router.get('/status', vendorController.getStatus);
 router.get('/dashboard', requireRole('vendor'), vendorController.getDashboard);
 
+/** Driver onboarding: inline phone OTP send & verify proof token for direct staff registration */
+router.post(
+  '/driver-onboarding/otp/send',
+  requireRole('vendor'),
+  validate(vendorDriverOnboardingSendOtpSchema),
+  vendorController.sendDriverOnboardingOtp,
+);
+router.post(
+  '/driver-onboarding/otp/verify',
+  requireRole('vendor'),
+  validate(vendorDriverOnboardingVerifyOtpSchema),
+  vendorController.verifyDriverOnboardingOtp,
+);
+router.post(
+  '/drivers',
+  requireRole('vendor'),
+  validate(createVendorStaffDriverSchema),
+  vendorController.createStaffDriver,
+);
+
+/** Payout account — real persistence on the partner's (vendor or independent driver) user profile. */
+router.get('/payout-account', requireRole('vendor', 'driver'), vendorController.getPayoutAccount);
+router.put(
+  '/payout-account',
+  requireRole('vendor', 'driver'),
+  validate(savePayoutAccountSchema),
+  vendorController.savePayoutAccount,
+);
+/** Real earnings/payout history from the transactions collection. */
+router.get('/earnings', requireRole('vendor'), vendorController.getEarnings);
+
 router.post(
   '/upload-document',
   vendorDocumentUpload.single('file'),
@@ -43,12 +79,21 @@ router.post(
 router.post('/selfie', vendorDocumentUpload.single('file'), vendorController.uploadSelfie);
 
 router.get('/drivers', requireRole('vendor'), vendorController.listDrivers);
+router.get('/drivers/memberships', requireRole('vendor'), vendorController.listDriverMemberships);
+router.get('/drivers/search', requireRole('vendor'), vendorController.searchDrivers);
 router.post(
-  '/drivers',
+  '/drivers/invitations',
   requireRole('vendor'),
-  validate(createVendorDriverSchema),
-  vendorController.createDriver,
+  validate(inviteVendorDriverSchema),
+  vendorController.inviteDriver,
 );
+router.delete(
+  '/drivers/memberships/:id',
+  requireRole('vendor'),
+  validate(revokeVendorDriverMembershipSchema),
+  vendorController.revokeDriverMembership,
+);
+/** Vendor uploads a document for their staff driver (registration/docs step). */
 router.post(
   '/drivers/:id/upload-document',
   requireRole('vendor'),
@@ -56,20 +101,19 @@ router.post(
   validate(uploadVendorDriverDocumentSchema),
   vendorController.uploadDriverDocument,
 );
-router.post(
-  '/drivers/claim',
-  requireRole('vendor'),
-  validate(claimVendorDriverSchema),
-  vendorController.claimDriver,
-);
-router.delete('/drivers/:id', requireRole('vendor'), vendorController.removeDriver);
-
 router.get('/vehicles', requireRole('vendor'), vendorController.listVehicles);
 router.post(
   '/vehicles',
   requireRole('vendor'),
   validate(createVendorVehicleSchema),
   vendorController.createVehicle,
+);
+router.post(
+  '/vehicles/:id/upload-document',
+  requireRole('vendor'),
+  vendorDocumentUpload.single('file'),
+  validate(uploadVendorVehicleDocumentSchema),
+  vendorController.uploadVehicleDocument,
 );
 router.put(
   '/vehicles/:id',
@@ -79,6 +123,8 @@ router.put(
 );
 router.delete('/vehicles/:id', requireRole('vendor'), vendorController.removeVehicle);
 
+router.get('/bookings', requireRole('vendor'), vendorController.listBookings);
+router.get('/bookings/:id/tracking', requireRole('vendor'), vendorController.getBookingTracking);
 router.get('/bookings/offers', requireRole('vendor'), vendorController.listBookingOffers);
 router.post(
   '/bookings/:id/approve',

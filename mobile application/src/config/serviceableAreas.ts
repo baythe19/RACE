@@ -27,6 +27,15 @@ export const SERVICEABLE_AREAS: ServiceableCity[] = [
     displayName: 'Cuttack',
     comingSoon: true,
   },
+  {
+    name: 'bhopal',
+    state: 'Madhya Pradesh',
+    centerLat: 23.2599,
+    centerLng: 77.4126,
+    radiusKm: 30,
+    displayName: 'Bhopal',
+    comingSoon: false,
+  },
 ];
 
 const EARTH_RADIUS_KM = 6371;

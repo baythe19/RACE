@@ -1,68 +1,89 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Image,
-  KeyboardAvoidingView,
+  Alert,
+  Animated,
+  BackHandler,
+  Easing,
+  Keyboard,
   Platform,
   Pressable,
-  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
-import {
-  ArrowLeft,
-  Check,
-  ChevronDown,
-  Lock,
-  Send,
-  ShieldCheck,
-  Smartphone,
-  Zap,
-} from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { TextInput } from 'react-native';
 
-import { images } from '../../assets';
+import { KeyboardScreen } from '../../components/ui/AppKeyboard';
+
+import {
+  AUTH_COLORS as COLORS,
+  AUTH_DESIGN_HEIGHT,
+  AUTH_DESIGN_WIDTH,
+  AUTH_HERO_RATIO,
+} from '../../components/auth/authDesign';
+import {
+  AuthHeader,
+  GoldButton,
+  HeadsetIcon,
+  MobileNumberField,
+  ScreenDivider,
+  ShieldIcon,
+  SupportCard,
+  TermsAgreeRow,
+  VerificationHint,
+} from '../../components/auth/AuthPhoneChrome';
+import {
+  LoginIllustration,
+  SignupIllustration,
+} from '../../components/auth/AuthSceneIllustrations';
 import AuthToast, { AuthLoadingOverlay } from '../../components/auth/AuthToast';
-import { API_CONFIG } from '../../config/api';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
-import { clearSignupPath } from '../../redux/onboarding/onboardingSlice';
+import { clearSignupPath, setSignupPath } from '../../redux/onboarding/onboardingSlice';
 import {
   getApiErrorMessage,
   useSendOtpMutation,
   useVerifyOtpMutation,
 } from '../../services/auth/useAuthMutations';
+import { ensurePreviewAuthSession, previewAdvanceFromMobileNumber } from '../../config/uiPreviewAuth';
+import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
-import { colors, layout, radius, shadows, spacing, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'MobileNumber'>;
 
 const MOBILE_REGEX = /^[6-9]\d{9}$/;
-const REF_W = 390;
-const SUCCESS_GREEN = '#22C55E';
 
-/** TEMP: skip OTP UI — auto-verify with backend dev OTP. Re-enable OTP by flipping this off. */
-const SKIP_OTP_AUTH = true;
+/** OTP verification screen for HanuSMS delivery. Can be forced off in preview via EXPO_PUBLIC_SKIP_OTP_AUTH=true */
+const SKIP_OTP_AUTH = process.env.EXPO_PUBLIC_SKIP_OTP_AUTH === 'true';
+
+function friendlyAuthError(raw: string): string {
+  const text = raw.toLowerCase();
+  if (text.includes('network') || text.includes('cannot reach')) {
+    return 'No connection to RACE. Check Wi‑Fi, then try Continue again.';
+  }
+  if (text.includes('partner') || text.includes('role')) {
+    return 'This number is on the RACE Partner app. Use a different number here.';
+  }
+  if (text.includes('invalid indian') || text.includes('invalid mobile')) {
+    return 'Use a 10-digit Indian mobile that starts with 6, 7, 8, or 9.';
+  }
+  if (text.includes('otp') && text.includes('limit')) {
+    return 'Too many codes sent. Wait a bit, then try again.';
+  }
+  if (text.includes('dev otp')) {
+    return 'Could not sign you in automatically. Try again in a moment.';
+  }
+  return raw;
+}
 
 function extractOtpFromMessage(message?: string): string | null {
   if (!message) return null;
   const match = message.match(/\b(\d{6})\b/);
   return match?.[1] ?? null;
-}
-
-const TRUST_ITEMS = [
-  { title: '24/7 Help', subtitle: 'Always on the road', Icon: Zap },
-  { title: 'Verified Pros', subtitle: 'Trained technicians', Icon: ShieldCheck },
-  { title: 'Fast Arrival', subtitle: 'Nearby network', Icon: Smartphone },
-] as const;
-
-function formatMobileDisplay(value: string) {
-  if (value.length <= 5) return value;
-  return `${value.slice(0, 5)} ${value.slice(5)}`;
 }
 
 export default function MobileNumberScreen({ navigation }: Props) {
@@ -71,52 +92,157 @@ export default function MobileNumberScreen({ navigation }: Props) {
   const signupAccountType = useAppSelector(state => state.onboarding.signupAccountType);
   const signupVendorType = useAppSelector(state => state.onboarding.signupVendorType);
   const partnerSignupRequired = useAppSelector(state => state.onboarding.partnerSignupRequired);
-  const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const scale = width / REF_W;
-  const px = (value: number) => Math.max(1, Math.round(value * scale));
 
-  const [mobileNumber, setMobileNumber] = useState('');
+  const insets = useSafeAreaInsets();
+  const { width, height } = useWindowDimensions();
+  const screenWidth = Math.min(width, 430);
+  const innerHeight = height - insets.top - insets.bottom;
+  const scale = Math.min(screenWidth / AUTH_DESIGN_WIDTH, innerHeight / AUTH_DESIGN_HEIGHT);
+
+  const isSignup = Boolean(signupAccountType);
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState('+91');
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false);
   const [error, setError] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [termsAccepted, setTermsAccepted] = useState(!isSignup);
+
+  const inputRef = useRef<TextInput>(null);
+  const heroFactor = useRef(new Animated.Value(1)).current;
+  const chromeOpacity = useRef(new Animated.Value(1)).current;
+  const fullHeroHeight = screenWidth * AUTH_HERO_RATIO;
+  const heroHeight = useMemo(
+    () =>
+      heroFactor.interpolate({
+        inputRange: [0.48, 1],
+        outputRange: [fullHeroHeight * 0.48, fullHeroHeight],
+      }),
+    [fullHeroHeight, heroFactor],
+  );
+  const keyboardOpen = keyboardHeight > 80;
 
   const sendOtpMutation = useSendOtpMutation();
   const verifyOtpMutation = useVerifyOtpMutation();
-  const isValid = useMemo(() => MOBILE_REGEX.test(mobileNumber), [mobileNumber]);
 
-  const isSignup = Boolean(signupAccountType);
-  const roleLabel =
-    signupAccountType === 'customer'
-      ? 'Customer'
-      : signupAccountType === 'vendor'
-        ? 'Vendor'
-        : signupAccountType === 'driver'
-          ? 'Driver'
-          : null;
-
-  const handleSendOtp = async () => {
+  const switchMode = (nextMode: 'login' | 'signup') => {
+    Keyboard.dismiss();
     setError('');
+    setCountryMenuOpen(false);
+    setTermsAccepted(nextMode === 'login');
+    if (nextMode === 'signup') {
+      dispatch(setSignupPath({ accountType: 'customer', vendorType: null }));
+    } else {
+      dispatch(clearSignupPath());
+    }
+  };
 
-    if (!isValid) {
-      setError('Enter a valid 10-digit mobile number');
+  const handleBack = () => {
+    if (isSignup) {
+      switchMode('login');
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const parent = navigation.getParent();
+    if (parent?.canGoBack()) parent.goBack();
+  };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isSignup) {
+        switchMode('login');
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [isSignup]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const animate = (open: boolean, duration: number) => {
+      Animated.parallel([
+        Animated.timing(heroFactor, {
+          toValue: open ? (Platform.OS === 'ios' ? 0.58 : 0.48) : 1,
+          duration,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: false,
+        }),
+        Animated.timing(chromeOpacity, {
+          toValue: open ? 0 : 1,
+          duration: Math.max(180, duration - 40),
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]).start();
+    };
+
+    const show = Keyboard.addListener(showEvent, event => {
+      setCountryMenuOpen(false);
+      setKeyboardHeight(event.endCoordinates.height);
+      animate(true, event.duration && event.duration > 0 ? event.duration : 280);
+    });
+    const hide = Keyboard.addListener(hideEvent, event => {
+      setKeyboardHeight(0);
+      animate(false, event.duration && event.duration > 0 ? event.duration : 240);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [chromeOpacity, heroFactor]);
+
+  const handleContinue = async () => {
+    if (UI_PREVIEW_AUTH_FLOW) {
+      Keyboard.dismiss();
+      setError('');
+      previewAdvanceFromMobileNumber(navigation, dispatch, isSignup);
       return;
     }
 
+    const digits = phone.replace(/\D/g, '');
+    setError('');
+
+    if (!MOBILE_REGEX.test(digits)) {
+      inputRef.current?.focus();
+      setError(
+        digits.length === 0
+          ? 'Enter your 10-digit mobile number to continue.'
+          : 'That number looks short or invalid. Use 10 digits starting with 6, 7, 8, or 9.',
+      );
+      return;
+    }
+
+    if (country !== '+91') {
+      setError('RACE currently signs in with Indian numbers only (+91).');
+      return;
+    }
+
+    if (!termsAccepted) {
+      setError('Tick “I agree to Terms & Privacy” before you continue.');
+      return;
+    }
+
+    Keyboard.dismiss();
+
     try {
-      const result = await sendOtpMutation.mutateAsync({ mobileNumber });
+      const result = await sendOtpMutation.mutateAsync({ mobileNumber: digits });
       const isExistingUser = result.isExistingUser ?? false;
       if (isExistingUser) {
         dispatch(clearSignupPath());
       }
 
-      // --- OTP auth bypass (temporary) ---
       if (SKIP_OTP_AUTH) {
         const otp = result.devOtp ?? extractOtpFromMessage(result.message);
         if (!otp) {
-          setError('Dev OTP unavailable. Turn off SKIP_OTP_AUTH or use a non-production API.');
+          setError('Could not sign you in automatically. Try Continue again.');
           return;
         }
-        const verifyResult = await verifyOtpMutation.mutateAsync({ mobileNumber, otp });
+        const verifyResult = await verifyOtpMutation.mutateAsync({ mobileNumber: digits, otp });
         if (isExistingUser || verifyResult.user.isProfileCompleted) {
           dispatch(clearSignupPath());
         }
@@ -128,17 +254,15 @@ export default function MobileNumberScreen({ navigation }: Props) {
           navigation.replace('VendorWizard', { vendorType: signupVendorType });
           return;
         }
-        // Existing user / profile complete → RootNavigator swaps to Main
         return;
       }
-      // --- end OTP bypass ---
 
-      // navigation.navigate('OtpVerification', {
-      //   mobileNumber,
-      //   isExistingUser,
-      //   devOtp: result.devOtp,
-      //   otpMessage: result.message,
-      // });
+      navigation.navigate('OtpVerification', {
+        mobileNumber: digits,
+        isExistingUser,
+        devOtp: result.devOtp,
+        otpMessage: result.message,
+      });
     } catch (err) {
       if (isRoleMismatchError(err)) {
         setError(
@@ -149,429 +273,289 @@ export default function MobileNumberScreen({ navigation }: Props) {
         );
         return;
       }
-      setError(getApiErrorMessage(err, SKIP_OTP_AUTH ? 'Unable to sign in' : 'Unable to send OTP'));
+      if (__DEV__ || UI_PREVIEW_AUTH_FLOW) {
+        navigation.navigate('OtpVerification', {
+          mobileNumber: digits,
+          isExistingUser: !isSignup,
+          devOtp: '123456',
+          otpMessage: 'Dev mode: use OTP 123456',
+        });
+        return;
+      }
+      setError(
+        friendlyAuthError(
+          getApiErrorMessage(err, SKIP_OTP_AUTH ? 'Unable to sign in' : 'Unable to send OTP'),
+        ),
+      );
     }
   };
 
-  const inputBorderColor = error
-    ? colors.error
-    : focused || isValid
-      ? colors.primary
-      : colors.border;
+  const handleHelp = () => {
+    Alert.alert('24/7 roadside support', "We're here whenever you need us.");
+  };
+
+  const handleTerms = () => {
+    Alert.alert('Terms & Privacy', "RACE's Terms and Privacy Policy will open here.");
+  };
 
   return (
-    <>
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.pageBg} />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
 
-        <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
-          </Pressable>
+      <KeyboardScreen>
+        <View style={[styles.fill, { width: screenWidth, alignSelf: 'center' }]}>
+          {countryMenuOpen ? (
+            <Pressable
+              accessibilityLabel="Close country list"
+              onPress={() => setCountryMenuOpen(false)}
+              style={[StyleSheet.absoluteFill, { zIndex: 12 }]}
+            />
+          ) : null}
 
-          <View style={styles.brandBlock}>
-            <Text style={[styles.brandRace, { fontSize: px(18), lineHeight: px(22) }]}>RACE</Text>
-            <Text style={[styles.brandCustomer, { fontSize: px(11), lineHeight: px(14) }]}>
-              SERVICE
+          <AuthHeader scale={scale} onBack={handleBack} />
+
+          <Animated.View style={{ width: screenWidth, height: heroHeight, overflow: 'hidden' }}>
+            {isSignup ? (
+              <SignupIllustration width={screenWidth} compact={1} />
+            ) : (
+              <LoginIllustration width={screenWidth} compact={1} />
+            )}
+          </Animated.View>
+
+          <Text
+            numberOfLines={1}
+            style={{
+              marginTop: 10 * scale,
+              marginHorizontal: 24 * scale,
+              color: '#0B0C10',
+              fontSize: 28 * scale,
+              lineHeight: 40 * scale,
+              fontWeight: '800',
+              letterSpacing: -0.6 * scale,
+              textAlign: 'left',
+              includeFontPadding: true,
+            }}>
+            {isSignup ? "Let's get you moving" : 'Welcome back'}
+          </Text>
+          <Animated.View
+            pointerEvents={keyboardOpen ? 'none' : 'auto'}
+            style={{
+              opacity: chromeOpacity,
+              maxHeight: keyboardOpen ? 0 : 40 * scale,
+              overflow: 'hidden',
+            }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                marginTop: 4 * scale,
+                marginHorizontal: 24 * scale,
+                color: COLORS.secondary,
+                fontSize: 16 * scale,
+                lineHeight: 26 * scale,
+                paddingBottom: 3 * scale,
+                textAlign: 'left',
+                includeFontPadding: true,
+              }}>
+              {isSignup ? 'Create your account in seconds.' : "Let's get you back on the road."}
             </Text>
+          </Animated.View>
+
+          <View style={{ marginTop: 18 * scale }}>
+            <MobileNumberField
+              scale={scale}
+              country={country}
+              phone={phone}
+              inputRef={inputRef}
+              menuOpen={countryMenuOpen}
+              onPhoneChange={value => {
+                setPhone(value.replace(/[^\d\s]/g, ''));
+                if (error) setError('');
+              }}
+              onToggleCountryMenu={() => {
+                Keyboard.dismiss();
+                setCountryMenuOpen(open => !open);
+              }}
+              onSelectCountry={code => {
+                setCountry(code);
+                setCountryMenuOpen(false);
+              }}
+              onSubmit={() => void handleContinue()}
+            />
           </View>
 
-          <View style={styles.backButton} />
-        </View>
-
-        <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <ScrollView
-            style={styles.scroll}
-            bounces={false}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.scrollContent,
-              {
-                paddingHorizontal: px(layout.screenPadding),
-                paddingBottom: insets.bottom + px(spacing.xl),
-              },
-            ]}>
-            <View style={[styles.welcomeBlock, { marginTop: px(spacing.sm) }]}>
-              <Text style={[styles.welcomeTitle, { fontSize: px(28), lineHeight: px(34) }]}>
-                {isSignup ? 'Create your account' : 'Welcome back!'}
-              </Text>
-              <Text
-                style={[
-                  styles.welcomeSubtitle,
-                  { fontSize: px(14), lineHeight: px(21), marginTop: px(6) },
-                ]}>
-                {isSignup
-                  ? SKIP_OTP_AUTH
-                    ? 'Enter your mobile number to create your account.'
-                    : 'Verify your mobile number with a secure OTP to continue.'
-                  : SKIP_OTP_AUTH
-                    ? 'Enter your mobile number to sign in to RACE.'
-                    : 'Sign in to your RACE account with a secure OTP.'}
-              </Text>
-              {roleLabel ? (
-                <View style={[styles.rolePill, { marginTop: px(10) }]}>
-                  <Text style={styles.rolePillText}>Continuing as {roleLabel}</Text>
-                </View>
-              ) : null}
-              {signupVendorType ? (
-                <Text style={[styles.pathHint, { marginTop: px(8), fontSize: px(12) }]}>
-                  Selected: {signupVendorType.replace(/_/g, ' ')}
-                </Text>
-              ) : null}
-            </View>
-
-            <Image
-              source={images.homeHeroTruck}
-              style={[styles.heroImage, { height: px(110), marginTop: px(spacing.md) }]}
-              resizeMode="contain"
-              accessibilityLabel="RACE roadside assistance"
-            />
-
-            <View
-              style={[
-                styles.card,
-                {
-                  marginTop: px(spacing.md),
-                  paddingHorizontal: px(spacing.xl),
-                  paddingTop: px(spacing.xxl),
-                  paddingBottom: px(spacing.xl),
-                  borderRadius: px(18),
-                },
-              ]}>
-              <View style={styles.phoneIconWrap}>
-                <Smartphone size={px(26)} color={colors.primary} strokeWidth={2.2} />
-              </View>
-
-              <Text style={[styles.cardTitle, { fontSize: px(20), marginTop: px(14) }]}>
-                Enter mobile number
-              </Text>
-              <Text
-                style={[
-                  styles.cardSubtitle,
-                  { fontSize: px(13), lineHeight: px(19), marginTop: px(6) },
-                ]}>
-                {SKIP_OTP_AUTH
-                  ? 'We will sign you in with this number.'
-                  : "We'll send a 6-digit OTP to verify your account."}
-              </Text>
-
-              <Text style={[styles.fieldLabel, { fontSize: px(13), marginTop: px(22) }]}>
-                Mobile number
-              </Text>
-
-              <View style={[styles.phoneRow, { marginTop: px(8), gap: px(10) }]}>
-                <View style={[styles.countryBox, { minHeight: px(52), borderRadius: px(12) }]}>
-                  <Text style={[styles.countryCode, { fontSize: px(15) }]}>+91</Text>
-                  <ChevronDown size={px(16)} color={colors.grey} strokeWidth={2.5} />
-                </View>
-
-                <View
-                  style={[
-                    styles.phoneInputWrap,
-                    {
-                      minHeight: px(52),
-                      borderRadius: px(12),
-                      borderColor: inputBorderColor,
-                    },
-                  ]}>
-                  <TextInput
-                    value={formatMobileDisplay(mobileNumber)}
-                    onChangeText={text => {
-                      setMobileNumber(text.replace(/\D/g, '').slice(0, 10));
-                      if (error) setError('');
-                    }}
-                    onFocus={() => setFocused(true)}
-                    onBlur={() => setFocused(false)}
-                    keyboardType="number-pad"
-                    placeholder="98765 43210"
-                    placeholderTextColor={colors.textMuted}
-                    maxLength={11}
-                    style={[styles.phoneInput, { fontSize: px(16) }]}
-                  />
-                  {isValid ? (
-                    <View style={styles.validCheck}>
-                      <Check size={14} color={SUCCESS_GREEN} strokeWidth={3} />
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
+          {error ? (
+            <View style={{ marginHorizontal: 24 * scale, marginTop: 8 * scale }}>
               <AuthToast message={error} type="error" />
-
-              {__DEV__ ? (
-                <Text style={[styles.devHint, { fontSize: px(11), marginTop: px(8) }]}>
-                  API: {API_CONFIG.baseUrl}
-                </Text>
-              ) : null}
-
-              <Pressable
-                disabled={!isValid || loading}
-                onPress={() => void handleSendOtp()}
-                style={({ pressed }) => [
-                  styles.sendButton,
-                  {
-                    marginTop: px(spacing.lg),
-                    minHeight: px(54),
-                    borderRadius: px(14),
-                  },
-                  (!isValid || loading) && styles.sendButtonDisabled,
-                  pressed && isValid && !loading && styles.pressed,
-                ]}>
-                <Send size={px(18)} color={colors.dark} strokeWidth={2.4} />
-                <Text style={[styles.sendButtonLabel, { fontSize: px(16) }]}>
-                  {loading
-                    ? SKIP_OTP_AUTH
-                      ? 'Signing in...'
-                      : 'Sending OTP...'
-                    : SKIP_OTP_AUTH
-                      ? 'Continue'
-                      : 'Send OTP'}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => navigation.navigate('AccountType')}
-                style={({ pressed }) => [
-                  styles.changeRoleRow,
-                  { marginTop: px(spacing.lg) },
-                  pressed && styles.pressed,
-                ]}>
-                <Text style={[styles.changeRoleText, { fontSize: px(13) }]}>
-                  {isSignup ? (
-                    <>
-                      Wrong path? <Text style={styles.changeRoleLink}>Change account type</Text>
-                    </>
-                  ) : (
-                    <>
-                      New to RACE? <Text style={styles.changeRoleLink}>Get started</Text>
-                    </>
-                  )}
-                </Text>
-              </Pressable>
-
-              <View style={[styles.safeRow, { marginTop: px(spacing.xl) }]}>
-                <Lock size={13} color={colors.grey} strokeWidth={2.2} />
-                <Text style={[styles.safeText, { fontSize: px(12) }]}>
-                  Your data is safe and secure with RACE
-                </Text>
-              </View>
             </View>
+          ) : null}
 
-            <View style={[styles.trustRow, { marginTop: px(spacing.xl), gap: px(8) }]}>
-              {TRUST_ITEMS.map(({ title, subtitle, Icon }) => (
-                <View key={title} style={styles.trustItem}>
-                  <View style={styles.trustIconWrap}>
-                    <Icon size={16} color={colors.primary} strokeWidth={2.2} />
-                  </View>
-                  <Text style={[styles.trustTitle, { fontSize: px(11) }]} numberOfLines={1}>
-                    {title}
-                  </Text>
+          <VerificationHint scale={scale} />
+          <TermsAgreeRow
+            scale={scale}
+            accepted={termsAccepted}
+            onToggle={() => {
+              setTermsAccepted(value => !value);
+              if (error) setError('');
+            }}
+            onPressTerms={handleTerms}
+          />
+          <GoldButton
+            scale={scale}
+            isSignup={isSignup}
+            marginTop={keyboardOpen ? 12 : 22}
+            onPress={() => void handleContinue()}
+            disabled={loading}
+          />
+
+          <Animated.View
+            pointerEvents={keyboardOpen ? 'none' : 'auto'}
+            style={{
+              flexGrow: keyboardOpen ? 0 : 1,
+              height: keyboardOpen ? 0 : undefined,
+              opacity: chromeOpacity,
+              overflow: 'hidden',
+            }}>
+
+          <ScreenDivider scale={scale} isSignup={isSignup} marginTop={22} />
+          <View
+            style={{
+              marginTop: 18 * scale,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Text
+              style={{
+                color: '#494951',
+                fontSize: 16 * scale,
+                lineHeight: 26 * scale,
+                includeFontPadding: true,
+                paddingBottom: 2 * scale,
+              }}>
+              {isSignup ? 'Already have an account?' : 'New to RACE?'}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => switchMode(isSignup ? 'login' : 'signup')}
+              hitSlop={6}
+              style={{ marginLeft: 6 * scale }}>
+              <Text
+                style={{
+                  color: COLORS.orange,
+                  fontSize: 16 * scale,
+                  lineHeight: 26 * scale,
+                  includeFontPadding: true,
+                  paddingBottom: 2 * scale,
+                }}>
+                {isSignup ? 'Sign in' : 'Create account'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Quick Demo Mode Card */}
+          <View
+            style={{
+              marginTop: 14 * scale,
+              padding: 12 * scale,
+              backgroundColor: '#F3F4F6',
+              borderRadius: 12 * scale,
+              alignItems: 'center',
+            }}>
+            <Text style={{ fontSize: 11 * scale, fontWeight: '700', color: COLORS.orange }}>
+              ⚡ QUICK DEMO MODE (NO BACKEND)
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => ensurePreviewAuthSession(dispatch, true)}
+              style={({ pressed }) => ({
+                marginTop: 8 * scale,
+                backgroundColor: COLORS.orange,
+                paddingVertical: 8 * scale,
+                paddingHorizontal: 16 * scale,
+                borderRadius: 8 * scale,
+                opacity: pressed ? 0.85 : 1,
+              })}>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 * scale }}>
+                🚀 Explore Customer App (Demo)
+              </Text>
+            </Pressable>
+          </View>
+
+          {isSignup ? (
+            <>
+              <View style={styles.flexSpacer} />
+              <SupportCard scale={scale} onPress={handleHelp} />
+            </>
+          ) : (
+            <>
+              <View style={styles.flexSpacer} />
+
+              <View style={{ marginBottom: 18 * scale, alignItems: 'center' }}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={handleHelp}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}>
+                  <HeadsetIcon size={22 * scale} />
                   <Text
-                    style={[styles.trustSubtitle, { fontSize: px(10), lineHeight: px(13) }]}
-                    numberOfLines={2}>
-                    {subtitle}
+                    style={{
+                      marginLeft: 5 * scale,
+                      color: COLORS.orange,
+                      fontSize: 14 * scale,
+                      lineHeight: 22 * scale,
+                      paddingBottom: 2 * scale,
+                      includeFontPadding: true,
+                    }}>
+                    Need help?
+                  </Text>
+                </Pressable>
+                <View
+                  style={{
+                    marginTop: 10 * scale,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}>
+                  <ShieldIcon size={22 * scale} />
+                  <Text
+                    style={{
+                      marginLeft: 8 * scale,
+                      color: '#90909C',
+                      fontSize: 13 * scale,
+                      lineHeight: 22 * scale,
+                      paddingBottom: 2 * scale,
+                      includeFontPadding: true,
+                    }}>
+                    Your data is safe and secure with RACE.
                   </Text>
                 </View>
-              ))}
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
+              </View>
+            </>
+          )}
+          </Animated.View>
+        </View>
+      </KeyboardScreen>
 
       <AuthLoadingOverlay
         visible={loading}
-        label={SKIP_OTP_AUTH ? 'Signing in...' : 'Sending OTP...'}
+        label={
+          SKIP_OTP_AUTH
+            ? isSignup
+              ? 'Creating your account…'
+              : 'Signing you in…'
+            : 'Sending your code…'
+        }
       />
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.pageBg },
-  flex: { flex: 1 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  brandBlock: { alignItems: 'center' },
-  brandRace: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    letterSpacing: 0.5,
-  },
-  brandCustomer: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-    letterSpacing: 1.6,
-  },
-  scroll: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  welcomeBlock: { alignItems: 'flex-start' },
-  welcomeTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-  },
-  welcomeSubtitle: { color: colors.grey },
-  rolePill: {
-    alignSelf: 'flex-start',
-    backgroundColor: colors.goldLight,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderWidth: 1,
-    borderColor: '#F5D98A',
-  },
-  rolePillText: {
-    color: colors.primaryDark,
-    fontSize: typography.sizes.sm,
-    fontWeight: typography.weights.semibold,
-  },
-  pathHint: {
-    color: colors.primaryDark,
-    fontWeight: typography.weights.semibold,
-    textTransform: 'capitalize',
-  },
-  heroImage: {
-    width: '100%',
-    maxWidth: 260,
-    alignSelf: 'center',
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  phoneIconWrap: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.goldLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-  },
-  cardTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    textAlign: 'center',
-  },
-  cardSubtitle: {
-    color: colors.grey,
-    textAlign: 'center',
-  },
-  fieldLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  countryBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.lightGrey,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  countryCode: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  phoneInputWrap: {
+  safeArea: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.md,
+    backgroundColor: COLORS.background,
   },
-  phoneInput: {
-    flex: 1,
-    color: colors.dark,
-    fontWeight: typography.weights.medium,
-    paddingVertical: spacing.md,
-  },
-  validCheck: { marginLeft: spacing.xs },
-  sendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.primary,
-  },
-  sendButtonDisabled: { opacity: 0.5 },
-  sendButtonLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  changeRoleRow: { alignItems: 'center' },
-  changeRoleText: {
-    color: colors.grey,
-    textAlign: 'center',
-  },
-  changeRoleLink: {
-    color: '#2563EB',
-    fontWeight: typography.weights.semibold,
-  },
-  safeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  safeText: { color: colors.grey },
-  trustRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  trustItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  trustIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.goldLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  trustTitle: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-    textAlign: 'center',
-  },
-  trustSubtitle: {
-    color: colors.grey,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  devHint: {
-    color: colors.textMuted,
-    textAlign: 'center',
-  },
-  pressed: { opacity: 0.9 },
+  fill: { flex: 1 },
+  flexSpacer: { flex: 1, minHeight: 4 },
 });

@@ -8,7 +8,7 @@ import { bindSetOnboardingRequired } from './authState';
 import {
   clearCustomerOnboardingComplete,
   getCustomerOnboardingStep,
-  setCustomerOnboardingStep,
+  setCustomerOnboardingStep as persistCustomerOnboardingStep,
   type CustomerOnboardingStep,
 } from './customerOnboarding';
 import { useVehicleStore } from './vehicleStore';
@@ -93,7 +93,7 @@ async function completeAuthSession(
   }
 
   const step = await resolveCustomerOnboardingStep(result);
-  await setCustomerOnboardingStep(step);
+  await persistCustomerOnboardingStep(step);
   return step;
 }
 
@@ -128,15 +128,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   partnerAuthEntry: 'PartnerSplash',
   authSessionVersion: 0,
 
-  setAuth: payload =>
+  setAuth: payload => {
+    const customerOnboardingStep: CustomerOnboardingStep = payload.onboardingRequired
+      ? 'profile'
+      : 'done';
     set({
       user: payload.user,
       isAuthenticated: true,
       onboardingRequired: payload.onboardingRequired,
-      customerOnboardingStep: payload.onboardingRequired ? 'profile' : 'done',
+      customerOnboardingStep,
       isLoading: false,
       error: null,
-    }),
+    });
+    if (customerOnboardingStep === 'done') {
+      void persistCustomerOnboardingStep('done');
+    }
+  },
 
   patchAuth: patch =>
     set(state => {
@@ -246,17 +253,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setAuthenticated: value => set({ isAuthenticated: value }),
 
-  setOnboardingRequired: value =>
+  setOnboardingRequired: value => {
     set(state => ({
       onboardingRequired: value,
       customerOnboardingStep: value ? state.customerOnboardingStep : 'done',
-    })),
+    }));
+    if (!value) {
+      void persistCustomerOnboardingStep('done');
+    }
+  },
 
-  setCustomerOnboardingStep: step =>
+  setCustomerOnboardingStep: step => {
     set({
       customerOnboardingStep: step,
       onboardingRequired: onboardingRequiredForStep(step),
-    }),
+    });
+    void persistCustomerOnboardingStep(step);
+  },
 
   setLoading: value => set({ isLoading: value }),
 }));

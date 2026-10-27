@@ -40,13 +40,34 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          // No native push/scale — SoftScreenFade is opacity-only.
+          animation: 'none',
+          contentStyle: { backgroundColor: colors.pageBg },
+          statusBarAnimation: 'fade',
+        }}>
         {canEnterApp ? (
-          <Stack.Screen name="Main" component={MainTabNavigator} />
+          <Stack.Screen
+            name="Main"
+            component={MainTabNavigator}
+            options={{ animation: 'fade', animationDuration: 280 }}
+          />
         ) : (
           <>
             <Stack.Screen name="Splash" component={SplashScreen} />
-            <Stack.Screen name="Auth" component={AuthNavigator} />
+            <Stack.Screen
+              name="Auth"
+              component={AuthNavigator}
+              options={{
+                // Keep Splash painted underneath so SoftScreenFade can crossfade
+                // instead of flashing pageBg white between screens.
+                presentation: 'transparentModal',
+                animation: 'none',
+                contentStyle: { backgroundColor: 'transparent' },
+              }}
+            />
           </>
         )}
       </Stack.Navigator>

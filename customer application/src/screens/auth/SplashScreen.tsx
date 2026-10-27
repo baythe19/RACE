@@ -1,170 +1,268 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   View,
   StyleSheet,
-  TouchableOpacity,
   Image,
+  Text,
   useWindowDimensions,
   StatusBar,
   type LayoutChangeEvent,
 } from 'react-native';
 import { Asset } from 'expo-asset';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Clock3, MapPin, ShieldCheck, Zap } from 'lucide-react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../types/navigation';
 import { useAuthStore } from '../../store/authStore';
 import { getCustomerOnboardingRouteFromStep } from '../../store/customerOnboardingRoute';
 import { images } from '../../assets';
+import { getCoverBackgroundFrame } from './splashBackground';
 
-const REF_W = 484;
-const REF_H = 1024;
+/** Brand splash — no CTAs; auto-continues to walkthrough or resume in-progress signup. */
+/** Foreground-active display time; pauses while the app is backgrounded. */
+const SPLASH_DISPLAY_MS = 2800;
+const DESIGN_WIDTH = 375;
 
-const BTN_H = 66;
-const BTN_SIDE = 67;
-const BTN1_BOTTOM = 90;
-const BTN2_BOTTOM = 22;
+const TRUST_ITEMS = [
+  { label: '24/7', detail: 'Support', Icon: Clock3 },
+  { label: 'Fast', detail: 'Response', Icon: Zap },
+  { label: 'Verified', detail: 'Professionals', Icon: ShieldCheck },
+  { label: 'Near You', detail: 'Always', Icon: MapPin },
+] as const;
 
 type SplashNav = NativeStackNavigationProp<RootStackParamList, 'Splash'>;
 
 type SplashScreenProps = {
-  onGetStarted?: () => void;
-  onLogin?: () => void;
+  onFinished?: () => void;
 };
 
-function SplashScreen({ onGetStarted, onLogin }: SplashScreenProps) {
+function SplashScreen({ onFinished }: SplashScreenProps) {
   const navigation = useNavigation<SplashNav>();
+  const insets = useSafeAreaInsets();
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const customerOnboardingStep = useAuthStore(state => state.customerOnboardingStep);
-  const resumeOnboarding = isAuthenticated && customerOnboardingStep !== 'done';
-  const insets = useSafeAreaInsets();
   const { width: winW, height: winH } = useWindowDimensions();
   const [layout, setLayout] = useState({ w: winW, h: winH });
+  const navigatingRef = useRef(false);
+  const authSnapshotRef = useRef({ isAuthenticated, customerOnboardingStep });
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerStartedAtRef = useRef<number | null>(null);
+  const remainingMsRef = useRef(SPLASH_DISPLAY_MS);
+  const scale = layout.w / DESIGN_WIDTH;
+  const bgFrame = useMemo(
+    () => getCoverBackgroundFrame(layout.w, layout.h),
+    [layout.h, layout.w],
+  );
+  authSnapshotRef.current = { isAuthenticated, customerOnboardingStep };
+
+  const onRootLayout = (e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width <= 0 || height <= 0) return;
+    if (Math.abs(width - layout.w) < 0.5 && Math.abs(height - layout.h) < 0.5) return;
+    setLayout({ w: width, h: height });
+  };
 
   useEffect(() => {
-    void Asset.fromModule(images.onboarding1).downloadAsync();
-    void Asset.fromModule(images.onboarding2).downloadAsync();
-    void Asset.fromModule(images.onboarding3).downloadAsync();
-    void Asset.fromModule(images.onboarding4).downloadAsync();
+    const prefetch = [
+      images.splashBackground,
+      images.onboarding1,
+      images.onboarding2,
+      images.onboarding3,
+      images.onboarding4,
+    ];
+    for (const moduleId of prefetch) {
+      // Prefetch only. A dropped Expo tunnel must not surface as an uncaught rejection;
+      // the Image still loads from the same Metro URL.
+      void Asset.fromModule(moduleId).downloadAsync().catch(() => undefined);
+    }
   }, []);
 
-  const onLayout = (e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    if (width > 0 && height > 0) {
-      setLayout({ w: width, h: height });
-    }
-  };
+  const continueFromSplash = useCallback(() => {
+    if (navigatingRef.current) return;
+    navigatingRef.current = true;
 
-  const w = layout.w;
-  const h = layout.h;
-  const scaleX = w / REF_W;
-  const scaleY = h / REF_H;
-
-  const btnH = BTN_H * scaleY;
-  const btnW = (REF_W - BTN_SIDE * 2) * scaleX;
-  const btnLeft = BTN_SIDE * scaleX;
-
-  const safeLift = Math.max(0, insets.bottom - BTN2_BOTTOM * scaleY);
-  const btn2Bottom = BTN2_BOTTOM * scaleY + safeLift;
-  const btn1Bottom = BTN1_BOTTOM * scaleY + safeLift;
-
-  const handleGetStarted = () => {
-    if (onGetStarted) {
-      onGetStarted();
+    if (onFinished) {
+      onFinished();
       return;
     }
-    if (resumeOnboarding) {
+
+    const { isAuthenticated: hasSession, customerOnboardingStep: step } =
+      authSnapshotRef.current;
+    if (hasSession && step === 'done') {
+      return;
+    }
+
+    if (hasSession && step !== 'done') {
       navigation.navigate('Auth', {
-        screen: getCustomerOnboardingRouteFromStep(customerOnboardingStep),
+        screen: getCustomerOnboardingRouteFromStep(step),
+        initial: true,
       });
       return;
     }
-    navigation.navigate('Auth', { screen: 'Onboarding' });
-  };
 
-  const handleLogin = () => {
-    if (onLogin) {
-      onLogin();
-      return;
-    }
-    if (resumeOnboarding) {
-      navigation.navigate('Auth', {
-        screen: getCustomerOnboardingRouteFromStep(customerOnboardingStep),
-      });
-      return;
-    }
-    navigation.navigate('Auth', { screen: 'AccountType' });
-  };
+    navigation.navigate('Auth', { screen: 'Onboarding', initial: true });
+  }, [navigation, onFinished]);
+
+  useFocusEffect(
+    useCallback(() => {
+      navigatingRef.current = false;
+      remainingMsRef.current = SPLASH_DISPLAY_MS;
+
+      const clearSplashTimer = () => {
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        timerStartedAtRef.current = null;
+      };
+
+      const scheduleSplashTimer = () => {
+        if (navigatingRef.current || timerRef.current) return;
+        if (remainingMsRef.current <= 0) {
+          continueFromSplash();
+          return;
+        }
+        timerStartedAtRef.current = Date.now();
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          timerStartedAtRef.current = null;
+          continueFromSplash();
+        }, remainingMsRef.current);
+      };
+
+      const onAppStateChange = (nextState: string) => {
+        if (nextState === 'active') {
+          scheduleSplashTimer();
+          return;
+        }
+
+        if (timerRef.current && timerStartedAtRef.current !== null) {
+          const elapsed = Date.now() - timerStartedAtRef.current;
+          remainingMsRef.current = Math.max(0, remainingMsRef.current - elapsed);
+        }
+        clearSplashTimer();
+      };
+
+      const subscription = AppState.addEventListener('change', onAppStateChange);
+      if (AppState.currentState === 'active') {
+        scheduleSplashTimer();
+      }
+
+      return () => {
+        clearSplashTimer();
+        subscription.remove();
+      };
+    }, [continueFromSplash]),
+  );
+
+  const logoWidth = Math.min(210 * scale, layout.w * 0.54);
+  const logoHeight = logoWidth * (230 / 480);
+  const fogHeight = Math.max(layout.h * 0.46, 280 * scale);
 
   return (
-    <View style={styles.root} onLayout={onLayout}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+    <View style={styles.root} onLayout={onRootLayout}>
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
       <Image
-        source={images.splashContent}
-        style={{ position: 'absolute', top: 0, left: 0, width: w, height: h }}
-        resizeMode="stretch"
-        resizeMethod="scale"
-        fadeDuration={0}
-      />
-
-      <Image
-        source={images.onboarding1}
-        style={styles.preload}
-        resizeMode="stretch"
-        resizeMethod="scale"
-        fadeDuration={0}
-      />
-
-      <Image
-        source={images.onboarding2}
-        style={styles.preload}
-        resizeMode="stretch"
-        resizeMethod="scale"
-        fadeDuration={0}
-      />
-
-      <Image
-        source={images.onboarding3}
-        style={styles.preload}
-        resizeMode="stretch"
-        resizeMethod="scale"
-        fadeDuration={0}
-      />
-
-      <Image
-        source={images.onboarding4}
-        style={styles.preload}
-        resizeMode="stretch"
-        resizeMethod="scale"
-        fadeDuration={0}
-      />
-
-      <TouchableOpacity
-        activeOpacity={1}
+        source={images.splashBackground}
         style={{
           position: 'absolute',
-          zIndex: 10,
-          bottom: btn1Bottom,
-          left: btnLeft,
-          width: btnW,
-          height: btnH,
+          left: bgFrame.left,
+          top: bgFrame.top,
+          width: bgFrame.width,
+          height: bgFrame.height,
         }}
-        onPress={handleGetStarted}
+        resizeMode="stretch"
+        fadeDuration={0}
       />
 
-      <TouchableOpacity
-        activeOpacity={1}
-        style={{
-          position: 'absolute',
-          zIndex: 10,
-          bottom: btn2Bottom,
-          left: btnLeft,
-          width: btnW,
-          height: btnH,
-        }}
-        onPress={handleLogin}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[
+          'rgba(236,245,252,0.78)',
+          'rgba(247,243,236,0.42)',
+          'rgba(255,248,232,0.16)',
+          'rgba(255,248,232,0)',
+        ]}
+        locations={[0, 0.38, 0.68, 1]}
+        style={[styles.skyFog, { height: fogHeight }]}
       />
+
+      <View
+        style={[
+          styles.content,
+          {
+            paddingTop: insets.top + 10 * scale,
+            paddingHorizontal: 22 * scale,
+          },
+        ]}>
+        <Image
+          source={images.logoTransparent}
+          style={{
+            width: logoWidth,
+            height: logoHeight,
+          }}
+          resizeMode="contain"
+          fadeDuration={0}
+        />
+
+        <View style={[styles.copy, { marginTop: 10 * scale, maxWidth: layout.w - 44 * scale }]}>
+          <Text
+            style={[styles.title, { fontSize: 19.5 * scale, lineHeight: 24 * scale }]}
+            allowFontScaling={false}>
+            <Text style={styles.titleAccent}>24/7 </Text>
+            ROADSIDE ASSISTANCE{'\n'}& TOWING SERVICE
+          </Text>
+          <Text
+            style={[styles.subtitle, { marginTop: 10 * scale, fontSize: 12.5 * scale }]}
+            allowFontScaling={false}>
+            Wherever you are, we'll get you moving.
+          </Text>
+        </View>
+
+        <View style={[styles.trustRow, { marginTop: 16 * scale, width: layout.w - 36 * scale }]}>
+          {TRUST_ITEMS.map(({ label, detail, Icon }, index) => (
+            <View key={`${label}-${detail}`} style={styles.trustCell}>
+              {index > 0 ? <View style={styles.trustDivider} /> : null}
+              <View style={styles.trustItem}>
+                <View
+                  style={[
+                    styles.trustIcon,
+                    {
+                      width: 40 * scale,
+                      height: 40 * scale,
+                      borderRadius: 20 * scale,
+                    },
+                  ]}>
+                  <Icon size={18 * scale} color="#E8A317" strokeWidth={2.2} />
+                </View>
+                <Text
+                  style={[styles.trustLabel, { marginTop: 6 * scale, fontSize: 10.5 * scale }]}
+                  numberOfLines={1}
+                  allowFontScaling={false}>
+                  {label}
+                </Text>
+                <Text
+                  style={[styles.trustDetail, { fontSize: 9.5 * scale }]}
+                  numberOfLines={1}
+                  allowFontScaling={false}>
+                  {detail}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <View pointerEvents="none" style={styles.preloadContainer}>
+        <Image source={images.onboarding1} style={styles.preload} fadeDuration={0} />
+        <Image source={images.onboarding2} style={styles.preload} fadeDuration={0} />
+        <Image source={images.onboarding3} style={styles.preload} fadeDuration={0} />
+        <Image source={images.onboarding4} style={styles.preload} fadeDuration={0} />
+      </View>
     </View>
   );
 }
@@ -172,14 +270,90 @@ function SplashScreen({ onGetStarted, onLogin }: SplashScreenProps) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    backgroundColor: '#1A1208',
+  },
+  skyFog: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
+  content: {
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  copy: {
+    alignItems: 'center',
+  },
+  title: {
+    color: '#12161C',
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: 0.15,
+  },
+  titleAccent: {
+    color: '#F0A415',
+  },
+  subtitle: {
+    color: '#5E6670',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  trustRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  trustCell: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  trustDivider: {
+    width: StyleSheet.hairlineWidth,
+    alignSelf: 'stretch',
+    minHeight: 52,
+    marginTop: 6,
+    marginRight: 4,
+    backgroundColor: 'rgba(0,0,0,0.08)',
+  },
+  trustItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  trustIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.38)',
+  },
+  trustLabel: {
+    color: '#1E252C',
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  trustDetail: {
+    color: '#3D4650',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  preloadContainer: {
+    position: 'absolute',
+    top: 0,
+    left: -9999,
+    width: 1,
+    height: 1,
   },
   preload: {
     position: 'absolute',
     width: 1,
     height: 1,
     opacity: 0,
-    left: -9999,
   },
 });
 

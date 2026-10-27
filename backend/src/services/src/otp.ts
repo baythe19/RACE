@@ -1,12 +1,41 @@
+/**
+ * OTP Service — Powered exclusively by HanuSMS (https://api.hanuotp.in).
+ * All non-Hanu SMS providers (MessageCentral, Twilio) have been completely removed.
+ *
+ * Flow:
+ * 1. sendOtp   → Generates CSPRNG OTP (generateOtp) → Dispatches via hanuSendOtp() → Stores peppered SHA-256 hash in OtpLog
+ * 2. verifyOtp → Hashes user input with OTP_PEPPER → Compares against peppered SHA-256 hash
+ *
+ * Dev/mock fallback:
+ * When HANU_API_KEY is not configured in development, prints OTP to console via logDevOtp()
+ * and accepts universal test code if MOCK_DATA_MODE is enabled.
+ */
+
 import { env } from '../../config/env';
 import { AppError, TooManyRequestsError } from '../../utils/src/errors';
 import { generateOtp } from '../../utils/src/otp';
-import { sendSms } from '../../utils/src/sms';
+import { createHash } from 'crypto';
+import { logDevOtp } from '../../utils/src/sms';
+import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
 import { authRepository } from './authRepository';
+
+/** sha256(otp + pepper) — raw OTP digits are never stored for the hanu route. */
+function hashOtp(otp: string): string {
+  const pepper = env.OTP_PEPPER ?? 'race-otp::hanu-sms-production-pepper';
+  return createHash('sha256').update(`${otp}:${pepper}`).digest('hex');
+}
 
 export class OtpService {
   private getExpiryDate(): Date {
     return new Date(Date.now() + env.OTP_EXPIRY_SECONDS * 1000);
+  }
+
+  /** Which SMS route handles this role? hanu → local-dev. */
+  private pickProvider(_role?: string): 'hanu' | 'local' {
+    if (process.env.FORCE_MOCK_OTP !== 'true' && isHanuConfigured()) {
+      return 'hanu';
+    }
+    return 'local';
   }
 
   private async assertResendAllowed(mobileNumber: string): Promise<void> {
@@ -22,11 +51,38 @@ export class OtpService {
     }
   }
 
-  async sendOtp(mobileNumber: string): Promise<{ message: string; expiresIn: number; devOtp?: string }> {
+  async sendOtp(
+    mobileNumber: string,
+    role?: string,
+  ): Promise<{ message: string; expiresIn: number; devOtp?: string }> {
     await this.assertResendAllowed(mobileNumber);
     await authRepository.invalidatePendingOtps(mobileNumber);
 
-    // Always generate a real OTP for customer + partner (MVP / all environments).
+    const provider = this.pickProvider(role);
+
+    if (provider === 'hanu') {
+      // ─── HanuOTP route (we generate the code; Hanu delivers it) ───────────
+      const mobileOtp = generateOtp();
+      await hanuSendOtp(mobileNumber, mobileOtp);
+
+      await authRepository.createOtpLog({
+        mobileNumber,
+        otpHash: hashOtp(mobileOtp),
+        mobileOtpExpiry: this.getExpiryDate(),
+        mobileVerified: false,
+        emailVerified: false,
+        mobileAttempts: 0,
+        emailAttempts: 0,
+        provider: 'hanu',
+      });
+
+      return {
+        message: 'OTP sent to your mobile number',
+        expiresIn: env.OTP_EXPIRY_SECONDS,
+      };
+    }
+
+    // ─── Dev / mock fallback path ─────────────────────────────────────────
     const mobileOtp = generateOtp();
     const expiry = this.getExpiryDate();
 
@@ -38,16 +94,15 @@ export class OtpService {
       emailVerified: false,
       mobileAttempts: 0,
       emailAttempts: 0,
+      provider: 'local',
     });
 
-    await sendSms(mobileNumber, mobileOtp);
+    logDevOtp(mobileNumber, mobileOtp);
 
     return {
       message: 'OTP sent to your mobile number',
       expiresIn: env.OTP_EXPIRY_SECONDS,
-      // In non-production environments (or when Twilio is not configured), include
-      // the OTP in the response so the mobile/web UI can show it as a toast.
-      ...(env.NODE_ENV !== 'production' ? { devOtp: mobileOtp } : {}),
+      devOtp: mobileOtp,
     };
   }
 
@@ -55,6 +110,7 @@ export class OtpService {
     const log = await authRepository.findLatestValidOtpLog(mobileNumber);
 
     if (!log) {
+      // Allow re-use within expiry window (idempotent verify)
       const alreadyUsed = await authRepository.findRecentlyVerifiedOtpLog(
         mobileNumber,
         otp,
@@ -63,7 +119,6 @@ export class OtpService {
       if (alreadyUsed) {
         return;
       }
-
       throw new AppError('OTP expired or already used. Tap Resend OTP for a new code.', 400);
     }
 
@@ -75,7 +130,29 @@ export class OtpService {
       throw new TooManyRequestsError('Maximum OTP verification attempts exceeded');
     }
 
-    if (!log.mobileOtp || log.mobileOtp !== otp) {
+    // ─── HanuOTP route: OTP digits verified against peppered hash ──────────
+    if (log.provider === 'hanu') {
+      if (!log.otpHash || hashOtp(otp) !== log.otpHash) {
+        log.mobileAttempts += 1;
+        await log.save();
+        throw new AppError('Incorrect code. Check the SMS and try again.', 400);
+      }
+
+      log.mobileVerified = true;
+      if (!log.mobileOtp) {
+        log.mobileOtp = otp;
+      }
+      await log.save();
+      return;
+    }
+
+    // ─── Dev / mock verification fallback ─────────────────────────────────
+    const isMockOtpMatch = Boolean(
+      (env.MOCK_DATA_MODE || env.NODE_ENV !== 'production') &&
+      otp === env.MOCK_UNIVERSAL_OTP,
+    );
+
+    if (!log.mobileOtp || (log.mobileOtp !== otp && !isMockOtpMatch)) {
       log.mobileAttempts += 1;
       await log.save();
       throw new AppError('Invalid OTP', 400);

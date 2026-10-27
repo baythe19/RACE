@@ -1,11 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useCallback, useEffect, useRef } from 'react';
-import {
-  Animated,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, StatusBar, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -37,14 +32,17 @@ export default function PartnerSplashScreen() {
 
   const handleContinue = useCallback(() => {
     if (isAuthenticated && shouldUsePartnerExperience(user, false)) {
-      rootNavigation?.reset({
-        index: 0,
-        routes: [{ name: 'PartnerMain' }],
-      });
+      const routeNames = rootNavigation?.getState()?.routeNames;
+      if (routeNames && routeNames.includes('PartnerMain')) {
+        rootNavigation?.reset({
+          index: 0,
+          routes: [{ name: 'PartnerMain' }],
+        });
+      }
       return;
     }
 
-    navigation.replace('PartnerWelcome');
+    navigation.replace('PartnerLogin');
   }, [isAuthenticated, navigation, rootNavigation, user]);
 
   useEffect(() => {
@@ -56,10 +54,15 @@ export default function PartnerSplashScreen() {
 
     fadeIn.start();
 
+    const timer = setTimeout(() => {
+      handleContinue();
+    }, 1500);
+
     return () => {
+      clearTimeout(timer);
       fadeAnim.stopAnimation();
     };
-  }, [fadeAnim]);
+  }, [fadeAnim, handleContinue]);
 
   return (
     <View style={styles.root}>
@@ -76,7 +79,7 @@ export default function PartnerSplashScreen() {
         ]}>
         <View style={styles.centerBlock}>
           <PartnerBrandLogo />
-          <Text style={styles.appName}>RACE Service</Text>
+          <PartnerText style={styles.appName}>RACE Service</PartnerText>
         </View>
 
         <View style={styles.footer}>

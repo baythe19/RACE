@@ -14,6 +14,11 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatReadableLocation } from '../../../utils/readableAddress';
+import {
+  TOWING_DEMO_DROP,
+  TOWING_DEMO_PICKUP,
+  TOWING_WALKTHROUGH_ENABLED,
+} from '../../../utils/towingBookingWalkthrough';
 import { formatRupee } from '../../../utils/towingPricing';
 import { colors, shadows, typography } from '../../../theme';
 
@@ -111,6 +116,31 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
   const { data: savedLocations = [] } = useSavedLocationsQuery();
 
   useEffect(() => {
+    if (!TOWING_WALKTHROUGH_ENABLED) return;
+    if (pickupLat != null && dropLat != null) return;
+
+    setPickup(TOWING_DEMO_PICKUP.address);
+    setPickupLabel(TOWING_DEMO_PICKUP.label);
+    setPickupLat(TOWING_DEMO_PICKUP.lat);
+    setPickupLng(TOWING_DEMO_PICKUP.lng);
+    setDrop(TOWING_DEMO_DROP.address);
+    setDropLabel(TOWING_DEMO_DROP.label);
+    setDropLat(TOWING_DEMO_DROP.lat);
+    setDropLng(TOWING_DEMO_DROP.lng);
+    updateBooking({
+      pickup: TOWING_DEMO_PICKUP.address,
+      pickupLabel: TOWING_DEMO_PICKUP.label,
+      pickupLat: TOWING_DEMO_PICKUP.lat,
+      pickupLng: TOWING_DEMO_PICKUP.lng,
+      drop: TOWING_DEMO_DROP.address,
+      dropLabel: TOWING_DEMO_DROP.label,
+      dropLat: TOWING_DEMO_DROP.lat,
+      dropLng: TOWING_DEMO_DROP.lng,
+      distanceKm: 8,
+    });
+  }, [dropLat, pickupLat, updateBooking]);
+
+  useEffect(() => {
     if (!selectedLocation) return;
     if (booking.pickupLat != null) return;
     if (pickupLat != null) return;
@@ -191,8 +221,9 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
 
   return (
     <TowingBookingLayout
-      title="Pickup & Drop Location"
+      title="Pickup & drop"
       step={2}
+      buttonLabel="Review booking"
       onBack={() => navigation.goBack()}
       continueDisabled={!canContinue}
       onContinue={() => {
@@ -207,7 +238,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           dropLng,
           distanceKm: distanceKm ?? undefined,
         });
-        navigation.navigate('TowingSelectType');
+        navigation.navigate('TowingReview');
       }}>
       <View
         style={[
@@ -235,7 +266,15 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           t={t}
         />
 
-        <View style={{ height: t.px(18) }} />
+        <View
+          style={{
+            height: t.px(28),
+            marginLeft: t.px(9),
+            borderLeftWidth: 2,
+            borderLeftColor: '#F5D78A',
+            borderStyle: 'dashed',
+          }}
+        />
 
         <LocationCard
           label="Drop"

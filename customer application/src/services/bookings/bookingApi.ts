@@ -1,7 +1,7 @@
 import { API_ENDPOINTS } from '../../config/api';
 import type { ApiSuccessResponse } from '../../types/auth';
 import type { Booking, BookingStatus, SubmitRatingRequest } from '../../types/booking';
-import type { CombinedBookingListItem, ServiceBooking } from '../../types/serviceBooking';
+import type { CombinedBookingListItem, ServiceBooking, ServiceBookingType } from '../../types/serviceBooking';
 import { apiClient } from '../api/apiClient';
 import { formatReadableAddress } from '../../utils/readableAddress';
 import {
@@ -74,8 +74,6 @@ function mapServiceBookingToBooking(
           name: item.driver.name,
           rating: item.driver.rating,
           phone: item.driver.phone,
-          experience: 'RACE verified',
-          verified: true,
         }
       : undefined,
     vendorId: item.vendorId,
@@ -100,6 +98,12 @@ function mapServiceBookingToBooking(
     advancePaid: item.advancePaid,
     remainingPaid: item.remainingPaid,
     paymentStatus: item.paymentStatus,
+    estimatedFare: item.estimatedFare,
+    fareBreakdown: item.fareBreakdown,
+    arrivedAtDropoffAt: item.arrivedAtDropoffAt,
+    completionOtp: item.completionOtp,
+    paymentCollectionMode: item.paymentCollectionMode,
+    paymentConfirmedByCustomer: item.paymentConfirmedByCustomer,
   };
 }
 
@@ -114,18 +118,26 @@ export async function listBookings(): Promise<Booking[]> {
   return data.data.map(mapCombinedItem);
 }
 
-export async function getBooking(id: string): Promise<Booking | null> {
-  try {
+export async function getBooking(
+  id: string,
+  bookingType?: ServiceBookingType,
+): Promise<Booking | null> {
+  if (bookingType === 'towing') {
     const towing = await getTowingBooking(id);
     return mapServiceBookingToBooking(towing, 'towing', 'Towing');
-  } catch {
-    try {
-      const driver = await getDriverBooking(id);
-      return mapServiceBookingToBooking(driver, 'driver', 'Driver Hire');
-    } catch {
-      throw new Error('Unable to fetch booking details');
-    }
   }
+  if (bookingType === 'driver') {
+    const driver = await getDriverBooking(id);
+    return mapServiceBookingToBooking(driver, 'driver', 'Driver Hire');
+  }
+
+  // Legacy callers without a type resolve through the combined endpoint. Never
+  // probe two Mongo collections by ID because their ObjectIds can collide.
+  const matches = (await listBookings()).filter(booking => booking.id === id);
+  if (matches.length > 1) {
+    throw new Error('Booking type is required because this ID exists in multiple service collections');
+  }
+  return matches[0] ?? null;
 }
 
 /** @deprecated Use towing/driver booking APIs via Home flow. */
@@ -150,7 +162,7 @@ export async function submitBookingRating(
 export interface BookingTracking {
   bookingId: string;
   status: string;
-  etaMinutes: number;
+  etaMinutes?: number;
   driver?: Booking['driver'];
   driverLocation?: { latitude: number; longitude: number };
   pickup: Booking['pickup'];
@@ -159,34 +171,24 @@ export interface BookingTracking {
   assignedFleetVehicleLabel?: string;
 }
 
-export async function getBookingTracking(bookingId: string): Promise<BookingTracking | null> {
-  try {
-    const towing = await getTowingBookingTracking(bookingId);
-    return {
-      bookingId: towing.bookingId,
-      status: towing.status,
-      etaMinutes: 15,
-      driverLocation: towing.driverLocation,
-      pickup: toBookingLocation(towing.pickup),
-      dropoff: towing.dropoff ? toBookingLocation(towing.dropoff) : undefined,
-      tripStartOtp: towing.tripStartOtp,
-      assignedFleetVehicleLabel: towing.assignedFleetVehicleLabel,
-    };
-  } catch {
-    try {
-      const driver = await getDriverBookingTracking(bookingId);
-      return {
-        bookingId: driver.bookingId,
-        status: driver.status,
-        etaMinutes: 15,
-        driverLocation: driver.driverLocation,
-        pickup: toBookingLocation(driver.pickup),
-        dropoff: driver.dropoff ? toBookingLocation(driver.dropoff) : undefined,
-        tripStartOtp: driver.tripStartOtp,
-        assignedFleetVehicleLabel: driver.assignedFleetVehicleLabel,
-      };
-    } catch {
-      throw new Error('Unable to fetch booking tracking');
-    }
-  }
+export async function getBookingTracking(
+  bookingId: string,
+  bookingType?: ServiceBookingType,
+): Promise<BookingTracking | null> {
+  const resolvedType = bookingType ?? (await getBooking(bookingId))?.bookingType;
+  if (!resolvedType) return null;
+
+  const result =
+    resolvedType === 'towing'
+      ? await getTowingBookingTracking(bookingId)
+      : await getDriverBookingTracking(bookingId);
+  return {
+    bookingId: result.bookingId,
+    status: result.status,
+    driverLocation: result.driverLocation,
+    pickup: toBookingLocation(result.pickup),
+    dropoff: result.dropoff ? toBookingLocation(result.dropoff) : undefined,
+    tripStartOtp: result.tripStartOtp,
+    assignedFleetVehicleLabel: result.assignedFleetVehicleLabel,
+  };
 }

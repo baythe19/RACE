@@ -1,9 +1,12 @@
-import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { PartnerText } from './PartnerText';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, InteractionManager, Linking, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { Check, CloudUpload, MoreHorizontal, type LucideIcon } from 'lucide-react-native';
-
+import { Check, CloudUpload, FileText, MoreHorizontal, type LucideIcon } from 'lucide-react-native';
+import PartnerUploadSheet from './dialogs/PartnerUploadSheet';
+import PartnerCameraPrimerSheet from './dialogs/PartnerCameraPrimerSheet';
 import { colors, radius, spacing, typography } from '../../theme';
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -16,243 +19,383 @@ export interface PartnerDocumentFieldConfig {
   hint?: string;
   required: boolean;
   Icon: LucideIcon;
+  alternatives?: Array<{ id: string; label: string }>;
 }
+
+export interface PartnerDocumentSelection {
+  id: string;
+  uri: string;
+  name: string;
+  mimeType?: string;
+}
+
+export type PartnerDocumentUploadState = {
+  status: 'uploading' | 'uploaded' | 'error';
+  progress?: number;
+};
 
 interface PartnerDocumentUploadListProps {
   documents: PartnerDocumentFieldConfig[];
   uploadedIds: string[];
   onUpload: (id: string, uri: string, name: string, mimeType?: string) => void;
-  /** `card` matches the RACE Partner documents design */
+  selectedFiles?: PartnerDocumentSelection[];
+  uploadStates?: Record<string, PartnerDocumentUploadState>;
+  disabled?: boolean;
   variant?: 'default' | 'card';
   hideTitle?: boolean;
+  compact?: boolean;
 }
 
+type PickerSource = 'gallery' | 'camera' | 'files';
+
 export default function PartnerDocumentUploadList({
-  documents,
-  uploadedIds,
-  onUpload,
-  variant = 'default',
-  hideTitle = false,
+  documents, uploadedIds, onUpload, selectedFiles, uploadStates = {}, disabled = false,
+  variant = 'default', hideTitle = false, compact = false,
 }: PartnerDocumentUploadListProps) {
-  if (variant === 'card') {
-    return (
-      <View style={styles.cardList}>
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
+  const [altDialog, setAltDialog] = useState<{
+    title: string;
+    options: Array<{ label: string; onPress: () => void }>;
+  } | null>(null);
+  const [activeDoc, setActiveDoc] = useState<PartnerDocumentFieldConfig | null>(null);
+  const [cameraPrimerVisible, setCameraPrimerVisible] = useState(false);
+  const [preview, setPreview] = useState<PartnerDocumentSelection | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState(false);
+  const [pickingId, setPickingId] = useState<string | null>(null);
+  const pickerBusy = useRef(false);
+  const mounted = useRef(true);
+  const pendingAction = useRef<(() => void) | null>(null);
+  const flushAction = useCallback(() => {
+    const action = pendingAction.current;
+    pendingAction.current = null;
+    action?.();
+  }, []);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; pendingAction.current = null; };
+  }, []);
+  useEffect(() => {
+    if (activeDoc || Platform.OS === 'ios') return;
+    const task = InteractionManager.runAfterInteractions(flushAction);
+    return () => task.cancel();
+  }, [activeDoc, flushAction]);
+
+  const selectedFor = (doc: PartnerDocumentFieldConfig) => selectedFiles?.find(file =>
+    file.id === doc.id || doc.alternatives?.some(option => option.id === file.id),
+  );
+  const showPreview = (file: PartnerDocumentSelection) => {
+    setPreviewError(false);
+    setPreviewLoading(file.mimeType !== 'application/pdf' && !/\.pdf$/i.test(file.name));
+    setPreview(file);
+  };
+  const pick = async (doc: PartnerDocumentFieldConfig, source: PickerSource) => {
+    if (pickerBusy.current || disabled) return;
+    pickerBusy.current = true;
+    setPickingId(doc.id);
+    try {
+      const file = await pickFile(source, doc.id);
+      if (file && mounted.current) onUpload(doc.id, file.uri, file.name, file.mimeType);
+    } catch (error) {
+      if (!mounted.current) return;
+      const raw = error instanceof Error ? error.message : 'Please try again.';
+      if (raw.startsWith('CAMERA_SETTINGS::')) {
+        showAlert({
+          tone: 'warning',
+          title: 'Camera permission required',
+          message: raw.replace('CAMERA_SETTINGS::', ''),
+          primaryAction: {
+            label: 'Open Settings',
+            onPress: () => void Linking.openSettings().catch(() => showAlert({
+              tone: 'error',
+              title: 'Could not open Settings',
+              message: 'Open your device settings to allow camera access.',
+            })),
+          },
+          secondaryAction: { label: 'Close', onPress: () => {} },
+        });
+      } else {
+        showAlert({
+          tone: 'error',
+          title: 'Could not select document',
+          message: raw,
+        });
+      }
+    } finally {
+      pickerBusy.current = false;
+      if (mounted.current) setPickingId(null);
+    }
+  };
+  const chooseSource = (source: PickerSource) => {
+    if (!activeDoc) return;
+    const doc = activeDoc;
+    // Camera gets a branded primer first; the OS permission dialog follows it.
+    if (source === 'camera') {
+      setActiveDoc(null);
+      setCameraPrimerVisible(true);
+      return;
+    }
+    pendingAction.current = () => {
+      if (doc.alternatives?.length) {
+        setAltDialog({
+          title: doc.label,
+          options: doc.alternatives.map(option => ({
+            label: option.label,
+            onPress: () => void pick({ ...doc, ...option, alternatives: undefined }, source),
+          })),
+        });
+      } else void pick(doc, source);
+    };
+  };
+  const busy = disabled || pickingId !== null;
+  const isPdf = preview?.mimeType === 'application/pdf' || Boolean(preview && /\.pdf$/i.test(preview.name));
+
+  return (
+    <View>
+      {variant === 'default' && !hideTitle ? <PartnerText style={styles.listTitle}>Required Documents</PartnerText> : null}
+      <View style={variant === 'card' ? styles.cardList : undefined}>
         {documents.map(doc => {
-          const uploaded = uploadedIds.includes(doc.id);
+          const file = selectedFor(doc);
+          const state = file ? uploadStates[file.id] : undefined;
+          const legacyUploaded = selectedFiles === undefined && (uploadedIds.includes(doc.id) || Boolean(doc.alternatives?.some(option => uploadedIds.includes(option.id))));
+          const uploaded = state?.status === 'uploaded' || legacyUploaded;
+          const uploading = state?.status === 'uploading';
           const Icon = doc.Icon;
-
+          const statusText = uploading ? `Uploading${state.progress === undefined ? '...' : ` ${state.progress}%`}`
+            : state?.status === 'error' ? 'Upload failed'
+            : uploaded ? 'Uploaded'
+            : file ? 'Selected - ready to upload'
+            : doc.required ? 'Not uploaded' : 'Optional';
           return (
-            <View key={doc.id} style={styles.cardRow}>
-              <View style={[styles.cardIconWrap, uploaded && styles.cardIconWrapDone]}>
-                <Icon
-                  size={18}
-                  color={uploaded ? SUCCESS_GREEN : colors.primary}
-                  strokeWidth={2.2}
-                />
+            <View key={doc.id} style={variant === 'card' ? [styles.cardRow, compact && styles.compactCardRow] : styles.row}>
+              <View style={variant === 'card' ? [styles.cardIconWrap, compact && styles.compactIconWrap, uploaded && styles.cardIconWrapDone] : styles.iconWrap}>
+                <Icon size={18} color={variant === 'card' ? uploaded ? SUCCESS_GREEN : colors.primary : colors.partnerRed} strokeWidth={2.2} />
               </View>
-
-              <View style={styles.cardCopy}>
-                <Text style={styles.cardTitle}>
-                  {doc.label}
-                  {doc.required ? <Text style={styles.required}> *</Text> : null}
-                </Text>
-                {doc.hint ? <Text style={styles.cardHint}>{doc.hint}</Text> : null}
+              <View style={variant === 'card' ? styles.cardCopy : styles.copy}>
+                <PartnerText
+                  numberOfLines={variant === 'card' && compact ? 2 : undefined}
+                  ellipsizeMode="tail"
+                  style={variant === 'card' ? [styles.cardTitle, compact && styles.compactCardTitle] : styles.docTitle}>
+                  {doc.label}{variant === 'card' && doc.required && !compact ? <PartnerText style={styles.required}> *</PartnerText> : null}
+                </PartnerText>
+                {variant === 'card' && compact ? (
+                  <PartnerText
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    style={[
+                      styles.compactCardMeta,
+                      state?.status === 'error' && { color: colors.error },
+                    ]}>
+                    {state?.status === 'error'
+                      ? 'Upload failed. Tap Upload to try again.'
+                      : doc.hint || (doc.required ? 'Required for verification.' : 'Optional document.')}
+                  </PartnerText>
+                ) : doc.hint ? (
+                  <PartnerText style={styles.docHint}>{doc.hint}</PartnerText>
+                ) : null}
+                {variant === 'card' && compact ? null : variant === 'card' || selectedFiles !== undefined ? (
+                  <PartnerText style={[styles.compactDocStatus, state?.status === 'error' && { color: colors.error }]}>{statusText}</PartnerText>
+                ) : (
+                  <View style={[styles.badge, doc.required ? styles.badgeRequired : styles.badgeOptional]}>
+                    <PartnerText style={[styles.badgeText, doc.required ? styles.badgeTextRequired : styles.badgeTextOptional]}>{doc.required ? 'Required' : 'Optional'}</PartnerText>
+                  </View>
+                )}
+                {file ? <PartnerText numberOfLines={1} style={styles.compactDocStatus}>{file.name}</PartnerText> : null}
+                {uploading && state.progress !== undefined ? (
+                  <View style={styles.uploadProgressTrack}>
+                    <View style={[styles.uploadProgressFill, { width: `${state.progress}%` }]} />
+                  </View>
+                ) : null}
               </View>
-
-              {uploaded ? (
-                <Pressable
-                  onPress={() => void pickDocument(doc, uploaded, onUpload)}
-                  style={({ pressed }) => [styles.uploadedStatus, pressed && styles.pressed]}>
-                  <Check size={14} color={SUCCESS_GREEN} strokeWidth={3} />
-                  <Text style={styles.uploadedLabel}>Uploaded</Text>
-                </Pressable>
-              ) : (
-                <Pressable
-                  onPress={() => void pickDocument(doc, uploaded, onUpload)}
-                  style={({ pressed }) => [styles.uploadPill, pressed && styles.pressed]}>
-                  <CloudUpload size={14} color={colors.dark} strokeWidth={2.4} />
-                  <Text style={styles.uploadPillLabel}>Upload</Text>
-                </Pressable>
-              )}
-
               <Pressable
-                onPress={() => void pickDocument(doc, uploaded, onUpload)}
-                hitSlop={8}
-                style={styles.moreBtn}>
-                <MoreHorizontal size={18} color={colors.grey} strokeWidth={2.2} />
+                testID={`document-${doc.id}-action`}
+                disabled={busy || uploading}
+                accessibilityRole="button"
+                accessibilityLabel={file ? `Preview ${doc.label}` : `Upload ${doc.label}`}
+                onPress={() => file ? showPreview(file) : setActiveDoc(doc)}
+                style={({ pressed }) => [variant === 'card' ? [styles.uploadPill, compact && styles.compactUploadPill] : [styles.uploadBtn, uploaded && styles.uploadBtnDone], pressed && styles.pressed, (busy || uploading) && { opacity: 0.6 }]}>
+                {uploading || pickingId === doc.id ? <ActivityIndicator size="small" color={colors.dark} /> :
+                  uploaded ? <Check size={14} color={colors.dark} /> : <CloudUpload size={14} color={colors.dark} />}
+                <PartnerText style={variant === 'card' ? styles.uploadPillLabel : [styles.uploadLabel, uploaded && styles.uploadLabelDone]}>{uploading ? 'Uploading' : file ? 'View' : uploaded ? 'Uploaded' : 'Upload'}</PartnerText>
               </Pressable>
+              {variant === 'card' ? <Pressable
+                testID={`document-${doc.id}-options`}
+                disabled={busy || uploading}
+                accessibilityRole="button"
+                accessibilityLabel={`${doc.label} options`}
+                onPress={() => setActiveDoc(doc)} hitSlop={8} style={styles.moreBtn}>
+                <MoreHorizontal size={18} color={colors.grey} />
+              </Pressable> : null}
             </View>
           );
         })}
       </View>
-    );
-  }
-
-  return (
-    <View>
-      {hideTitle ? null : <Text style={styles.listTitle}>Required Documents</Text>}
-      {documents.map(doc => {
-        const uploaded = uploadedIds.includes(doc.id);
-        const Icon = doc.Icon;
-
-        return (
-          <View key={doc.id} style={styles.row}>
-            <View style={styles.iconWrap}>
-              <Icon size={18} color={colors.partnerRed} strokeWidth={2} />
-            </View>
-            <View style={styles.copy}>
-              <Text style={styles.docTitle}>{doc.label}</Text>
-              {doc.hint ? <Text style={styles.docHint}>{doc.hint}</Text> : null}
-              <View
-                style={[
-                  styles.badge,
-                  doc.required ? styles.badgeRequired : styles.badgeOptional,
-                ]}>
-                <Text
-                  style={[
-                    styles.badgeText,
-                    doc.required ? styles.badgeTextRequired : styles.badgeTextOptional,
-                  ]}>
-                  {doc.required ? 'Required' : 'Optional'}
-                </Text>
-              </View>
-            </View>
-            <Pressable
-              onPress={() => void pickDocument(doc, uploaded, onUpload)}
-              style={({ pressed }) => [
-                styles.uploadBtn,
-                uploaded && styles.uploadBtnDone,
-                pressed && styles.pressed,
-              ]}>
-              <CloudUpload
-                size={16}
-                color={uploaded ? colors.partnerRed : colors.grey}
-                strokeWidth={2}
-              />
-              <Text style={[styles.uploadLabel, uploaded && styles.uploadLabelDone]}>
-                {uploaded ? 'Uploaded' : 'Upload'}
-              </Text>
+      {variant === 'default' ? <View style={styles.infoBox}>
+        <PartnerText style={styles.infoText}>Use clear, readable JPG, PNG or PDF files (maximum 5MB each).</PartnerText>
+      </View> : null}
+      <PartnerUploadSheet
+        visible={Boolean(activeDoc)}
+        onClose={() => setActiveDoc(null)}
+        onDismiss={flushAction}
+        onTakePhoto={() => chooseSource('camera')}
+        onPickGallery={() => chooseSource('gallery')}
+        onPickFile={() => chooseSource('files')}
+        hasExistingPreview={Boolean(activeDoc && selectedFor(activeDoc))}
+        onPreview={() => {
+          const file = activeDoc && selectedFor(activeDoc);
+          if (file) pendingAction.current = () => showPreview(file);
+        }}
+      />
+      <PartnerCameraPrimerSheet
+        visible={cameraPrimerVisible}
+        forLabel={activeDoc?.label}
+        onAllow={() => {
+          setCameraPrimerVisible(false);
+          flushAction();
+        }}
+        onClose={() => {
+          setCameraPrimerVisible(false);
+          pendingAction.current = null;
+        }}
+      />
+      <Modal visible={Boolean(preview)} transparent animationType="fade" onRequestClose={() => setPreview(null)}>
+        <View style={styles.previewOverlay}>
+          <View style={styles.previewCard}>
+            <PartnerText style={styles.cardTitle}>Document preview</PartnerText>
+            <PartnerText numberOfLines={2} style={styles.previewName}>{preview?.name}</PartnerText>
+            {isPdf ? <View style={styles.pdfPreview}>
+              <FileText size={44} color={colors.primary} />
+              <PartnerText style={styles.infoText}>PDF document</PartnerText>
+              <Pressable style={styles.uploadPill} onPress={() => {
+                if (preview) void Linking.openURL(preview.uri).catch(() => showAlert({
+                  tone: 'error',
+                  title: 'Could not open PDF',
+                  message: 'A PDF viewer is required to open this file on your device.',
+                }));
+              }}><PartnerText style={styles.uploadPillLabel}>Open PDF</PartnerText></Pressable>
+            </View> : preview ? <View style={styles.imagePreview}>
+              <Image source={{ uri: preview.uri }} style={styles.previewImage} resizeMode="contain"
+                onLoadEnd={() => setPreviewLoading(false)} onError={() => { setPreviewError(true); setPreviewLoading(false); }} />
+              {previewLoading ? <ActivityIndicator style={StyleSheet.absoluteFill} color={colors.primary} /> : null}
+              {previewError ? <PartnerText style={styles.previewError}>Image could not be displayed. Select it again.</PartnerText> : null}
+            </View> : null}
+            <Pressable testID="document-preview-close" accessibilityRole="button" onPress={() => setPreview(null)} style={styles.previewClose}>
+              <PartnerText style={styles.uploadPillLabel}>Close preview</PartnerText>
             </Pressable>
           </View>
-        );
-      })}
+        </View>
+      </Modal>
 
-      <View style={styles.infoBox}>
-        <Text style={styles.infoText}>
-          Ensure all documents are clear and information is readable. Supported formats: JPG, PNG,
-          PDF (Max 5MB each)
-        </Text>
-      </View>
+      {/* Document-type chooser (replaces system Alert options) */}
+      <Modal transparent animationType="fade" visible={Boolean(altDialog)} onRequestClose={() => setAltDialog(null)}>
+        <Pressable style={styles.altOverlay} onPress={() => setAltDialog(null)}>
+          <Pressable style={styles.altSheet} onPress={e => e.stopPropagation()}>
+            <PartnerText style={styles.altTitle}>{altDialog?.title ?? ''}</PartnerText>
+            <PartnerText style={styles.altSubtitle}>Choose the document type.</PartnerText>
+            {altDialog?.options.map(option => (
+              <Pressable
+                key={option.label}
+                accessibilityRole="button"
+                onPress={() => {
+                  setAltDialog(null);
+                  option.onPress();
+                }}
+                style={({ pressed }) => [styles.altOption, pressed && styles.altOptionPressed]}>
+                <PartnerText style={styles.altOptionText}>{option.label}</PartnerText>
+              </Pressable>
+            ))}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setAltDialog(null)}
+              style={({ pressed }) => [styles.altOption, styles.altClose, pressed && styles.altOptionPressed]}>
+              <PartnerText style={styles.altCloseText}>Cancel</PartnerText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
+      {partnerDialog}
     </View>
   );
 }
 
-async function pickDocument(
-  doc: PartnerDocumentFieldConfig,
-  uploaded: boolean,
-  onUpload: PartnerDocumentUploadListProps['onUpload'],
-) {
-  if (uploaded) {
-    Alert.alert(doc.label, 'Document already uploaded. Pick again to replace?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Replace', onPress: () => void launchPicker(doc, onUpload) },
-    ]);
-    return;
+async function pickFile(source: PickerSource, id: string): Promise<{ uri: string; name: string; mimeType: string } | null> {
+  let file: { uri: string; name: string; mimeType?: string | null; size?: number | null };
+  if (source === 'files') {
+    const result = await DocumentPicker.getDocumentAsync({ type: [...ALLOWED_MIME], copyToCacheDirectory: true, multiple: false });
+    if (result.canceled || !result.assets[0]) return null;
+    const asset = result.assets[0];
+    file = { uri: asset.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size };
+  } else {
+    if (source === 'camera') {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error(
+          permission.canAskAgain
+            ? 'Allow camera access in Settings or choose a file instead.'
+            : 'CAMERA_SETTINGS::Allow camera access in Settings or choose a file instead.',
+        );
+      }
+    }
+    const result = source === 'camera' ? await ImagePicker.launchCameraAsync({ quality: 0.85 }) :
+      await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.85 });
+    if (result.canceled || !result.assets[0]) return null;
+    const asset = result.assets[0];
+    file = { uri: asset.uri, name: asset.fileName ?? `${id}.jpg`, mimeType: asset.mimeType ?? 'image/jpeg', size: asset.fileSize };
   }
-  await launchPicker(doc, onUpload);
-}
-
-function validateFile(
-  mimeType: string,
-  size?: number | null,
-): { ok: true } | { ok: false; message: string } {
-  const normalized = mimeType.toLowerCase();
-  if (!ALLOWED_MIME.has(normalized)) {
-    return { ok: false, message: 'Only JPG, PNG, and PDF files are allowed' };
-  }
-  if (size && size > MAX_BYTES) {
-    return { ok: false, message: 'File exceeds 5MB limit' };
-  }
-  return { ok: true };
-}
-
-function submitFile(
-  doc: PartnerDocumentFieldConfig,
-  onUpload: PartnerDocumentUploadListProps['onUpload'],
-  file: { uri: string; name: string; mimeType: string; size?: number | null },
-) {
-  const validation = validateFile(file.mimeType, file.size);
-  if (!validation.ok) {
-    Alert.alert('Invalid file', validation.message);
-    return;
-  }
-  onUpload(doc.id, file.uri, file.name, file.mimeType);
-}
-
-async function launchPicker(
-  doc: PartnerDocumentFieldConfig,
-  onUpload: PartnerDocumentUploadListProps['onUpload'],
-) {
-  Alert.alert('Upload document', doc.label, [
-    {
-      text: 'Gallery',
-      onPress: async () => {
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          quality: 0.85,
-        });
-        if (result.canceled || !result.assets[0]) return;
-        const asset = result.assets[0];
-        submitFile(doc, onUpload, {
-          uri: asset.uri,
-          name: asset.fileName ?? `${doc.id}.jpg`,
-          mimeType: asset.mimeType ?? 'image/jpeg',
-          size: asset.fileSize,
-        });
-      },
-    },
-    {
-      text: 'Camera',
-      onPress: async () => {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permission required', 'Camera permission is needed to take a photo.');
-          return;
-        }
-        const result = await ImagePicker.launchCameraAsync({ quality: 0.85 });
-        if (result.canceled || !result.assets[0]) return;
-        const asset = result.assets[0];
-        submitFile(doc, onUpload, {
-          uri: asset.uri,
-          name: asset.fileName ?? `${doc.id}.jpg`,
-          mimeType: asset.mimeType ?? 'image/jpeg',
-          size: asset.fileSize,
-        });
-      },
-    },
-    {
-      text: 'Browse Files',
-      onPress: async () => {
-        const result = await DocumentPicker.getDocumentAsync({
-          type: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'],
-          copyToCacheDirectory: true,
-          multiple: false,
-        });
-        if (result.canceled || !result.assets[0]) return;
-        const asset = result.assets[0];
-        submitFile(doc, onUpload, {
-          uri: asset.uri,
-          name: asset.name,
-          mimeType: asset.mimeType ?? 'application/pdf',
-          size: asset.size,
-        });
-      },
-    },
-    { text: 'Cancel', style: 'cancel' },
-  ]);
+  const mimeType = (file.mimeType ?? (/\.pdf$/i.test(file.name) ? 'application/pdf' : /\.png$/i.test(file.name) ? 'image/png' : /\.jpe?g$/i.test(file.name) ? 'image/jpeg' : '')).toLowerCase();
+  if (!file.uri || !ALLOWED_MIME.has(mimeType)) throw new Error('Only JPG, PNG and PDF files are allowed.');
+  if (file.size != null && (file.size <= 0 || file.size > MAX_BYTES)) throw new Error('Choose a non-empty file up to 5MB.');
+  return { uri: file.uri, name: file.name, mimeType };
 }
 
 const styles = StyleSheet.create({
+  altOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15,18,25,0.45)',
+    justifyContent: 'flex-end',
+  },
+  altSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    paddingHorizontal: 18,
+    paddingBottom: 12,
+    alignItems: 'center',
+  },
+  altTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.dark,
+    marginTop: 14,
+  },
+  altSubtitle: {
+    fontSize: 12,
+    color: colors.grey,
+    marginTop: 2,
+  },
+  altOption: {
+    width: '100%',
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#F1F5F9',
+  },
+  altOptionPressed: {
+    backgroundColor: '#F8FAFC',
+  },
+  altOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.dark,
+  },
+  altClose: {
+    marginTop: 4,
+  },
+  altCloseText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.grey,
+  },
   listTitle: {
     color: colors.dark,
     fontSize: typography.sizes.md,
@@ -349,6 +492,30 @@ const styles = StyleSheet.create({
   cardList: {
     gap: spacing.sm,
   },
+  compactCardRow: { gap: 7, paddingHorizontal: 8, paddingVertical: 8, minHeight: 58, borderRadius: 10 },
+  compactIconWrap: { width: 30, height: 30, borderRadius: 8 },
+  compactCardTitle: { fontSize: 11, lineHeight: 14 },
+  compactCardMeta: {
+    fontSize: 9,
+    lineHeight: 13,
+    color: colors.grey,
+    marginTop: 3,
+    minHeight: 26,
+    maxHeight: 26,
+  },
+  compactDocStatus: { fontSize: 9, color: colors.grey, marginTop: 3 },
+  compactUploadPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    minWidth: 76,
+    height: 32,
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    borderRadius: 8,
+    gap: 4,
+  },
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -416,6 +583,16 @@ const styles = StyleSheet.create({
   moreBtn: {
     padding: 2,
   },
+  uploadProgressTrack: { height: 3, borderRadius: 2, overflow: 'hidden', backgroundColor: '#E5E7EB', marginTop: 5 },
+  uploadProgressFill: { height: 3, backgroundColor: colors.primary },
+  previewOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
+  previewCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, maxHeight: '85%', gap: 12 },
+  previewName: { color: colors.grey, fontSize: 12 },
+  imagePreview: { height: 300, justifyContent: 'center', alignItems: 'center' },
+  previewImage: { width: '100%', height: '100%' },
+  previewError: { position: 'absolute', backgroundColor: '#FFFFFF', padding: 12, color: colors.error },
+  pdfPreview: { minHeight: 180, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  previewClose: { minHeight: 44, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   pressed: {
     opacity: 0.9,
   },

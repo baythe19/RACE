@@ -13,7 +13,7 @@ import {
 import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Crosshair, MapPin, Search } from 'lucide-react-native';
+import { ArrowLeft, Crosshair, Edit3, MapPin, Search } from 'lucide-react-native';
 
 import { BHUBANESWAR_DEFAULT, forwardGeocode, reverseGeocode } from '../../utils/googleMaps';
 import { formatLocationDisplay } from '../../utils/readableAddress';
@@ -167,9 +167,10 @@ export default function LocationPickerMap({
   return (
     <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        {/* Top Header */}
         <View style={styles.header}>
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
-            <ArrowLeft size={24} color={colors.dark} strokeWidth={2.5} />
+            <ArrowLeft size={22} color={colors.dark} strokeWidth={2.4} />
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {title}
@@ -177,20 +178,7 @@ export default function LocationPickerMap({
           <View style={styles.headerSide} />
         </View>
 
-        <View style={styles.searchRow}>
-          <Search size={18} color={colors.grey} />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search location..."
-            placeholderTextColor={colors.grey}
-            returnKeyType="search"
-            onSubmitEditing={() => void handleSearch()}
-            style={styles.searchInput}
-          />
-          {isSearching ? <ActivityIndicator size="small" color={accentColor} /> : null}
-        </View>
-
+        {/* Map Wrap */}
         <View style={styles.mapWrap}>
           <MapView
             ref={mapRef}
@@ -207,42 +195,69 @@ export default function LocationPickerMap({
             showsMyLocationButton={false}
           />
 
-          <View style={styles.pinWrap} pointerEvents="none">
-            <MapPin size={40} color={accentColor} fill={accentColor} />
-            <View style={styles.pinShadow} />
+          {/* Floating Search Bar */}
+          <View style={[styles.searchRow, shadows.card]}>
+            <Search size={18} color={colors.grey} strokeWidth={2} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search location..."
+              placeholderTextColor={colors.grey}
+              returnKeyType="search"
+              onSubmitEditing={() => void handleSearch()}
+              style={styles.searchInput}
+            />
+            {isSearching ? <ActivityIndicator size="small" color={accentColor} /> : null}
           </View>
 
+          {/* Center Pin + Blue accuracy ring */}
+          <View style={styles.pinWrap} pointerEvents="none">
+            <MapPin size={42} color={accentColor} fill={accentColor} strokeWidth={1.5} />
+            {/* Accuracy ring with center blue dot */}
+            <View style={styles.accuracyCircle}>
+              <View style={styles.accuracyDot} />
+            </View>
+          </View>
+
+          {/* Floating Current Location Button */}
           <Pressable
             onPress={() => void handleCurrentLocation()}
             style={[styles.locateBtn, shadows.card]}
             disabled={isLocating}>
             {isLocating ? (
-              <ActivityIndicator size="small" color={accentColor} />
+              <ActivityIndicator size="small" color={colors.dark} />
             ) : (
-              <Crosshair size={22} color={accentColor} strokeWidth={2.5} />
+              <Crosshair size={22} color={colors.dark} strokeWidth={2.2} />
             )}
           </Pressable>
         </View>
 
+        {/* Bottom Sheet Card */}
         <View style={[styles.bottomSheet, shadows.card]}>
-          <Text style={styles.addressLabel}>Selected address</Text>
-          {isGeocoding ? (
-            <View style={styles.addressLoading}>
-              <ActivityIndicator size="small" color={accentColor} />
-              <Text style={styles.addressLoadingText}>Getting address...</Text>
-            </View>
-          ) : (
-            <Text style={styles.addressText} numberOfLines={3}>
-              {address ? formatLocationDisplay(address) : 'Move the map to select a location'}
-            </Text>
-          )}
+          <Text style={styles.addressLabel}>Selected location</Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginVertical: 6 }}>
+            {isGeocoding ? (
+              <View style={styles.addressLoading}>
+                <ActivityIndicator size="small" color={accentColor} />
+                <Text style={styles.addressLoadingText}>Getting address...</Text>
+              </View>
+            ) : (
+              <Text style={styles.addressText} numberOfLines={2}>
+                {address ? formatLocationDisplay(address) : 'Bhubaneswar, Odisha'}
+              </Text>
+            )}
+            <Pressable hitSlop={8} style={{ padding: 4 }}>
+              <Edit3 size={18} color={colors.grey} strokeWidth={2} />
+            </Pressable>
+          </View>
 
           <Pressable
             onPress={handleConfirm}
             disabled={isGeocoding}
             style={[
               styles.confirmBtn,
-              { backgroundColor: isGeocoding ? colors.grey : accentColor },
+              { backgroundColor: isGeocoding ? '#E5E7EB' : accentColor },
             ]}>
             <Text style={styles.confirmLabel}>Use this location</Text>
           </Pressable>
@@ -260,82 +275,94 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: colors.background,
   },
   headerSide: {
-    width: 40,
+    width: 36,
     alignItems: 'flex-start',
   },
   headerTitle: {
     flex: 1,
     textAlign: 'center',
     fontSize: 18,
-    fontWeight: typography.weights.bold,
+    fontWeight: typography.weights.extrabold,
     color: colors.dark,
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 16,
-    marginVertical: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: colors.dark,
-    padding: 0,
   },
   mapWrap: {
     flex: 1,
     position: 'relative',
   },
+  searchRow: {
+    position: 'absolute',
+    top: 12,
+    left: 16,
+    right: 16,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.dark,
+    padding: 0,
+  },
   pinWrap: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    marginLeft: -20,
-    marginTop: -44,
+    marginLeft: -21,
+    marginTop: -52,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  pinShadow: {
+  accuracyCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(59, 130, 246, 0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -8,
+  },
+  accuracyDot: {
     width: 10,
-    height: 4,
+    height: 10,
     borderRadius: 5,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    marginTop: 2,
+    backgroundColor: '#2563EB',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   locateBtn: {
     position: 'absolute',
     right: 16,
-    bottom: 16,
+    bottom: 20,
     width: 48,
     height: 48,
     borderRadius: 24,
     backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 10,
   },
   bottomSheet: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    paddingBottom: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     backgroundColor: colors.background,
-    gap: 12,
   },
   addressLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: typography.weights.semibold,
     color: colors.grey,
   },
@@ -343,27 +370,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    minHeight: 48,
+    paddingVertical: 4,
   },
   addressLoadingText: {
     fontSize: 14,
     color: colors.grey,
   },
   addressText: {
-    fontSize: 15,
-    fontWeight: typography.weights.semibold,
+    flex: 1,
+    fontSize: 18,
+    fontWeight: typography.weights.extrabold,
     color: colors.dark,
-    lineHeight: 22,
-    minHeight: 48,
+    lineHeight: 24,
+    paddingRight: 8,
   },
   confirmBtn: {
-    minHeight: 52,
-    borderRadius: 12,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 10,
   },
   confirmLabel: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: typography.weights.bold,
     color: colors.dark,
   },

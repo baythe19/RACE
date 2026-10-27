@@ -43,7 +43,7 @@ These flows trace through the **release4Aug2026** codebase. Each flow names the 
 | 6 | App shows confirmation | `SosDetailsScreen` | Shows what was sent + next steps |
 | 8 | Admin / support sees alert | Admin live feed (Socket.IO) | Operator calls back / dispatches help |
 
-> **QR-triggered SOS**: if a stranger scans the vehicle's QR via the customer web's `QrScanPage`, the same flow triggers but with a "scanned-by" context attached.
+> **QR-triggered SOS**: customer app `QRScanScreen` can scan a vehicle QR and attach a scanned-by context.
 
 ---
 
@@ -67,7 +67,7 @@ These flows trace through the **release4Aug2026** codebase. Each flow names the 
 
 ---
 
-## Flow 4 — Vendor manages a fleet (partner mobile + web)
+## Flow 4 — Vendor manages a fleet (partner mobile)
 
 | # | User Action | Screen / API | What happens |
 |---|---|---|---|
@@ -144,4 +144,4 @@ These flows trace through the **release4Aug2026** codebase. Each flow names the 
 - ❌ Customer app push token registration endpoint is not exposed in API.md (verify with backend before integrating)
 - ❌ Vendor-side sub-admin permissions — vendor can manage their own fleet but cannot invite other vendors
 
-These gaps are tracked but not yet actioned. See `docs/CLIENT_OVERVIEW.md` for a high-level summary.
+These gaps are tracked but not yet actioned. See `docs/client/CLIENT_OVERVIEW.md` for a high-level summary.

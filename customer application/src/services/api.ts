@@ -1,7 +1,10 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+
+import { humanizeApiErrorMessage } from '../utils/humanizeApiError';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
+import { UI_PREVIEW_AUTH_FLOW } from '../config/uiPreviewMode';
 import type { ApiErrorResponse, ApiSuccessResponse } from '../types/auth';
 import { notifyUnauthorized } from './authSession';
 
@@ -26,6 +29,11 @@ function processQueue(token: string | null) {
 
 async function getAccessToken(): Promise<string | null> {
   return SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
+}
+
+/** socketService (and other non-axios callers) read the current user token. */
+export async function readAccessToken(): Promise<string | null> {
+  return getAccessToken();
 }
 
 async function getRefreshToken(): Promise<string | null> {
@@ -65,6 +73,14 @@ api.interceptors.response.use(
     }
 
     const refreshToken = await getRefreshToken();
+    const accessToken = await getAccessToken();
+    const previewSession =
+      UI_PREVIEW_AUTH_FLOW ||
+      accessToken === 'ui-preview-access' ||
+      refreshToken === 'ui-preview-refresh';
+    if (previewSession) {
+      return Promise.reject(error);
+    }
     if (!refreshToken) {
       await clearTokens();
       notifyUnauthorized();
@@ -79,7 +95,7 @@ api.interceptors.response.use(
             return;
           }
           if (!originalRequest.headers) {
-            originalRequest.headers = {};
+            originalRequest.headers = {} as never;
           }
           originalRequest.headers.Authorization = `Bearer ${token}`;
           resolve(api(originalRequest));
@@ -100,7 +116,7 @@ api.interceptors.response.use(
       processQueue(accessToken);
 
       if (!originalRequest.headers) {
-        originalRequest.headers = {};
+        originalRequest.headers = {} as never;
       }
       originalRequest.headers.Authorization = `Bearer ${accessToken}`;
       return api(originalRequest);
@@ -126,10 +142,11 @@ export function getApiErrorMessage(error: unknown, fallback = 'Something went wr
     if (error.response?.status === 429) {
       return 'OTP limit reached. Try again in 1 hour.';
     }
-    return error.response?.data?.message ?? error.message ?? fallback;
+    const raw = error.response?.data?.message ?? error.message ?? fallback;
+    return humanizeApiErrorMessage(raw, fallback);
   }
   if (error instanceof Error) {
-    return error.message;
+    return humanizeApiErrorMessage(error.message, fallback);
   }
   return fallback;
 }

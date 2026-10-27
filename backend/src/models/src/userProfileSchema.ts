@@ -25,6 +25,21 @@ export type VerificationStage =
 
 export type DriverStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 
+/** Vendor payout destination — bank transfer or UPI VPA.
+ *  `isVerified` is set only by a real verification step (penny-drop or admin review). */
+export interface VendorBankDetails {
+  accountHolderName?: string;
+  accountNumber?: string;
+  ifsc?: string;
+  bankName?: string;
+  payoutMethod?: 'bank' | 'upi';
+  upiId?: string;
+  isVerified?: boolean;
+  verifiedAt?: Date;
+  source?: 'vendor_app' | 'driver_app' | 'admin' | 'seed';
+  updatedAt?: Date;
+}
+
 export interface IVendorProfile {
   vendorType: VendorType;
   status: VendorStatus;
@@ -38,12 +53,7 @@ export interface IVendorProfile {
     capacity?: string;
     photos?: string[];
   };
-  bankDetails?: {
-    accountHolderName?: string;
-    accountNumber?: string;
-    ifsc?: string;
-    bankName?: string;
-  };
+  bankDetails?: VendorBankDetails;
   partnerDriverDetails?: {
     dateOfBirth?: string;
     emergencyContact?: {
@@ -101,12 +111,17 @@ export interface IDriverProfile {
   reviewCount: number;
   status: DriverStatus;
   totalTrips: number;
+  experienceYears?: number;
+  languages?: string[];
+  availabilityWindow?: string;
+  policeVerificationStatus?: 'PENDING' | 'VERIFIED' | 'REJECTED';
   documents: Array<{
     type: string;
     url: string;
     status: 'PENDING' | 'VERIFIED' | 'REJECTED';
     uploadedAt: Date;
   }>;
+  bankDetails?: VendorBankDetails;
   statusHistory: Array<{
     status: string;
     note?: string;
@@ -159,6 +174,15 @@ export const VendorProfileSchema = new Schema<IVendorProfile>(
       accountNumber: String,
       ifsc: String,
       bankName: String,
+      /** Payout channel: bank transfer or UPI VPA. */
+      payoutMethod: { type: String, enum: ['bank', 'upi'] },
+      upiId: { type: String, trim: true, lowercase: true },
+      /** True only after a real verification (penny-drop / admin review). */
+      isVerified: { type: Boolean, default: false },
+      verifiedAt: Date,
+      /** Where this record came from — vendor app, admin panel, or seeding. */
+      source: { type: String, enum: ['vendor_app', 'admin', 'seed'] },
+      updatedAt: Date,
     },
     partnerDriverDetails: {
       dateOfBirth: String,
@@ -211,8 +235,8 @@ export const DriverProfileSchema = new Schema<IDriverProfile>(
     fleetSource: { type: String, enum: ['vendor', 'admin'] },
     loginId: { type: String, trim: true, lowercase: true },
     passwordHash: { type: String, select: false },
-    driverType: { type: String, required: true },
-    city: { type: String, required: true },
+    driverType: { type: String, required: true, default: 'Tow Driver' },
+    city: { type: String, required: true, default: 'Bhubaneswar' },
     state: { type: String, default: 'Odisha' },
     vehicleRegistration: { type: String },
     rating: { type: Number, default: 0 },
@@ -223,6 +247,14 @@ export const DriverProfileSchema = new Schema<IDriverProfile>(
       default: 'PENDING',
     },
     totalTrips: { type: Number, default: 0 },
+    experienceYears: { type: Number },
+    languages: [{ type: String }],
+    availabilityWindow: { type: String },
+    policeVerificationStatus: {
+      type: String,
+      enum: ['PENDING', 'VERIFIED', 'REJECTED'],
+      default: 'PENDING',
+    },
     documents: [
       {
         type: { type: String, required: true },
@@ -239,6 +271,18 @@ export const DriverProfileSchema = new Schema<IDriverProfile>(
         changedBy: { type: String },
       },
     ],
+    bankDetails: {
+      accountHolderName: String,
+      accountNumber: String,
+      ifsc: String,
+      bankName: String,
+      payoutMethod: { type: String, enum: ['bank', 'upi'] },
+      upiId: { type: String, trim: true, lowercase: true },
+      isVerified: { type: Boolean, default: false },
+      verifiedAt: Date,
+      source: { type: String, enum: ['vendor_app', 'driver_app', 'admin', 'seed'] },
+      updatedAt: Date,
+    },
   },
   { _id: false },
 );

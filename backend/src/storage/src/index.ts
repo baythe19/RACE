@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -34,11 +34,13 @@ const DOCUMENT_FOLDER: Record<string, string> = {
   police_verification: 'documents/verification',
   medical_certificate: 'documents/verification',
   vehicle_insurance: 'documents/insurance',
+  vehicle_rc: 'documents/vehicle',
   fitness_certificate: 'documents/permits',
   puc: 'documents/permits',
   commercial_permit: 'documents/permits',
   selfie: 'verification/selfies',
   vehicle_photo: 'documents/vehicle',
+  voter_id: 'documents/voter-id',
   other: 'documents/other',
 };
 
@@ -74,6 +76,12 @@ function resolveFolder(vendorType: string, documentType: string): string {
 function resolveDriverFolder(driverId: string, documentType: string): string {
   const docFolder = DOCUMENT_FOLDER[documentType] ?? 'documents/other';
   return `drivers/${driverId}/${docFolder}`;
+}
+
+function resolveVehicleFolder(vendorType: string, vendorId: string, vehicleId: string, documentType: string): string {
+  const vendorFolder = VENDOR_TYPE_FOLDER[vendorType] ?? 'vendors';
+  const docFolder = (DOCUMENT_FOLDER[documentType] ?? 'documents/other').replace(/^documents\//, '');
+  return `vendors/${vendorFolder}/${vendorId}/vehicles/${vehicleId}/${docFolder}`;
 }
 
 function getLocalUploadsRoot(): string {
@@ -183,9 +191,79 @@ export class StorageService {
     );
   }
 
+  async uploadVendorVehicleDocument(
+    input: UploadFileInput & { vendorId: string; vehicleId: string },
+  ): Promise<UploadResult> {
+    this.validateFile(input.buffer, input.mimeType);
+    const storagePath = resolveVehicleFolder(
+      input.vendorType,
+      input.vendorId,
+      input.vehicleId,
+      input.documentType,
+    );
+    const fileName = buildFileName(input.originalName);
+
+    if (gcsConfig.isConfigured) {
+      try {
+        return await uploadToGcs(input, storagePath, fileName);
+      } catch (error) {
+        logger.warn('GCS vehicle document upload failed, falling back to local storage', { error });
+      }
+    }
+
+    return uploadToLocal(input, storagePath, fileName);
+  }
+
+  async readUploadedFile(fileUrl: string): Promise<Buffer> {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(fileUrl);
+    } catch {
+      throw new AppError('Stored document URL is invalid', 404);
+    }
+
+    if (parsedUrl.hostname === 'storage.googleapis.com') {
+      const [bucketName, ...objectSegments] = decodeURIComponent(parsedUrl.pathname)
+        .split('/')
+        .filter(Boolean);
+      if (!bucketName || bucketName !== gcsConfig.bucketName || !objectSegments.length) {
+        throw new AppError('Stored document was not found', 404);
+      }
+      try {
+        const { Storage } = await import('@google-cloud/storage');
+        const storage = new Storage({
+          projectId: gcsConfig.projectId,
+          keyFilename: gcsConfig.keyFile || undefined,
+        });
+        const [buffer] = await storage
+          .bucket(bucketName)
+          .file(objectSegments.join('/'))
+          .download();
+        return buffer;
+      } catch (error) {
+        logger.warn('Could not read uploaded GCS document', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new AppError('Stored document could not be read', 503);
+      }
+    }
+
+    const marker = '/uploads/';
+    const markerIndex = parsedUrl.pathname.indexOf(marker);
+    if (markerIndex < 0) throw new AppError('Stored document source is unsupported', 404);
+    const relativePath = decodeURIComponent(parsedUrl.pathname.slice(markerIndex + marker.length));
+    const uploadsRoot = path.resolve(getLocalUploadsRoot());
+    const absolutePath = path.resolve(uploadsRoot, relativePath);
+    if (!absolutePath.startsWith(uploadsRoot + path.sep) || !existsSync(absolutePath)) {
+      throw new AppError('Stored document was not found', 404);
+    }
+    return readFileSync(absolutePath);
+  }
+
   getLocalFileStream(relativePath: string) {
-    const absolutePath = path.join(getLocalUploadsRoot(), relativePath);
-    if (!existsSync(absolutePath)) {
+    const uploadsRoot = path.resolve(getLocalUploadsRoot());
+    const absolutePath = path.resolve(uploadsRoot, relativePath);
+    if (!absolutePath.startsWith(uploadsRoot + path.sep) || !existsSync(absolutePath)) {
       throw new AppError('File not found', 404);
     }
     return createReadStream(absolutePath);

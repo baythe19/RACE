@@ -249,6 +249,7 @@ function QrInfoBanner({ px }: { px: (n: number) => number }) {
 export default function VehicleListScreen({ navigation }: Props) {
   const px = useProfilePx();
   const { vehicles, isLoading, error, fetchVehicles, deleteVehicle } = useVehicleStore();
+  const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
 
   useEffect(() => {
     void fetchVehicles();
@@ -283,11 +284,11 @@ export default function VehicleListScreen({ navigation }: Props) {
     <ProfileSubScreenLayout
       title="My Vehicles"
       subtitle="Manage your registered vehicles">
-      {isLoading && !vehicles.length ? (
+      {isLoading && !safeVehicles.length ? (
         <ActivityIndicator size="large" color={VEHICLE_YELLOW} style={{ marginTop: px(40) }} />
       ) : (
         <>
-          {error && !vehicles.length ? (
+          {error && !safeVehicles.length ? (
             <Text
               style={{
                 textAlign: 'center',
@@ -299,7 +300,7 @@ export default function VehicleListScreen({ navigation }: Props) {
             </Text>
           ) : null}
 
-          {vehicles.map(renderVehicle)}
+          {safeVehicles.map(renderVehicle)}
 
           <AddVehicleCard px={px} onPress={() => navigation.navigate('AddVehicle')} />
           <QrInfoBanner px={px} />

@@ -23,10 +23,14 @@ function mapPaymentMethod(pm: BackendPaymentMethod): PaymentMethod {
 }
 
 export async function listPaymentMethods(): Promise<PaymentMethod[]> {
-  const { data } = await apiClient.get<ApiSuccessResponse<BackendPaymentMethod[]>>(
-    API_ENDPOINTS.paymentMethods,
-  );
-  return data.data.map(mapPaymentMethod);
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<BackendPaymentMethod[]>>(
+      API_ENDPOINTS.paymentMethods,
+    );
+    return Array.isArray(data?.data) ? data.data.map(mapPaymentMethod) : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function createPaymentMethod(payload: {
@@ -47,6 +51,10 @@ export async function deletePaymentMethod(id: string): Promise<void> {
 }
 
 export async function getWalletBalance(): Promise<WalletBalance> {
-  const { data } = await apiClient.get<ApiSuccessResponse<WalletBalance>>(API_ENDPOINTS.wallet);
-  return data.data;
+  try {
+    const { data } = await apiClient.get<ApiSuccessResponse<WalletBalance>>(API_ENDPOINTS.wallet);
+    return data?.data ?? { balance: 0, currency: 'INR' };
+  } catch {
+    return { balance: 0, currency: 'INR' };
+  }
 }

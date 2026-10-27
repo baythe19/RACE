@@ -2,10 +2,8 @@ import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import DriverDocumentsScreen from '../screens/partner/registration/driver/DriverDocumentsScreen';
-import DriverPersonalInfoScreen from '../screens/partner/registration/driver/DriverPersonalInfoScreen';
-import DriverReviewScreen from '../screens/partner/registration/driver/DriverReviewScreen';
-import DriverVehicleInfoScreen from '../screens/partner/registration/driver/DriverVehicleInfoScreen';
+import DriverRegistrationFlowScreen from '../screens/partner/registration/driver/DriverRegistrationFlowScreen';
+import DriverVerificationPendingScreen from '../screens/partner/registration/DriverVerificationPendingScreen';
 import VendorBusinessAddressScreen from '../screens/partner/registration/vendor/VendorBusinessAddressScreen';
 import VendorBusinessInfoScreen from '../screens/partner/registration/vendor/VendorBusinessInfoScreen';
 import VendorDocumentsScreen from '../screens/partner/registration/vendor/VendorDocumentsScreen';
@@ -16,6 +14,42 @@ import type {
   PartnerRootStackParamList,
 } from '../types/partnerNavigation';
 import { colors } from '../theme';
+
+function DriverPersonalInfoFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 1 } }}
+    />
+  );
+}
+
+function DriverVehicleInfoFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 1 } }}
+    />
+  );
+}
+
+function DriverDocumentsFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 2 } }}
+    />
+  );
+}
+
+function DriverReviewFlowScreen(props: any) {
+  return (
+    <DriverRegistrationFlowScreen
+      {...props}
+      route={{ ...props.route, params: { ...props.route?.params, initialStep: 3 } }}
+    />
+  );
+}
 
 const Stack = createNativeStackNavigator<PartnerRegistrationStackParamList>();
 
@@ -40,30 +74,40 @@ export default function PartnerRegistrationNavigator({ route }: Props) {
 
   return (
     <Stack.Navigator
+      key={role}
       initialRouteName={initialRoute}
       screenOptions={{
         headerShown: false,
-        contentStyle: { backgroundColor: colors.background },
-        animation: 'slide_from_right',
+        contentStyle: { backgroundColor: '#F8F9FA' },
+        // Registration keeps one shell (header, stepper, footer) per step —
+        // a slide transition would move the fixed chrome with the content.
+        animation: 'fade',
+        animationDuration: 160,
+        gestureEnabled: false,
       }}>
       <Stack.Screen
         name="DriverPersonalInfo"
-        component={DriverPersonalInfoScreen}
+        component={DriverPersonalInfoFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen
         name="DriverVehicleInfo"
-        component={DriverVehicleInfoScreen}
+        component={DriverVehicleInfoFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen
         name="DriverDocuments"
-        component={DriverDocumentsScreen}
+        component={DriverDocumentsFlowScreen}
         initialParams={screenParams}
       />
       <Stack.Screen
         name="DriverReview"
-        component={DriverReviewScreen}
+        component={DriverReviewFlowScreen}
+        initialParams={screenParams}
+      />
+      <Stack.Screen
+        name="DriverVerificationPending"
+        component={DriverVerificationPendingScreen}
         initialParams={screenParams}
       />
       <Stack.Screen

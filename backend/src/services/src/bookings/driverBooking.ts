@@ -1,10 +1,10 @@
-import { BadRequestError, ForbiddenError, NotFoundError } from '../../../utils/src/errors';
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../../utils/src/errors';
 import { emitBookingStatusUpdate } from '../socket';
 import { UserModel } from '../../../models/src/user';
+import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { vehicleRepository } from '../vehicleRepository';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import {
-  appendStatusHistory,
   assertValidStatusTransition,
   calculateDriverFare,
   createInitialStatusHistory,
@@ -12,7 +12,7 @@ import {
   getVehicleCategory,
   resolvePackageHours,
 } from './booking';
-import { canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
+import { assertActorMayTransition, canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
 import { driverBookingRepository } from '../driverBookingRepository';
 import type { IDriverBooking } from '../../../models/src/driverBooking';
 import type {
@@ -29,7 +29,7 @@ import {
   isDriverVisibleToCustomer,
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
-import { customerTripOtp } from './tripOtp';
+import { customerTripOtp, customerCompletionOtp } from './tripOtp';
 
 function mapDriverBooking(
   booking: IDriverBooking,
@@ -42,6 +42,7 @@ function mapDriverBooking(
     vehicleId: booking.vehicleId?.toString(),
     pickup: booking.pickup,
     dropoff: booking.dropoff,
+    driverServiceType: booking.driverServiceType,
     estimatedDurationHours: booking.estimatedDurationHours,
     packageHours: booking.packageHours,
     vehicleCategory: booking.vehicleCategory,
@@ -59,6 +60,11 @@ function mapDriverBooking(
     driverId: booking.driverId?.toString(),
     driver,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
+    tripStartOtp: customerTripOtp(booking),
+    completionOtp: customerCompletionOtp(booking),
+    arrivedAtDropoffAt: booking.arrivedAtDropoffAt?.toISOString(),
+    paymentCollectionMode: booking.paymentCollectionMode,
+    paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
     scheduledAt: booking.scheduledAt?.toISOString(),
     statusHistory: booking.statusHistory.map((entry) => ({
       status: entry.status,
@@ -113,6 +119,7 @@ export class DriverBookingService {
       vehicleId: vehicle.id as unknown as IDriverBooking['vehicleId'],
       pickup: dto.pickup,
       dropoff: dto.dropoff,
+      driverServiceType: dto.driverServiceType ?? 'part_time',
       estimatedDurationHours: dto.estimatedDurationHours ?? packageHours,
       packageHours,
       vehicleCategory,
@@ -178,23 +185,32 @@ export class DriverBookingService {
       throw new ForbiddenError('You do not have access to this booking');
     }
 
+    if (newStatus === 'CANCELLED' && actor.role !== 'admin') {
+      throw new BadRequestError(
+        'Use the cancellation endpoint so the cancellation policy and refund state are applied',
+      );
+    }
+
+    // VOC P0.9: forbid customers from confirming/starting/completing jobs —
+    // only cancellation is theirs (via the dedicated cancel endpoint too).
+    assertActorMayTransition(actor.role, booking.status, newStatus);
     assertValidStatusTransition(booking.status, newStatus);
 
     const updated = await driverBookingRepository.updateStatus(
       bookingId,
+      booking.status,
       newStatus,
-      appendStatusHistory(booking.statusHistory, newStatus),
     );
 
     if (!updated) {
-      throw new NotFoundError('Driver booking not found');
+      throw new ConflictError('Booking changed before the status update was saved');
     }
 
     if (
       (newStatus === 'COMPLETED' || newStatus === 'CANCELLED') &&
       booking.driverId
     ) {
-      await releaseDriver(booking.driverId.toString());
+      await releaseDriver(booking.driverId.toString(), bookingId);
     }
 
     emitBookingStatusUpdate(bookingId, newStatus, {
@@ -258,6 +274,12 @@ export class DriverBookingService {
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
       tripStartOtp:
         requestingUser.role === 'customer' ? customerTripOtp(booking) : undefined,
+      completionOtp:
+        requestingUser.role === 'customer' ? customerCompletionOtp(booking) : undefined,
+      arrivedAtDropoffAt: booking.arrivedAtDropoffAt?.toISOString(),
+      paymentCollectionMode: booking.paymentCollectionMode,
+      paymentConfirmedByCustomer: booking.paymentConfirmedByCustomer,
+      fare: booking.finalFare ?? booking.estimatedFare,
     };
   }
 
@@ -290,7 +312,7 @@ export class DriverBookingService {
     refundStatus: string;
     policy: CancellationResult;
   }> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    let booking = await driverBookingRepository.findById(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -312,21 +334,40 @@ export class DriverBookingService {
       throw new BadRequestError(policy.reason);
     }
 
-    booking.status = 'CANCELLED';
-    booking.cancelledAt = new Date();
-    booking.cancelledBy = 'customer';
-    booking.cancellationReason = reason?.trim() || 'Customer requested';
-    booking.refundAmount = policy.refundAmount;
-    booking.refundStatus = policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE';
-    booking.statusHistory.push({
-      status: 'CANCELLED',
-      timestamp: new Date(),
-      note: policy.reason,
-    });
-    await booking.save();
+    const cancelledAt = new Date();
+    const cancelledBooking = await DriverBookingModel.findOneAndUpdate(
+      {
+        _id: booking._id,
+        status: booking.status,
+        advancePaid: booking.advancePaid,
+        advanceAmount: booking.advanceAmount,
+      },
+      {
+        $set: {
+          status: 'CANCELLED',
+          cancelledAt,
+          cancelledBy: 'customer',
+          cancellationReason: reason?.trim() || 'Customer requested',
+          refundAmount: policy.refundAmount,
+          refundStatus: policy.refundAmount > 0 ? 'PENDING' : 'NOT_APPLICABLE',
+        },
+        $push: {
+          statusHistory: {
+            status: 'CANCELLED',
+            timestamp: cancelledAt,
+            note: policy.reason,
+          },
+        },
+      },
+      { new: true, runValidators: true },
+    ).exec();
+    if (!cancelledBooking) {
+      throw new ConflictError('Booking changed while cancellation was being processed');
+    }
+    booking = cancelledBooking;
 
     if (booking.driverId) {
-      await releaseDriver(booking.driverId.toString());
+      await releaseDriver(booking.driverId.toString(), booking._id.toString());
     }
 
     if (policy.refundAmount > 0) {
@@ -368,19 +409,43 @@ export class DriverBookingService {
       throw new NotFoundError('Driver booking not found');
     }
 
-    let statusHistory = booking.statusHistory;
-    if (update.status && update.status !== booking.status) {
-      statusHistory = appendStatusHistory(statusHistory, update.status);
+    const expectedFields: Record<string, unknown> = {};
+    if (update.advancePaid === true) expectedFields.advancePaid = { $ne: true };
+    if (update.remainingPaid === true) expectedFields.remainingPaid = { $ne: true };
+    if (update.remainingPaid === true && booking.status !== 'COMPLETED') {
+      throw new ConflictError('Booking is no longer eligible for final payment');
     }
 
-    const updated = await driverBookingRepository.updateById(bookingId, {
-      ...update,
-      statusHistory,
-    });
+    const updateFields = { ...update };
+    delete updateFields.statusHistory;
+    delete updateFields.status;
+
+    const updateOperation: Record<string, unknown> = { $set: updateFields };
+    if (update.status) updateFields.status = update.status;
+    if (update.status && update.status !== booking.status) {
+      updateOperation.$push = {
+        statusHistory: { status: update.status, timestamp: new Date() },
+      };
+    }
+
+    const updated = await DriverBookingModel.findOneAndUpdate(
+      { _id: bookingId, status: booking.status, ...expectedFields },
+      updateOperation,
+      { new: true, runValidators: true },
+    ).exec();
 
     if (!updated) {
-      throw new NotFoundError('Driver booking not found');
+      throw new ConflictError('Booking payment state changed before the payment was applied');
     }
+
+    emitBookingStatusUpdate(bookingId, updated.status, {
+      paymentStatus: updated.paymentStatus,
+      statusHistory: updated.statusHistory.map((entry) => ({
+        status: entry.status,
+        timestamp: entry.timestamp.toISOString(),
+        note: entry.note,
+      })),
+    });
 
     return mapDriverBookingWithDriver(updated);
   }

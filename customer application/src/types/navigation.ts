@@ -127,7 +127,7 @@ export type AuthStackParamList = {
 
 export type BookingsStackParamList = {
   BookingsMain: undefined;
-  BookingDetail: { bookingId: string };
+  BookingDetail: { bookingId: string; bookingType?: ServiceBookingTypeParam };
   TowingTrack: BookingTrackParams | undefined;
   DriverTrack: BookingTrackParams | undefined;
   TowingRate: BookingRateParams | undefined;
@@ -145,6 +145,7 @@ export type CallStackParamList = {
   CallMain: undefined;
   QRScan: undefined;
   SOSEmergency: undefined;
+  VehicleQrEmergency: { vehicleId: string };
 };
 
 export type RootStackParamList = {

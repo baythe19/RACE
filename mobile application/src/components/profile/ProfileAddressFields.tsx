@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ChevronRight, MapPin } from 'lucide-react-native';
 
 import FormField from '../auth/FormField';
@@ -52,7 +53,7 @@ export default function ProfileAddressFields({
 
   return (
     <View>
-      <Text
+      <PartnerText
         style={{
           fontSize: px(14),
           fontWeight: typography.weights.bold,
@@ -60,7 +61,7 @@ export default function ProfileAddressFields({
           marginBottom: px(8),
         }}>
         Select Address
-      </Text>
+      </PartnerText>
 
       <Pressable onPress={() => setShowLocationPicker(true)} style={{ marginBottom: px(12) }}>
         <View
@@ -76,7 +77,7 @@ export default function ProfileAddressFields({
             gap: px(10),
           }}>
           <MapPin size={px(18)} color={colors.primary} />
-          <Text
+          <PartnerText
             style={{
               flex: 1,
               fontSize: px(15),
@@ -85,7 +86,7 @@ export default function ProfileAddressFields({
             }}
             numberOfLines={2}>
             {searchDisplayValue || 'Select your address'}
-          </Text>
+          </PartnerText>
           <ChevronRight size={px(18)} color={colors.grey} />
         </View>
       </Pressable>

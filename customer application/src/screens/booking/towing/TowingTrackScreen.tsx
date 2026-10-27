@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { Clock, MapPin, Navigation, Radio } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,8 +6,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LiveTripMap from '../../../components/booking/LiveTripMap';
 import DriverAvatar from '../../../components/bookings/DriverAvatar';
 import TripOtpCard from '../../../components/booking/TripOtpCard';
+import DropoffPaymentModal from '../../../components/booking/DropoffPaymentModal';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import { useBookingTracking } from '../../../hooks/useBookingTracking';
+import { claimDropoffPrompt } from '../../../services/dropoffPromptGate';
 import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import {
@@ -45,9 +47,20 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const bookingId = route.params?.bookingId;
   const fromBookings = route.params?.fromBookings;
-  const booking = useBookingQuery(bookingId ?? '');
-  const { etaLabel, status, driverLocation, driverName, driverRating, tripStartOtp: trackedOtp } =
-    useBookingTracking(bookingId, 'towing');
+  const booking = useBookingQuery(bookingId ?? '', 'towing');
+  const {
+    etaLabel,
+    status,
+    driverLocation,
+    driverName,
+    driverRating,
+    tripStartOtp: trackedOtp,
+    arrivedAtDropoffAt,
+    completionOtp,
+    paymentCollectionMode,
+    paymentConfirmedByCustomer,
+    fare: trackedFare,
+  } = useBookingTracking(bookingId, 'towing');
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
   const displayDriverName =
     driverName ?? booking?.driver?.name ?? 'Assigning driver';
@@ -55,6 +68,20 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
   const isCompleted = isCompletedUnifiedStatus(status);
+
+  const resolvedFare =
+    trackedFare ??
+    (booking?.fareBreakdown && 'totalFare' in booking.fareBreakdown
+      ? (booking.fareBreakdown as { totalFare?: number }).totalFare
+      : booking?.estimatedFare) ??
+    0;
+
+  const isArrivedDropoff = Boolean(
+    arrivedAtDropoffAt || (booking as any)?.arrivedAtDropoffAt,
+  );
+  const showDropoffPayment = isArrivedDropoff && !isCompleted;
+
+  useEffect(() => claimDropoffPrompt(), []);
 
   const trackParams = bookingId
     ? { bookingId, bookingType: 'towing' as const, fromBookings }
@@ -246,7 +273,7 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
               }}>
               {displayDriverName}
             </Text>
-            {hasAssignedDriver ? (
+            {hasAssignedDriver && driverRating != null ? (
               <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>
                 ★ {driverRating.toFixed(1)} · Tow driver
               </Text>
@@ -266,6 +293,10 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
               <Text style={{ fontSize: t.caption, color: colors.success, marginTop: t.px(2) }}>
                 Partner location updating live
               </Text>
+            ) : status === 'DRIVER_ASSIGNED' ? (
+              <Text style={{ fontSize: t.caption, color: colors.warning, marginTop: t.px(2) }}>
+                Driver allotted · Awaiting confirmation & start
+              </Text>
             ) : null}
           </View>
         </View>
@@ -277,6 +308,18 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
               subtitle="Share this code with your driver when they arrive to start the trip."
             />
           </View>
+        ) : null}
+
+        {bookingId ? (
+          <DropoffPaymentModal
+            visible={showDropoffPayment}
+            bookingId={bookingId}
+            bookingType="towing"
+            fare={resolvedFare}
+            completionOtp={completionOtp ?? (booking as any)?.completionOtp}
+            paymentCollectionMode={paymentCollectionMode ?? (booking as any)?.paymentCollectionMode}
+            paymentConfirmedByCustomer={paymentConfirmedByCustomer ?? (booking as any)?.paymentConfirmedByCustomer}
+          />
         ) : null}
       </View>
     </TowingBookingLayout>

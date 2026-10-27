@@ -1,12 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, layout, radius, spacing, typography } from '../../theme';
 
@@ -66,7 +60,7 @@ export default function GoldButton({
           }
         />
       ) : (
-        <Text
+        <PartnerText
           style={[
             styles.label,
             labelSize != null && { fontSize: labelSize },
@@ -77,7 +71,7 @@ export default function GoldButton({
             isOutlineLight && styles.outlineLightLabel,
           ]}>
           {label}
-        </Text>
+        </PartnerText>
       )}
     </Pressable>
   );

@@ -163,15 +163,19 @@ export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Pro
             <DriverAvatar size={px(34)} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4) }}>
-                <Star size={px(10)} color={colors.primary} fill={colors.primary} />
-                <Text
-                  style={{
-                    fontSize: px(11),
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {booking.driver.rating}
-                </Text>
+                {booking.driver.rating != null ? (
+                  <>
+                    <Star size={px(10)} color={colors.primary} fill={colors.primary} />
+                    <Text
+                      style={{
+                        fontSize: px(11),
+                        fontWeight: typography.weights.bold,
+                        color: colors.dark,
+                      }}>
+                      {booking.driver.rating.toFixed(1)}
+                    </Text>
+                  </>
+                ) : null}
                 <Text
                   numberOfLines={1}
                   style={{
@@ -183,7 +187,9 @@ export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Pro
                 </Text>
               </View>
               <Text style={{ fontSize: px(10), color: colors.grey, marginTop: px(1) }}>
-                Your Driver
+                {booking.driver.name === 'Finding a driver'
+                  ? 'Driver assignment in progress'
+                  : 'Your Driver'}
               </Text>
             </View>
           </View>

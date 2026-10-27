@@ -1,23 +1,16 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import * as Location from 'expo-location';
+import { ActivityIndicator, Image, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Crosshair, Map as MapIcon, MapPin, Search } from 'lucide-react-native';
 
 import { images } from '../../assets';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import LocationPickerMap from '../booking/LocationPickerMap';
 import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
 import { useLocationStore } from '../../store/locationStore';
 import { reverseGeocode } from '../../utils/googleMaps';
+import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
 interface LocationSelectorSheetProps {
@@ -34,6 +27,7 @@ export default function LocationSelectorSheet({
   dismissible = false,
   onRequestClose,
 }: LocationSelectorSheetProps) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const setLocation = useLocationStore(state => state.setLocation);
   const selectedLocation = useLocationStore(state => state.selectedLocation);
 
@@ -52,27 +46,24 @@ export default function LocationSelectorSheet({
   const handleUseCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission needed',
-          'Allow location access to use your current location, or search on the map.',
-        );
+      const position = await getCurrentPositionWhenAllowed();
+      if (!position) {
+        showAlert({
+          tone: 'warning',
+          title: 'Permission needed',
+          message: 'Allow location access to use your current location, or search on the map.',
+        });
         return;
       }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
       const { latitude, longitude } = position.coords;
       const address = await reverseGeocode(latitude, longitude);
       applyLocation({ address, latitude, longitude });
     } catch {
-      Alert.alert('Location error', 'Unable to get your current location. Try the map picker.');
+      showAlert({ tone: 'error', title: 'Location error', message: 'Unable to get your current location. Try the map picker.' });
     } finally {
       setIsLocating(false);
     }
-  }, [applyLocation]);
+  }, [applyLocation, showAlert]);
 
   const handleCityChip = useCallback(
     (cityName: string) => {
@@ -80,10 +71,11 @@ export default function LocationSelectorSheet({
       if (!city) return;
 
       if (city.comingSoon) {
-        Alert.alert(
-          'Coming soon',
-          `${city.displayName} is coming soon! We'll notify you when we launch there.`,
-        );
+        showAlert({
+          tone: 'info',
+          title: 'Coming soon',
+          message: `${city.displayName} is coming soon! We'll notify you when we launch there.`,
+        });
         return;
       }
 
@@ -119,19 +111,19 @@ export default function LocationSelectorSheet({
               accessibilityLabel="RACE"
             />
 
-            <Text style={styles.title}>Set your location</Text>
-            <Text style={styles.subtitle}>
+            <PartnerText style={styles.title}>Set your location</PartnerText>
+            <PartnerText style={styles.subtitle}>
               Choose where you need help so we can show nearby services
-            </Text>
+            </PartnerText>
 
             <Pressable style={styles.searchBar} onPress={() => setShowMapPicker(true)}>
               <Search size={18} color={colors.grey} strokeWidth={2} />
-              <Text style={styles.searchPlaceholder}>Search your location...</Text>
+              <PartnerText style={styles.searchPlaceholder}>Search your location...</PartnerText>
             </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
+              <PartnerText style={styles.dividerText}>or</PartnerText>
               <View style={styles.dividerLine} />
             </View>
 
@@ -144,14 +136,14 @@ export default function LocationSelectorSheet({
               ) : (
                 <Crosshair size={20} color={colors.dark} strokeWidth={2.2} />
               )}
-              <Text style={styles.actionText}>
+              <PartnerText style={styles.actionText}>
                 {isLocating ? 'Getting your location...' : 'Use my current location'}
-              </Text>
+              </PartnerText>
             </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>Select on map</Text>
+              <PartnerText style={styles.dividerText}>Select on map</PartnerText>
               <View style={styles.dividerLine} />
             </View>
 
@@ -159,10 +151,10 @@ export default function LocationSelectorSheet({
               style={[styles.actionRow, shadows.card]}
               onPress={() => setShowMapPicker(true)}>
               <MapIcon size={20} color={colors.dark} strokeWidth={2} />
-              <Text style={styles.actionText}>Open Map Picker</Text>
+              <PartnerText style={styles.actionText}>Open Map Picker</PartnerText>
             </Pressable>
 
-            <Text style={styles.popularLabel}>Popular cities</Text>
+            <PartnerText style={styles.popularLabel}>Popular cities</PartnerText>
             <View style={styles.chipsRow}>
               {SERVICEABLE_AREAS.map(city => (
                 <Pressable
@@ -174,14 +166,14 @@ export default function LocationSelectorSheet({
                     color={city.comingSoon ? colors.grey : colors.dark}
                     strokeWidth={2.2}
                   />
-                  <Text
+                  <PartnerText
                     style={[
                       styles.chipText,
                       city.comingSoon && { color: colors.grey },
                     ]}>
                     {city.displayName}
                     {city.comingSoon ? ' · Soon' : ''}
-                  </Text>
+                  </PartnerText>
                 </Pressable>
               ))}
             </View>
@@ -203,6 +195,7 @@ export default function LocationSelectorSheet({
         onClose={() => setShowMapPicker(false)}
         onLocationSelected={location => applyLocation(location)}
       />
+      {partnerDialog}
     </>
   );
 }
@@ -230,8 +223,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   logo: {
-    width: 64,
-    height: 64,
+    width: 132,
+    height: 132 * (230 / 480),
     marginBottom: 14,
   },
   title: {

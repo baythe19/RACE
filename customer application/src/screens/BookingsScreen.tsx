@@ -102,13 +102,14 @@ export default function BookingsScreen() {
     navigation.navigate('TowingTrack', { bookingId, bookingType, fromBookings: true });
   };
 
-  const openDetail = (bookingId: string) => {
-    navigation.navigate('BookingDetail', { bookingId });
+  const openDetail = (bookingId: string, bookingType: 'towing' | 'driver') => {
+    navigation.navigate('BookingDetail', { bookingId, bookingType });
   };
 
   const isEmpty =
     !isLoading &&
     !isRefetching &&
+    !loadError && // UX fix: with a load error, show only the error card — the "No bookings yet" empty state must not appear alongside it.
     ongoingList.length === 0 &&
     historyList.length === 0 &&
     otherList.length === 0;
@@ -163,9 +164,57 @@ export default function BookingsScreen() {
       </View>
 
       {isLoading && bookings.length === 0 ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(32) }}>
-          <ActivityIndicator color={colors.primary} />
-          <Text style={{ marginTop: px(10), fontSize: px(13), color: colors.grey }}>
+        <View style={{ marginBottom: px(12) }}>
+          {[0, 1].map(rowIndex => (
+            <View
+              key={rowIndex}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: px(12),
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1,
+                borderColor: '#ECEEF1',
+                borderRadius: px(14),
+                padding: px(12),
+                marginBottom: px(10),
+                opacity: 0.75,
+              }}>
+              <View
+                style={{
+                  width: px(46),
+                  height: px(46),
+                  borderRadius: px(23),
+                  backgroundColor: '#EEF0F3',
+                }}
+              />
+              <View style={{ flex: 1, gap: px(8) }}>
+                <View
+                  style={{
+                    width: '62%',
+                    height: px(13),
+                    borderRadius: px(7),
+                    backgroundColor: '#EEF0F3',
+                  }}
+                />
+                <View
+                  style={{
+                    width: '42%',
+                    height: px(11),
+                    borderRadius: px(6),
+                    backgroundColor: '#EEF0F3',
+                  }}
+                />
+              </View>
+            </View>
+          ))}
+          <Text
+            style={{
+              textAlign: 'center',
+              marginTop: px(4),
+              fontSize: px(12),
+              color: colors.grey,
+            }}>
             Loading bookings…
           </Text>
         </View>
@@ -178,21 +227,47 @@ export default function BookingsScreen() {
             borderWidth: 1,
             borderColor: colors.error,
             backgroundColor: '#FEE2E2',
-            padding: px(12),
+            padding: px(14),
             marginBottom: px(12),
           }}>
           <Text
             style={{
               color: colors.error,
-              fontSize: px(12),
+              fontSize: px(12.5),
               fontWeight: typography.weights.semibold,
-              marginBottom: px(8),
+              lineHeight: px(18),
             }}>
             {loadError}
           </Text>
-          <Pressable onPress={() => void refetch()}>
-            <Text style={{ color: colors.primaryDark, fontWeight: typography.weights.bold }}>
-              Retry
+          <Text
+            style={{
+              marginTop: px(4),
+              color: colors.grey,
+              fontSize: px(11),
+            }}>
+            Tip: the first request after a while can timeout while the server wakes up. Retrying
+            usually fixes it.
+          </Text>
+          <Pressable
+            onPress={() => {
+              setLoadError(null);
+              void refetch().then(result => {
+                setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
+              });
+            }}
+            style={({ pressed }) => ({
+              marginTop: px(10),
+              alignSelf: 'flex-start',
+              backgroundColor: colors.error,
+              borderRadius: px(10),
+              paddingHorizontal: px(16),
+              paddingVertical: px(8),
+              opacity: pressed ? 0.85 : 1,
+            })}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading bookings">
+            <Text style={{ color: '#FFFFFF', fontWeight: typography.weights.bold, fontSize: px(12.5) }}>
+              Retry now
             </Text>
           </Pressable>
         </View>
@@ -268,7 +343,7 @@ export default function BookingsScreen() {
                 booking={booking}
                 px={px}
                 onTrack={() => openTrack(booking.id, booking.bookingType)}
-                onPress={() => openDetail(booking.id)}
+                onPress={() => openDetail(booking.id, booking.bookingType)}
               />
             ))
           )}
@@ -297,7 +372,7 @@ export default function BookingsScreen() {
                 key={item.id}
                 item={item}
                 px={px}
-                onPress={() => openDetail(item.id)}
+                onPress={() => openDetail(item.id, item.bookingType)}
               />
             ))
           )}

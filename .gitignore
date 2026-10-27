@@ -3,7 +3,17 @@ dist/
 backend/dist/
 web-build/
 .expo/
-.env
-.env*.local
+.env*
 .DS_Store
 *.log
+
+# Unlazy / agent runtime (machine-local; do not commit)
+.unlazy/
+.unlazy-hook-state.json
+.claude/settings.local.json
+.superpowers/
+
+# Local backups (do not commit raw secrets)
+race-env-backup.tar.gz
+scripts/env-backup.base64
+

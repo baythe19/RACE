@@ -3,6 +3,8 @@ export { typography, headingStyle, bodyStyle, labelStyle, textStyles } from './t
 export { spacing, radius, layout } from './spacing';
 export { brand } from './brand';
 export { shadows } from './shadows';
+export { motionTokens, getPressableFeedback } from './motion';
+export { useInterFonts, interFontForWeight, interTextStyle } from './interFonts';
 
 import { colors } from './colors';
 import { typography } from './typography';

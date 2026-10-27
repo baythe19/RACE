@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.overlay,
   },
   overlayBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   sheet: {
     backgroundColor: COLORS.background,

@@ -23,6 +23,7 @@ import {
   useCreateVehicleMutation,
 } from '../../services/vehicles/useVehicleQueries';
 import type { AuthStackParamList } from '../../types/navigation';
+import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
 import { FUEL_TYPE_IDS, VEHICLE_TYPE_IDS } from '../../components/vehicles/vehicleUi';
 import type { FuelType, VehicleType } from '../../types/vehicle';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -56,6 +57,13 @@ export default function AddFirstVehicleScreen({ navigation }: Props) {
 
   const handleSubmit = async () => {
     setError('');
+    if (UI_PREVIEW_AUTH_FLOW) {
+      navigation.replace('VehicleSuccess', {
+        vehicleId: 'ui-preview-vehicle',
+        vehicleNumber: vehicleNumber.trim() || 'OD02AB1234',
+      });
+      return;
+    }
     if (!vehicleNumber.trim() || !brand.trim() || !model.trim()) {
       setError('Vehicle number, brand, and model are required');
       return;

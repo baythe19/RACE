@@ -10,13 +10,20 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://race-api-w361.onrender.com"
+      },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://race-api-w361.onrender.com"
+      },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
       }
     }
   },

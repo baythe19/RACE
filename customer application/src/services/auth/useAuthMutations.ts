@@ -76,6 +76,7 @@ export function useVerifyOtpMutation() {
             onboardingRequired: data.onboardingRequired,
           }),
         );
+        dispatch(setLoading(false));
       },
       onError: () => dispatch(setLoading(false)),
     },

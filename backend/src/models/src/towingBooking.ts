@@ -25,16 +25,25 @@ export interface ITowingBooking extends Document {
   customerId: Types.ObjectId;
   bookingNumber: string;
   vehicleId: Types.ObjectId;
+  towingMode?: 'instant' | 'scheduled' | 'emergency';
   pickup: ITowingBookingLocation;
   dropoff?: ITowingBookingLocation;
   distanceKm?: number;
   estimatedFare: number;
   fareBreakdown?: TowingFareBreakdown;
+  /**
+   * Amount the backend confirms at completion. Written once, when the driver
+   * marks the job COMPLETED, so partner/earnings screens never have to trust a
+   * client-side estimate.
+   */
+  finalFare?: number;
+  finalFareConfirmedAt?: Date;
   advanceAmount: number;
   advancePaid: boolean;
   advancePaymentId?: string;
   remainingAmount: number;
   remainingPaid: boolean;
+  finalPaymentId?: string;
   paymentStatus: BookingPaymentStatus;
   status: UnifiedBookingStatus;
   vendorId?: Types.ObjectId;
@@ -45,6 +54,17 @@ export interface ITowingBooking extends Document {
   /** 4-digit code customer shares with partner to start trip */
   tripStartOtp?: string;
   tripStartOtpVerified?: boolean;
+  tripStartOtpAttempts?: number;
+  /** Timestamp when partner marks arrival at dropoff */
+  arrivedAtDropoffAt?: Date;
+  /** 4-digit code customer shares with partner to complete trip after payment confirmation */
+  completionOtp?: string;
+  completionOtpVerified?: boolean;
+  completionOtpAttempts?: number;
+  /** Mode selected by customer: CASH, UPI, or ONLINE */
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  paymentCollectedAt?: Date;
   scheduledAt?: Date;
   statusHistory: ITowingStatusHistoryEntry[];
   cancelledAt?: Date;
@@ -54,6 +74,7 @@ export interface ITowingBooking extends Document {
   refundStatus: 'NOT_APPLICABLE' | 'PENDING' | 'PROCESSED';
   driverLatitude?: number;
   driverLongitude?: number;
+  driverLocationUpdatedAt?: Date;
   rating?: {
     score: number;
     review?: string;
@@ -92,11 +113,14 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     distanceKm: { type: Number },
     estimatedFare: { type: Number, required: true },
     fareBreakdown: { type: Schema.Types.Mixed },
+    finalFare: { type: Number },
+    finalFareConfirmedAt: { type: Date },
     advanceAmount: { type: Number, required: true },
     advancePaid: { type: Boolean, default: false },
     advancePaymentId: { type: String },
     remainingAmount: { type: Number, required: true },
     remainingPaid: { type: Boolean, default: false },
+    finalPaymentId: { type: String },
     paymentStatus: {
       type: String,
       enum: BOOKING_PAYMENT_STATUSES,
@@ -115,6 +139,20 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     assignedFleetVehicleLabel: { type: String, trim: true },
     tripStartOtp: { type: String, trim: true },
     tripStartOtpVerified: { type: Boolean, default: false },
+    tripStartOtpAttempts: { type: Number, default: 0 },
+    arrivedAtDropoffAt: { type: Date },
+    completionOtp: { type: String, trim: true },
+    completionOtpVerified: { type: Boolean, default: false },
+    completionOtpAttempts: { type: Number, default: 0 },
+    paymentCollectionMode: { type: String, enum: ['CASH', 'UPI', 'ONLINE'] },
+    paymentConfirmedByCustomer: { type: Boolean, default: false },
+    paymentCollectedAt: { type: Date },
+    towingMode: {
+      type: String,
+      enum: ['instant', 'scheduled', 'emergency'],
+      default: 'instant',
+      index: true,
+    },
     scheduledAt: { type: Date },
     statusHistory: { type: [StatusHistorySchema], default: [] },
     cancelledAt: { type: Date },
@@ -128,6 +166,7 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     },
     driverLatitude: { type: Number },
     driverLongitude: { type: Number },
+    driverLocationUpdatedAt: { type: Date },
     rating: { type: ServiceBookingRatingSchema },
   },
   { timestamps: true },
@@ -135,5 +174,8 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
 
 TowingBookingSchema.index({ customerId: 1, createdAt: -1 });
 TowingBookingSchema.index({ status: 1, createdAt: -1 });
+TowingBookingSchema.index({ driverId: 1, status: 1 });
+TowingBookingSchema.index({ vendorId: 1, status: 1 });
+TowingBookingSchema.index({ assignedFleetVehicleId: 1, status: 1 });
 
 export const TowingBookingModel = model<ITowingBooking>('TowingBooking', TowingBookingSchema);

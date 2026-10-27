@@ -7,6 +7,7 @@ import {
   updateBooking,
 } from '../../redux/bookings/bookingsSlice';
 import type { Booking, SubmitRatingRequest } from '../../types/booking';
+import type { ServiceBookingType } from '../../types/serviceBooking';
 import {
   getBooking,
   listBookings,
@@ -16,7 +17,7 @@ import { isBookingOngoing } from '../../utils/bookingDisplay';
 
 export const bookingKeys = {
   all: ['bookings'] as const,
-  detail: (id: string) => ['bookings', id] as const,
+  detail: (id: string, bookingType?: ServiceBookingType) => ['bookings', bookingType ?? 'legacy', id] as const,
 };
 
 export function useBookingsQuery() {
@@ -36,6 +37,8 @@ export function useBookingsQuery() {
     },
     staleTime: 0,
     refetchOnMount: 'always',
+    retry: 2,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
     refetchInterval: (query) => {
       const data = query.state.data;
       if (data?.some(isBookingOngoing)) {
@@ -46,16 +49,19 @@ export function useBookingsQuery() {
   });
 }
 
-export function useBookingQuery(bookingId: string) {
+export function useBookingQuery(bookingId: string, bookingType?: ServiceBookingType) {
   const dispatch = useAppDispatch();
-  const localBooking = useAppSelector((state) =>
-    state.bookings.items.find((b) => b.id === bookingId),
-  );
+  const localBooking = useAppSelector((state) => {
+    const matches = state.bookings.items.filter(
+      booking => booking.id === bookingId && (!bookingType || booking.bookingType === bookingType),
+    );
+    return matches.length === 1 ? matches[0] : undefined;
+  });
 
   const query = useQuery({
-    queryKey: bookingKeys.detail(bookingId),
+    queryKey: bookingKeys.detail(bookingId, bookingType),
     queryFn: async () => {
-      const remote = await getBooking(bookingId);
+      const remote = await getBooking(bookingId, bookingType);
       if (remote) {
         dispatch(updateBooking(remote));
         return remote;

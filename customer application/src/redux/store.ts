@@ -20,7 +20,10 @@ import {
   savePersistedAuthState,
 } from './secureAuthStorage';
 import { clearTokens, saveTokens } from '../services/api';
-import { getCustomerOnboardingStep } from '../store/customerOnboarding';
+import {
+  getCustomerOnboardingStep,
+  setCustomerOnboardingStep,
+} from '../store/customerOnboarding';
 
 function pickPersistedAuth(state: AuthState) {
   return {
@@ -66,20 +69,26 @@ export const store = configureStore({
     vendorOnboarding: vendorOnboardingReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().concat(persistAuthMiddleware),
+    getDefaultMiddleware({
+      serializableCheck: false,
+      immutableCheck: false,
+    }).concat(persistAuthMiddleware),
 });
 
 export async function hydrateAuthStore(): Promise<void> {
   const persisted = await loadPersistedAuthState();
-  if (!persisted) return;
+  if (!persisted?.accessToken) return;
 
-  const step = await getCustomerOnboardingStep();
-  const onboardingRequired = step !== 'done';
+  const storedStep = await getCustomerOnboardingStep();
+  const completed = storedStep === 'done' || persisted.onboardingRequired === false;
+  if (completed && storedStep !== 'done') {
+    await setCustomerOnboardingStep('done');
+  }
 
   store.dispatch(
     rehydrateAuth({
       ...persisted,
-      onboardingRequired,
+      onboardingRequired: !completed,
     }),
   );
 

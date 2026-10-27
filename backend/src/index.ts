@@ -1,12 +1,15 @@
+import './config/env';
 import { createApp } from './app';
 import { createServer } from 'http';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { connectCache, disconnectCache } from './config/cache';
 import { env } from './config/env';
+import { assertProductionConfig } from './config/productionGuard';
 import { initializeSocket } from './services/src/socket';
 import { logger } from './utils/src/logger';
 
 async function bootstrap(): Promise<void> {
+  assertProductionConfig();
   await connectDatabase();
   const { ensureDatabaseIndexes } = await import('./database/src/indexes');
   await ensureDatabaseIndexes();

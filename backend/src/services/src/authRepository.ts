@@ -45,15 +45,20 @@ export class AuthRepository {
     withinMs: number,
   ): Promise<IOtpLog | null> {
     const since = new Date(Date.now() - withinMs);
+    /**
+     * Idempotent re-verify within the expiry window.
+     * Matches the submitted OTP against the verified record.
+     */
     return OtpLogModel.findOne({
       mobileNumber,
-      mobileOtp: otp,
       mobileVerified: true,
       createdAt: { $gte: since },
+      mobileOtp: otp,
     })
       .sort({ createdAt: -1 })
       .exec();
   }
+
 }
 
 export const authRepository = new AuthRepository();

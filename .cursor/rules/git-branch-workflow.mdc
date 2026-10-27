@@ -1,15 +1,12 @@
 ---
-description: Keep all work off master until final merge
+description: Freeze main and old releases; all work stays on v2.0.1-cleanup
 alwaysApply: true
 ---
 
-# Git branch workflow
+# Git branch freeze
 
-- **Never commit directly to `master`.** All ongoing work stays on feature/test branches until the user explicitly asks to merge or finalize.
-- **Default branch for commits:** `test/onboarding-and-vehicles` (or another active feature branch the user names).
-- Before any commit, verify the current branch with `git branch --show-current`. If on `master`, create or switch to a feature branch first:
-  ```bash
-  git checkout -b test/<feature-name>
-  ```
-- Push feature branches to `origin`; do not push commits to `master` unless the user explicitly requests a final merge/release.
-- When the user says work is done and asks to finalize, they may merge the feature branch into `master` via PR or explicit instruction.
+- **Work only on `v2.0.1-cleanup`** (or a branch the user names that was cut from it).
+- **Do not commit, merge, or push to `main`, `master`, `release4Aug2026`, or `release/13July26`.** Those hold the known-good snapshot until the user says testing is done and explicitly asks to promote.
+- `main` is the frozen old code. It is not the working branch.
+- Before any commit: `git branch --show-current`. If you are on a frozen branch, stop and switch to `v2.0.1-cleanup`.
+- Push only the active work branch to `origin`. Never push the freeze list unless the user explicitly requests a final merge.

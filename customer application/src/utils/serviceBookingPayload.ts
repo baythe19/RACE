@@ -63,6 +63,11 @@ export function buildTowingBookingRequest(
 
   if (booking.serviceMode === 'scheduled') {
     payload.scheduledAt = towingDateIdToScheduledAt(booking.dateId);
+    payload.towingMode = 'scheduled';
+  } else if (booking.towingType?.toLowerCase().includes('emergency')) {
+    payload.towingMode = 'emergency';
+  } else {
+    payload.towingMode = 'instant';
   }
 
   validateTowingBookingRequest(payload);
@@ -84,6 +89,7 @@ export function buildDriverBookingRequest(
       'pickup',
     ),
     packageHours: booking.packageHours,
+    driverServiceType: booking.driverType,
   };
 
   const scheduledAt = driverDateIdToScheduledAt(booking.dateId);

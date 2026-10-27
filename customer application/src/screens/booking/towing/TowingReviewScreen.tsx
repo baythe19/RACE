@@ -19,6 +19,10 @@ import type { TowingFareBreakdown } from '../../../types/fare';
 import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
 import { formatRupee } from '../../../utils/towingPricing';
 import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
+import {
+  getTowingWalkthroughFare,
+  TOWING_WALKTHROUGH_ENABLED,
+} from '../../../utils/towingBookingWalkthrough';
 import { colors, shadows, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingReview'>;
@@ -98,7 +102,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
         }
       } catch {
         if (!cancelled) {
-          setFareBreakdown(null);
+          setFareBreakdown(TOWING_WALKTHROUGH_ENABLED ? getTowingWalkthroughFare() : null);
         }
       } finally {
         if (!cancelled) {
@@ -153,12 +157,12 @@ export default function TowingReviewScreen({ navigation }: Props) {
 
   return (
     <TowingBookingLayout
-      title="Review & Confirm"
-      step={5}
+      title="Confirm booking"
+      step={3}
       accentColor={TOWING_ACCENT}
       scrollable
       onBack={() => navigation.goBack()}
-      buttonLabel="Continue"
+      buttonLabel="Pay advance"
       onContinue={handleContinue}
       continueDisabled={isLoadingFare || !fareBreakdown}
       footerNoteBelow={
@@ -239,7 +243,9 @@ export default function TowingReviewScreen({ navigation }: Props) {
                     fontWeight: typography.weights.semibold,
                     color: colors.dark,
                   }}>
-                  {getDateLabel(booking.dateId)}, {getTimeLabel(booking.timeId)}
+                  {booking.serviceMode === 'instant'
+                    ? 'Now · dispatched immediately'
+                    : `${getDateLabel(booking.dateId)}, ${getTimeLabel(booking.timeId)}`}
                 </Text>
               </View>
             </View>

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { useEffect, useRef } from 'react';
 
@@ -8,9 +8,12 @@ import { refreshAuthSession } from '../authService';
 import { useAuthStore } from '../../store/authStore';
 import {
   getVendorDashboard,
+  getVendorEarnings,
   getVendorProfile,
+  getPayoutAccount,
   getVendorStatus,
   registerVendor,
+  savePayoutAccount,
   saveVendorDraft,
   updateVendor,
   uploadVendorDocument,
@@ -82,6 +85,48 @@ export function useVendorDashboardQuery(enabled = true) {
     refetchInterval: 30_000,
   });
 }
+
+/* ── Payout account & earnings — real backend, no mock fallbacks ── */
+
+export function usePayoutAccountQuery(enabled = true) {
+  return useQuery({
+    queryKey: ['vendor', 'payout-account'],
+    queryFn: async () => {
+      try {
+        return await getPayoutAccount();
+      } catch (error) {
+        // 404 = nothing saved yet → legitimate empty state, not an error.
+        if (axios.isAxiosError(error) && error.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    enabled,
+    retry: false,
+  });
+}
+
+export function useSavePayoutAccountMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: savePayoutAccount,
+    onSuccess: account => {
+      queryClient.setQueryData(['vendor', 'payout-account'], account);
+    },
+  });
+}
+
+export function useVendorEarningsQuery(enabled = true) {
+  return useQuery({
+    queryKey: ['vendor', 'earnings'],
+    queryFn: getVendorEarnings,
+    enabled,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+  });
+}
+
 
 export function useVendorProfileQuery(enabled = true) {
   return useQuery({

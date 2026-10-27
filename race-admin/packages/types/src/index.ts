@@ -436,6 +436,7 @@ export interface BookingListItem {
   fareBreakdown?: Record<string, unknown>;
   vehicleCategory?: string;
   packageHours?: number;
+  assignedFleetVehicleLabel?: string;
 }
 
 export interface BookingListFilters {
@@ -514,6 +515,7 @@ export interface BookingStatusCounts {
   created: number;
   assigned: number;
   enRoute: number;
+  active: number;
   completed: number;
   cancelled: number;
   pending?: number;

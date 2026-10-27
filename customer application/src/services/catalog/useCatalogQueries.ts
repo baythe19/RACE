@@ -12,15 +12,15 @@ export function useServicesQuery() {
   const { services, isLoading, error, fetchServices } = useCatalogStore();
 
   useEffect(() => {
-    if (!services.length) {
+    if (!services?.length) {
       void fetchServices();
     }
-  }, [fetchServices, services.length]);
+  }, [fetchServices, services?.length]);
 
   const refetch = useCallback(() => fetchServices(), [fetchServices]);
 
   return {
-    data: services.length ? services : FALLBACK_CATEGORIES,
+    data: services?.length ? services : FALLBACK_CATEGORIES,
     isLoading,
     isError: Boolean(error),
     error,

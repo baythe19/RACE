@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   searchOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
     zIndex: 20,
     paddingHorizontal: 16,

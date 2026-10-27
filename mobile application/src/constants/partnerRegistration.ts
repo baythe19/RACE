@@ -9,8 +9,7 @@ export interface PartnerRegistrationDocumentField {
 }
 
 export const DRIVER_REGISTRATION_STEPS = [
-  'Personal Info',
-  'Vehicle Details',
+  'Personal & Details',
   'Documents',
   'Review',
 ] as const;

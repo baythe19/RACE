@@ -1,11 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { type ReactNode } from 'react';
-import {
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { colors, layout, radius, shadows, spacing, typography } from '../../theme';
 
@@ -58,17 +53,17 @@ interface SectionTitleProps {
 export function SectionTitle({ title, highlight, subtitle }: SectionTitleProps) {
   return (
     <View style={sectionStyles.wrap}>
-      <Text style={sectionStyles.title}>
+      <PartnerText style={sectionStyles.title}>
         {highlight ? (
           <>
             {title}
-            <Text style={sectionStyles.highlight}> {highlight}</Text>
+            <PartnerText style={sectionStyles.highlight}> {highlight}</PartnerText>
           </>
         ) : (
           title
         )}
-      </Text>
-      {subtitle ? <Text style={sectionStyles.subtitle}>{subtitle}</Text> : null}
+      </PartnerText>
+      {subtitle ? <PartnerText style={sectionStyles.subtitle}>{subtitle}</PartnerText> : null}
     </View>
   );
 }

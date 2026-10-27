@@ -1,0 +1,28 @@
+{
+  "name": "RACE Codespace",
+  "forwardPorts": [3000, 3001, 8081, 8082, 19000, 19001],
+  "portsAttributes": {
+    "3000": {
+      "label": "RACE Backend API",
+      "onAutoForward": "notify",
+      "requireLocalPort": false,
+      "elevateIfNeeded": false
+    },
+    "3001": {
+      "label": "RACE Admin Web",
+      "onAutoForward": "openBrowser",
+      "requireLocalPort": false,
+      "elevateIfNeeded": false
+    },
+    "8081": {
+      "label": "Customer Mobile Metro",
+      "onAutoForward": "silent"
+    },
+    "8082": {
+      "label": "Partner Mobile Metro",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash scripts/restore-env.sh",
+  "postStartCommand": "bash scripts/restore-env.sh"
+}

@@ -1,5 +1,6 @@
+import { PartnerText } from './PartnerText';
 import React, { type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
@@ -17,8 +18,8 @@ export function PartnerSectionHeader({ Icon, title, subtitle }: PartnerSectionHe
         <Icon size={20} color={colors.partnerRed} strokeWidth={2.2} />
       </View>
       <View style={styles.copy}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+        <PartnerText style={styles.title}>{title}</PartnerText>
+        <PartnerText style={styles.subtitle}>{subtitle}</PartnerText>
       </View>
     </View>
   );
@@ -49,7 +50,7 @@ export function PartnerRegistrationFooter({
           continueDisabled && styles.disabled,
           pressed && !continueDisabled && styles.pressed,
         ]}>
-        <Text style={styles.continueLabel}>{continueLabel}</Text>
+        <PartnerText style={styles.continueLabel}>{continueLabel}</PartnerText>
       </Pressable>
     );
   }
@@ -59,7 +60,7 @@ export function PartnerRegistrationFooter({
       <Pressable
         onPress={onBack}
         style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
-        <Text style={styles.backLabel}>Back</Text>
+        <PartnerText style={styles.backLabel}>Back</PartnerText>
       </Pressable>
       <Pressable
         disabled={continueDisabled}
@@ -69,7 +70,7 @@ export function PartnerRegistrationFooter({
           continueDisabled && styles.disabled,
           pressed && !continueDisabled && styles.pressed,
         ]}>
-        <Text style={styles.continueLabel}>{continueLabel}</Text>
+        <PartnerText style={styles.continueLabel}>{continueLabel}</PartnerText>
       </Pressable>
     </View>
   );
@@ -90,7 +91,7 @@ interface PartnerSecurityNoteProps {
 export function PartnerSecurityNote({ text }: PartnerSecurityNoteProps) {
   return (
     <View style={styles.securityBox}>
-      <Text style={styles.securityText}>{text}</Text>
+      <PartnerText style={styles.securityText}>{text}</PartnerText>
     </View>
   );
 }

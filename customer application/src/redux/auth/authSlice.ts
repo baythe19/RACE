@@ -87,6 +87,8 @@ const authSlice = createSlice({
       if (user) {
         syncZustandPatch(user, false);
       }
+      useAuthStore.getState().setOnboardingRequired(false);
+      useAuthStore.getState().setCustomerOnboardingStep('done');
     },
     updateTokens(
       state,

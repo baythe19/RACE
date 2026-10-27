@@ -23,7 +23,7 @@ export function getVehicleCategory(
     return 'suv';
   }
 
-  switch (vehicleType.toLowerCase()) {
+  switch (String(vehicleType ?? '').toLowerCase()) {
     case 'truck':
     case 'bus':
       return 'suv';

@@ -216,3 +216,33 @@ export async function createDriverBookingWithPayment(
   const payment = await completeAdvancePayment(booking.id, 'driver');
   return { booking, payment };
 }
+
+export type ConfirmPaymentModePayload = {
+  bookingId: string;
+  bookingType: ServiceBookingType;
+  paymentMode: 'CASH' | 'UPI' | 'ONLINE';
+};
+
+export type ConfirmPaymentModeResult = {
+  success: boolean;
+  bookingId: string;
+  bookingNumber?: string;
+  bookingType: ServiceBookingType;
+  paymentMode: 'CASH' | 'UPI' | 'ONLINE';
+  amount?: number;
+  completionOtp: string;
+};
+
+export async function confirmCustomerPaymentMode(
+  payload: ConfirmPaymentModePayload,
+): Promise<ConfirmPaymentModeResult> {
+  return unwrap(
+    apiClient.post<ApiSuccessResponse<ConfirmPaymentModeResult>>(
+      API_ENDPOINTS.confirmPaymentMode(payload.bookingId),
+      {
+        bookingType: payload.bookingType,
+        paymentMode: payload.paymentMode,
+      },
+    ),
+  );
+}

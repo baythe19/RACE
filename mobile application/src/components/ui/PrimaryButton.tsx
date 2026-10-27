@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 
 import { colors, layout, radius, spacing, typography } from '../../theme';
 import type { ButtonVariant } from '../../types/models';
@@ -29,13 +30,13 @@ export default function PrimaryButton({
         disabled && styles.disabled,
         pressed && !disabled && styles.pressed,
       ]}>
-      <Text
+      <PartnerText
         style={[
           styles.label,
           isOutline ? styles.outlineLabel : styles.primaryLabel,
         ]}>
         {label}
-      </Text>
+      </PartnerText>
     </Pressable>
   );
 }

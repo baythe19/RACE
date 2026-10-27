@@ -25,6 +25,7 @@ export interface IDriverBooking extends Document {
   customerId: Types.ObjectId;
   bookingNumber: string;
   vehicleId?: Types.ObjectId;
+  driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   pickup: IDriverBookingLocation;
   dropoff?: IDriverBookingLocation;
   estimatedDurationHours?: number;
@@ -33,11 +34,19 @@ export interface IDriverBooking extends Document {
   includedKm?: number;
   estimatedFare: number;
   fareBreakdown?: DriverFareBreakdown;
+  /**
+   * Amount the backend confirms at completion. Written once, when the driver
+   * marks the job COMPLETED, so partner/earnings screens never have to trust a
+   * client-side estimate.
+   */
+  finalFare?: number;
+  finalFareConfirmedAt?: Date;
   advanceAmount: number;
   advancePaid: boolean;
   advancePaymentId?: string;
   remainingAmount: number;
   remainingPaid: boolean;
+  finalPaymentId?: string;
   paymentStatus: BookingPaymentStatus;
   status: UnifiedBookingStatus;
   vendorId?: Types.ObjectId;
@@ -46,6 +55,17 @@ export interface IDriverBooking extends Document {
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
   tripStartOtpVerified?: boolean;
+  tripStartOtpAttempts?: number;
+  /** Timestamp when partner marks arrival at dropoff */
+  arrivedAtDropoffAt?: Date;
+  /** 4-digit code customer shares with partner to complete trip after payment confirmation */
+  completionOtp?: string;
+  completionOtpVerified?: boolean;
+  completionOtpAttempts?: number;
+  /** Mode selected by customer: CASH, UPI, or ONLINE */
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  paymentCollectedAt?: Date;
   scheduledAt?: Date;
   statusHistory: IDriverStatusHistoryEntry[];
   cancelledAt?: Date;
@@ -55,6 +75,7 @@ export interface IDriverBooking extends Document {
   refundStatus: 'NOT_APPLICABLE' | 'PENDING' | 'PROCESSED';
   driverLatitude?: number;
   driverLongitude?: number;
+  driverLocationUpdatedAt?: Date;
   rating?: {
     score: number;
     review?: string;
@@ -96,11 +117,14 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     includedKm: { type: Number },
     estimatedFare: { type: Number, required: true },
     fareBreakdown: { type: Schema.Types.Mixed },
+    finalFare: { type: Number },
+    finalFareConfirmedAt: { type: Date },
     advanceAmount: { type: Number, required: true },
     advancePaid: { type: Boolean, default: false },
     advancePaymentId: { type: String },
     remainingAmount: { type: Number, required: true },
     remainingPaid: { type: Boolean, default: false },
+    finalPaymentId: { type: String },
     paymentStatus: {
       type: String,
       enum: BOOKING_PAYMENT_STATUSES,
@@ -119,6 +143,20 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     assignedFleetVehicleLabel: { type: String, trim: true },
     tripStartOtp: { type: String, trim: true },
     tripStartOtpVerified: { type: Boolean, default: false },
+    tripStartOtpAttempts: { type: Number, default: 0 },
+    arrivedAtDropoffAt: { type: Date },
+    completionOtp: { type: String, trim: true },
+    completionOtpVerified: { type: Boolean, default: false },
+    completionOtpAttempts: { type: Number, default: 0 },
+    paymentCollectionMode: { type: String, enum: ['CASH', 'UPI', 'ONLINE'] },
+    paymentConfirmedByCustomer: { type: Boolean, default: false },
+    paymentCollectedAt: { type: Date },
+    driverServiceType: {
+      type: String,
+      enum: ['part_time', 'full_time', 'outstation', 'night'],
+      default: 'part_time',
+      index: true,
+    },
     scheduledAt: { type: Date },
     statusHistory: { type: [StatusHistorySchema], default: [] },
     cancelledAt: { type: Date },
@@ -132,6 +170,7 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     },
     driverLatitude: { type: Number },
     driverLongitude: { type: Number },
+    driverLocationUpdatedAt: { type: Date },
     rating: { type: ServiceBookingRatingSchema },
   },
   { timestamps: true },
@@ -139,5 +178,7 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
 
 DriverBookingSchema.index({ customerId: 1, createdAt: -1 });
 DriverBookingSchema.index({ status: 1, createdAt: -1 });
+DriverBookingSchema.index({ driverId: 1, status: 1 });
+DriverBookingSchema.index({ vendorId: 1, status: 1 });
 
 export const DriverBookingModel = model<IDriverBooking>('DriverBooking', DriverBookingSchema);

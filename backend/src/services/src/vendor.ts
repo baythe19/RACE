@@ -1,20 +1,29 @@
-import { AppError, ConflictError, NotFoundError } from '../../utils/src/errors';
+import { Types } from 'mongoose';
+import { AppError, BadRequestError, ConflictError, NotFoundError } from '../../utils/src/errors';
 import { notificationService } from './eventNotification';
 import { storageService } from '../../storage/src/index';
 import { BookingModel } from '../../models/src/booking';
 import { TransactionModel } from '../../models/src/transaction';
 import { UserModel } from '../../models/src/user';
+import { DriverBookingModel } from '../../models/src/driverBooking';
+import { TowingBookingModel } from '../../models/src/towingBooking';
+import { PaymentTransactionModel } from '../../models/src/paymentTransaction';
+import type { VendorBankDetails } from '../../models/src/userProfileSchema';
 import { userRepository } from './userRepository';
 import { vendorRepository } from './vendorRepository';
 import type { IVendor } from '../../models/src/vendor';
 import {
   REQUIRED_DOCUMENTS,
+  VENDOR_EXEMPT_DOCUMENT_CHECK_TYPES,
   type RegisterVendorDto,
   type ReviewDocumentDto,
   type ReviewVendorDto,
+  type SavePayoutAccountDto,
   type SaveVendorDraftDto,
   type UpdateVendorDto,
   type VendorResponseDto,
+  type PayoutAccountDto,
+  type VendorEarningsDto,
 } from './vendorValidator';
 
 async function mapVendor(vendor: IVendor): Promise<VendorResponseDto> {
@@ -56,13 +65,71 @@ async function mapVendor(vendor: IVendor): Promise<VendorResponseDto> {
   };
 }
 
+async function getServicePaymentTransactions(
+  vendorId: Types.ObjectId,
+  driverIds: Types.ObjectId[],
+) {
+  const bookingQuery =
+    driverIds.length > 0
+      ? { $or: [{ vendorId }, { driverId: { $in: driverIds } }] }
+      : { vendorId };
+  const [towingBookingIds, driverBookingIds] = await Promise.all([
+    TowingBookingModel.find(bookingQuery).distinct('_id').exec(),
+    DriverBookingModel.find(bookingQuery).distinct('_id').exec(),
+  ]);
+  const [towingTransactions, driverTransactions] = await Promise.all([
+    PaymentTransactionModel.find({
+      bookingType: 'towing',
+      bookingId: { $in: towingBookingIds },
+      status: 'success',
+    }).lean().exec(),
+    PaymentTransactionModel.find({
+      bookingType: 'driver',
+      bookingId: { $in: driverBookingIds },
+      status: 'success',
+    }).lean().exec(),
+  ]);
+  return [...towingTransactions, ...driverTransactions];
+}
+
+function netServicePayments(
+  transactions: Array<{ paymentType: string; amount: number; updatedAt: Date }>,
+  from?: Date,
+): number {
+  return transactions.reduce((total, transaction) => {
+    if (from && transaction.updatedAt < from) return total;
+    return total + (transaction.paymentType === 'refund' ? -transaction.amount : transaction.amount);
+  }, 0);
+}
+
 function assertEditable(vendor: IVendor): void {
   if (!['draft', 'changes_requested'].includes(vendor.status)) {
     throw new ConflictError('Application cannot be edited in current status');
   }
 }
 
+const VENDOR_IDENTITY_TYPES = ['aadhaar', 'pan', 'driving_license', 'voter_id'];
+const VENDOR_BUSINESS_TYPES = [
+  'shop_license',
+  'gst',
+  'msme',
+  'commercial_licence',
+  'commercial_permit',
+];
+
 function validateRequiredDocuments(vendorType: string, documentTypes: string[]): void {
+  if (VENDOR_EXEMPT_DOCUMENT_CHECK_TYPES.has(vendorType)) {
+    // One identity proof + one business identity proof; any type in each bucket.
+    const hasIdentity = documentTypes.some((type) => VENDOR_IDENTITY_TYPES.includes(type));
+    const hasBusiness = documentTypes.some((type) => VENDOR_BUSINESS_TYPES.includes(type));
+    if (!hasIdentity) {
+      throw new AppError('Add at least one identity proof document', 400);
+    }
+    if (!hasBusiness) {
+      throw new AppError('Add at least one business identity proof document', 400);
+    }
+    return;
+  }
   const required = REQUIRED_DOCUMENTS[vendorType] ?? [];
   const missing = required.filter((type) => !documentTypes.includes(type));
   if (missing.length > 0) {
@@ -179,8 +246,12 @@ export class VendorService {
 
   async register(userId: string, dto: RegisterVendorDto): Promise<VendorResponseDto> {
     const existing = await vendorRepository.findByUserId(userId);
+
+    // Idempotent submit: an application that is already in review (or beyond)
+    // must not 409 — the client resubmits after token refresh / retries.
+    // Return the stored application untouched instead.
     if (existing && !['draft', 'changes_requested'].includes(existing.status)) {
-      throw new ConflictError('Vendor application already submitted');
+      return mapVendor(existing);
     }
 
     const user = await userRepository.findById(userId);
@@ -431,17 +502,26 @@ export class VendorService {
       .select('_id')
       .lean();
     const driverIds = driverUsers.map((driver) => driver._id.toString());
+    const driverObjectIds = driverUsers.map((driver) => driver._id);
 
     const bookingQuery =
       driverIds.length > 0
         ? { $or: [{ vendorId: user._id }, { 'driver.id': { $in: driverIds } }] }
         : { vendorId: user._id };
+    const serviceBookingQuery =
+      driverObjectIds.length > 0
+        ? { $or: [{ vendorId: user._id }, { driverId: { $in: driverObjectIds } }] }
+        : { vendorId: user._id };
 
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
-    const [jobsToday, earningsTodayAgg, earningsTotalAgg] = await Promise.all([
+    const [jobsToday, serviceJobsToday, earningsTodayAgg, earningsTotalAgg, serviceTransactions] = await Promise.all([
       BookingModel.countDocuments({ ...bookingQuery, createdAt: { $gte: startOfDay } }),
+      Promise.all([
+        TowingBookingModel.countDocuments({ ...serviceBookingQuery, createdAt: { $gte: startOfDay } }),
+        DriverBookingModel.countDocuments({ ...serviceBookingQuery, createdAt: { $gte: startOfDay } }),
+      ]).then((counts) => counts.reduce((sum, count) => sum + count, 0)),
       TransactionModel.aggregate([
         {
           $match: {
@@ -463,12 +543,178 @@ export class VendorService {
         },
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
+      getServicePaymentTransactions(user._id, driverObjectIds),
     ]);
 
     return {
-      jobsToday,
-      earningsToday: earningsTodayAgg[0]?.total ?? 0,
-      earningsTotal: earningsTotalAgg[0]?.total ?? 0,
+      jobsToday: jobsToday + serviceJobsToday,
+      earningsToday: (earningsTodayAgg[0]?.total ?? 0) + netServicePayments(serviceTransactions, startOfDay),
+      earningsTotal: (earningsTotalAgg[0]?.total ?? 0) + netServicePayments(serviceTransactions),
+    };
+  }
+
+  /**
+   * Save (upsert) the partner's (vendor or independent driver) payout account on the user profile.
+   * Real validation happens in savePayoutAccountSchema; verification is a
+   * separate step — saving alone never marks the channel verified.
+   */
+  async savePayoutAccount(
+    userId: string,
+    dto: SavePayoutAccountDto,
+  ): Promise<PayoutAccountDto> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+
+    const now = new Date();
+    const isDriver = user.role === 'driver';
+    const existing = isDriver ? user.driverProfile?.bankDetails : user.vendorProfile?.bankDetails;
+    const accountNumber =
+      dto.payoutMethod === 'bank'
+        ? dto.bank?.accountNumber ??
+          (existing && (existing.payoutMethod ?? 'bank') === 'bank' ? existing.accountNumber : undefined)
+        : undefined;
+    if (dto.payoutMethod === 'bank' && !accountNumber) {
+      throw new BadRequestError('Bank account number is required for a new payout account');
+    }
+    const isSameAccount =
+      existing &&
+      dto.payoutMethod === (existing.payoutMethod ?? 'bank') &&
+      dto.accountHolderName === existing.accountHolderName &&
+      (dto.payoutMethod === 'upi'
+        ? dto.upi?.upiId === existing.upiId
+        : accountNumber === existing.accountNumber && dto.bank?.ifsc === existing.ifsc);
+    // Re-verification only required when the destination account changes.
+    const keepVerified = Boolean(isSameAccount && existing?.isVerified);
+
+    const bankDetails: VendorBankDetails = {
+      accountHolderName: dto.accountHolderName,
+      payoutMethod: dto.payoutMethod,
+      isVerified: keepVerified,
+      verifiedAt: keepVerified ? existing?.verifiedAt : undefined,
+      source: isDriver ? 'driver_app' : 'vendor_app',
+      updatedAt: now,
+    };
+    if (dto.payoutMethod === 'bank' && dto.bank) {
+      bankDetails.accountNumber = accountNumber;
+      bankDetails.ifsc = dto.bank.ifsc;
+      bankDetails.bankName = dto.bank.bankName;
+    }
+    if (dto.payoutMethod === 'upi' && dto.upi) {
+      bankDetails.upiId = dto.upi.upiId;
+    }
+
+    if (isDriver) {
+      await userRepository.updateById(userId, {
+        driverProfile: { ...user.driverProfile, bankDetails } as NonNullable<typeof user.driverProfile>,
+      });
+    } else {
+      await userRepository.updateById(userId, {
+        vendorProfile: { ...user.vendorProfile, bankDetails } as NonNullable<typeof user.vendorProfile>,
+      });
+    }
+    return this.getPayoutAccount(userId);
+  }
+
+  async getPayoutAccount(userId: string): Promise<PayoutAccountDto> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+    const bank = user.role === 'driver' ? user.driverProfile?.bankDetails : user.vendorProfile?.bankDetails;
+    if (!bank || (!bank.accountNumber && !bank.upiId)) {
+      throw new NotFoundError('No payout account saved yet');
+    }
+    const digits = bank.accountNumber ?? '';
+    return {
+      payoutMethod: bank.payoutMethod ?? 'bank',
+      accountHolderName: bank.accountHolderName ?? user.fullName ?? '',
+      accountNumberMasked: digits ? `${'*'.repeat(Math.max(digits.length - 4, 0))}${digits.slice(-4)}` : undefined,
+      ifsc: bank.ifsc,
+      bankName: bank.bankName,
+      upiId: bank.upiId,
+      isVerified: Boolean(bank.isVerified),
+      verifiedAt: bank.verifiedAt?.toISOString(),
+      updatedAt: bank.updatedAt?.toISOString(),
+    };
+  }
+
+  async getEarningsHistory(userId: string): Promise<VendorEarningsDto> {
+    const user = await userRepository.findById(userId);
+    if (!user) throw new NotFoundError('User not found');
+
+    const driverIds = (
+      await UserModel.find({ role: 'driver', 'driverProfile.vendorUserId': user._id })
+        .select('_id')
+        .lean()
+        .exec()
+    ).map((driver) => driver._id);
+
+    const vendorMatch = driverIds.length > 0
+      ? { $or: [{ vendorId: user._id }, { driverId: { $in: driverIds } }] }
+      : { vendorId: user._id };
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    const sum = async (match: Record<string, unknown>): Promise<number> => {
+      const rows = await TransactionModel.aggregate([
+        { $match: { ...vendorMatch, type: 'PAYMENT', status: 'COMPLETED', ...match } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]);
+      return rows[0]?.total ?? 0;
+    };
+
+    const [today, week, month, allTime, payoutsRows, dailyRows, serviceTransactions] = await Promise.all([
+      sum({ createdAt: { $gte: startOfToday } }),
+      sum({ createdAt: { $gte: weekAgo } }),
+      sum({ createdAt: { $gte: monthAgo } }),
+      sum({}),
+      TransactionModel.find({ ...vendorMatch, type: 'VENDOR_PAYOUT' })
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean()
+        .exec(),
+      TransactionModel.aggregate([
+        { $match: { ...vendorMatch, type: 'PAYMENT', status: 'COMPLETED', createdAt: { $gte: weekAgo } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            amount: { $sum: '$amount' },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+      getServicePaymentTransactions(user._id, driverIds),
+    ]);
+
+    const dailyTotals = new Map<string, number>(
+      dailyRows.map((row) => [row._id, row.amount]),
+    );
+    for (const transaction of serviceTransactions) {
+      if (transaction.updatedAt < weekAgo) continue;
+      const date = transaction.updatedAt.toISOString().slice(0, 10);
+      const amount = transaction.paymentType === 'refund' ? -transaction.amount : transaction.amount;
+      dailyTotals.set(date, (dailyTotals.get(date) ?? 0) + amount);
+    }
+
+    return {
+      currency: 'INR',
+      totals: {
+        today: today + netServicePayments(serviceTransactions, startOfToday),
+        week: week + netServicePayments(serviceTransactions, weekAgo),
+        month: month + netServicePayments(serviceTransactions, monthAgo),
+        allTime: allTime + netServicePayments(serviceTransactions),
+      },
+      payouts: payoutsRows.map((row) => ({
+        id: row._id?.toString() ?? '',
+        amount: row.amount,
+        status: row.status,
+        paidAt: row.createdAt.toISOString(),
+        description: row.description,
+      })),
+      dailyEarnings: [...dailyTotals]
+        .sort(([first], [second]) => first.localeCompare(second))
+        .map(([date, amount]) => ({ date, amount })),
     };
   }
 }

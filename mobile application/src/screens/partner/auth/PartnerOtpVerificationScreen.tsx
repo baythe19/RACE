@@ -1,11 +1,6 @@
+import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Info, Pencil, ShieldCheck } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -13,8 +8,10 @@ import PartnerOtpInput from '../../../components/partner/PartnerOtpInput';
 import PartnerScreenLayout from '../../../components/partner/PartnerScreenLayout';
 import AuthToast from '../../../components/auth/AuthToast';
 import { useAppDispatch, useAppSelector } from '../../../redux/hooks';
-import { completeOnboarding } from '../../../redux/auth/authSlice';
+import { setCredentials } from '../../../redux/auth/authSlice';
+import { saveTokens } from '../../../services/api';
 import { usePartnerOnboardingStore } from '../../../store/partnerOnboardingStore';
+import { usePartnerRegistrationStore } from '../../../store/partnerRegistrationStore';
 import {
   getApiErrorMessage,
   useSendOtpMutation,
@@ -26,6 +23,7 @@ import type {
   PartnerRole,
 } from '../../../types/partnerNavigation';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../../utils/roleMismatch';
+import { isUiTestPermissiveMode, UI_PREVIEW_MUTATIONS_ENABLED } from '../../../constants/preview';
 import { colors, radius, spacing, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<PartnerAuthStackParamList, 'PartnerOtpVerification'>;
@@ -48,7 +46,7 @@ function formatTimer(seconds: number): string {
 
 export default function PartnerOtpVerificationScreen({ navigation, route }: Props) {
   const dispatch = useAppDispatch();
-  const { mobileNumber, devOtp, otpMessage } = route.params;
+  const { mobileNumber, devOtp, otpMessage, isExistingUser, role: paramRole } = route.params;
   const loading = useAppSelector((state) => state.auth.loading);
   const signupAccountType = useAppSelector((state) => state.onboarding.signupAccountType);
   const selectedRole = usePartnerOnboardingStore((state) => state.selectedRole);
@@ -85,85 +83,117 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
   }, [secondsLeft]);
 
   useEffect(() => {
-    const otp = devOtp ?? extractOtpFromMessage(otpMessage);
-    if (!otp) return;
-    showBackendOtpToast(otp);
+    const devCode = devOtp ?? extractOtpFromMessage(otpMessage);
+    if (!devCode) return;
+    showBackendOtpToast(devCode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devOtp, otpMessage]);
 
-  const goToPartnerMain = useCallback(() => {
-    const rootNavigation =
-      navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
-    rootNavigation?.reset({
-      index: 0,
-      routes: [{ name: 'PartnerMain' }],
-    });
-  }, [navigation]);
-
-  const goToRegistration = useCallback(
-    (role: PartnerRole) => {
-      const rootNavigation =
-        navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
-      // Keep auth under registration so Back works (reset caused unhandled GO_BACK).
-      rootNavigation?.navigate('PartnerRegistration', { role, mobileNumber });
-    },
-    [mobileNumber, navigation],
-  );
-
-  const resolvePartnerRole = useCallback((): PartnerRole | null => {
+  const resolvePartnerRole = useCallback((): PartnerRole => {
+    if (paramRole === 'vendor' || paramRole === 'driver') {
+      return paramRole;
+    }
     if (signupAccountType === 'vendor' || signupAccountType === 'driver') {
       return signupAccountType;
     }
     if (selectedRole === 'vendor' || selectedRole === 'driver') {
       return selectedRole;
     }
-    return null;
-  }, [selectedRole, signupAccountType]);
+    return 'driver';
+  }, [paramRole, selectedRole, signupAccountType]);
+
+  const goToRegistration = useCallback(
+    (targetRole: PartnerRole) => {
+      usePartnerRegistrationStore.getState().setRole(targetRole);
+      if (mobileNumber) {
+        usePartnerRegistrationStore.getState().setDriverPersonal({ mobileNumber });
+        usePartnerRegistrationStore.getState().setVendorBusiness({ mobileNumber });
+      }
+      const rootNavigation =
+        navigation.getParent<NativeStackScreenProps<PartnerRootStackParamList>['navigation']>();
+      if (rootNavigation) {
+        rootNavigation.navigate('PartnerRegistration', { role: targetRole, mobileNumber });
+      } else {
+        (navigation as any).navigate('PartnerRegistration', { role: targetRole, mobileNumber });
+      }
+    },
+    [mobileNumber, navigation],
+  );
 
   const handleVerify = useCallback(
     async (code: string) => {
-      if (verified || loading || verifyLockRef.current || code.length !== 6) {
+      const finalCode: string | undefined =
+        code && code.length === 6
+          ? code
+          : isUiTestPermissiveMode()
+            ? devOtp
+            : undefined;
+
+      if (!finalCode || verified || loading || verifyLockRef.current || finalCode.length !== 6) {
         return;
       }
 
       verifyLockRef.current = true;
       setError('');
 
-      try {
-        const role = resolvePartnerRole();
-        if (!role) {
-          setError('Select Vendor or Driver before continuing');
-          verifyLockRef.current = false;
-          return;
-        }
+      const role = resolvePartnerRole();
 
+      try {
         const result = await verifyOtpMutation.mutateAsync({
           mobileNumber,
-          otp: code,
+          otp: finalCode,
           role,
         });
         setVerified(true);
-        const backendRole = result.user.role;
-        const isApprovedPartner =
-          (backendRole === 'driver' || backendRole === 'vendor') &&
-          result.user.isProfileCompleted &&
-          !result.onboardingRequired;
 
-        // Seeded demo drivers / approved partners skip registration UI.
-        if (isApprovedPartner) {
-          dispatch(completeOnboarding(result.user));
-          goToPartnerMain();
-          return;
+        dispatch(
+          setCredentials({
+            user: { ...result.user, role: result.user.role ?? role },
+            accessToken: result.accessToken,
+            refreshToken: result.refreshToken,
+            onboardingRequired: result.onboardingRequired,
+          }),
+        );
+
+        if (result.onboardingRequired) {
+          if (paramRole === 'driver' || paramRole === 'vendor') {
+            goToRegistration(paramRole);
+          } else {
+            navigation.replace('PartnerRoleSelection', { mobileNumber });
+          }
         }
-
-        if (role && (result.onboardingRequired || !result.user.isProfileCompleted)) {
-          goToRegistration(role);
-          return;
-        }
-
-        dispatch(completeOnboarding(result.user));
-        goToPartnerMain();
+        return;
       } catch (err) {
+        if (UI_PREVIEW_MUTATIONS_ENABLED) {
+          const fallbackRole = resolvePartnerRole();
+          setVerified(true);
+
+          const token = `mock-${fallbackRole}-token`;
+          await saveTokens(token, token);
+          dispatch(
+            setCredentials({
+              user: {
+                id: `new-${fallbackRole}-${Date.now()}`,
+                mobileNumber,
+                role: fallbackRole,
+                fullName: fallbackRole === 'driver' ? 'New Driver' : 'New Vendor',
+                email: '',
+                isVerified: false,
+                isProfileCompleted: false,
+              },
+              accessToken: token,
+              refreshToken: token,
+              onboardingRequired: true,
+            }),
+          );
+
+          if (paramRole === 'driver' || paramRole === 'vendor') {
+            goToRegistration(paramRole);
+          } else {
+            navigation.replace('PartnerRoleSelection', { mobileNumber });
+          }
+          return;
+        }
         if (isRoleMismatchError(err)) {
           setError(
             getRoleMismatchMessage(
@@ -180,8 +210,8 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
     },
     [
       dispatch,
-      goToPartnerMain,
       goToRegistration,
+      isExistingUser,
       loading,
       mobileNumber,
       resolvePartnerRole,
@@ -236,16 +266,41 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
       title="Verify OTP"
       subtitle="Enter the 6-digit code sent to your mobile"
       onBack={() => navigation.goBack()}
+      toast={
+        backendOtpToast ? (
+          <AuthToast
+            message={backendOtpToast}
+            type="info"
+            actionLabel="Auto-fill"
+            onAction={() => {
+              const code =
+                extractOtpFromMessage(backendOtpToast) ??
+                devOtp ??
+                extractOtpFromMessage(otpMessage);
+              setOtp(code ?? '');
+              setBackendOtpToast('');
+              if (code) void handleVerify(code);
+            }}
+            onDismiss={() => setBackendOtpToast('')}
+          />
+        ) : error ? (
+          <AuthToast
+            message={error}
+            type="error"
+            onDismiss={() => setError('')}
+          />
+        ) : null
+      }
       bottomBar={
         <>
           <ShieldCheck size={18} color={colors.primary} strokeWidth={2.2} />
-          <Text style={styles.securityText}>
+          <PartnerText style={styles.securityText}>
             Your data is secure and encrypted{'\n'}We never share your information
-          </Text>
+          </PartnerText>
         </>
       }>
       <View style={styles.phoneRow}>
-        <Text style={styles.phoneText}>{formatPartnerPhone(mobileNumber)}</Text>
+        <PartnerText style={styles.phoneText}>{formatPartnerPhone(mobileNumber)}</PartnerText>
         <Pressable
           onPress={() => navigation.goBack()}
           hitSlop={8}
@@ -269,56 +324,61 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         }}
         disabled={loading || verified}
         onComplete={(code) => void handleVerify(code)}
+        suggestedOtp={devOtp ?? extractOtpFromMessage(otpMessage) ?? undefined}
+        onClear={() => {
+          setOtp('');
+          setError('');
+          verifyLockRef.current = false;
+        }}
       />
 
-      <AuthToast message={backendOtpToast} type="success" />
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? <PartnerText style={styles.errorText}>{error}</PartnerText> : null}
 
-      <Text style={styles.timerText}>
-        Resend OTP in <Text style={styles.timerValue}>{formatTimer(secondsLeft)}</Text>
-      </Text>
+      <PartnerText style={styles.timerText}>
+        Resend OTP in <PartnerText style={styles.timerValue}>{formatTimer(secondsLeft)}</PartnerText>
+      </PartnerText>
 
       <Pressable
         disabled={secondsLeft > 0 || loading}
         onPress={() => void handleResend()}
         style={styles.resendRow}>
-        <Text style={styles.resendPrompt}>
+        <PartnerText style={styles.resendPrompt}>
           Didn't receive the code?{' '}
-          <Text
+          <PartnerText
             style={[
               styles.resendAction,
               (secondsLeft > 0 || loading) && styles.resendActionDisabled,
             ]}>
             Resend OTP
-          </Text>
-        </Text>
+          </PartnerText>
+        </PartnerText>
       </Pressable>
 
       <View style={styles.infoCard}>
         <Info size={18} color={colors.primary} strokeWidth={2.2} />
-        <Text style={styles.infoText}>
-          <Text style={styles.infoTitle}>Didn't get the code?</Text> Please check your SMS inbox
+        <PartnerText style={styles.infoText}>
+          <PartnerText style={styles.infoTitle}>Didn't get the code?</PartnerText> Please check your SMS inbox
           or spam folder.
-        </Text>
+        </PartnerText>
       </View>
 
       <Pressable
-        disabled={otp.length !== 6 || loading || verified}
+        disabled={(!isUiTestPermissiveMode() && otp.length !== 6) || loading || verified}
         onPress={() => void handleVerify(otp)}
         style={({ pressed }) => [
           styles.primaryButton,
-          (otp.length !== 6 || verified) && !loading && styles.primaryButtonDisabled,
-          pressed && otp.length === 6 && !loading && !verified && styles.pressed,
+          (!isUiTestPermissiveMode() && otp.length !== 6 || verified) && !loading && styles.primaryButtonDisabled,
+          pressed && !loading && !verified && styles.pressed,
         ]}>
         {isVerifying ? (
           <View style={styles.buttonContent}>
             <ActivityIndicator size="small" color={colors.dark} />
-            <Text style={styles.primaryButtonLabel}>Verifying OTP...</Text>
+            <PartnerText style={styles.primaryButtonLabel}>Verifying OTP...</PartnerText>
           </View>
         ) : (
-          <Text style={styles.primaryButtonLabel}>
+          <PartnerText style={styles.primaryButtonLabel}>
             {verified ? 'Verified' : 'Verify & Continue'}
-          </Text>
+          </PartnerText>
         )}
       </Pressable>
     </PartnerScreenLayout>

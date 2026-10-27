@@ -161,11 +161,19 @@ export function BookingList() {
                 `/bookings/${row.original.id}${row.original.bookingType ? `?type=${row.original.bookingType}` : ''}`,
               )
             }
-            onEdit={() => {
-              setEditing(row.original);
-              setFormOpen(true);
-            }}
-            onDelete={() => setDeleteTarget(row.original)}
+            onEdit={
+              row.original.bookingType === 'legacy'
+                ? () => {
+                    setEditing(row.original);
+                    setFormOpen(true);
+                  }
+                : undefined
+            }
+            onDelete={
+              row.original.bookingType === 'legacy'
+                ? () => setDeleteTarget(row.original)
+                : undefined
+            }
           />
         ),
       },
@@ -179,7 +187,7 @@ export function BookingList() {
   const tabCounts: Record<string, number> = {
     ALL: counts?.all ?? 0,
     PENDING: counts?.pending ?? 0,
-    ACTIVE: counts?.enRoute ?? 0,
+    ACTIVE: counts?.active ?? counts?.enRoute ?? 0,
     COMPLETED: counts?.completed ?? 0,
     CANCELLED: counts?.cancelled ?? 0,
   };

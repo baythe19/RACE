@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { colors, spacing, typography } from '../../theme';
 
@@ -11,7 +12,7 @@ export default function LoadingState({ message = 'Loading...' }: LoadingStatePro
   return (
     <View style={styles.wrap}>
       <ActivityIndicator size="large" color={colors.primary} />
-      <Text style={styles.message}>{message}</Text>
+      <PartnerText style={styles.message}>{message}</PartnerText>
     </View>
   );
 }

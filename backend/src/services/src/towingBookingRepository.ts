@@ -1,7 +1,6 @@
 import {
   TowingBookingModel,
   type ITowingBooking,
-  type ITowingStatusHistoryEntry,
 } from '../../models/src/towingBooking';
 import type { UnifiedBookingStatus } from './bookingStatusConstants';
 
@@ -49,14 +48,18 @@ export class TowingBookingRepository {
 
   async updateStatus(
     id: string,
+    expectedStatus: UnifiedBookingStatus,
     status: UnifiedBookingStatus,
-    statusHistory: ITowingStatusHistoryEntry[],
     extra?: Partial<ITowingBooking>,
+    expectedFields: Record<string, unknown> = {},
   ): Promise<ITowingBooking | null> {
-    return TowingBookingModel.findByIdAndUpdate(
-      id,
-      { status, statusHistory, ...extra },
-      { new: true },
+    return TowingBookingModel.findOneAndUpdate(
+      { _id: id, status: expectedStatus, ...expectedFields },
+      {
+        $set: { status, ...(extra ?? {}) },
+        $push: { statusHistory: { status, timestamp: new Date() } },
+      },
+      { new: true, runValidators: true },
     );
   }
 

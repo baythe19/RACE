@@ -15,6 +15,8 @@ export interface ServiceBooking {
   vehicleId: string;
   pickup: BookingLocation;
   dropoff?: BookingLocation;
+  towingMode?: 'instant' | 'scheduled' | 'emergency';
+  driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   distanceKm?: number;
   estimatedDurationHours?: number;
   packageHours?: number;
@@ -50,12 +52,18 @@ export interface ServiceBooking {
     rating: number;
     experience?: string;
   };
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }
 
 export interface CreateTowingBookingRequest {
   vehicleId: string;
   pickup: BookingLocation;
   dropoff: BookingLocation;
+  towingMode?: 'instant' | 'scheduled' | 'emergency';
   scheduledAt?: string;
 }
 
@@ -65,6 +73,7 @@ export interface CreateDriverBookingRequest {
   dropoff?: BookingLocation;
   packageHours?: 2 | 4 | 8 | 12 | 24;
   estimatedDurationHours?: number;
+  driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   scheduledAt?: string;
 }
 
@@ -137,6 +146,11 @@ export interface ServiceBookingTracking {
   dropoff?: BookingLocation;
   assignedFleetVehicleLabel?: string;
   tripStartOtp?: string;
+  arrivedAtDropoffAt?: string;
+  completionOtp?: string;
+  paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
+  paymentConfirmedByCustomer?: boolean;
+  fare?: number;
 }
 
 export interface CancellationPolicy {

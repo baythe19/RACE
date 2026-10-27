@@ -11,13 +11,22 @@ import type {
 } from '../../types/auth';
 import type { Profile } from '../../types/models';
 
-function toAuthUser(profile: Profile): AuthUser {
+function toAuthUser(profile: Profile | null | undefined): AuthUser {
+  if (!profile) {
+    return {
+      id: '',
+      mobileNumber: '',
+      role: 'customer',
+      isVerified: false,
+      isProfileCompleted: false,
+    };
+  }
   return {
-    id: profile.id,
-    mobileNumber: profile.mobileNumber,
-    role: profile.role,
-    isVerified: profile.isVerified,
-    isProfileCompleted: profile.isProfileCompleted,
+    id: profile.id ?? '',
+    mobileNumber: profile.mobileNumber ?? '',
+    role: profile.role ?? 'customer',
+    isVerified: Boolean(profile.isVerified),
+    isProfileCompleted: Boolean(profile.isProfileCompleted),
     fullName: profile.fullName,
     email: profile.email,
     gender: profile.gender,

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
 import { TOKEN_KEYS } from '../config/env';
+import { UI_PREVIEW_AUTH_FLOW } from '../config/uiPreviewMode';
 import { hydrateAuthStore } from '../redux/store';
 import { setUnauthorizedHandler } from '../services/authSession';
 import { getCustomerOnboardingStep } from '../store/customerOnboarding';
@@ -47,14 +48,21 @@ export function useAuth() {
         }
 
         try {
-          await useProfileStore.getState().fetchProfile();
-          await useVehicleStore.getState().fetchVehicles();
+          if (!UI_PREVIEW_AUTH_FLOW) {
+            await useProfileStore.getState().fetchProfile();
+            await useVehicleStore.getState().fetchVehicles();
+          }
           const step = await getCustomerOnboardingStep();
+          const current = useAuthStore.getState().customerOnboardingStep;
+          const next = current === 'done' || step === 'done' ? 'done' : step;
           if (mounted) {
-            useAuthStore.getState().setCustomerOnboardingStep(step);
+            useAuthStore.getState().setCustomerOnboardingStep(next);
           }
         } catch {
-          // Keep session on transient network errors; 401 handler will clear auth.
+          // Keep a finished session on transient network errors.
+          if (mounted && useAuthStore.getState().customerOnboardingStep === 'done') {
+            useAuthStore.getState().setCustomerOnboardingStep('done');
+          }
         }
       } finally {
         if (mounted) {

@@ -8,7 +8,7 @@ This catalogue is the **client-facing source of truth** for what's been built in
 
 ## 1. Customer Mobile App — `customer application/`
 
-**Stack:** Expo React Native, Redux Toolkit, React Query, React Navigation 7, Expo Router file-based routing. Targets iOS, Android, and Web.
+**Stack:** Expo React Native, Redux Toolkit, React Query, React Navigation 7. Targets iOS and Android.
 
 ### 1.1 Onboarding & Authentication
 - **Phone OTP login** — unified `send-otp` / `verify-otp` (no separate flows for new vs returning users; backend auto-detects)
@@ -66,24 +66,7 @@ This catalogue is the **client-facing source of truth** for what's been built in
 
 ---
 
-## 2. Customer Web — `customerweb/`
-
-**Stack:** React 19, Vite, Redux Toolkit, TanStack Query, React Router 7, Tailwind-style utility CSS. SPA.
-
-Same feature surface as the customer mobile app, presented for desktop users:
-
-- **Auth pages** — Splash, Login, OTP, Create Account, QR Code, Profile Setup, Vehicle Registration
-- **Home + Select Location** — desktop-friendly location picker with map embed
-- **Services** — Services index, Category detail, Service detail, Coming Soon
-- **Bookings** — List, Create, Detail
-- **SOS** — QR scan, Call screen (web-rtc or click-to-call fallback)
-- **Profile** — Personal info, My Vehicles, Vehicle detail, Add Vehicle, Subscriptions, plus misc profile utility pages
-
-> All customer-web pages hit the same backend as the mobile app. No code duplication between mobile & web — they share the backend, not the UI.
-
----
-
-## 3. Partner Mobile App — `mobile application/`
+## 2. Partner Mobile App — `mobile application/`
 
 **Stack:** Expo React Native, Redux Toolkit, React Query, React Navigation 7.
 
@@ -119,80 +102,67 @@ This is what **towing vendors & on-road drivers** use to register, get jobs, and
 
 ---
 
-## 4. Partner Web — `partnerweb/`
+## 3. Admin Web — `race-admin/`
 
-**Stack:** React 19, Vite, Redux Toolkit, TanStack Query, React Router 7.
+**Stack:** Turborepo monorepo (apps + packages). React 19, Vite, Zustand, TanStack Query. Roles: super-admin, ops, finance, support, etc.
 
-- **Auth** — Splash, Welcome, Role Selection, Login, OTP
-- **Dashboard** — KPI tiles, recent jobs
-- **Jobs** — Jobs list, Active Job detail (mirror of partner mobile)
-- **Account** — Profile, Verification, Subscriptions, Vendor Vehicles, Vendor Drivers
-- **Registration (multi-step)** — Driver: Personal, Vehicle, Documents, Review; Vendor: Business, Address, Documents, Review
-
----
-
-## 5. Admin Web — `race-admin/`
-
-**Stack:** Turborepo monorepo (apps + packages). React 19, Vite, Redux Toolkit, TanStack Query. Roles: super-admin, ops, finance, support, etc.
-
-### 5.1 Dashboard
+### 3.1 Dashboard
 - KPIs (bookings, GMV, active partners, customer growth)
 - Live booking feed
 - Operational alerts
 
-### 5.2 Customers
+### 3.2 Customers
 - Customers list (search, filter, paginate)
 - Customer detail (profile, vehicles, bookings, payment history, ratings)
 - Customer-side actions (force logout, KYC verify, suspend)
 
-### 5.3 Vendors
+### 3.3 Vendors
 - Vendor list (verification status filter)
 - Vendor detail (business info, documents, fleet, drivers, ratings, earnings)
 
-### 5.4 Drivers
+### 3.4 Drivers
 - Drivers list (availability filter)
 - Driver detail (documents, ratings, history)
 - **Available drivers** (real-time) — list of drivers currently online
 
-### 5.5 Bookings
+### 3.5 Bookings
 - Bookings list (status/type/date filters)
 - Booking detail (timeline, payments, assigned driver/vendor)
 - **Admin actions**: assign driver, cancel booking, force-refund
 
-### 5.6 Documents
+### 3.6 Documents
 - Browse uploaded vendor/driver documents
 - **PDF download / inline view** for any document (GST, PAN, Aadhaar, etc.)
 
-### 5.7 Finance
+### 3.7 Finance
 - Earnings dashboard, pending payouts, completed payouts
 - Refund management
 - GST/TDS reports
 
-### 5.8 Reports
+### 3.8 Reports
 - Exportable CSV / Excel for finance & ops
 
-### 5.9 Notifications
+### 3.9 Notifications
 - Send platform-wide or targeted notifications (push + SMS + email)
 
-### 5.10 Subscriptions
+### 3.10 Subscriptions
 - Plan management (create, edit, retire plans)
 - Subscriber list (active / churned)
-- Promo codes (if
 
-### 5.11 Settings
-- Platform-wide config (branding, support numbers, region-specific fees, feature feature categories)
+### 3.11 Settings
+- Platform-wide config (branding, support numbers, region-specific fees, service categories)
 
-### 5.12 Admin Users & Activity
-- Admin user list, role assignment
+### 3.12 Admin Users & Activity
+- Admin user list, role assignment (note: live login uses a hardcoded env super-admin; the Admin Mongo model is unused)
 - Activity audit log
 
 ---
 
-## 6. Backend — `backend/`
+## 4. Backend — `backend/`
 
 **Stack:** Node 22, Express 5, Mongoose 8 (MongoDB), Socket.IO 4, ioredis, Twilio (OTP), Google Cloud Storage (uploads), Helmet, express-rate-limit, Zod validation, JWT (access 15m + refresh), Pino structured logging.
 
-### 6.1 Public APIs (no auth)
+### 4.1 Public APIs (no auth)
 - `/health`
 - `/api/v1/services` + `/api/v1/services/upcoming`
 - `/api/v1/brand`
@@ -202,7 +172,7 @@ This is what **towing vendors & on-road drivers** use to register, get jobs, and
 - `/api/v1/subscriptions/plans`
 - `/api/v1/sos/config`
 
-### 6.2 Customer-Authenticated APIs
+### 4.2 Customer-Authenticated APIs
 - `/api/v1/auth/*` — send-otp, verify-otp, refresh-token
 - `/api/v1/profile` + `/api/v1/profile/complete`
 - `/api/v1/profile/locations` (CRUD)
@@ -216,28 +186,28 @@ This is what **towing vendors & on-road drivers** use to register, get jobs, and
 - `/api/v1/subscriptions` (GET/POST + cancel)
 - `/api/v1/sos/context` + `/api/v1/sos/alert`
 
-### 6.3 Driver APIs (driver role)
+### 4.3 Driver APIs (driver role)
 - `/api/v1/driver/availability` (PATCH)
 - `/api/v1/driver/location` (PATCH — drives Socket.IO tracking)
 - `/api/v1/driver/bookings` (list)
 - `/api/v1/driver/bookings/active`
 - `/api/v1/driver/bookings/:id/status`
 
-### 6.4 Admin APIs (admin role)
+### 4.4 Admin APIs (admin role)
 - `/api/v1/admin/bookings/:id/assign-driver`
 - `/api/v1/admin/bookings/:id/cancel`
 - `/api/v1/admin/drivers/available`
 
-### 6.5 Payment Stubs
+### 4.5 Payment Stubs
 - `/api/v1/payments/advance` + `/verify`
 - `/api/v1/payments/final` + `/verify`
 - Real gateway wiring is **not** present — needs Razorpay / Stripe integration
 
-### 6.6 Realtime
+### 4.6 Realtime
 - **Socket.IO** for live driver location, booking status updates, admin live feed
 - Connected after JWT auth (token handshake)
 
-### 6.7 Operational Tooling
+### 4.7 Operational Tooling
 - `npm run seed` — populates demo customers, drivers, vendors, bookings, plans
 - `npm run seed:demo-drivers` — more demo drivers
 - `npm run seed:reset` — wipe and reseed
@@ -247,10 +217,10 @@ This is what **towing vendors & on-road drivers** use to register, get jobs, and
 - `npm run reset-test-data`
 - `npm run lint`
 
-### 6.8 Data Models (MongoDB collections)
+### 4.8 Data Models (MongoDB collections)
 `user`, `userProfileSchema`, `vehicle`, `vehicleQr`, `booking`, `bookingRatingSchema`, `towingBooking`, `driverBooking`, `driver`, `vendor`, `vendorVehicle`, `vendorDocument`, `subscription`, `payment`, `paymentTransaction`, `transaction`, `wallet`, `notification`, `notificationPrefs`, `adminNotification`, `admin`, `otpLog`, `activityLog`, `location`, `service`, `brand`, `platformSettings`.
 
-### 6.9 RBAC (Roles)
+### 4.9 RBAC (Roles)
 - `customer` — default for new phone-OTP users
 - `driver` — for individual on-road drivers
 - `vendor` — for fleet owners / towing companies

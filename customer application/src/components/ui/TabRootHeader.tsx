@@ -49,7 +49,7 @@ export default function TabRootHeader({
     // Prefer Profile stack notifications when available
     const parent = navigation.getParent();
     if (parent) {
-      parent.navigate('Profile' as never, { screen: 'Notifications' } as never);
+      (parent as any).navigate('Profile', { screen: 'Notifications' });
       return;
     }
     navigation.navigate('Notifications' as never);

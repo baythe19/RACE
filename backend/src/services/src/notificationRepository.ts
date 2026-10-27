@@ -52,6 +52,11 @@ export class NotificationRepository {
   async countUnread(userId: string) {
     return NotificationModel.countDocuments({ 'recipient.userId': userId, isRead: false });
   }
+
+  async deleteAllForUser(userId: string) {
+    const result = await NotificationModel.deleteMany({ 'recipient.userId': userId });
+    return result.deletedCount;
+  }
 }
 
 export const notificationRepository = new NotificationRepository();

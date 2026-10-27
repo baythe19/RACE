@@ -72,7 +72,27 @@ export class VehicleController {
         );
     }
 
-    return sendSuccess(res, result);
+    const hasAuth = Boolean(req.headers.authorization && req.headers.authorization.startsWith('Bearer '));
+    const maskPhone = (phone?: string) => {
+      if (!phone) return undefined;
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length < 8) return phone;
+      const prefix = phone.slice(0, Math.min(phone.length - 4, 6));
+      const suffix = phone.slice(-2);
+      return `${prefix}•••••${suffix}`;
+    };
+
+    const responsePayload = result.valid
+      ? {
+          ...result,
+          ownerMobile: hasAuth ? result.ownerMobile : maskPhone(result.ownerMobile),
+          emergencyMobile: hasAuth ? result.emergencyMobile : maskPhone(result.emergencyMobile),
+          ownerMobileMasked: maskPhone(result.ownerMobile),
+          emergencyMobileMasked: maskPhone(result.emergencyMobile),
+        }
+      : result;
+
+    return sendSuccess(res, responsePayload);
   });
 
   getQrMetadata = asyncHandler(async (req: Request, res: Response) => {

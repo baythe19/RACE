@@ -34,6 +34,21 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().default('admin@raceservice.com'),
   ADMIN_PASSWORD: z.string().min(8).default('Admin@123'),
   ADMIN_NAME: z.string().default('Admin User'),
+  // BUG-13 fix: z.coerce.boolean() treats the STRING "false" as true.
+  // Parse real booleans so MOCK_DATA_MODE=false in env actually disables it.
+  MOCK_DATA_MODE: z
+    .string()
+    .default('false')
+    .transform((v) => v.trim().toLowerCase() === 'true'),
+  MOCK_UNIVERSAL_OTP: z.string().default('123456'),
+  // HanuSMS OTP service (Exclusive production SMS route: api.hanuotp.in)
+  HANU_API_KEY: z.string().optional(),
+  HANU_BASE_URL: z.string().default('https://api.hanuotp.in'),
+  HANU_TEMPLATE_ID: z.string().default('default'),
+  /** Roles that route OTPs through HanuSMS */
+  HANU_OTP_ROLES: z.string().default('customer,vendor,driver,admin'),
+  /** Pepper mixed into the OTP hash stored in the DB (falls back to a project constant). */
+  OTP_PEPPER: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

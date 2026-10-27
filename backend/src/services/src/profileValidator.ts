@@ -42,6 +42,35 @@ export const updateProfileSchema = completeProfileSchema
 
 export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
 
+export type DriverVerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
+export type DriverDocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
+
+/**
+ * Driver-only verification summary. Exposed so the Partner app can show the real
+ * review state (screens: "Your account is under verification", driver dashboard
+ * verification card) instead of inferring it from `isVerified`.
+ * Never includes credential fields (loginId / passwordHash).
+ */
+export interface ProfileDriverSummaryDto {
+  status: DriverVerificationStatus;
+  driverCode?: string;
+  driverType?: string;
+  licenseNo?: string;
+  city?: string;
+  state?: string;
+  vehicleRegistration?: string;
+  fleetSource?: 'vendor' | 'admin';
+  vendorUserId?: string;
+  policeVerificationStatus?: DriverDocumentStatus;
+  documents: Array<{
+    type: string;
+    status: DriverDocumentStatus;
+    uploadedAt?: string;
+  }>;
+  statusHistory: Array<{ status: string; note?: string; changedAt: string }>;
+  submittedAt?: string;
+}
+
 export interface ProfileResponseDto {
   id: string;
   mobileNumber: string;
@@ -67,4 +96,7 @@ export interface ProfileResponseDto {
   isProfileCompleted: boolean;
   role: string;
   isAvailable?: boolean;
+  driverContext?: 'VENDOR_MANAGED' | 'INDEPENDENT';
+  vendorUserId?: string;
+  driverProfile?: ProfileDriverSummaryDto;
 }

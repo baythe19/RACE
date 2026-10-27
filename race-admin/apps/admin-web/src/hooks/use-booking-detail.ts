@@ -7,5 +7,7 @@ export function useBookingDetail(id: string, type?: 'towing' | 'driver' | 'legac
     queryKey: ['booking', id, type],
     queryFn: () => getBookingByIdWithType(id, type),
     enabled: Boolean(id),
+    refetchInterval: 10_000,
+    refetchIntervalInBackground: false,
   });
 }

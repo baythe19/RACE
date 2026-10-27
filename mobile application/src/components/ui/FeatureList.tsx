@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -13,7 +14,7 @@ export default function FeatureList({ features }: FeatureListProps) {
       {features.map(feature => (
         <View key={feature} style={styles.item}>
           <View style={styles.dot} />
-          <Text style={styles.text}>{feature}</Text>
+          <PartnerText style={styles.text}>{feature}</PartnerText>
         </View>
       ))}
     </View>

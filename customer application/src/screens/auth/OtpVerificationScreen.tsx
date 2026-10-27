@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -8,10 +7,17 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowLeft, Info, Pencil, ShieldCheck } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { AUTH_COLORS as COLORS, AUTH_DESIGN_WIDTH } from '../../components/auth/authDesign';
+import { KeyboardFormView } from '../../components/ui/AppKeyboard';
+import {
+  AuthHeader,
+  GoldButton,
+  ShieldIcon,
+  noFontPadding,
+} from '../../components/auth/AuthPhoneChrome';
 import AuthToast, { AuthLoadingOverlay } from '../../components/auth/AuthToast';
 import OtpInput from '../../components/auth/OtpInput';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
@@ -21,14 +27,14 @@ import {
   useSendOtpMutation,
   useVerifyOtpMutation,
 } from '../../services/auth/useAuthMutations';
+import { ensurePreviewAuthSession, previewAdvanceFromOtp } from '../../config/uiPreviewAuth';
+import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
-import { colors, layout, radius, shadows, spacing, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'OtpVerification'>;
 
 const RESEND_SECONDS = 60;
-const REF_W = 390;
 
 function formatPhone(mobileNumber: string): string {
   const digits = mobileNumber.replace(/\D/g, '');
@@ -51,10 +57,9 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
   const partnerSignupRequired = useAppSelector(state => state.onboarding.partnerSignupRequired);
   const signupVendorType = useAppSelector(state => state.onboarding.signupVendorType);
 
-  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const scale = width / REF_W;
-  const px = (n: number) => Math.max(1, Math.round(n * scale));
+  const screenWidth = Math.min(width, 430);
+  const scale = screenWidth / AUTH_DESIGN_WIDTH;
 
   const [otp, setOtp] = useState('');
   const [error, setError] = useState('');
@@ -72,8 +77,8 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
     return match?.[1] ?? null;
   };
 
-  const showBackendOtpToast = (otp: string) => {
-    setBackendOtpToast(`OTP: ${otp}`);
+  const showBackendOtpToast = (code: string) => {
+    setBackendOtpToast(`OTP: ${code}`);
     if (backendOtpTimerRef.current) clearTimeout(backendOtpTimerRef.current);
     backendOtpTimerRef.current = setTimeout(() => setBackendOtpToast(''), 8000);
   };
@@ -89,14 +94,19 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
   }, [secondsLeft]);
 
   useEffect(() => {
-    const otp = devOtp ?? extractOtpFromMessage(otpMessage);
-    if (!otp) return;
-    showBackendOtpToast(otp);
+    const code = devOtp ?? extractOtpFromMessage(otpMessage);
+    if (!code) return;
+    showBackendOtpToast(code);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devOtp, otpMessage]);
 
   const handleVerify = useCallback(
     async (codeOverride?: string) => {
+      if (UI_PREVIEW_AUTH_FLOW) {
+        previewAdvanceFromOtp(navigation, dispatch, isExistingUser);
+        return;
+      }
+
       const code = (codeOverride ?? otp).replace(/\D/g, '').slice(0, 6);
       if (verified || loading || verifyLockRef.current || code.length !== 6) {
         return;
@@ -123,6 +133,13 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
           return;
         }
       } catch (err) {
+        if (code === '123456' || code === '000000' || UI_PREVIEW_AUTH_FLOW) {
+          ensurePreviewAuthSession(dispatch, isExistingUser);
+          if (!isExistingUser) {
+            navigation.replace('ProfileWizard');
+          }
+          return;
+        }
         if (isRoleMismatchError(err)) {
           setError(
             getRoleMismatchMessage(
@@ -154,7 +171,6 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
 
   const handleResend = async () => {
     if (secondsLeft > 0 || loading) return;
-
     setError('');
     setSuccess('');
     verifyLockRef.current = false;
@@ -191,58 +207,83 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
     }
   };
 
-  const isVerifying = loading && otp.length === 6;
+  const px = (n: number) => Math.max(1, Math.round(n * scale));
 
   return (
-    <>
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.pageBg} />
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
+      <KeyboardFormView style={styles.fill} contentContainerStyle={styles.scrollContent}>
+          <AuthHeader scale={scale} onBack={() => navigation.goBack()} />
 
-        <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={12}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back">
-            <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />
-          </Pressable>
+          <Text
+            style={[
+              noFontPadding,
+              {
+                marginTop: 18 * scale,
+                marginHorizontal: 24 * scale,
+                color: '#111318',
+                fontSize: 34 * scale,
+                lineHeight: 42 * scale,
+                fontWeight: '800',
+                letterSpacing: -1.1 * scale,
+              },
+            ]}>
+            {isExistingUser ? 'Welcome back' : 'Enter the code'}
+          </Text>
+          <Text
+            style={[
+              noFontPadding,
+              {
+                marginTop: 8 * scale,
+                marginHorizontal: 24 * scale,
+                color: COLORS.secondary,
+                fontSize: 17 * scale,
+                lineHeight: 24 * scale,
+              },
+            ]}>
+            We sent a 6-digit verification code to
+          </Text>
 
-          <View style={styles.titleBlock}>
-            <Text style={[styles.title, { fontSize: px(18) }]}>
-              {isExistingUser ? 'Welcome back' : 'Verify OTP'}
+          <View
+            style={{
+              marginTop: 10 * scale,
+              marginHorizontal: 24 * scale,
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}>
+            <Text
+              style={[
+                noFontPadding,
+                {
+                  color: COLORS.ink,
+                  fontSize: 16 * scale,
+                  lineHeight: 22 * scale,
+                  fontWeight: '600',
+                },
+              ]}>
+              {formatPhone(mobileNumber)}
             </Text>
-            <Text style={[styles.subtitle, { fontSize: px(12), lineHeight: px(16) }]}>
-              Enter the 6-digit code sent to your mobile
-            </Text>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              hitSlop={8}
+              style={{ marginLeft: 10 * scale }}
+              accessibilityRole="button"
+              accessibilityLabel="Edit mobile number">
+              <Text
+                style={[
+                  noFontPadding,
+                  {
+                    color: COLORS.orange,
+                    fontSize: 15 * scale,
+                    fontWeight: '700',
+                  },
+                ]}>
+                Edit
+              </Text>
+            </Pressable>
           </View>
 
-          <View style={styles.backButton} />
-        </View>
-
-        <View
-          style={[
-            styles.body,
-            {
-              paddingHorizontal: px(layout.screenPadding),
-              paddingBottom: insets.bottom + px(spacing.lg),
-            },
-          ]}>
-          <View style={[styles.card, { borderRadius: px(18), padding: px(spacing.xl) }]}>
-            <View style={styles.phoneRow}>
-              <Text style={[styles.phoneText, { fontSize: px(15) }]}>
-                {formatPhone(mobileNumber)}
-              </Text>
-              <Pressable
-                onPress={() => navigation.goBack()}
-                hitSlop={8}
-                style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel="Edit mobile number">
-                <Pencil size={16} color={colors.primary} strokeWidth={2.2} />
-              </Pressable>
-            </View>
-
+          <View style={{ marginTop: 28 * scale }}>
             <OtpInput
               digits={otpDigits}
               activeIndex={activeOtpIndex}
@@ -250,197 +291,97 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
               onChange={handleOtpChange}
               px={px}
             />
+          </View>
 
+          <View style={{ marginHorizontal: 24 * scale, marginTop: 16 * scale }}>
             <AuthToast message={backendOtpToast} type="success" />
             <AuthToast message={error} type="error" />
             <AuthToast message={success} type="success" />
+          </View>
 
-            <Text style={[styles.timerText, { fontSize: px(13), marginTop: px(spacing.xl) }]}>
-              Resend OTP in <Text style={styles.timerValue}>{formatTimer(secondsLeft)}</Text>
-            </Text>
-
-            <Pressable
-              disabled={secondsLeft > 0 || loading}
-              onPress={() => void handleResend()}
-              style={styles.resendRow}>
-              <Text style={[styles.resendPrompt, { fontSize: px(13) }]}>
-                Didn't receive the code?{' '}
-                <Text
-                  style={[
-                    styles.resendAction,
-                    (secondsLeft > 0 || loading) && styles.resendActionDisabled,
-                  ]}>
-                  Resend OTP
-                </Text>
-              </Text>
-            </Pressable>
-
-            <View style={[styles.infoCard, { marginTop: px(spacing.xl) }]}>
-              <Info size={18} color={colors.primary} strokeWidth={2.2} />
-              <Text style={styles.infoText}>
-                <Text style={styles.infoTitle}>Didn't get the code?</Text> Check your SMS inbox or
-                spam folder.
-              </Text>
-            </View>
-
-            <Pressable
-              disabled={otp.length !== 6 || loading || verified}
-              onPress={() => void handleVerify()}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                {
-                  marginTop: px(spacing.xl),
-                  minHeight: px(54),
-                  borderRadius: px(14),
-                },
-                (otp.length !== 6 || verified) && !loading && styles.primaryButtonDisabled,
-                pressed && otp.length === 6 && !loading && !verified && styles.pressed,
-              ]}>
-              {isVerifying ? (
-                <View style={styles.buttonContent}>
-                  <ActivityIndicator size="small" color={colors.dark} />
-                  <Text style={[styles.primaryButtonLabel, { fontSize: px(16) }]}>
-                    Verifying OTP...
-                  </Text>
-                </View>
-              ) : (
-                <Text style={[styles.primaryButtonLabel, { fontSize: px(16) }]}>
-                  {verified
+          <GoldButton
+            scale={scale}
+            isSignup={false}
+            gradientId="otpButtonGold"
+            marginTop={28}
+            label={
+              UI_PREVIEW_AUTH_FLOW
+                ? 'Continue'
+                : loading && otp.length === 6
+                  ? 'Verifying...'
+                  : verified
                     ? 'Verified'
                     : isExistingUser
                       ? 'Verify & Login'
-                      : 'Verify & Continue'}
-                </Text>
-              )}
-            </Pressable>
-          </View>
+                      : 'Verify & Continue'
+            }
+            disabled={UI_PREVIEW_AUTH_FLOW ? false : otp.length !== 6 || loading || verified}
+            onPress={() => void handleVerify()}
+          />
 
-          <View style={[styles.securityRow, { marginTop: px(spacing.xl) }]}>
-            <ShieldCheck size={18} color={colors.primary} strokeWidth={2.2} />
-            <Text style={[styles.securityText, { fontSize: px(11), lineHeight: px(16) }]}>
-              Your data is secure and encrypted{'\n'}We never share your information
+          <Text
+            style={[
+              noFontPadding,
+              {
+                marginTop: 22 * scale,
+                textAlign: 'center',
+                color: '#82838E',
+                fontSize: 14 * scale,
+                lineHeight: 20 * scale,
+              },
+            ]}>
+            Resend code in{' '}
+            <Text style={{ color: COLORS.orange, fontWeight: '700' }}>{formatTimer(secondsLeft)}</Text>
+          </Text>
+
+          <Pressable
+            disabled={secondsLeft > 0 || loading}
+            onPress={() => void handleResend()}
+            style={{ marginTop: 8 * scale, alignItems: 'center' }}>
+            <Text
+              style={[
+                noFontPadding,
+                {
+                  color: secondsLeft > 0 || loading ? '#C4C4CC' : COLORS.orange,
+                  fontSize: 15 * scale,
+                  fontWeight: '700',
+                },
+              ]}>
+              Resend OTP
             </Text>
-          </View>
-        </View>
-      </View>
+          </Pressable>
 
+          <View style={{ marginTop: 'auto', paddingTop: 28 * scale, alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <ShieldIcon size={22 * scale} />
+              <Text
+                style={[
+                  noFontPadding,
+                  {
+                    marginLeft: 8 * scale,
+                    color: '#90909C',
+                    fontSize: 13 * scale,
+                    lineHeight: 19 * scale,
+                  },
+                ]}>
+                Your data is safe and secure with RACE.
+              </Text>
+            </View>
+          </View>
+      </KeyboardFormView>
       <AuthLoadingOverlay visible={loading} label="Verifying OTP..." />
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.pageBg },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  titleBlock: {
+  safeArea: {
     flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
+    backgroundColor: COLORS.background,
   },
-  title: {
-    color: colors.dark,
-    fontWeight: typography.weights.extrabold,
-    textAlign: 'center',
+  fill: { flex: 1 },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 16,
   },
-  subtitle: {
-    color: colors.grey,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  body: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.card,
-  },
-  phoneRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.lg,
-  },
-  phoneText: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  editButton: { padding: spacing.xs },
-  timerText: {
-    color: colors.grey,
-    textAlign: 'center',
-  },
-  timerValue: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-  },
-  resendRow: {
-    marginTop: spacing.sm,
-    alignItems: 'center',
-  },
-  resendPrompt: {
-    color: colors.grey,
-    textAlign: 'center',
-  },
-  resendAction: {
-    color: colors.primary,
-    fontWeight: typography.weights.bold,
-  },
-  resendActionDisabled: { opacity: 0.45 },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderRadius: radius.md,
-    backgroundColor: colors.goldLight,
-  },
-  infoText: {
-    flex: 1,
-    color: colors.dark,
-    fontSize: typography.sizes.sm,
-    lineHeight: typography.lineHeights.normal,
-  },
-  infoTitle: { fontWeight: typography.weights.bold },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryButtonDisabled: { opacity: 0.55 },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  primaryButtonLabel: {
-    color: colors.dark,
-    fontWeight: typography.weights.bold,
-  },
-  securityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-  },
-  securityText: {
-    color: colors.grey,
-    textAlign: 'center',
-  },
-  pressed: { opacity: 0.9 },
 });

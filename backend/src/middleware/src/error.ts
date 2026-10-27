@@ -21,8 +21,8 @@ export function errorHandler(
   }
 
   if (isMongoDuplicateKeyError(error)) {
-    const field = Object.keys(error.keyPattern ?? {})[0] ?? 'field';
-    return sendError(res, `A record with this ${field} already exists`, 409);
+    const fields = Object.keys(error.keyPattern ?? {}).join(' and ') || 'field';
+    return sendError(res, `A record with this ${fields} already exists`, 409);
   }
 
   if (error.name === 'ValidationError') {

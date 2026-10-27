@@ -6,6 +6,7 @@ import {
   type NotificationCategory,
   type NotificationSeverity,
 } from '../../../models/src/notification';
+import { emitToUser } from '../socket';
 
 export type { NotificationCategory };
 
@@ -21,7 +22,7 @@ export interface CreateNotificationInput {
 }
 
 export async function createNotification(input: CreateNotificationInput): Promise<void> {
-  await NotificationModel.create({
+  const notification = await NotificationModel.create({
     recipient: {
       audience: input.audience ?? 'admin',
       userId: input.userId,
@@ -34,4 +35,11 @@ export async function createNotification(input: CreateNotificationInput): Promis
     entityId: input.entityId,
     isRead: false,
   });
+  const recipientId = input.userId?.toString();
+  if (recipientId) {
+    emitToUser(recipientId, 'notification:new', {
+      notificationId: notification.id,
+      createdAt: notification.createdAt.toISOString(),
+    });
+  }
 }

@@ -23,6 +23,8 @@ export const adminDriversController = {
       req.query.bookingType === 'towing' || req.query.bookingType === 'driver'
         ? req.query.bookingType
         : undefined;
+    const bookingId =
+      typeof req.query.bookingId === 'string' ? req.query.bookingId : undefined;
     const hasCoords =
       lat !== undefined && !Number.isNaN(lat) && lng !== undefined && !Number.isNaN(lng);
     sendSuccess(
@@ -30,6 +32,7 @@ export const adminDriversController = {
       await listAvailableDrivers({
         ...(hasCoords ? { latitude: lat, longitude: lng } : {}),
         ...(bookingType ? { bookingType } : {}),
+        ...(bookingId ? { bookingId } : {}),
       }),
     );
   }),

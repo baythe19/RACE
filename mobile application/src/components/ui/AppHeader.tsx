@@ -1,5 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { colors, radius, spacing, typography } from '../../theme';
 import type { Brand } from '../../types/models';
@@ -12,11 +13,11 @@ export default function AppHeader({ brand }: AppHeaderProps) {
   return (
     <View style={styles.header}>
       <View style={styles.textWrap}>
-        <Text style={styles.product}>{brand.productName}</Text>
-        <Text style={styles.name}>{brand.name}</Text>
+        <PartnerText style={styles.product}>{brand.productName}</PartnerText>
+        <PartnerText style={styles.name}>{brand.name}</PartnerText>
       </View>
       <View style={styles.badge}>
-        <Text style={styles.badgeText}>24/7</Text>
+        <PartnerText style={styles.badgeText}>24/7</PartnerText>
       </View>
     </View>
   );

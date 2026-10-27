@@ -2,6 +2,8 @@ import { create } from 'zustand';
 
 import * as catalogService from '../services/catalogService';
 import { getApiErrorMessage } from '../services/api';
+import fallbackBrand from '../data/brand.json';
+import fallbackServices from '../data/services.json';
 import type { Brand, ServiceCategory } from '../types/models';
 
 interface CatalogState {
@@ -13,9 +15,12 @@ interface CatalogState {
   fetchBrand: () => Promise<void>;
 }
 
+const DEFAULT_SERVICES = (fallbackServices as unknown as ServiceCategory[]) ?? [];
+const DEFAULT_BRAND = (fallbackBrand as unknown as Brand) ?? null;
+
 export const useCatalogStore = create<CatalogState>((set) => ({
-  services: [],
-  brand: null,
+  services: DEFAULT_SERVICES,
+  brand: DEFAULT_BRAND,
   isLoading: false,
   error: null,
 
@@ -23,13 +28,15 @@ export const useCatalogStore = create<CatalogState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const services = await catalogService.getServices();
-      set({ services, isLoading: false });
+      set({
+        services: Array.isArray(services) && services.length > 0 ? services : DEFAULT_SERVICES,
+        isLoading: false,
+      });
     } catch (error) {
       set({
         isLoading: false,
         error: getApiErrorMessage(error, 'Unable to load services'),
       });
-      throw error;
     }
   },
 
@@ -37,13 +44,12 @@ export const useCatalogStore = create<CatalogState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const brand = await catalogService.getBrand();
-      set({ brand, isLoading: false });
+      set({ brand: brand ?? DEFAULT_BRAND, isLoading: false });
     } catch (error) {
       set({
         isLoading: false,
         error: getApiErrorMessage(error, 'Unable to load brand'),
       });
-      throw error;
     }
   },
 }));

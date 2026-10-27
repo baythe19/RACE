@@ -1,316 +1,244 @@
 import React from 'react';
 import {
-  Alert,
-  Image,
   Linking,
   Pressable,
+  ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { MapPin, Phone, ShieldCheck, Zap } from 'lucide-react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-
-import ServiceDetailScreenLayout, {
-  useServiceDetailMetrics,
-} from '../components/services/ServiceDetailScreenLayout';
-import { images } from '../assets';
 import {
-  ROADSIDE_ACCENT,
-  ROADSIDE_ACCENT_LIGHT,
-  ROADSIDE_SERVICES,
-  ROADSIDE_VALUE_PROPS,
-} from '../constants/roadsideBooking';
+  ArrowRight,
+  BatteryCharging,
+  Disc,
+  Fuel,
+  Phone,
+  Wrench,
+} from 'lucide-react-native';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
+import { useCatalogStore } from '../store/catalogStore';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
 
-const COMING_SOON_BADGE = '#F59E0B';
-const DISABLED_ACTION = '#9CA3AF';
-
-const VALUE_ICONS = {
-  response: Zap,
-  verified: ShieldCheck,
-  location: MapPin,
-} as const;
+const REF_W = 390;
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideAssistance'>;
 
-function showComingSoonAlert() {
-  Alert.alert('Coming Soon!', "We're launching this service soon.");
-}
+const ROADSIDE_OPTIONS = [
+  {
+    id: 'flat_tyre',
+    title: 'Flat Tyre Assistance',
+    price: 'From ₹199',
+    Icon: Disc,
+  },
+  {
+    id: 'battery_jumpstart',
+    title: 'Battery Jumpstart',
+    price: 'From ₹199',
+    Icon: BatteryCharging,
+  },
+  {
+    id: 'fuel_delivery',
+    title: 'Fuel Delivery',
+    price: 'From ₹299',
+    Icon: Fuel,
+  },
+  {
+    id: 'minor_repair',
+    title: 'Minor Mechanical Fix',
+    price: 'From ₹399',
+    Icon: Wrench,
+  },
+];
 
 export default function RoadsideAssistanceScreen({ navigation }: Props) {
-  const { px } = useServiceDetailMetrics();
+  const { width } = useWindowDimensions();
+  const s = width / REF_W;
+  const px = (n: number) => Math.round(n * s);
+  const insets = useSafeAreaInsets();
+  const heroCard = getServiceCategoryCard('roadside');
 
-  const bookTowing = () => {
-    navigation.navigate('TowingService');
+  const apiBrand = useCatalogStore(state => state.brand);
+
+  const bookRoadside = () => {
+    navigation.navigate('RoadsideSelectService');
+  };
+
+  const callSupport = () => {
+    const phone = apiBrand?.phoneRaw ?? brand.phoneRaw;
+    void Linking.openURL(`tel:${phone}`);
   };
 
   return (
-    <ServiceDetailScreenLayout>
-      <View
-        style={[
-          {
-            borderRadius: px(18),
-            overflow: 'hidden',
-            marginBottom: px(16),
-            height: px(168),
-          },
-          shadows.card,
-        ]}>
-        <Image
-          source={images.roadsideHeroBanner}
-          style={{ width: '100%', height: '100%' }}
-          resizeMode="cover"
-        />
-      </View>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <ServiceNavHeader title="Roadside Assistance" onBack={() => navigation.goBack()} />
 
-      <View style={{ gap: px(12), marginBottom: px(18) }}>
-        <Pressable
-          onPress={bookTowing}
-          style={[
-            {
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: px(10),
-              borderRadius: px(16),
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.background,
-              padding: px(14),
-            },
-            shadows.card,
-          ]}>
-          <View
-            style={{
-              width: px(52),
-              height: px(52),
-              borderRadius: px(26),
-              backgroundColor: ROADSIDE_ACCENT_LIGHT,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}>
-            <MaterialCommunityIcons name="tow-truck" size={px(28)} color={COMING_SOON_BADGE} />
-          </View>
-
-          <View style={{ flex: 1, minWidth: 0, flexShrink: 1 }}>
-            <Text
-              numberOfLines={2}
-              style={{
-                fontSize: px(15),
-                fontWeight: typography.weights.bold,
-                color: colors.dark,
-                marginBottom: px(3),
-              }}>
-              Towing Service
-            </Text>
-            <Text
-              numberOfLines={2}
-              style={{
-                fontSize: px(12),
-                color: colors.grey,
-                marginBottom: px(6),
-              }}>
-              Vehicle breakdown? We'll tow it safely
-            </Text>
-            <Text
-              style={{
-                fontSize: px(13),
-                fontWeight: typography.weights.bold,
-                color: COMING_SOON_BADGE,
-              }}>
-              From ₹399
-            </Text>
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: px(2),
-              flexShrink: 0,
-            }}>
-            <Text
-              style={{
-                fontSize: px(12),
-                fontWeight: typography.weights.bold,
-                color: COMING_SOON_BADGE,
-              }}>
-              Book Now
-            </Text>
-            <MaterialCommunityIcons name="arrow-right" size={px(14)} color={COMING_SOON_BADGE} />
-          </View>
-        </Pressable>
-
-        {ROADSIDE_SERVICES.map(service => (
-          <Pressable
-            key={service.id}
-            onPress={showComingSoonAlert}
-            style={{
-              position: 'relative',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: px(10),
-              borderRadius: px(16),
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.background,
-              padding: px(14),
-              opacity: 0.92,
-            }}>
-            <View
-              style={{
-                position: 'absolute',
-                top: px(10),
-                right: px(10),
-                backgroundColor: COMING_SOON_BADGE,
-                borderRadius: px(10),
-                paddingHorizontal: px(8),
-                paddingVertical: px(3),
-                zIndex: 1,
-              }}>
-              <Text
-                style={{
-                  fontSize: px(9),
-                  fontWeight: typography.weights.bold,
-                  color: colors.background,
-                }}>
-                Coming Soon
-              </Text>
-            </View>
-
-            <View
-              style={{
-                width: px(52),
-                height: px(52),
-                borderRadius: px(26),
-                backgroundColor: colors.lightGrey,
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-              <Image
-                source={service.image}
-                style={{ width: px(34), height: px(34), opacity: 0.7 }}
-                resizeMode="contain"
-              />
-            </View>
-
-            <View style={{ flex: 1, minWidth: 0, flexShrink: 1, paddingRight: px(72) }}>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontSize: px(15),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                  marginBottom: px(3),
-                }}>
-                {service.label}
-              </Text>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontSize: px(12),
-                  color: colors.grey,
-                  marginBottom: px(6),
-                }}>
-                {service.description}
-              </Text>
-              <Text
-                style={{
-                  fontSize: px(13),
-                  fontWeight: typography.weights.bold,
-                  color: DISABLED_ACTION,
-                }}>
-                From ₹{service.price}
-              </Text>
-            </View>
-
-            <View
-              pointerEvents="none"
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(2),
-                flexShrink: 0,
-              }}>
-              <Text
-                style={{
-                  fontSize: px(12),
-                  fontWeight: typography.weights.bold,
-                  color: DISABLED_ACTION,
-                }}>
-                Book Now
-              </Text>
-              <MaterialCommunityIcons name="arrow-right" size={px(14)} color={DISABLED_ACTION} />
-            </View>
-          </Pressable>
-        ))}
-      </View>
-
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          backgroundColor: colors.lightGrey,
-          borderRadius: px(14),
-          paddingVertical: px(16),
-          paddingHorizontal: px(8),
-          marginBottom: px(16),
-        }}>
-        {ROADSIDE_VALUE_PROPS.map(item => {
-          const Icon = VALUE_ICONS[item.id];
-          return (
-            <View key={item.id} style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
-              <Icon size={px(20)} color={ROADSIDE_ACCENT} strokeWidth={2} />
-              <Text
-                style={{
-                  marginTop: px(6),
-                  fontSize: px(11),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                  textAlign: 'center',
-                }}>
-                {item.highlight}
-              </Text>
-              <Text
-                style={{
-                  marginTop: px(2),
-                  fontSize: px(9),
-                  color: colors.grey,
-                  textAlign: 'center',
-                  lineHeight: px(12),
-                }}>
-                {item.label}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
-
-      <Pressable
-        onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: px(8),
-          borderRadius: px(14),
-          backgroundColor: colors.error,
-          paddingVertical: px(16),
-        }}>
-        <Phone size={px(20)} color={colors.background} strokeWidth={2.5} />
+      <ScrollView
+        style={{ backgroundColor: colors.pageBg }}
+        contentContainerStyle={{
+          paddingHorizontal: px(14),
+          paddingTop: px(12),
+          paddingBottom: px(100),
+          gap: px(12),
+        }}
+        showsVerticalScrollIndicator={false}>
+        <ServiceCategoryArtCard card={heroCard} />
         <Text
           style={{
-            fontSize: px(16),
-            fontWeight: typography.weights.bold,
-            color: colors.background,
+            marginTop: -px(4),
+            fontSize: px(12),
+            lineHeight: px(17),
+            color: colors.grey,
+            textAlign: 'center',
+            fontWeight: typography.weights.medium,
           }}>
-          Emergency Call
+          On-spot help · Fair upfront pricing
         </Text>
-      </Pressable>
-    </ServiceDetailScreenLayout>
+
+        {/* Roadside Options List */}
+        <View style={{ gap: px(10) }}>
+          {ROADSIDE_OPTIONS.map(opt => (
+            <View
+              key={opt.id}
+              style={[
+                shadows.cardSoft,
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: colors.background,
+                  borderRadius: px(16),
+                  padding: px(14),
+                  borderWidth: 1,
+                  borderColor: '#F0EFEA',
+                  gap: px(12),
+                },
+              ]}>
+              <View
+                style={{
+                  width: px(44),
+                  height: px(44),
+                  borderRadius: px(22),
+                  backgroundColor: colors.goldLight,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <opt.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: px(14),
+                    fontWeight: typography.weights.bold,
+                    color: colors.dark,
+                  }}>
+                  {opt.title}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: px(12),
+                    fontWeight: typography.weights.bold,
+                    color: colors.primary,
+                    marginTop: px(3),
+                  }}>
+                  {opt.price}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() => bookRoadside()}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: px(14),
+                  height: px(32),
+                  borderRadius: px(8),
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Text
+                  style={{
+                    fontSize: px(12),
+                    fontWeight: typography.weights.bold,
+                    color: colors.dark,
+                  }}>
+                  Book Now
+                </Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+
+      {/* Bottom Sticky Action Bar */}
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          paddingHorizontal: px(20),
+          paddingTop: px(10),
+          paddingBottom: Math.max(insets.bottom, px(12)),
+          flexDirection: 'row',
+          gap: px(12),
+        }}>
+        <Pressable
+          onPress={callSupport}
+          style={{
+            flex: 1,
+            height: px(46),
+            borderRadius: px(14),
+            borderWidth: 1.5,
+            borderColor: colors.primary,
+            backgroundColor: colors.background,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: px(6),
+          }}>
+          <Phone size={px(16)} color={colors.primary} strokeWidth={2.4} />
+          <Text
+            style={{
+              fontSize: px(14),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            Call Now
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => bookRoadside()}
+          style={{
+            flex: 1.5,
+            height: px(46),
+            borderRadius: px(14),
+            backgroundColor: colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: px(8),
+          }}>
+          <Text
+            style={{
+              fontSize: px(14),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            Book Service
+          </Text>
+          <ArrowRight size={px(16)} color={colors.dark} strokeWidth={2.5} />
+        </Pressable>
+      </View>
+    </SafeAreaView>
   );
 }

@@ -8,8 +8,11 @@ import PartnerAppNavigator from './src/navigation/PartnerAppNavigator';
 import { queryClient } from './src/services/queryClient';
 import { store } from './src/redux/store';
 import { colors } from './src/theme';
+import { useInterFonts } from './src/theme/interFonts';
 
 export default function App() {
+  useInterFonts();
+
   return (
     <ReduxProvider store={store}>
       <QueryClientProvider client={queryClient}>

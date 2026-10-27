@@ -1,5 +1,6 @@
 import { io, type Socket } from 'socket.io-client';
 import { API_CONFIG } from '../config/api';
+import { readAccessToken } from './api';
 
 let socket: Socket | null = null;
 
@@ -8,7 +9,7 @@ function getBaseUrl(): string {
 }
 
 export function connectSocket(): Socket {
-  if (socket?.connected) return socket;
+  if (socket) return socket;
 
   socket = io(getBaseUrl(), {
     transports: ['websocket'],
@@ -16,6 +17,12 @@ export function connectSocket(): Socket {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 2000,
+    // BUG-03/P0.3: backend rejects unauthenticated handshakes — send the
+    // stored user access token; reconnects re-read it (fresh after refresh).
+    auth: async (cb) => {
+      const token = await readAccessToken();
+      cb({ token: token ?? '' });
+    },
   });
 
   socket.on('connect', () => {
@@ -45,6 +52,13 @@ export function trackBooking(bookingId: string, bookingType: string): void {
   });
 }
 
+export function onSocketConnected(callback: () => void): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('connect', callback);
+  if (activeSocket.connected) callback();
+  return () => activeSocket.off('connect', callback);
+}
+
 export function onDriverLocation(
   callback: (data: {
     bookingId: string;
@@ -53,20 +67,40 @@ export function onDriverLocation(
     longitude: number;
     updatedAt: string;
   }) => void,
-): void {
-  connectSocket().on('driver:location', callback);
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('driver:location', callback);
+  return () => activeSocket.off('driver:location', callback);
 }
 
 export function onBookingStatus(
-  callback: (data: { bookingId: string; status: string }) => void,
-): void {
-  connectSocket().on('booking:status', callback);
+  callback: (data: {
+    bookingId: string;
+    status: string;
+    arrivedAtDropoff?: boolean;
+    arrivedAtDropoffAt?: string;
+    fare?: number;
+    paymentConfirmed?: boolean;
+    paymentMode?: 'CASH' | 'UPI' | 'ONLINE';
+  }) => void,
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('booking:status', callback);
+  return () => activeSocket.off('booking:status', callback);
 }
 
-export function offDriverLocation(): void {
-  socket?.off('driver:location');
-}
-
-export function offBookingStatus(): void {
-  socket?.off('booking:status');
+export function onDriverArrivedDropoff(
+  callback: (data: {
+    bookingId: string;
+    bookingType: string;
+    status: string;
+    arrivedAtDropoffAt: string;
+    fare: number;
+    paymentOptions: string[];
+    message: string;
+  }) => void,
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('booking:driver_arrived_dropoff', callback);
+  return () => activeSocket.off('booking:driver_arrived_dropoff', callback);
 }

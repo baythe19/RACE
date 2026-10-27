@@ -15,6 +15,11 @@ import {
 import { useRoadsideBooking } from '../../../context/RoadsideBookingContext';
 import { useServiceBookingPayment } from '../../../hooks/useServiceBookingPayment';
 import { createRoadsideBooking } from '../../../services/bookings/serviceBookingApi';
+import {
+  isPreviewBookingMode,
+  previewAdvancePayment,
+  previewTowingBooking,
+} from '../../../services/bookings/previewBooking';
 import { useVehicleStore } from '../../../store/vehicleStore';
 import { buildRoadsideBookingRequest } from '../../../utils/serviceBookingPayload';
 import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
@@ -102,6 +107,22 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
     try {
       const serviceType = roadsideServiceIdToSlug(booking.serviceId);
       const payload = buildRoadsideBookingRequest(booking, vehicles, serviceType);
+
+      // BUG-C1: preview vehicles are local ids the backend rejects — demo the
+      // whole roadside confirm in preview mode.
+      if (__DEV__ && isPreviewBookingMode()) {
+        const previewBooking = previewTowingBooking({
+          vehicleId: payload.vehicleId,
+          pickup: payload.pickup,
+          dropoff: payload.dropoff ?? payload.pickup,
+          towingMode: 'instant',
+        });
+        previewAdvancePayment(previewBooking.id, 'towing');
+        resetBooking();
+        navigation.navigate('RoadsideHelpOnWay');
+        return;
+      }
+
       const response = await createRoadsideBooking(payload);
 
       if (!response.available) {
@@ -119,7 +140,24 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       Alert.alert('Booking failed', 'Unable to create roadside booking. Please try again.');
     } catch (error) {
       if (error instanceof Error && error.message.includes('Add a vehicle')) {
-        Alert.alert('Vehicle required', 'Add a vehicle in Profile before booking roadside help.');
+        Alert.alert(
+          'Vehicle required',
+          'Please add a vehicle to your profile before booking roadside help.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Add Vehicle',
+              onPress: () => {
+                const parent = navigation.getParent();
+                if (parent) {
+                  (parent as any).navigate('Profile', { screen: 'AddVehicle' });
+                } else {
+                  (navigation as any).navigate('Profile', { screen: 'AddVehicle' });
+                }
+              },
+            },
+          ],
+        );
         return;
       }
       if (error instanceof Error && error.message.includes('map')) {

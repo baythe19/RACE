@@ -1,10 +1,24 @@
 import React from 'react';
-import { Text, useWindowDimensions, View } from 'react-native';
-import { Rocket } from 'lucide-react-native';
+import {
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import {
+  Activity,
+  Building2,
+  FileCheck2,
+  ShieldAlert,
+  Sparkles,
+  Zap,
+} from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import ProfileSubScreenLayout from '../components/profile/ProfileSubScreenLayout';
-import { MORE_SERVICES_ITEMS } from '../constants/moreServices';
+import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
 
@@ -12,66 +26,82 @@ const REF_W = 390;
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'MoreServices'>;
 
+const UPCOMING_SERVICES = [
+  {
+    id: 'car_wash',
+    title: 'Car Wash',
+    description: 'Professional cleaning at your doorstep',
+    Icon: Sparkles,
+  },
+  {
+    id: 'inspection',
+    title: 'Vehicle Inspection',
+    description: 'Pre-purchase & health checks',
+    Icon: FileCheck2,
+  },
+  {
+    id: 'insurance',
+    title: 'Insurance Assistance',
+    description: 'Claims, renewals & support',
+    Icon: ShieldAlert,
+  },
+  {
+    id: 'ev_charging',
+    title: 'EV Charging Support',
+    description: 'Mobile charging for EVs',
+    Icon: Zap,
+  },
+  {
+    id: 'ambulance',
+    title: 'Ambulance Service',
+    description: 'Emergency medical transport',
+    Icon: Activity,
+  },
+  {
+    id: 'corporate_fleet',
+    title: 'Corporate Fleet',
+    description: 'Fleet management & bulk solutions',
+    Icon: Building2,
+  },
+];
+
 export default function MoreServicesScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
-  const px = (n: number) => Math.round(n * (width / REF_W));
+  const s = width / REF_W;
+  const px = (n: number) => Math.round(n * s);
+  const heroCard = getServiceCategoryCard('future');
 
   return (
-    <ProfileSubScreenLayout
-      title="More Services"
-      subtitle="Coming Soon — Exciting new services!"
-      onBack={() => navigation.goBack()}>
-      <View
-        style={[
-          {
-            borderRadius: px(14),
-            backgroundColor: colors.goldLight,
-            padding: px(16),
-            marginBottom: px(16),
-            overflow: 'hidden',
-          },
-          shadows.card,
-        ]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(8) }}>
-          <Rocket size={px(18)} color={colors.primary} />
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            Expanding Soon!
-          </Text>
-        </View>
-        <Text
-          style={{
-            marginTop: px(6),
-            fontSize: px(13),
-            color: colors.grey,
-            lineHeight: px(18),
-          }}>
-          We're working hard to bring you more amazing services.
-        </Text>
-      </View>
+    <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <ServiceNavHeader title="More Services" onBack={() => navigation.goBack()} />
 
-      <View style={{ gap: px(10) }}>
-        {MORE_SERVICES_ITEMS.map(item => {
-          const Icon = item.Icon;
-          return (
+      <ScrollView
+        style={{ backgroundColor: colors.pageBg }}
+        contentContainerStyle={{
+          paddingHorizontal: px(14),
+          paddingTop: px(12),
+          paddingBottom: px(36),
+          gap: px(10),
+        }}
+        showsVerticalScrollIndicator={false}>
+        <ServiceCategoryArtCard card={heroCard} />
+
+        {/* Upcoming Services List */}
+        {UPCOMING_SERVICES.map(item => (
           <View
             key={item.id}
             style={[
+              shadows.cardSoft,
               {
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: px(12),
-                borderRadius: px(14),
-                borderWidth: 1,
-                borderColor: colors.border,
                 backgroundColor: colors.background,
+                borderRadius: px(16),
                 padding: px(14),
+                borderWidth: 1,
+                borderColor: '#F0EFEA',
+                gap: px(12),
               },
-              shadows.card,
             ]}>
             <View
               style={{
@@ -82,8 +112,9 @@ export default function MoreServicesScreen({ navigation }: Props) {
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Icon size={px(20)} color={colors.primary} strokeWidth={2} />
+              <item.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
             </View>
+
             <View style={{ flex: 1 }}>
               <Text
                 style={{
@@ -93,30 +124,35 @@ export default function MoreServicesScreen({ navigation }: Props) {
                 }}>
                 {item.title}
               </Text>
-              <Text style={{ fontSize: px(12), color: colors.grey, marginTop: px(3) }}>
+              <Text
+                style={{
+                  fontSize: px(11),
+                  color: colors.grey,
+                  marginTop: px(2),
+                }}>
                 {item.description}
               </Text>
             </View>
+
             <View
               style={{
-                paddingHorizontal: px(8),
+                backgroundColor: '#F3F4F6',
+                paddingHorizontal: px(10),
                 paddingVertical: px(4),
                 borderRadius: px(8),
-                backgroundColor: colors.lightGrey,
               }}>
               <Text
                 style={{
-                  fontSize: px(10),
-                  fontWeight: typography.weights.bold,
-                  color: colors.grey,
+                  fontSize: px(11),
+                  fontWeight: typography.weights.semibold,
+                  color: '#6B7280',
                 }}>
                 Soon
               </Text>
             </View>
           </View>
-          );
-        })}
-      </View>
-    </ProfileSubScreenLayout>
+        ))}
+      </ScrollView>
+    </SafeAreaView>
   );
 }

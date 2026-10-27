@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { AdminPermission, AdminRole, getPermissionsForRole } from '../services/src/admin/rbac';
 import { env } from './env';
 
@@ -25,10 +26,17 @@ export function getPlatformAdmin(): PlatformAdmin {
 }
 
 export function verifyPlatformAdminCredentials(email: string, password: string): boolean {
-  return (
-    email.trim().toLowerCase() === env.ADMIN_EMAIL.toLowerCase() &&
-    password === env.ADMIN_PASSWORD
-  );
+  if (email.trim().toLowerCase() !== env.ADMIN_EMAIL.toLowerCase()) {
+    return false;
+  }
+  const expectedBuffer = Buffer.from(env.ADMIN_PASSWORD);
+  const actualBuffer = Buffer.from(password);
+  if (expectedBuffer.length !== actualBuffer.length) {
+    // Constant-time dummy comparison to prevent early-exit timing leaks
+    crypto.timingSafeEqual(expectedBuffer, expectedBuffer);
+    return false;
+  }
+  return crypto.timingSafeEqual(expectedBuffer, actualBuffer);
 }
 
 export function isPlatformAdminId(id: string): boolean {

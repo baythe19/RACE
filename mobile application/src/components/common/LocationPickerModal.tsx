@@ -1,13 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GooglePlacesAutocomplete, type GooglePlacesAutocompleteRef } from 'react-native-google-places-autocomplete';
 import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
@@ -24,9 +17,10 @@ import {
   reverseGeocodeToLocation,
 } from '../../utils/googlePlaces';
 import { formatLocationDisplay } from '../../utils/readableAddress';
+import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+const MAP_PROVIDER = PROVIDER_GOOGLE;
 const REVERSE_GEOCODE_DEBOUNCE_MS = 500;
 
 export interface LocationPickerModalProps {
@@ -198,12 +192,8 @@ export default function LocationPickerModal({
   const handleCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
+      const position = await getCurrentPositionWhenAllowed(Location.Accuracy.High);
+      if (!position) return;
       animateTo(position.coords.latitude, position.coords.longitude);
     } finally {
       setIsLocating(false);
@@ -246,9 +236,9 @@ export default function LocationPickerModal({
         {/* Center pin — map moves underneath */}
         <View style={styles.centerPinWrap} pointerEvents="none">
           <View style={[styles.pinBubble, shadows.card]}>
-            <Text style={styles.pinBubbleText} numberOfLines={1}>
+            <PartnerText style={styles.pinBubbleText} numberOfLines={1}>
               {isGeocoding ? 'Finding address...' : addressParts.title || 'Move map to pin'}
-            </Text>
+            </PartnerText>
           </View>
           <MapPin size={42} color={accentColor} fill={accentColor} strokeWidth={1.5} />
           <View style={styles.pinShadow} />
@@ -281,7 +271,7 @@ export default function LocationPickerModal({
               <Pressable onPress={() => setShowSearch(false)} hitSlop={8}>
                 <Ionicons name="arrow-back" size={22} color={colors.dark} />
               </Pressable>
-              <Text style={styles.searchOverlayTitle}>Select location</Text>
+              <PartnerText style={styles.searchOverlayTitle}>Select location</PartnerText>
               <View style={{ width: 22 }} />
             </View>
 
@@ -319,15 +309,15 @@ export default function LocationPickerModal({
                 )}
                 renderRow={rowData => (
                   <View style={styles.suggestionRow}>
-                    <Text style={styles.suggestionIcon}>📍</Text>
+                    <PartnerText style={styles.suggestionIcon}>📍</PartnerText>
                     <View style={styles.suggestionTextWrap}>
-                      <Text style={styles.suggestionMain} numberOfLines={1}>
+                      <PartnerText style={styles.suggestionMain} numberOfLines={1}>
                         {rowData.structured_formatting?.main_text ?? rowData.description}
-                      </Text>
+                      </PartnerText>
                       {rowData.structured_formatting?.secondary_text ? (
-                        <Text style={styles.suggestionSecondary} numberOfLines={1}>
+                        <PartnerText style={styles.suggestionSecondary} numberOfLines={1}>
                           {rowData.structured_formatting.secondary_text}
-                        </Text>
+                        </PartnerText>
                       ) : null}
                     </View>
                   </View>
@@ -339,11 +329,11 @@ export default function LocationPickerModal({
                 }}
               />
             ) : (
-              <Text style={styles.fallbackSearchText}>
+              <PartnerText style={styles.fallbackSearchText}>
                 Address search needs a Google Maps API key in `.env` (`EXPO_PUBLIC_GOOGLE_MAPS_KEY`).
                 You can still drag the map or use GPS — street, city, state and PIN will fill from the
                 device location service.
-              </Text>
+              </PartnerText>
             )}
           </View>
         ) : null}
@@ -352,8 +342,8 @@ export default function LocationPickerModal({
         <View
           style={[styles.bottomSheet, shadows.card, { paddingBottom: Math.max(insets.bottom, 16) }]}
           onLayout={event => setSheetHeight(event.nativeEvent.layout.height)}>
-          <Text style={styles.sheetTitle}>{title}</Text>
-          <Text style={styles.sheetSubtitle}>Drag map to move pin</Text>
+          <PartnerText style={styles.sheetTitle}>{title}</PartnerText>
+          <PartnerText style={styles.sheetSubtitle}>Drag map to move pin</PartnerText>
 
           <Pressable
             onPress={() => setShowSearch(true)}
@@ -363,17 +353,17 @@ export default function LocationPickerModal({
               {isGeocoding ? (
                 <View style={styles.addressLoading}>
                   <ActivityIndicator size="small" color={accentColor} />
-                  <Text style={styles.addressLoadingText}>Getting address...</Text>
+                  <PartnerText style={styles.addressLoadingText}>Getting address...</PartnerText>
                 </View>
               ) : (
                 <>
-                  <Text style={styles.addressTitle} numberOfLines={1}>
+                  <PartnerText style={styles.addressTitle} numberOfLines={1}>
                     {addressParts.title || 'Move map to select'}
-                  </Text>
+                  </PartnerText>
                   {addressParts.subtitle ? (
-                    <Text style={styles.addressSubtitle} numberOfLines={2}>
+                    <PartnerText style={styles.addressSubtitle} numberOfLines={2}>
                       {addressParts.subtitle}
-                    </Text>
+                    </PartnerText>
                   ) : null}
                 </>
               )}
@@ -390,7 +380,7 @@ export default function LocationPickerModal({
               styles.confirmBtn,
               { backgroundColor: selected && !isGeocoding ? accentColor : colors.grey },
             ]}>
-            <Text style={styles.confirmLabel}>{confirmLabel}</Text>
+            <PartnerText style={styles.confirmLabel}>{confirmLabel}</PartnerText>
           </Pressable>
         </View>
       </View>
@@ -466,7 +456,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   searchOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.background,
     zIndex: 20,
     paddingHorizontal: 16,

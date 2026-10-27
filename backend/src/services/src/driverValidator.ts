@@ -23,6 +23,7 @@ export const updateDriverBookingStatusSchema = z.object({
   status: z.enum(UNIFIED_BOOKING_STATUSES),
   bookingType: z.enum(['towing', 'driver']),
   tripOtp: z.string().regex(/^\d{4}$/, 'Enter 4-digit trip OTP').optional(),
+  completionOtp: z.string().regex(/^\d{4}$/, 'Enter 4-digit completion OTP').optional(),
 });
 
 export const driverBookingActionSchema = z.object({

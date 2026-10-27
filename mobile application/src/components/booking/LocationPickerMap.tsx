@@ -1,15 +1,7 @@
+import { PartnerText, PartnerTextInput } from '../partner/PartnerText';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,9 +9,10 @@ import { ArrowLeft, Crosshair, MapPin, Search } from 'lucide-react-native';
 
 import { BHUBANESWAR_DEFAULT, forwardGeocode, reverseGeocode } from '../../utils/googleMaps';
 import { formatLocationDisplay } from '../../utils/readableAddress';
+import { getCurrentPositionWhenAllowed } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+const MAP_PROVIDER = PROVIDER_GOOGLE;
 
 export interface SelectedLocation {
   address: string;
@@ -46,6 +39,7 @@ export default function LocationPickerMap({
   initialLocation,
   accentColor = colors.primary,
 }: LocationPickerMapProps) {
+  const { dialog: partnerDialog, showAlert } = usePartnerDialog();
   const mapRef = useRef<MapView>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const regionRef = useRef<Region>({
@@ -125,35 +119,32 @@ export default function LocationPickerMap({
         animateTo(result.latitude, result.longitude);
         setAddress(result.address);
       } else {
-        Alert.alert('Not found', 'Could not find that location. Try a different search.');
+        showAlert({ tone: 'warning', title: 'Not found', message: 'Could not find that location. Try a different search.' });
       }
     } finally {
       setIsSearching(false);
     }
-  }, [animateTo, searchQuery]);
+  }, [animateTo, searchQuery, showAlert]);
 
   const handleCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Location access denied',
-          'Location access denied. Please search or move map manually.',
-        );
+      const position = await getCurrentPositionWhenAllowed(Location.Accuracy.High);
+      if (!position) {
+        showAlert({
+          tone: 'warning',
+          title: 'Location access denied',
+          message: 'Location access denied. Please search or move map manually.',
+        });
         return;
       }
-
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
       animateTo(position.coords.latitude, position.coords.longitude);
     } catch {
-      Alert.alert('Location error', 'Unable to get your location. Please search or move the map.');
+      showAlert({ tone: 'error', title: 'Location error', message: 'Unable to get your location. Please search or move the map.' });
     } finally {
       setIsLocating(false);
     }
-  }, [animateTo]);
+  }, [animateTo, showAlert]);
 
   const handleConfirm = useCallback(() => {
     const region = regionRef.current;
@@ -171,15 +162,15 @@ export default function LocationPickerMap({
           <Pressable onPress={onClose} hitSlop={12} style={styles.headerSide}>
             <ArrowLeft size={24} color={colors.dark} strokeWidth={2.5} />
           </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>
+          <PartnerText style={styles.headerTitle} numberOfLines={1}>
             {title}
-          </Text>
+          </PartnerText>
           <View style={styles.headerSide} />
         </View>
 
         <View style={styles.searchRow}>
           <Search size={18} color={colors.grey} />
-          <TextInput
+          <PartnerTextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search location..."
@@ -225,16 +216,16 @@ export default function LocationPickerMap({
         </View>
 
         <View style={[styles.bottomSheet, shadows.card]}>
-          <Text style={styles.addressLabel}>Selected address</Text>
+          <PartnerText style={styles.addressLabel}>Selected address</PartnerText>
           {isGeocoding ? (
             <View style={styles.addressLoading}>
               <ActivityIndicator size="small" color={accentColor} />
-              <Text style={styles.addressLoadingText}>Getting address...</Text>
+              <PartnerText style={styles.addressLoadingText}>Getting address...</PartnerText>
             </View>
           ) : (
-            <Text style={styles.addressText} numberOfLines={3}>
+            <PartnerText style={styles.addressText} numberOfLines={3}>
               {address ? formatLocationDisplay(address) : 'Move the map to select a location'}
-            </Text>
+            </PartnerText>
           )}
 
           <Pressable
@@ -244,10 +235,11 @@ export default function LocationPickerMap({
               styles.confirmBtn,
               { backgroundColor: isGeocoding ? colors.grey : accentColor },
             ]}>
-            <Text style={styles.confirmLabel}>Use this location</Text>
+            <PartnerText style={styles.confirmLabel}>Use this location</PartnerText>
           </Pressable>
         </View>
       </SafeAreaView>
+      {partnerDialog}
     </Modal>
   );
 }

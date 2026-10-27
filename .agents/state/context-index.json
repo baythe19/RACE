@@ -1,0 +1,214 @@
+{
+  "generated": "2026-10-02T07:31:12Z",
+  "files": {
+    "AGENTS.md": {
+      "hash": "4823f21ce0f8e2677ccd8a9218f5b2eb96b0189a4a4e6622018e326c866eeb54",
+      "bytes": 5073,
+      "lines": 124,
+      "ext": "md",
+      "status": "updated",
+      "summary": "RACE — Agent Instructions",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/state/ACTIVE.md": {
+      "hash": "9750ce0ced2ae8783a92e8fe96e169aa5de316571be1b6ec29e115b24a235ee2",
+      "bytes": 3026,
+      "lines": 82,
+      "ext": "md",
+      "status": "updated",
+      "summary": "RACE — Active State",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/state/PROJECT_INDEX.md": {
+      "hash": "d8a5c2c4c8820850647bfe18470e0401b4461deef0a1ad9ee86418ff4defb412",
+      "bytes": 6211,
+      "lines": 158,
+      "ext": "md",
+      "status": "updated",
+      "summary": "RACE — Project Index",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/state/DECISIONS_INDEX.md": {
+      "hash": "3a54fe502eebd105235306b2db0985cc16554668ed5b64a829223055bbcaa9aa",
+      "bytes": 1550,
+      "lines": 19,
+      "ext": "md",
+      "status": "updated",
+      "summary": "RACE — Decisions Index",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "backend/src/STRUCTURE.md": {
+      "hash": "dfad32d526b06a4aea7dd894ea6c4b897dbb2d07c7adf48e61b9e1efcc008cd1",
+      "bytes": 1869,
+      "lines": 48,
+      "ext": "md",
+      "status": "updated",
+      "summary": "Backend source layout",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "backend/src/index.ts": {
+      "hash": "51e393684489d215ffff414574d3759798c86a4d4b9d22e6cf675f70c15ee93e",
+      "bytes": 1416,
+      "lines": 43,
+      "ext": "ts",
+      "status": "updated",
+      "summary": "backend/src/index.ts",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "backend/src/app.ts": {
+      "hash": "df6e18381933854e3e6e924f60ccae79e786dd354bee34e056fcd6fd0e5cb324",
+      "bytes": 1125,
+      "lines": 41,
+      "ext": "ts",
+      "status": "updated",
+      "summary": "backend/src/app.ts",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "backend/package.json": {
+      "hash": "bdd911b648431e09124dfbeb9b883f524e49c5438ef0cfab5279be68ffd709b2",
+      "bytes": 1931,
+      "lines": 61,
+      "ext": "json",
+      "status": "updated",
+      "summary": "backend/package.json",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "race-admin/turbo.json": {
+      "hash": "e5d823266d7cc66a6e1f26184716dd052f33b4144a0babfee4a049281e9fcbdc",
+      "bytes": 267,
+      "lines": 16,
+      "ext": "json",
+      "status": "updated",
+      "summary": "race-admin/turbo.json",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "race-admin/package.json": {
+      "hash": "48fdd05c7e15c58a09d5283bec1cc168469705e2d481c2873dfdf646887685d2",
+      "bytes": 652,
+      "lines": 27,
+      "ext": "json",
+      "status": "updated",
+      "summary": "race-admin/package.json",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "clintdoc.md": {
+      "hash": "91e580e314731821f58b03f0f8c0d9c49fa6ea1e345dbd232e82684e6f8ad48e",
+      "bytes": 4104,
+      "lines": 238,
+      "ext": "md",
+      "status": "updated",
+      "summary": "clintdoc.md",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    "docs/MOCK_TESTING_PLAYBOOK.md": {
+      "hash": "156633bbb605878548fd726c125906074893f5e8bff5e11227b9b4129b16fe01",
+      "bytes": 4208,
+      "lines": 112,
+      "ext": "md",
+      "status": "updated",
+      "summary": "RACE System: Mock Testing Playbook & Mode Switching Guide",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-005-otp-skip-flag.md": {
+      "hash": "357e884883a7539d6c6dc563ccf8e7176c75e80c303092bf8db6dc8281291173",
+      "bytes": 945,
+      "lines": 26,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-005 — OTP Skip Flag",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-002-booking-duality.md": {
+      "hash": "74fe563af3be9e98910b04a9725a71a5b490b3410d8b2cbf301a002f6769ad37",
+      "bytes": 995,
+      "lines": 28,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-002 — Booking Model Duality",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-008-skills-strategy.md": {
+      "hash": "49d1cbf633d97a35a733b43672b47dead27728c0895bd95b995bce56d7275397",
+      "bytes": 1099,
+      "lines": 29,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-008 — Skills Strategy",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-007-leftover-screens.md": {
+      "hash": "26a2ba0a3fc3cf27d1a53c34d7a8babd1e591be02fc1e75c6de0a5d01218c284",
+      "bytes": 935,
+      "lines": 26,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-007 — Leftover Screens Policy",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-003-admin-auth.md": {
+      "hash": "fd13b4149383b5a4757699746cc6e076d263bfe1a97c0765833ec38e44f54fea",
+      "bytes": 861,
+      "lines": 26,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-003 — Admin Authentication",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-009-context-engineering.md": {
+      "hash": "8925f3d7aea5af867a933a0fd5074a18d268106c231197814090c81f22729db1",
+      "bytes": 1807,
+      "lines": 42,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-009 — Context Engineering Architecture",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-004-no-web-portals.md": {
+      "hash": "1ab6d8c1da4861baa19767a6d5f0a18d1ade54f7cd41b2faac12319ca11dcb35",
+      "bytes": 677,
+      "lines": 25,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-004 — No Web Portals in v2",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-006-admin-state.md": {
+      "hash": "87801431818d901d971af2152d2e54564218915d2d07c242c8c1ba765fb9a92c",
+      "bytes": 767,
+      "lines": 27,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-006 — Admin State Management",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+,
+    ".agents/decisions/ADR-001-branch-strategy.md": {
+      "hash": "3f4f1108bf98076b71afbc4705ee2d3720a15f5b1eb499ae5092870043619ee6",
+      "bytes": 852,
+      "lines": 26,
+      "ext": "md",
+      "status": "updated",
+      "summary": "ADR-001 — Branch Strategy",
+      "indexed": "2026-10-02T07:31:12Z"
+    }
+  }
+}

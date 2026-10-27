@@ -1,16 +1,6 @@
-import React, { type ReactNode } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { PartnerText } from './PartnerText';
+import React, { type ReactNode, useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +12,7 @@ interface PartnerScreenLayoutProps {
   title: string;
   subtitle?: string;
   onBack?: () => void;
+  headerRight?: ReactNode;
   headerExtra?: ReactNode;
   footer?: ReactNode;
   bottomBar?: ReactNode;
@@ -31,12 +22,17 @@ interface PartnerScreenLayoutProps {
   showBackButton?: boolean;
   /** Extra top spacing inside the scroll area (default: comfortable offset below header). */
   contentTopSpacing?: number;
+  /** Tighter padding under the sticky header (e.g. filter chips + list screens). */
+  denseHeader?: boolean;
+  /** Floating top toast notification rendered at the screen root outside the scroll area. */
+  toast?: ReactNode;
 }
 
 export default function PartnerScreenLayout({
   title,
   subtitle,
   onBack,
+  headerRight,
   headerExtra,
   footer,
   bottomBar,
@@ -45,14 +41,18 @@ export default function PartnerScreenLayout({
   scrollContentStyle,
   showBackButton = true,
   contentTopSpacing = spacing.xxxl,
+  denseHeader = false,
+  toast,
 }: PartnerScreenLayoutProps) {
   const insets = useSafeAreaInsets();
+  const [overlayHeight, setOverlayHeight] = useState(0);
 
   const body = (
     <>
       <View
         style={[
           styles.stickyHeader,
+          denseHeader && styles.stickyHeaderDense,
           {
             paddingTop: insets.top + spacing.xs,
             paddingHorizontal: layout.screenPadding,
@@ -63,30 +63,36 @@ export default function PartnerScreenLayout({
             <Pressable
               onPress={onBack}
               hitSlop={12}
-              style={({ pressed }) => [styles.sideSlot, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
               accessibilityRole="button"
               accessibilityLabel="Go back">
               <ArrowLeft size={24} color={colors.dark} strokeWidth={2.5} />
             </Pressable>
           ) : (
-            <View style={styles.sideSlot} />
+            <View style={styles.sideSpacer} />
           )}
 
           <View style={styles.titleBlock}>
-            <Text style={styles.title} numberOfLines={2}>
+            <PartnerText style={styles.title} numberOfLines={2}>
               {title}
-            </Text>
+            </PartnerText>
             {subtitle ? (
-              <Text style={styles.subtitle} numberOfLines={3}>
+              <PartnerText style={styles.subtitle} numberOfLines={3}>
                 {subtitle}
-              </Text>
+              </PartnerText>
             ) : null}
           </View>
 
-          <View style={styles.sideSlot} />
+          {headerRight ? (
+            <View style={styles.sideSlot}>{headerRight}</View>
+          ) : (
+            <View style={styles.sideSpacer} />
+          )}
         </View>
 
-        {headerExtra ? <View style={styles.headerExtra}>{headerExtra}</View> : null}
+        {headerExtra ? (
+          <View style={[styles.headerExtra, denseHeader && styles.headerExtraDense]}>{headerExtra}</View>
+        ) : null}
       </View>
 
       <ScrollView
@@ -99,7 +105,10 @@ export default function PartnerScreenLayout({
           {
             paddingHorizontal: layout.screenPadding,
             paddingTop: contentTopSpacing,
-            paddingBottom: footer || bottomBar ? spacing.lg : insets.bottom + spacing.xl,
+            paddingBottom:
+              footer || bottomBar
+                ? overlayHeight + spacing.lg
+                : insets.bottom + spacing.xl,
           },
           scrollContentStyle,
         ]}>
@@ -108,6 +117,7 @@ export default function PartnerScreenLayout({
 
       {footer ? (
         <View
+          onLayout={event => setOverlayHeight(event.nativeEvent.layout.height)}
           style={[
             styles.footer,
             {
@@ -121,6 +131,7 @@ export default function PartnerScreenLayout({
 
       {bottomBar ? (
         <View
+          onLayout={event => setOverlayHeight(event.nativeEvent.layout.height)}
           style={[
             styles.bottomBar,
             {
@@ -137,10 +148,12 @@ export default function PartnerScreenLayout({
   return (
     <View style={styles.root}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.background} />
+      {toast ? toast : null}
       {keyboardAvoiding ? (
         <KeyboardAvoidingView
           style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
           {body}
         </KeyboardAvoidingView>
       ) : (
@@ -160,23 +173,36 @@ const styles = StyleSheet.create({
   },
   stickyHeader: {
     backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E8ECF0',
     paddingBottom: spacing.lg,
+  },
+  stickyHeaderDense: {
+    paddingBottom: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  sideSlot: {
+  backButton: {
     width: HEADER_SIDE,
     height: HEADER_SIDE,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: HEADER_SIDE / 2,
-    backgroundColor: colors.lightGrey,
-    borderWidth: 1,
-    borderColor: colors.border,
+    flexShrink: 0,
+  },
+  sideSlot: {
+    minWidth: HEADER_SIDE,
+    height: HEADER_SIDE,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  sideSpacer: {
+    width: HEADER_SIDE,
+    height: HEADER_SIDE,
+    flexShrink: 0,
   },
   titleBlock: {
     flex: 1,
@@ -202,6 +228,9 @@ const styles = StyleSheet.create({
   },
   headerExtra: {
     marginTop: spacing.md,
+  },
+  headerExtraDense: {
+    marginTop: spacing.sm,
   },
   scroll: {
     flex: 1,

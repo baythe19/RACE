@@ -1,11 +1,6 @@
+import { PartnerText } from '../partner/PartnerText';
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronLeft, ChevronRight, X } from 'lucide-react-native';
 
@@ -119,9 +114,9 @@ function CalendarView({
           style={{ opacity: canGoPrev ? 1 : 0.3 }}>
           <ChevronLeft size={22} color={COLORS.selectedText} />
         </Pressable>
-        <Text style={styles.calendarMonthLabel}>
+        <PartnerText style={styles.calendarMonthLabel}>
           {MONTHS[viewMonth - 1]} {viewYear}
-        </Text>
+        </PartnerText>
         <Pressable
           onPress={() => {
             if (!canGoNext) return;
@@ -140,9 +135,9 @@ function CalendarView({
 
       <View style={styles.weekdayRow}>
         {WEEKDAYS.map((label, index) => (
-          <Text key={`weekday-${index}`} style={styles.weekdayLabel}>
+          <PartnerText key={`weekday-${index}`} style={styles.weekdayLabel}>
             {label}
-          </Text>
+          </PartnerText>
         ))}
       </View>
 
@@ -168,14 +163,14 @@ function CalendarView({
                   selected && styles.calendarDaySelected,
                   !selected && isToday && styles.calendarDayToday,
                 ]}>
-                <Text
+                <PartnerText
                   style={[
                     styles.calendarDayText,
                     selected && styles.calendarDayTextSelected,
                     disabled && styles.calendarDayTextDisabled,
                   ]}>
                   {cellDay}
-                </Text>
+                </PartnerText>
               </View>
             </Pressable>
           );
@@ -254,7 +249,7 @@ export default function DateOfBirthPickerModal({
 
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Date of Birth</Text>
+            <PartnerText style={styles.title}>Date of Birth</PartnerText>
             <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Close">
               <X size={22} color={COLORS.selectedText} strokeWidth={2.5} />
             </Pressable>
@@ -277,7 +272,7 @@ export default function DateOfBirthPickerModal({
           />
 
           <Pressable style={styles.confirmButton} onPress={handleConfirm}>
-            <Text style={styles.confirmButtonText}>Confirm</Text>
+            <PartnerText style={styles.confirmButtonText}>Confirm</PartnerText>
           </Pressable>
         </View>
       </View>
@@ -292,7 +287,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.overlay,
   },
   overlayBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   sheet: {
     backgroundColor: COLORS.background,

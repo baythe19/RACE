@@ -80,19 +80,21 @@ export default function TowingBookingLayout({
         ) : (
           <Pressable
             onPress={onContinue}
-            style={{
+            disabled={continueDisabled}
+            style={({ pressed }) => ({
               minHeight: t.buttonHeight,
               borderRadius: t.cardRadius,
-              backgroundColor: accentColor,
+              backgroundColor: continueDisabled ? colors.border : accentColor,
+              opacity: continueDisabled ? 0.55 : pressed ? 0.9 : 1,
               alignItems: 'center',
               justifyContent: 'center',
               paddingHorizontal: t.px(20),
-            }}>
+            })}>
             <Text
               style={{
                 fontSize: t.buttonLabel,
                 fontWeight: typography.weights.bold,
-                color: colors.dark,
+                color: continueDisabled ? colors.grey : colors.dark,
               }}>
               {buttonLabel}
             </Text>

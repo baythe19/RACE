@@ -1,7 +1,11 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
-const extraApiUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
+// Prefer EXPO_PUBLIC_* from .env (reloads with Metro). app.config extra can stay stale on device.
+const extraApiUrl =
+  (process.env.EXPO_PUBLIC_API_URL?.trim() ||
+    (Constants.expoConfig?.extra?.apiUrl as string | undefined)) ??
+  undefined;
 
 const DEV_API_HOST = Platform.select({
   android: '10.0.2.2',
@@ -72,4 +76,5 @@ export const API_ENDPOINTS = {
   vendorDriver: (id: string) => `/api/v1/vendor/drivers/${id}`,
   vendorDriverUploadDocument: (id: string) => `/api/v1/vendor/drivers/${id}/upload-document`,
   driverRegister: '/api/v1/driver/register',
+  confirmPaymentMode: (id: string) => `/api/v1/bookings/${id}/confirm-payment-mode`,
 } as const;

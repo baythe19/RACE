@@ -7,17 +7,22 @@ export const AUTH_USER = {
 /** Demo: registered returning user (10-digit mobile without country code) */
 export const REGISTERED_PHONE_DIGITS = '8249472910';
 
-/** Prefer Om Singh for partner demo login UI (legacy constant; prefer real Twilio OTP login). */
-export const PARTNER_DEMO_PHONE = '8888880001';
+/** Linked preview personas (see previewPartnerWorld.ts). */
+export const PARTNER_DEMO_VENDOR_PHONE = '9812345670';
+export const PARTNER_DEMO_DRIVER_PHONE = '9876543210';
 
-/** @deprecated Fixed OTP removed — backend sends real Twilio SMS OTP. */
+/** @deprecated Use PARTNER_DEMO_DRIVER_PHONE */
+export const PARTNER_DEMO_PHONE = PARTNER_DEMO_DRIVER_PHONE;
+
+/** @deprecated Fixed OTP removed — backend sends real HanuSMS OTP. */
 export const DEMO_OTP = '';
 
-/** Legacy seed phones — not used for login shortcuts anymore. */
 export const PARTNER_DEMO_DRIVERS = [
-  { name: 'Om Singh', phone: '8888880001', type: 'Tow Driver' },
-  { name: 'Ramesh', phone: '8888880002', type: 'Full-Time Driver' },
-  { name: 'Vaibhav', phone: '8888880003', type: 'Part-Time Driver' },
+  { name: 'Abhishek Sharma', phone: PARTNER_DEMO_DRIVER_PHONE, type: 'Tow Driver' },
+] as const;
+
+export const PARTNER_DEMO_VENDORS = [
+  { name: 'Bikram Keshari Rout', phone: PARTNER_DEMO_VENDOR_PHONE, type: 'Towing Vendor' },
 ] as const;
 
 export const DEMO_PIN = '1234';
