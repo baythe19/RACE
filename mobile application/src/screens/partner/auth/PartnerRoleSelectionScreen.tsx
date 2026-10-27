@@ -143,11 +143,14 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
         </View>
 
         {/* Hero Artwork Image — Full Width Edge-to-Edge Fit */}
-        <View style={[styles.artworkContainer, { height: heroHeight, marginTop: px(14) }]}>
+        <View
+          style={[styles.artworkContainer, { height: heroHeight, marginTop: px(14), backgroundColor: '#FFFBEB' }]}
+          testID="roleSelectionHero">
           <Image
             source={images.partnerWelcomeHero}
-            style={[styles.heroImage, { width, height: heroHeight }]}
+            style={[styles.heroImage, { width: '100%', height: '100%' }]}
             resizeMode="cover"
+            fadeDuration={0}
             accessibilityLabel="RACE Partner Drivers and Fleet Illustration"
           />
         </View>

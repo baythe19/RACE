@@ -245,6 +245,8 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         return;
       }
       if (UI_PREVIEW_MUTATIONS_ENABLED) {
+        // UI-preview fallback only (preview builds point at a dead API URL).
+        // Real backend errors must surface as errors — never fake an OTP.
         navigation.navigate('PartnerOtpVerification', {
           mobileNumber: phoneToUse || '9876543210',
           role: partnerRole ?? undefined,
@@ -254,7 +256,7 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
         });
         return;
       }
-      setError(errMsg || (SKIP_OTP_AUTH ? 'Unable to sign in' : 'Unable to send OTP'));
+      setError(errMsg || 'Unable to send OTP. Check your connection and try again.');
     }
   };
 

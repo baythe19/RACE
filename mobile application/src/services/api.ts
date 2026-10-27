@@ -7,7 +7,9 @@ import { notifyUnauthorized } from './authSession';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  // 45s: Render free tier cold-start after sleep can take 30-50s; 15s caused
+  // spurious "Network error" on the first Send OTP tap after inactivity.
+  timeout: 45000,
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
