@@ -122,10 +122,10 @@ api.interceptors.response.use(
 export function getApiErrorMessage(error: unknown, fallback = 'Something went wrong'): string {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     if (error.code === 'ECONNABORTED' || error.message.toLowerCase().includes('timeout')) {
-      return `Cannot reach backend at ${API_BASE_URL}. Start "npm run dev" in backend, keep phone on same WiFi, then reload the app.`;
+      return `Server is slow to wake up (${API_BASE_URL}). Wait a few seconds and try again.`;
     }
     if (error.message === 'Network Error' || !error.response) {
-      return `Network error — cannot reach ${API_BASE_URL}. Check backend is running and WiFi matches your Mac.`;
+      return `Network error — cannot reach ${API_BASE_URL}. Check internet and try again.`;
     }
     if (error.response?.status === 429) {
       return 'OTP limit reached. Try again in 1 hour.';

@@ -88,7 +88,7 @@ export function validateProfileForm(input: ProfileFormInput): Record<string, str
     errors.email = 'Enter a valid email address';
   }
   if (!normalizeDateOfBirth(input.dateOfBirth)) {
-    errors.dob = 'Use date format YYYY-MM-DD (e.g. 1990-01-15)';
+    errors.dob = 'Use date format DD/MM/YYYY (e.g. 15/01/1990)';
   }
 
   if (input.emergencyName.trim().length < 2) {
@@ -128,7 +128,7 @@ export function validateProfileForm(input: ProfileFormInput): Record<string, str
 export function buildUpdateProfilePayload(input: ProfileFormInput): UpdateProfileRequest {
   const dateOfBirth = normalizeDateOfBirth(input.dateOfBirth);
   if (!dateOfBirth) {
-    throw new Error('Use date format YYYY-MM-DD (e.g. 1990-01-15)');
+    throw new Error('Use date format DD/MM/YYYY (e.g. 15/01/1990)');
   }
 
   const emergencyDigits = getPhoneDigits(input.emergencyPhone);
@@ -164,7 +164,7 @@ export function buildUpdateProfilePayload(input: ProfileFormInput): UpdateProfil
 export function sanitizeUpdateProfileRequest(data: UpdateProfileRequest): UpdateProfileRequest {
   const dateOfBirth = normalizeDateOfBirth(data.dateOfBirth);
   if (!dateOfBirth) {
-    throw new Error('dateOfBirth must be YYYY-MM-DD (e.g. 1990-01-15)');
+    throw new Error('dateOfBirth must be a valid date (DD/MM/YYYY)');
   }
 
   const email = data.email?.trim();

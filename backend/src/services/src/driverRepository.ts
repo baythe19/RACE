@@ -25,6 +25,8 @@ export class DriverRepository {
     status?: DriverRecord['status'];
     statusHistory?: DriverRecord['statusHistory'];
     isVerified?: boolean;
+    experienceYears?: number;
+    emergencyContact?: { name: string; mobileNumber: string; relationship?: string };
   }): Promise<DriverRecord> {
     const user = await UserModel.create({
       mobileNumber: data.mobileNumber,
@@ -34,6 +36,7 @@ export class DriverRepository {
       isAvailable: false,
       isVerified: data.isVerified ?? true,
       isProfileCompleted: false,
+      emergencyContact: data.emergencyContact ?? undefined,
       driverProfile: {
         driverCode: data.driverCode,
         licenseNo: data.licenseNo,
@@ -51,6 +54,7 @@ export class DriverRepository {
         rating: 0,
         reviewCount: 0,
         totalTrips: 0,
+        experienceYears: data.experienceYears,
         documents: [],
         statusHistory: data.statusHistory ?? [{ status: data.status ?? 'PENDING', changedAt: new Date() }],
       },

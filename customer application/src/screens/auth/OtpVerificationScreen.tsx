@@ -133,7 +133,9 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
           return;
         }
       } catch (err) {
-        if (code === '123456' || code === '000000' || UI_PREVIEW_AUTH_FLOW) {
+        // Preview-only soft login. Never accept magic OTPs when preview is off —
+        // that would ship into APKs and bypass real HanuSMS verification.
+        if (UI_PREVIEW_AUTH_FLOW) {
           ensurePreviewAuthSession(dispatch, isExistingUser);
           if (!isExistingUser) {
             navigation.replace('ProfileWizard');

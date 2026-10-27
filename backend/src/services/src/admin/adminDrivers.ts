@@ -145,6 +145,7 @@ export const adminDriversService = {
 
   async create(input: Record<string, string>, actor: { id: string; name: string }) {
     const count = await driverRepository.count();
+    const experienceYears = input.experienceYears ? Number(input.experienceYears) : undefined;
     const driver = await driverRepository.create({
       driverCode: `DRV${String(count + 1).padStart(4, '0')}`,
       fullName: input.name,
@@ -153,11 +154,21 @@ export const adminDriversService = {
       licenseNo: input.licenseNo,
       driverType: input.driverType ?? 'Tow Driver',
       vendorUserId: input.vendorId || undefined,
+      fleetSource: input.vendorId ? 'vendor' : 'admin',
       city: input.city ?? 'Bhubaneswar',
       state: input.state ?? 'Odisha',
       vehicleRegistration: input.vehicleRegistration,
       status: (input.status ?? 'PENDING') as never,
       statusHistory: [{ status: input.status ?? 'PENDING', changedAt: new Date() }],
+      experienceYears: Number.isFinite(experienceYears) ? experienceYears : undefined,
+      emergencyContact:
+        input.emergencyContactName && input.emergencyContactPhone
+          ? {
+              name: input.emergencyContactName,
+              mobileNumber: input.emergencyContactPhone,
+              relationship: input.emergencyContactRelation || undefined,
+            }
+          : undefined,
     });
 
     await logActivity({

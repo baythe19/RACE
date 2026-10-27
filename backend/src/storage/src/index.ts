@@ -85,7 +85,12 @@ function resolveVehicleFolder(vendorType: string, vendorId: string, vehicleId: s
 }
 
 function getLocalUploadsRoot(): string {
-  return path.join(process.cwd(), 'uploads');
+  // Local dev / Render without a disk: <cwd>/uploads (ephemeral).
+  // With UPLOADS_DIR set (Render persistent disk mounted), files survive
+  // deploys. Switching to GCS later is env-only: fill GCS_* vars and uploads
+  // flip to the bucket wholesale — no code change, no broken image URLs in
+  // the admin panel (the /admin/documents proxy handles both backends).
+  return process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
 }
 
 function ensureDir(dir: string): void {

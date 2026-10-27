@@ -148,16 +148,12 @@ export function buildDriverDocuments(driver: {
     });
   }
 
+  // Placeholder documents (nothing uploaded yet). They must never claim
+  // VERIFIED — there is no file behind them, and the proxy would 404.
   const uploadedAt = (driver.createdAt ?? new Date()).toISOString();
   const rejected = driver.status === 'REJECTED';
-  const approved = driver.status === 'APPROVED';
-  const docStatus = (): 'VERIFIED' | 'PENDING' | 'REJECTED' => {
-    if (rejected) return 'REJECTED';
-    if (approved) return 'VERIFIED';
-    return 'PENDING';
-  };
-
   const driverId = driver._id.toString();
+
   return [
     { key: 'dl', name: 'Driving License' },
     { key: 'aadhaar', name: 'Aadhaar Card' },
@@ -166,8 +162,11 @@ export function buildDriverDocuments(driver: {
   ].map((doc) => ({
     id: `${driverId}-${doc.key}`,
     name: doc.name,
-    status: docStatus(),
-    url: `/admin/documents/driver/${driverId}/${doc.key}`,
+    // No file uploaded: awaiting upload, even when the driver is already
+    // approved (approval can pre-date document submission in testing flows).
+    status: (rejected ? 'REJECTED' : 'PENDING') as 'REJECTED' | 'PENDING',
+    // No url → admin card keeps Open/Download disabled (no 404 on click).
+    url: undefined,
     uploadedAt,
   }));
 }

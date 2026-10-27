@@ -453,34 +453,36 @@ export default function MobileNumberScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
-          {/* Quick Demo Mode Card */}
-          <View
-            style={{
-              marginTop: 14 * scale,
-              padding: 12 * scale,
-              backgroundColor: '#F3F4F6',
-              borderRadius: 12 * scale,
-              alignItems: 'center',
-            }}>
-            <Text style={{ fontSize: 11 * scale, fontWeight: '700', color: COLORS.orange }}>
-              ⚡ QUICK DEMO MODE (NO BACKEND)
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => ensurePreviewAuthSession(dispatch, true)}
-              style={({ pressed }) => ({
-                marginTop: 8 * scale,
-                backgroundColor: COLORS.orange,
-                paddingVertical: 8 * scale,
-                paddingHorizontal: 16 * scale,
-                borderRadius: 8 * scale,
-                opacity: pressed ? 0.85 : 1,
-              })}>
-              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 * scale }}>
-                🚀 Explore Customer App (Demo)
+          {/* Preview builds only — never show in APK when UI_PREVIEW_AUTH_FLOW=false */}
+          {UI_PREVIEW_AUTH_FLOW ? (
+            <View
+              style={{
+                marginTop: 14 * scale,
+                padding: 12 * scale,
+                backgroundColor: '#F3F4F6',
+                borderRadius: 12 * scale,
+                alignItems: 'center',
+              }}>
+              <Text style={{ fontSize: 11 * scale, fontWeight: '700', color: COLORS.orange }}>
+                ⚡ QUICK DEMO MODE (NO BACKEND)
               </Text>
-            </Pressable>
-          </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => ensurePreviewAuthSession(dispatch, true)}
+                style={({ pressed }) => ({
+                  marginTop: 8 * scale,
+                  backgroundColor: COLORS.orange,
+                  paddingVertical: 8 * scale,
+                  paddingHorizontal: 16 * scale,
+                  borderRadius: 8 * scale,
+                  opacity: pressed ? 0.85 : 1,
+                })}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 * scale }}>
+                  🚀 Explore Customer App (Demo)
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {isSignup ? (
             <>

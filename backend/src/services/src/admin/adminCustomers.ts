@@ -23,21 +23,38 @@ function mapCustomer(
     fullName?: string;
     mobileNumber: string;
     email?: string;
-    address?: { city?: string; state?: string };
+    address?: { line1?: string; city?: string; state?: string; pincode?: string };
+    gender?: string;
+    dateOfBirth?: Date;
+    emergencyContact?: { name?: string; mobileNumber?: string; relationship?: string };
     accountStatus?: string;
     createdAt: Date;
   },
   vehicleCount = 0,
   totalBookings = 0,
 ) {
+  const genderLabels: Record<string, string> = {
+    male: 'Male',
+    female: 'Female',
+    other: 'Other',
+    prefer_not_to_say: 'Prefer not to say',
+  };
   return {
     id: user._id.toString(),
     customerId: user.customerCode ?? `CUST${user._id.toString().slice(-6).toUpperCase()}`,
     name: user.fullName ?? 'Unnamed Customer',
     phone: user.mobileNumber,
     email: user.email ?? '',
+    addressLine: user.address?.line1 ?? '—',
     city: user.address?.city ?? '—',
     state: user.address?.state ?? 'Odisha',
+    pincode: user.address?.pincode ?? '—',
+    gender: user.gender ? genderLabels[user.gender] ?? user.gender : '—',
+    dateOfBirth: user.dateOfBirth ? user.dateOfBirth.toISOString().slice(0, 10) : null,
+    emergencyContact:
+      user.emergencyContact?.name && user.emergencyContact?.mobileNumber
+        ? `${user.emergencyContact.name} (${user.emergencyContact.mobileNumber})${user.emergencyContact.relationship ? ` · ${user.emergencyContact.relationship}` : ''}`
+        : null,
     vehicleCount,
     totalBookings,
     status: (user.accountStatus ?? 'ACTIVE') as 'ACTIVE' | 'SUSPENDED' | 'INACTIVE',
@@ -302,6 +319,13 @@ export const adminCustomersService = {
       city?: string;
       state?: string;
       status?: string;
+      addressLine?: string;
+      pincode?: string;
+      gender?: string;
+      dateOfBirth?: string;
+      emergencyContactName?: string;
+      emergencyContactPhone?: string;
+      emergencyContactRelation?: string;
     },
     actor: { id: string; name: string },
   ) {
@@ -312,6 +336,7 @@ export const adminCustomersService = {
     }
 
     const count = await UserModel.countDocuments({ role: 'customer' });
+    const dateOfBirth = input.dateOfBirth ? new Date(input.dateOfBirth) : undefined;
     const user = await UserModel.create({
       mobileNumber,
       fullName: input.name,
@@ -320,7 +345,23 @@ export const adminCustomersService = {
       isVerified: true,
       accountStatus: input.status ?? 'ACTIVE',
       customerCode: `CUST${String(count + 1).padStart(4, '0')}`,
-      address: { city: input.city, state: input.state ?? 'Odisha', country: 'India' },
+      gender: (input.gender as never) || undefined,
+      dateOfBirth: dateOfBirth && !Number.isNaN(dateOfBirth.getTime()) ? dateOfBirth : undefined,
+      emergencyContact:
+        input.emergencyContactName && input.emergencyContactPhone
+          ? {
+              name: input.emergencyContactName,
+              mobileNumber: input.emergencyContactPhone,
+              relationship: input.emergencyContactRelation || undefined,
+            }
+          : undefined,
+      address: {
+        line1: input.addressLine || undefined,
+        city: input.city,
+        state: input.state ?? 'Odisha',
+        pincode: input.pincode || undefined,
+        country: 'India',
+      },
     });
 
     await logActivity({
@@ -344,6 +385,13 @@ export const adminCustomersService = {
       city: string;
       state: string;
       status: string;
+      addressLine: string;
+      pincode: string;
+      gender: string;
+      dateOfBirth: string;
+      emergencyContactName: string;
+      emergencyContactPhone: string;
+      emergencyContactRelation: string;
     }>,
     actor: { id: string; name: string },
   ) {
@@ -363,11 +411,28 @@ export const adminCustomersService = {
     }
     if (input.email) user.email = input.email;
     if (input.status) user.accountStatus = input.status as never;
-    if (input.city || input.state) {
+    if (input.gender) user.gender = input.gender as never;
+    if (input.dateOfBirth !== undefined) {
+      const dob = input.dateOfBirth ? new Date(input.dateOfBirth) : undefined;
+      user.dateOfBirth = dob && !Number.isNaN(dob.getTime()) ? dob : undefined;
+    }
+    if (input.emergencyContactName !== undefined || input.emergencyContactPhone !== undefined) {
+      const hasContact = Boolean(input.emergencyContactName && input.emergencyContactPhone);
+      user.emergencyContact = hasContact
+        ? {
+            name: input.emergencyContactName ?? user.emergencyContact?.name ?? '',
+            mobileNumber: input.emergencyContactPhone ?? user.emergencyContact?.mobileNumber ?? '',
+            relationship: input.emergencyContactRelation ?? user.emergencyContact?.relationship,
+          }
+        : undefined;
+    }
+    if (input.addressLine !== undefined || input.city || input.state || input.pincode !== undefined) {
       user.address = {
         ...user.address,
+        line1: input.addressLine ?? user.address?.line1,
         city: input.city ?? user.address?.city,
         state: input.state ?? user.address?.state,
+        pincode: input.pincode ?? user.address?.pincode,
       };
     }
     await user.save();
