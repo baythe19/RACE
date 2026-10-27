@@ -60,14 +60,18 @@ function VendorProfileCard({
   vendor,
   onApprove,
   onReject,
+  onSuspend,
   isApproving,
   isRejecting,
+  isSuspending,
 }: {
   vendor: VendorDetail;
   onApprove: () => void;
   onReject: () => void;
+  onSuspend: () => void;
   isApproving: boolean;
   isRejecting: boolean;
+  isSuspending: boolean;
 }) {
   return (
     <Card className="overflow-hidden">
@@ -86,24 +90,37 @@ function VendorProfileCard({
             </div>
           </div>
 
-          {vendor.status === 'PENDING' ||
-          (vendor.verificationStatus === 'PENDING' && vendor.status !== 'REJECTED') ? (
-            <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
+            {vendor.status === 'PENDING' ||
+            (vendor.verificationStatus === 'PENDING' && vendor.status !== 'REJECTED') ? (
+              <>
+                <Button
+                  variant="outline"
+                  className="border-error/30 text-error hover:bg-[#FEF2F2]"
+                  onClick={onReject}
+                  disabled={isRejecting || isApproving || isSuspending}
+                >
+                  {isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Reject
+                </Button>
+                <Button onClick={onApprove} disabled={isApproving || isRejecting || isSuspending}>
+                  {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Approve
+                </Button>
+              </>
+            ) : null}
+            {vendor.status === 'APPROVED' ? (
               <Button
                 variant="outline"
-                className="border-error/30 text-error hover:bg-[#FEF2F2]"
-                onClick={onReject}
-                disabled={isRejecting || isApproving}
+                className="border-warning/40 text-warning hover:bg-warning/10"
+                onClick={onSuspend}
+                disabled={isSuspending || isApproving || isRejecting}
               >
-                {isRejecting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Reject
+                {isSuspending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Suspend
               </Button>
-              <Button onClick={onApprove} disabled={isApproving || isRejecting}>
-                {isApproving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Approve
-              </Button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-6 grid gap-4 border-t border-border pt-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -323,7 +340,7 @@ export function VendorDetailContent({ vendorId }: { vendorId: string }) {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const { data: vendor, isLoading, isError, refetch } = useVendorDetail(vendorId);
-  const { approve, reject } = useVendorActions(vendorId);
+  const { approve, reject, suspend } = useVendorActions(vendorId);
   const reviewDocument = useVendorDocumentReview(vendorId);
   const { createVehicle, updateVehicle, removeVehicle } = useVendorVehicleMutations(vendorId);
   const { assignDrivers, unassignDriver } = useVendorDriverAssignmentMutations(vendorId);
@@ -453,8 +470,18 @@ export function VendorDetailContent({ vendorId }: { vendorId: string }) {
               onSuccess: () => navigate('/vendors?status=REJECTED'),
             })
           }
+          onSuspend={() => {
+            if (
+              window.confirm(
+                `Suspend ${vendor.businessName}? They will not receive new jobs until re-approved.`,
+              )
+            ) {
+              suspend.mutate('Suspended from admin panel');
+            }
+          }}
           isApproving={approve.isPending}
           isRejecting={reject.isPending}
+          isSuspending={suspend.isPending}
         />
 
         <VerificationDocumentsCard

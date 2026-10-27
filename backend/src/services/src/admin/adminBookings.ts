@@ -338,8 +338,10 @@ export const adminBookingsService = {
         serviceType: row.bookingType,
         amount: booking.estimatedFare ?? 0,
         city: customer?.address?.city ?? '—',
-        status: mapPublicBookingStatus(booking.status),
+        // Admin ops view: keep raw service status (do not collapse CONFIRMED/DRIVER_ASSIGNED → PENDING).
+        status: booking.status,
         internalStatus: booking.status,
+        publicStatus: mapPublicBookingStatus(booking.status),
         date: new Date(booking.createdAt).toISOString(),
         fareBreakdown: booking.fareBreakdown,
         vehicleCategory: booking.vehicleCategory,
@@ -475,8 +477,9 @@ export const adminBookingsService = {
         serviceType: type,
         amount: booking.estimatedFare ?? 0,
         city: customer?.address?.city ?? '—',
-        status: mapPublicBookingStatus(booking.status),
+        status: booking.status,
         internalStatus: booking.status,
+        publicStatus: mapPublicBookingStatus(booking.status),
         date: booking.createdAt.toISOString(),
         location: {
           pickup: {
@@ -525,7 +528,8 @@ export const adminBookingsService = {
               ? 'Driver allotted — awaiting acceptance'
               : entry.status.replace(/_/g, ' '),
           timestamp: entry.timestamp.toISOString(),
-          status: mapPublicBookingStatus(entry.status),
+          status: entry.status,
+          publicStatus: mapPublicBookingStatus(entry.status),
           description: entry.note,
         })),
         cancellationInfo: booking.cancelledAt

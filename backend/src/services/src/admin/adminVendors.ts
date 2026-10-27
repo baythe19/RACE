@@ -126,9 +126,27 @@ function mapStoredVendorDocument(document: {
   };
 }
 
+function deriveVendorCity(user: IUser, address?: string) {
+  if (user.address?.city?.trim()) return user.address.city.trim();
+  if (!address?.trim()) return 'Odisha';
+  const parts = address
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return 'Odisha';
+  // The trailing segment is often the state ("…, Odisha") — prefer the
+  // segment before it when it looks like a state name.
+  const STATE_NAMES = new Set(['odisha', 'orissa']);
+  const last = parts[parts.length - 1];
+  if (parts.length >= 2 && STATE_NAMES.has(last.toLowerCase())) {
+    return parts[parts.length - 2];
+  }
+  return last;
+}
+
 function mapVendorFromUser(user: IUser) {
   const vendor = toVendorRecord(user);
-  const city = vendor.address?.split(',')[0] ?? 'Odisha';
+  const city = deriveVendorCity(user, vendor.address);
   const status = mapVendorStatus(vendor.status);
   const documents = buildVendorDocuments(vendor);
   return {

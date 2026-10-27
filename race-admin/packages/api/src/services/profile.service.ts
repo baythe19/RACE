@@ -25,14 +25,22 @@ export async function getProfile(): Promise<ProfileDetail> {
   };
 }
 
+/**
+ * Platform admin identity is env-backed (hardcoded-admin). Profile fields other than
+ * session display cannot be persisted via API yet — return current profile unchanged.
+ */
 export async function updateProfile(_input: Partial<ProfileDetail>) {
-  return getProfile();
+  throw new Error(
+    'Platform admin profile is managed by server configuration. Name/email come from ADMIN_NAME / ADMIN_EMAIL.',
+  );
 }
 
 export async function changePassword(_payload: ChangePasswordPayload) {
-  throw new Error('Change password via admin profile is not yet implemented');
+  throw new Error(
+    'Change the platform admin password by updating ADMIN_PASSWORD in the backend environment, then restart the API.',
+  );
 }
 
 export async function updateProfileImage(_file: File) {
-  throw new Error('Profile image upload is not yet implemented');
+  throw new Error('Admin profile image upload is not available for the env-backed platform admin.');
 }

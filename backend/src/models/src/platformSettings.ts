@@ -20,6 +20,8 @@ export interface IPlatformSettings extends Document {
     smsEnabled: boolean;
     pushEnabled: boolean;
   };
+  /** When true, admin UI may overlay demo/mock dashboard content. Default false = live data only. */
+  useMockData: boolean;
   updatedBy?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -46,6 +48,7 @@ const PlatformSettingsSchema = new Schema<IPlatformSettings>(
       smsEnabled: { type: Boolean, default: true },
       pushEnabled: { type: Boolean, default: true },
     },
+    useMockData: { type: Boolean, default: false },
     updatedBy: { type: String },
   },
   { timestamps: true },

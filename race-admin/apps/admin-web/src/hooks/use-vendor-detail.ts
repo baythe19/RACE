@@ -1,6 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { approveVendor, assignVendorDrivers, createVendorVehicle, deleteVendorVehicle, getVendorById, rejectVendor, reviewVendorDocument, unassignVendorDriver, updateVendorVehicle } from '@race/api';
+import {
+  approveVendor,
+  assignVendorDrivers,
+  createVendorVehicle,
+  deleteVendorVehicle,
+  getVendorById,
+  rejectVendor,
+  reviewVendorDocument,
+  suspendVendor,
+  unassignVendorDriver,
+  updateVendorVehicle,
+} from '@race/api';
 
 export function useVendorDetail(id: string) {
   return useQuery({
@@ -31,7 +42,16 @@ export function useVendorActions(id: string) {
     },
   });
 
-  return { approve, reject };
+  const suspend = useMutation({
+    mutationFn: (note?: string) => suspendVendor(id, note),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['vendor', id] });
+      void queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      void queryClient.invalidateQueries({ queryKey: ['vendor-status-counts'] });
+    },
+  });
+
+  return { approve, reject, suspend };
 }
 
 export function useVendorDocumentReview(vendorId: string) {

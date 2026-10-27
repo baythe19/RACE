@@ -60,6 +60,7 @@ export function useSettings() {
       if (partial.terms) next.terms = { ...prev.terms, ...partial.terms };
       if (partial.emailSms) next.emailSms = { ...prev.emailSms, ...partial.emailSms };
       if (partial.appearance) next.appearance = { ...prev.appearance, ...partial.appearance };
+      if (partial.demo) next.demo = { ...prev.demo, ...partial.demo };
       return next;
     });
     setIsDirty(true);

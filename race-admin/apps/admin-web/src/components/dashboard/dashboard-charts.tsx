@@ -19,7 +19,7 @@ import {
 } from 'recharts';
 
 import type { ChartDataPoint, DonutSegment } from '@race/types';
-import { CHART_COLORS } from '@race/constants';
+import { BRAND_RED, CHART_COLORS } from '@race/constants';
 import { Select } from '@race/ui';
 
 import { ChartCard } from '@/components/shared/chart-card';
@@ -111,10 +111,11 @@ export function RevenueChart({ data }: { data: ChartDataPoint[] }) {
             type="monotone"
             dataKey="previous"
             name="Last Month"
-            stroke="#D1D5DB"
+            stroke={BRAND_RED}
             strokeWidth={2}
             fill="transparent"
             strokeDasharray="4 4"
+            strokeOpacity={0.55}
             dot={false}
           />
         </AreaChart>
@@ -134,7 +135,7 @@ export function BookingsChart({ data }: { data: ChartDataPoint[] }) {
           <Tooltip content={<ChartTooltip />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Bar dataKey="current" name="This Month" fill={CHART_COLORS.primary} radius={[6, 6, 0, 0]} />
-          <Bar dataKey="previous" name="Last Month" fill="#E5E7EB" radius={[6, 6, 0, 0]} />
+          <Bar dataKey="previous" name="Last Month" fill={BRAND_RED} fillOpacity={0.45} radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartCard>
@@ -144,6 +145,19 @@ export function BookingsChart({ data }: { data: ChartDataPoint[] }) {
 export function TopServicesChart({ data }: { data: DonutSegment[] }) {
   const total = data.reduce((sum, d) => sum + d.value, 0);
   const topService = [...data].sort((a, b) => b.value - a.value)[0];
+
+  if (data.length === 0) {
+    return (
+      <ChartCard title="Top Services" subtitle="Service mix distribution">
+        <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-2 text-center">
+          <p className="text-sm font-semibold text-heading">No service data yet</p>
+          <p className="max-w-[220px] text-xs text-muted">
+            Once customers start booking, the service mix will appear here.
+          </p>
+        </div>
+      </ChartCard>
+    );
+  }
 
   return (
     <ChartCard title="Top Services" subtitle="Service mix distribution">
@@ -193,19 +207,26 @@ export function TopServicesChart({ data }: { data: DonutSegment[] }) {
   );
 }
 
-const DRIVER_PERFORMANCE = [
-  { metric: 'On-time', value: 92 },
-  { metric: 'Rating', value: 88 },
-  { metric: 'Acceptance', value: 85 },
-  { metric: 'Completion', value: 94 },
-  { metric: 'Safety', value: 90 },
-];
+export function DriverPerformanceChart({
+  data = [],
+}: {
+  data?: Array<{ metric: string; value: number }>;
+}) {
+  const chartData =
+    data.length > 0
+      ? data
+      : [
+          { metric: 'On-time', value: 0 },
+          { metric: 'Rating', value: 0 },
+          { metric: 'Acceptance', value: 0 },
+          { metric: 'Completion', value: 0 },
+          { metric: 'Safety', value: 0 },
+        ];
 
-export function DriverPerformanceChart() {
   return (
-    <ChartCard title="Driver Performance" subtitle="Fleet quality index" height={260}>
+    <ChartCard title="Driver Performance" subtitle="Fleet quality index (live)" height={260}>
       <ResponsiveContainer width="100%" height="100%">
-        <RadarChart data={DRIVER_PERFORMANCE} cx="50%" cy="50%" outerRadius="70%">
+        <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
           <PolarGrid stroke="#EAEAEA" />
           <PolarAngleAxis dataKey="metric" tick={{ fontSize: 11, fill: '#9CA3AF' }} />
           <Radar

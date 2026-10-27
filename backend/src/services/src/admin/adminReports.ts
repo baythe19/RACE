@@ -1,3 +1,5 @@
+import { Types } from 'mongoose';
+
 import { BookingModel } from '../../../models/src/booking';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
@@ -50,7 +52,6 @@ export const adminReportsService = {
       legacyServiceDistribution,
       towingServiceDistribution,
       driverServiceDistribution,
-      topVendors,
       legacyCompletionRate,
       towingCompletionRate,
       driverCompletionRate,
@@ -87,7 +88,7 @@ export const adminReportsService = {
         { $sort: { _id: 1 } },
       ]),
       UserModel.aggregate([
-        { $match: { ...match, role: 'vendor' } },
+        { $match: { ...match, role: 'vendor', vendorProfile: { $exists: true } } },
         { $group: { _id: { $month: '$createdAt' }, count: { $sum: 1 } } },
         { $sort: { _id: 1 } },
       ]),
@@ -110,7 +111,6 @@ export const adminReportsService = {
         { $match: match },
         { $group: { _id: { $ifNull: ['$driverServiceType', 'full_time'] }, count: { $sum: 1 } } },
       ]),
-      UserModel.find({ ...match, role: 'vendor' }).sort({ createdAt: -1 }).limit(5).lean(),
       BookingModel.aggregate([
         { $match: match },
         {
@@ -170,8 +170,10 @@ export const adminReportsService = {
         { $group: { _id: null, total: { $sum: '$amount' } } },
       ]),
       UserModel.find({ role: 'driver' }).sort({ 'driverProfile.totalTrips': -1 }).limit(5).lean(),
-      UserModel.countDocuments({ role: 'driver', 'driverProfile.status': 'APPROVED' }),
-      UserModel.countDocuments({ ...match, role: 'vendor' }),
+      // Align with Drivers list: any user with a driverProfile.
+      UserModel.countDocuments({ ...match, role: 'driver', driverProfile: { $exists: true } }),
+      // Align with Vendors list: profile-backed vendors only.
+      UserModel.countDocuments({ ...match, role: 'vendor', vendorProfile: { $exists: true } }),
       UserModel.countDocuments({ ...match, role: 'customer' }),
     ]);
 
@@ -221,13 +223,92 @@ export const adminReportsService = {
     };
     const totalRevenue = (revenueAgg[0]?.total ?? 0) + (bookingRevenueAgg[0]?.total ?? 0);
     const totalBookings = rates.total ?? 0;
-    const avgBookingValue = totalBookings ? Math.round((rates.revenue ?? 0) / totalBookings) : 0;
+    // Honest average from actual payment revenue, not completion-pipeline fare guesses.
+    const avgBookingValue = totalBookings ? Math.round(totalRevenue / totalBookings) : 0;
     const newCustomers = customerGrowth.reduce((sum, row) => sum + row.count, 0);
     const avgDriverRating =
       topDrivers.length > 0
-        ? topDrivers.reduce((sum, driver) => sum + (driver.driverProfile?.rating ?? 0), 0) / topDrivers.length
+        ? topDrivers.reduce((sum, driver) => sum + (driver.driverProfile?.rating ?? 0), 0) /
+          topDrivers.length
         : 0;
-    const totalDriverTrips = topDrivers.reduce((sum, driver) => sum + (driver.driverProfile?.totalTrips ?? 0), 0);
+
+    const completedTripCount = rates.completed ?? 0;
+
+    const [towingByVendor, driverByVendor, legacyByVendor, towingRev, driverRev, legacyRev] =
+      await Promise.all([
+        TowingBookingModel.aggregate<{ _id: Types.ObjectId; bookings: number }>([
+          { $match: { ...match, vendorId: { $exists: true, $ne: null } } },
+          { $group: { _id: '$vendorId', bookings: { $sum: 1 } } },
+        ]),
+        DriverBookingModel.aggregate<{ _id: Types.ObjectId; bookings: number }>([
+          { $match: { ...match, vendorId: { $exists: true, $ne: null } } },
+          { $group: { _id: '$vendorId', bookings: { $sum: 1 } } },
+        ]),
+        BookingModel.aggregate<{ _id: Types.ObjectId; bookings: number }>([
+          { $match: { ...match, vendorId: { $exists: true, $ne: null } } },
+          { $group: { _id: '$vendorId', bookings: { $sum: 1 } } },
+        ]),
+        TowingBookingModel.aggregate<{ _id: Types.ObjectId; revenue: number }>([
+          {
+            $match: {
+              ...match,
+              vendorId: { $exists: true, $ne: null },
+              paymentStatus: { $in: ['FULLY_PAID', 'ADVANCE_PAID'] },
+            },
+          },
+          { $group: { _id: '$vendorId', revenue: { $sum: '$estimatedFare' } } },
+        ]),
+        DriverBookingModel.aggregate<{ _id: Types.ObjectId; revenue: number }>([
+          {
+            $match: {
+              ...match,
+              vendorId: { $exists: true, $ne: null },
+              paymentStatus: { $in: ['FULLY_PAID', 'ADVANCE_PAID'] },
+            },
+          },
+          { $group: { _id: '$vendorId', revenue: { $sum: '$estimatedFare' } } },
+        ]),
+        BookingModel.aggregate<{ _id: Types.ObjectId; revenue: number }>([
+          { $match: { ...match, vendorId: { $exists: true, $ne: null }, status: { $in: ['PAID', 'SERVICE_COMPLETED'] } } },
+          { $group: { _id: '$vendorId', revenue: { $sum: '$invoice.total' } } },
+        ]),
+      ]);
+
+    const vendorStats = new Map<string, { bookings: number; revenue: number }>();
+    for (const row of [...towingByVendor, ...driverByVendor, ...legacyByVendor]) {
+      const key = row._id.toString();
+      const prev = vendorStats.get(key) ?? { bookings: 0, revenue: 0 };
+      prev.bookings += row.bookings;
+      vendorStats.set(key, prev);
+    }
+    for (const row of [...towingRev, ...driverRev, ...legacyRev]) {
+      const key = row._id.toString();
+      const prev = vendorStats.get(key) ?? { bookings: 0, revenue: 0 };
+      prev.revenue += row.revenue;
+      vendorStats.set(key, prev);
+    }
+
+    const topVendorIds = [...vendorStats.entries()]
+      .sort((a, b) => b[1].bookings - a[1].bookings || b[1].revenue - a[1].revenue)
+      .slice(0, 5)
+      .map(([id]) => id);
+
+    const topVendorUsers = topVendorIds.length
+      ? await UserModel.find({
+          _id: { $in: topVendorIds },
+          role: 'vendor',
+          vendorProfile: { $exists: true },
+        }).lean()
+      : [];
+    const vendorNameMap = new Map(
+      topVendorUsers.map((vendor) => [
+        vendor._id.toString(),
+        vendor.vendorProfile?.businessName ??
+          vendor.vendorProfile?.ownerName ??
+          vendor.fullName ??
+          'Vendor',
+      ]),
+    );
 
     return {
       revenueTrend: combinedRevenueTrend.map((row) => ({
@@ -247,11 +328,11 @@ export const adminReportsService = {
         value: row.count,
       })),
       serviceDistribution: combinedServiceDistribution,
-      topVendors: topVendors.map((vendor) => ({
-        id: vendor._id.toString(),
-        name: vendor.vendorProfile?.businessName ?? vendor.vendorProfile?.ownerName ?? vendor.fullName ?? 'Vendor',
-        bookings: 0,
-        revenue: 0,
+      topVendors: topVendorIds.map((id) => ({
+        id,
+        name: vendorNameMap.get(id) ?? 'Vendor',
+        bookings: vendorStats.get(id)?.bookings ?? 0,
+        revenue: vendorStats.get(id)?.revenue ?? 0,
       })),
       topDrivers: topDrivers.map((driver) => ({
         id: driver._id.toString(),
@@ -272,7 +353,8 @@ export const adminReportsService = {
         avgBookingValue,
         newCustomers,
         avgDriverRating,
-        totalDriverTrips,
+        // Prefer completed booking count over inflated seed trip counters.
+        totalDriverTrips: completedTripCount,
       },
     };
   },

@@ -19,6 +19,7 @@ export async function getSettings(): Promise<AppSettings> {
       smsEnabled?: boolean;
       pushEnabled?: boolean;
     };
+    demo?: { useMockData?: boolean };
   }>('/settings');
 
   return {
@@ -35,12 +36,21 @@ export async function getSettings(): Promise<AppSettings> {
       ...DEFAULT_SETTINGS.payment,
       commissionRate: raw.business?.commissionRate ?? DEFAULT_SETTINGS.payment.commissionRate,
     },
-    appearance: raw.appearance ?? DEFAULT_SETTINGS.appearance,
+    appearance: {
+      ...DEFAULT_SETTINGS.appearance,
+      ...(raw.appearance ?? {}),
+      compactMode:
+        (raw.appearance as { compactMode?: boolean } | undefined)?.compactMode ??
+        DEFAULT_SETTINGS.appearance.compactMode,
+    },
     notifications: {
       ...DEFAULT_SETTINGS.notifications,
       emailAlerts: raw.notifications?.emailEnabled ?? DEFAULT_SETTINGS.notifications.emailAlerts,
       smsAlerts: raw.notifications?.smsEnabled ?? DEFAULT_SETTINGS.notifications.smsAlerts,
       pushAlerts: raw.notifications?.pushEnabled ?? DEFAULT_SETTINGS.notifications.pushAlerts,
+    },
+    demo: {
+      useMockData: raw.demo?.useMockData ?? DEFAULT_SETTINGS.demo.useMockData,
     },
   };
 }
@@ -62,6 +72,9 @@ export async function saveSettings(settings: AppSettings): Promise<AppSettings> 
       emailEnabled: settings.notifications.emailAlerts,
       smsEnabled: settings.notifications.smsAlerts,
       pushEnabled: settings.notifications.pushAlerts,
+    },
+    demo: {
+      useMockData: settings.demo.useMockData,
     },
   });
   return settings;

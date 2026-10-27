@@ -13,6 +13,8 @@ import type {
   UserSubscriptionResponseDto,
 } from './subscriptionValidator';
 
+type BillingCycle = 'monthly' | 'yearly';
+
 /** Canonical RACE plans — customer towing/driver + vendor partner tiers. */
 export const DEFAULT_PLANS = [
   {
@@ -210,7 +212,36 @@ function mapUserSub(sub: IUserSubscription): UserSubscriptionResponseDto {
   };
 }
 
+/** P2: add a billing cycle without month-end drift (Jan 31 + 1mo = Feb 28). */
+function addCycle(from: Date, billingCycle: BillingCycle): Date {
+  const to = new Date(from);
+  if (billingCycle === 'yearly') {
+    to.setFullYear(to.getFullYear() + 1);
+    return to;
+  }
+  const dayOfMonth = to.getDate();
+  to.setMonth(to.getMonth() + 1);
+  const daysInTargetMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate();
+  to.setDate(Math.min(dayOfMonth, daysInTargetMonth));
+  return to;
+}
+
 export class SubscriptionService {
+  /** P3: seed once per process — plans are static; skip the 8 upserts per request. */
+  private plansSeededAt: Date | null = null;
+  private static PLANS_SEED_TTL_MS = 10 * 60 * 1000;
+
+  private async ensurePlansSeededFresh(): Promise<void> {
+    if (
+      this.plansSeededAt &&
+      Date.now() - this.plansSeededAt.getTime() < SubscriptionService.PLANS_SEED_TTL_MS
+    ) {
+      return;
+    }
+    await this.ensurePlansSeeded();
+    this.plansSeededAt = new Date();
+  }
+
   /** Upsert canonical plans so admin seed and runtime stay aligned. */
   async ensurePlansSeeded(): Promise<void> {
     for (const plan of DEFAULT_PLANS) {
@@ -258,7 +289,7 @@ export class SubscriptionService {
     audience?: string;
     category?: string;
   }): Promise<PlanResponseDto[]> {
-    await this.ensurePlansSeeded();
+    await this.ensurePlansSeededFresh();
     const filter: Record<string, unknown> = { isActive: true };
     if (filters?.billingCycle) filter.billingCycle = filters.billingCycle;
     if (filters?.audience) filter.audience = filters.audience;
@@ -297,7 +328,7 @@ export class SubscriptionService {
   }
 
   async subscribe(userId: string, dto: SubscribeDto): Promise<UserSubscriptionResponseDto> {
-    await this.ensurePlansSeeded();
+    await this.ensurePlansSeededFresh();
 
     const plan = await SubscriptionPlanModel.findOne({
       slug: dto.planSlug,
@@ -312,6 +343,9 @@ export class SubscriptionService {
       throw new ConflictError('Please contact support for corporate plans');
     }
 
+    // P1 race-safe duplicate guard: atomic check inside the unique-index scope.
+    // The partial unique index {userId, audience, category} on active subs is
+    // the hard guarantee; this pre-check just gives a friendly message first.
     const existing = await this.getUserSubscription(userId, {
       audience: plan.audience,
       category: plan.category,
@@ -327,36 +361,47 @@ export class SubscriptionService {
       billingCycle === 'yearly' ? Math.round(plan.price * 12 * 0.8) : plan.price;
 
     const startedAt = new Date();
-    const expiresAt = new Date(startedAt);
-    if (billingCycle === 'yearly') {
-      expiresAt.setFullYear(expiresAt.getFullYear() + 1);
-    } else {
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    const expiresAt = addCycle(startedAt, billingCycle);
+
+    try {
+      const sub = await UserSubscriptionModel.create({
+        userId,
+        planId: plan.id,
+        planSlug: plan.slug,
+        planName: plan.name,
+        audience: plan.audience,
+        category: plan.category,
+        billingCycle,
+        price,
+        currency: plan.currency,
+        status: 'active',
+        startedAt,
+        expiresAt,
+      });
+
+      await notificationService.createForUser(userId, {
+        type: 'SUBSCRIPTION',
+        title: 'Subscription Activated',
+        message: `Your ${plan.name} plan is now active until ${expiresAt.toLocaleDateString()}.`,
+        metadata: { planSlug: plan.slug },
+      });
+
+      return mapUserSub(sub);
+    } catch (error) {
+      // P1: concurrent double-tap lost the race against the partial unique
+      // index — surface the same friendly conflict as the pre-check.
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        (error as { code?: number }).code === 11000
+      ) {
+        throw new ConflictError(
+          `You already have an active ${plan.category} subscription. Cancel it before switching plans.`,
+        );
+      }
+      throw error;
     }
-
-    const sub = await UserSubscriptionModel.create({
-      userId,
-      planId: plan.id,
-      planSlug: plan.slug,
-      planName: plan.name,
-      audience: plan.audience,
-      category: plan.category,
-      billingCycle,
-      price,
-      currency: plan.currency,
-      status: 'active',
-      startedAt,
-      expiresAt,
-    });
-
-    await notificationService.createForUser(userId, {
-      type: 'SUBSCRIPTION',
-      title: 'Subscription Activated',
-      message: `Your ${plan.name} plan is now active until ${expiresAt.toLocaleDateString()}.`,
-      metadata: { planSlug: plan.slug },
-    });
-
-    return mapUserSub(sub);
   }
 
   async cancel(

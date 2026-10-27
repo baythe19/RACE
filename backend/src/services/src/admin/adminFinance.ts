@@ -174,7 +174,12 @@ export const adminFinanceService = {
           { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
         PaymentTransactionModel.aggregate([
-          { $match: { paymentType: 'refund', status: 'success' } },
+          {
+            $match: {
+              paymentType: 'refund',
+              status: { $in: ['success', 'initiated', 'pending', 'processing'] },
+            },
+          },
           { $group: { _id: null, total: { $sum: '$amount' } } },
         ]),
         TransactionModel.aggregate([
