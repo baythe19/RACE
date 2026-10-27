@@ -17,6 +17,94 @@ import { logger } from '../../utils/src/logger';
  */
 const router = Router();
 let used = false;
+let wipeUsed = false;
+
+const QA_KEEP_MOBILES = [
+  '+919000000001',
+  '+919000000002',
+  '+919000000003',
+  '+919000000004',
+];
+
+/**
+ * POST /qa-bootstrap/wipe-stale-data
+ *   header: x-qa-token === QA_BOOTSTRAP_TOKEN  (one-shot per instance)
+ *
+ * Deletes ALL users EXCEPT the 4 QA test accounts, plus every business
+ * collection (bookings, vehicles, transactions, notifications, ...).
+ * Preserved: brands, services, subscriptionplans, platformsettings, admins.
+ * User request 2026-10-27: dashboard par sirf QA testing data dikhna chahiye.
+ */
+router.post('/qa-bootstrap/wipe-stale-data', async (req, res) => {
+  if (env.NODE_ENV === 'production') {
+    return res.status(403).json({ success: false, message: 'Disabled in production' });
+  }
+  const token = process.env.QA_BOOTSTRAP_TOKEN;
+  if (!token || req.headers['x-qa-token'] !== token) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  if (wipeUsed) {
+    return res.status(409).json({ success: false, message: 'Already run on this instance' });
+  }
+  wipeUsed = true;
+  try {
+    await connectDatabase();
+    const { UserModel } = await import('../../models/src/user');
+    const { VendorVehicleModel } = await import('../../models/src/vendorVehicle');
+    const { DriverVendorMembershipModel } = await import('../../models/src/driverVendorMembership');
+
+    // 1. Delete every user that is NOT one of the 4 QA accounts.
+    const staleUsers = await UserModel.deleteMany({ mobileNumber: { $nin: QA_KEEP_MOBILES } });
+    // 2. QA fleet trucks re-point to the surviving vendor; drop others.
+    const qaVendor = await UserModel.findOne({ mobileNumber: QA_KEEP_MOBILES[0] });
+    if (qaVendor) {
+      await VendorVehicleModel.deleteMany({
+        vendorId: { $ne: qaVendor._id },
+        $or: [
+          { registrationNo: { $nin: ['QA01TR0001', 'QA01TR0002'] } },
+          { vendorId: { $nin: [qaVendor._id] } },
+        ],
+      });
+    }
+    // 3. Memberships: drop all, recreate the single QA link below.
+    await DriverVendorMembershipModel.deleteMany({});
+
+    // 4. Wipe business collections wholesale (raw collection names).
+    const db = UserModel.db;
+    const wipeAll = [
+      'vehicles', 'vehicleqrcodes', 'towingbookings', 'driverbookings', 'bookings',
+      'transactions', 'driverenquiries', 'vendordocuments', 'adminnotifications',
+      'paymenttransactions', 'savedlocations', 'notifications', 'wallets',
+      'paymentmethods', 'activitylogs', 'usersubscriptions', 'otplogs', 'enquiries',
+    ];
+    const wiped: Record<string, number> = {};
+    for (const name of wipeAll) {
+      try {
+        const r = await db.collection(name).deleteMany({});
+        wiped[name] = r.deletedCount;
+      } catch {
+        wiped[name] = -1;
+      }
+    }
+
+    // 5. Recreate the QA vendor fleet + membership (accounts survive).
+    const { upsertQaAccounts } = await import('../../services/src/qaAccounts');
+    const ensured = await upsertQaAccounts();
+    logger.info('QA wipe-stale-data complete', { staleUsers: staleUsers.deletedCount });
+    return res.json({
+      success: true,
+      deletedStaleUsers: staleUsers.deletedCount,
+      wipedCollections: wiped,
+      qaAccountsEnsured: ensured,
+      message: 'Stale data removed — only the 4 QA test accounts remain',
+    });
+  } catch (error) {
+    wipeUsed = false;
+    logger.error('QA wipe failed', { error: (error as Error).message });
+    return res.status(500).json({ success: false, message: (error as Error).message });
+  }
+});
+
 
 router.post('/qa-bootstrap/test-accounts', async (req, res) => {
   if (env.NODE_ENV === 'production') {
