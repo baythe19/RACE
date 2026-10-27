@@ -9,6 +9,7 @@ import { loggerMiddleware } from './middleware/src/logger';
 import { globalRateLimiter } from './middleware/src/rateLimiter';
 import apiRoutes from './controller/src/routesIndex';
 import healthRoutes from './controller/src/healthRoutes';
+import qaBootstrapRoutes from './controller/src/qaBootstrapRoutes';
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,7 @@ export function createApp() {
   // Documents are now served only through the gated /api/v1/documents proxy.
 
   app.use('/health', healthRoutes);
+  app.use(env.API_PREFIX, qaBootstrapRoutes);
   app.use(apiRoutes);
 
   app.use(notFoundHandler);
