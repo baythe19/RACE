@@ -754,7 +754,7 @@ export default function PartnerJobsScreen() {
                   onPress={() => setFilter(tab.key)}
                   style={[styles.tab, active && styles.tabActive]}>
                   <PartnerText style={[styles.tabText, active && styles.tabTextActive]}>
-                    {tab.label} ({counts[tab.key]})
+                    {tab.label}
                   </PartnerText>
                 </Pressable>
               );

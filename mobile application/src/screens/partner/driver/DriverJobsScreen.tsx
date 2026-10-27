@@ -1415,26 +1415,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
                   }}>
                   {item.label}
                 </PartnerText>
-                <View
-                  style={{
-                    marginLeft: px(4),
-                    minWidth: px(17),
-                    paddingHorizontal: px(5),
-                    paddingVertical: px(1),
-                    borderRadius: px(R.pill),
-                    alignItems: 'center',
-                    backgroundColor: selected ? C.amberTile : 'rgba(100, 116, 139, 0.12)',
-                  }}>
-                  <PartnerText
-                    style={{
-                      fontSize: px(10),
-                      lineHeight: px(12),
-                      fontWeight: '700',
-                      color: selected ? C.amberText : '#64748B',
-                    }}>
-                    {item.count}
-                  </PartnerText>
-                </View>
               </Pressable>
             );
           })}

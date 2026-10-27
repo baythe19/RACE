@@ -18,6 +18,7 @@ import {
 } from 'lucide-react-native';
 
 import FormField from '../../../../components/auth/FormField';
+import DatePickerModal from '../../../../components/common/DatePickerModal';
 import PartnerDocumentUploadList, {
   type PartnerDocumentFieldConfig,
   type PartnerDocumentSelection,
@@ -154,6 +155,7 @@ export default function VendorVehicleRegistrationScreen() {
   const [insuranceProvider, setInsuranceProvider] = useState('');
   const [insurancePolicyNumber, setInsurancePolicyNumber] = useState('');
   const [insuranceExpiry, setInsuranceExpiry] = useState('');
+  const [expiryPickerVisible, setExpiryPickerVisible] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -642,17 +644,19 @@ export default function VendorVehicleRegistrationScreen() {
               variant="outlined"
               returnKeyType="next"
             />
-            <FormField
-              label="Insurance expiry"
-              optional
-              value={insuranceExpiry}
-              onChangeText={text => setInsuranceExpiry(maskDate(text))}
-              keyboardType="number-pad"
-              error={errors.insuranceExpiry}
-              placeholder="DD/MM/YYYY"
-              Icon={Calendar}
-              variant="outlined"
-            />
+            <Pressable onPress={() => setExpiryPickerVisible(true)}>
+              <FormField
+                label="Insurance expiry"
+                optional
+                value={insuranceExpiry}
+                onChangeText={text => setInsuranceExpiry(maskDate(text))}
+                keyboardType="number-pad"
+                error={errors.insuranceExpiry}
+                placeholder="DD/MM/YYYY"
+                Icon={Calendar}
+                variant="outlined"
+              />
+            </Pressable>
             <View style={styles.optionalDocumentGroup}>
               <PartnerText style={styles.documentGroupTitle}>Additional vehicle documents</PartnerText>
               <PartnerText style={styles.documentGroupHint}>Add fitness, PUC, permit, or a vehicle photo when applicable.</PartnerText>
@@ -769,6 +773,17 @@ export default function VendorVehicleRegistrationScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+      <DatePickerModal
+        visible={expiryPickerVisible}
+        value={insuranceExpiry}
+        title="Insurance expiry"
+        fallbackDate={new Date()}
+        onConfirm={value => {
+          setInsuranceExpiry(value);
+          setErrors(current => ({ ...current, insuranceExpiry: '' }));
+        }}
+        onClose={() => setExpiryPickerVisible(false)}
+      />
     </AppScreenLayout>
     {partnerDialog}
     </View>

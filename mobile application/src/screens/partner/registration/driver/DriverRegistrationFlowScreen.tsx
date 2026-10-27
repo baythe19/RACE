@@ -1402,10 +1402,6 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
         <View style={[styles.cardDivider, { marginTop: px(4), marginBottom: px(12) }]} />
 
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(8) }]}>
-          {vendorStaffOnboarding ? 'Driving licence' : 'Licence & work preference'}
-        </PartnerText>
-
         {/* Work type is a choice only for a driver who registers themselves.
             A vendor-added driver is always full-time fleet staff. */}
         {vendorStaffOnboarding ? null : (
@@ -1542,11 +1538,14 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   textAlignVertical: 'center',
                 },
               ]}
-              placeholder="DL number (e.g. OD-0220190012345)"
+              placeholder="DL number e.g. OD-0220190012"
               placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={18}
+              numberOfLines={1}
+              scrollEnabled={false}
+              allowFontScaling={false}
               value={driverPersonal.licenseNumber || driverVehicle.licenseNumber}
               onFocus={() => setLicenceFocused(true)}
               onBlur={() => setLicenceFocused(false)}
@@ -3566,11 +3565,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 6,
-    height: 32,
+    height: 36,
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '700',
     color: '#111827',
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   manualDivider: {
     fontSize: 14,

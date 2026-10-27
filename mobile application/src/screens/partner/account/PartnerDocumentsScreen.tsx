@@ -222,7 +222,7 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
               styles.tabText,
               activeTab === 'required' && styles.tabTextActive,
             ]}>
-            Required ({requiredDocs.length})
+            Required
           </PartnerText>
         </Pressable>
 
@@ -234,7 +234,7 @@ export default function PartnerDocumentsScreen({ navigation }: Props) {
               styles.tabText,
               activeTab === 'optional' && styles.tabTextActive,
             ]}>
-            Optional ({optionalDocs.length})
+            Optional
           </PartnerText>
         </Pressable>
       </View>
