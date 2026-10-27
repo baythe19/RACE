@@ -5,6 +5,7 @@ import {
   BackHandler,
   Easing,
   Keyboard,
+  Linking,
   Platform,
   Pressable,
   StatusBar,
@@ -295,7 +296,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
   };
 
   const handleTerms = () => {
-    Alert.alert('Terms & Privacy', "RACE's Terms and Privacy Policy will open here.");
+    void Linking.openURL('https://www.raceservice.in/terms.html');
   };
 
   return (

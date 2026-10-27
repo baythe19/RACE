@@ -1,6 +1,6 @@
 import { PartnerText } from '../../../components/partner/PartnerText';
 import React, { useState } from 'react';
-import { Image, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { ArrowLeft, ArrowRight } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -298,6 +298,16 @@ export default function PartnerRoleSelectionScreen({ navigation, route }: Props)
               By continuing, you agree to our{' '}
               <PartnerText style={styles.termsLink}>Terms & Privacy Policy</PartnerText>
             </PartnerText>
+            <Pressable
+              onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}
+              hitSlop={8}
+              accessibilityRole="link"
+              accessibilityLabel="Read Terms and Privacy Policy"
+              style={({ pressed }) => [styles.termsLinkBtn, pressed && styles.pressed]}>
+              <PartnerText style={[styles.termsLink, { fontSize: px(12.5) }]}>
+                Read full terms ↗
+              </PartnerText>
+            </Pressable>
           </View>
 
           {/* Discreet Dev Demo Mode (for offline QA testing) */}
@@ -453,6 +463,10 @@ const styles = StyleSheet.create({
   termsFooter: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  termsLinkBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   termsText: {
     color: '#6B7280',

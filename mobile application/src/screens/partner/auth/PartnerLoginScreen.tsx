@@ -1,6 +1,6 @@
 import { PartnerText, PartnerTextInput } from '../../../components/partner/PartnerText';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { Image, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StatusBar, StyleSheet, View, useWindowDimensions } from 'react-native';
 import {
   ArrowLeft,
   ArrowRight,
@@ -406,7 +406,12 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
 
             {/* Security Assurance with Word Wrapping */}
             <View style={[styles.securityNotice, { marginTop: px(18) }]}>
-              <ShieldCheck size={px(18)} color="#9CA3AF" strokeWidth={2} style={{ flexShrink: 0 }} />
+              <ShieldCheck
+                size={px(16)}
+                color="#9CA3AF"
+                strokeWidth={2}
+                style={{ flexShrink: 0, marginTop: px(1) }}
+              />
               <PartnerText style={[styles.securityText, { fontSize: px(12.5) }]}>
                 Your number is used to verify your partner account.
               </PartnerText>
@@ -420,9 +425,16 @@ export default function PartnerLoginScreen({ navigation, route }: Props) {
               <PartnerText style={[styles.footerText, { fontSize: px(12) }]}>
                 By continuing, you agree to our
               </PartnerText>
-              <PartnerText style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
-                Terms & Privacy Policy
-              </PartnerText>
+              <Pressable
+                onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}
+                hitSlop={8}
+                accessibilityRole="link"
+                accessibilityLabel="Read Terms and Privacy Policy"
+                style={({ pressed }) => [styles.termsLinkBtn, pressed && styles.pressed]}>
+                <PartnerText style={[styles.termsLink, { fontSize: px(12), marginTop: px(2) }]}>
+                  Terms & Privacy Policy ↗
+                </PartnerText>
+              </Pressable>
             </View>
 
             {/* Discreet Dev Demo Mode (for offline QA testing) */}
@@ -586,7 +598,7 @@ const styles = StyleSheet.create({
   },
   securityNotice: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
     paddingHorizontal: 10,
     gap: 8,
@@ -648,6 +660,11 @@ const styles = StyleSheet.create({
     color: '#D97706',
     fontWeight: '600',
     textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+  termsLinkBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
   demoRow: {
     flexDirection: 'row',

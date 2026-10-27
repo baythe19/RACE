@@ -2168,7 +2168,18 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         </View>
         <PartnerText style={[styles.checkboxLabel, { fontSize: px(11) }]}>
           I confirm all details are genuine and agree to RACE{' '}
-          <PartnerText style={styles.linkText}>Terms</PartnerText> & <PartnerText style={styles.linkText}>Privacy</PartnerText>.
+          <PartnerText
+            style={styles.linkText}
+            onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+            Terms
+          </PartnerText>{' '}
+          &{' '}
+          <PartnerText
+            style={styles.linkText}
+            onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+            Privacy
+          </PartnerText>
+          .
         </PartnerText>
       </Pressable>
     </View>
@@ -3334,6 +3345,7 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#2563EB',
     fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   saveLaterLink: {
     alignItems: 'center',

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -168,9 +169,17 @@ export default function CreateAccountScreen({ navigation }: Props) {
               </View>
               <Text style={{ flex: 1, fontSize: px(13), color: colors.grey, lineHeight: px(20) }}>
                 I agree to the{' '}
-                <Text style={styles.termsLink}>Terms & Conditions</Text>
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+                  Terms & Conditions
+                </Text>
                 {' and '}
-                <Text style={styles.termsLink}>Privacy Policy</Text>
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+                  Privacy Policy
+                </Text>
               </Text>
             </Pressable>
 

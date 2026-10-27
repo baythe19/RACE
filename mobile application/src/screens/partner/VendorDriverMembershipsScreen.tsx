@@ -19,7 +19,6 @@ import {
   Plus,
   Search,
   ShieldCheck,
-  Star,
   UserRound,
 } from 'lucide-react-native';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -297,10 +296,10 @@ export default function VendorDriverMembershipsScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterRow}>
             {([
-              ['all', `All (${stats.total})`],
-              ['ACTIVE', `Available (${stats.active - stats.busy})`],
-              ['BUSY', `On duty (${stats.busy})`],
-              ['PENDING', `Pending (${stats.pending})`],
+              ['all', 'All'],
+              ['ACTIVE', 'Available'],
+              ['BUSY', 'On duty'],
+              ['PENDING', 'Pending'],
             ] as Array<[MemberFilter, string]>).map(([key, label]) => (
               <Pressable
                 key={key}
@@ -366,14 +365,6 @@ export default function VendorDriverMembershipsScreen() {
                         <PartnerText style={styles.specText}>
                           {driver?.city ? driver.city : (member.acceptedAt ? 'Joined ' + new Date(member.acceptedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—')}
                         </PartnerText>
-                        {driver?.rating != null && driver.rating > 0 ? (
-                          <>
-                            <Star size={12} color="#F59E0B" strokeWidth={2.4} />
-                            <PartnerText style={styles.specText}>
-                              {driver.rating.toFixed(1)}
-                            </PartnerText>
-                          </>
-                        ) : null}
                       </View>
                     </View>
                     <Pressable

@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -207,8 +208,17 @@ export default function LoginScreen({ navigation }: Props) {
 
             <Text style={[styles.terms, { fontSize: px(11), marginTop: px(16) }]}>
               By continuing, you agree to our{' '}
-              <Text style={styles.termsLink}>Terms of Service</Text> &{' '}
-              <Text style={styles.termsLink}>Privacy Policy</Text>
+              <Text
+                style={styles.termsLink}
+                onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+                Terms of Service
+              </Text>{' '}
+              &{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+                Privacy Policy
+              </Text>
             </Text>
 
             <Pressable

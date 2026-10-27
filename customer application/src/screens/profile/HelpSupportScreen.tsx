@@ -234,6 +234,37 @@ export default function HelpSupportScreen() {
           </Pressable>
         </View>
       </View>
+
+      {/* Legal */}
+      <View
+        style={{
+          borderRadius: px(14),
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          marginTop: px(16),
+          overflow: 'hidden',
+        }}>
+        <Pressable
+          onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}
+          style={({ pressed }) => [
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: px(14),
+              paddingVertical: px(13),
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}
+          accessibilityRole="link"
+          accessibilityLabel="Read Terms and Privacy Policy">
+          <Text style={{ fontSize: px(13), fontWeight: typography.weights.semibold, color: colors.dark }}>
+            Terms & Privacy Policy
+          </Text>
+          <ChevronRight size={px(16)} color={colors.grey} />
+        </Pressable>
+      </View>
     </ProfileSubScreenLayout>
   );
 }

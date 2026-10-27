@@ -342,7 +342,7 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         disabled={secondsLeft > 0 || loading}
         onPress={() => void handleResend()}
         style={styles.resendRow}>
-        <PartnerText style={styles.resendPrompt}>
+        <PartnerText style={[styles.resendPrompt, (secondsLeft > 0 || loading) && styles.resendActionDisabled]}>
           Didn't receive the code?{' '}
           <PartnerText
             style={[
@@ -354,13 +354,14 @@ export default function PartnerOtpVerificationScreen({ navigation, route }: Prop
         </PartnerText>
       </Pressable>
 
-      <View style={styles.infoCard}>
-        <Info size={18} color={colors.primary} strokeWidth={2.2} />
-        <PartnerText style={styles.infoText}>
-          <PartnerText style={styles.infoTitle}>Didn't get the code?</PartnerText> Please check your SMS inbox
-          or spam folder.
-        </PartnerText>
-      </View>
+      {secondsLeft === 0 ? (
+        <View style={styles.infoCard}>
+          <Info size={16} color={colors.primary} strokeWidth={2.2} />
+          <PartnerText style={styles.infoText} numberOfLines={1}>
+            <PartnerText style={styles.infoTitle}>Didn't get the code?</PartnerText> Check SMS or spam folder.
+          </PartnerText>
+        </View>
+      ) : null}
 
       <Pressable
         disabled={(!isUiTestPermissiveMode() && otp.length !== 6) || loading || verified}
@@ -435,19 +436,19 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginTop: spacing.xl,
-    marginBottom: spacing.xl,
-    padding: spacing.lg,
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
     borderRadius: radius.md,
     backgroundColor: colors.partnerRedLight,
   },
   infoText: {
     flex: 1,
     color: colors.dark,
-    fontSize: typography.sizes.sm,
-    lineHeight: typography.lineHeights.relaxed,
+    fontSize: typography.sizes.xs,
+    lineHeight: 16,
   },
   infoTitle: {
     fontWeight: typography.weights.bold,

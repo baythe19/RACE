@@ -302,10 +302,10 @@ export default function VendorVehiclesScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.filterRow}>
             {([
-              ['all', `All (${vehicles.length})`],
-              ['ACTIVE', `Available (${stats.available})`],
-              ['UNDER_MAINTENANCE', `In service (${stats.service})`],
-              ['INACTIVE', `Inactive (${stats.inactive})`],
+              ['all', 'All'],
+              ['ACTIVE', 'Available'],
+              ['UNDER_MAINTENANCE', 'In service'],
+              ['INACTIVE', 'Inactive'],
             ] as Array<[StatusFilter, string]>).map(([key, label]) => (
               <Pressable
                 key={key}

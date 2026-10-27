@@ -13,6 +13,7 @@ import {
   AlertOctagon,
   ChevronRight,
   Headphones,
+  ShieldCheck,
 } from 'lucide-react-native';
 
 import { driverColors, driverRadius, getPressableFeedback } from '../../../theme/driverUi';
@@ -151,6 +152,17 @@ export default function PartnerHelpSupportScreen({ navigation }: Props) {
           <PartnerText style={styles.contactButtonText}>Contact Us</PartnerText>
         </Pressable>
       </View>
+
+      {/* Legal — Terms & Privacy Policy */}
+      <Pressable
+        onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}
+        style={({ pressed }) => [styles.legalRow, pressed && { opacity: 0.7 }]}
+        accessibilityRole="link"
+        accessibilityLabel="Read Terms and Privacy Policy">
+        <ShieldCheck size={16} color={driverColors.grey} strokeWidth={2.2} />
+        <PartnerText style={styles.legalText}>Terms & Privacy Policy</PartnerText>
+        <ChevronRight size={16} color={driverColors.greySoft} strokeWidth={2.2} />
+      </Pressable>
     </PartnerScreenLayout>
     {partnerDialog}
     </View>
@@ -262,7 +274,21 @@ const styles = StyleSheet.create({
     borderColor: '#FEEFC8',
     padding: 20,
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 16,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    marginBottom: 20,
+  },
+  legalText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: driverColors.ink,
   },
   bannerIconCircle: {
     width: 48,
