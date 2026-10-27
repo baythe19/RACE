@@ -32,7 +32,7 @@ module.exports = {
     },
     android: {
       package: 'com.racecar.partner',
-      versionCode: 2,
+      versionCode: 3,
       softwareKeyboardLayoutMode: 'resize',
       adaptiveIcon: {
         foregroundImage: './src/assets/images/icon-1024.png',
