@@ -30,4 +30,11 @@ export const adminNotificationsService = {
       { isRead: true },
     );
   },
+
+  async delete(id: string) {
+    await NotificationModel.findOneAndDelete({
+      _id: id,
+      'recipient.audience': 'admin',
+    });
+  },
 };

@@ -3,6 +3,9 @@ import { Types } from 'mongoose';
 import { normalizeMobileNumber } from '../../../utils/src/otp';
 import { ConflictError } from '../../../utils/src/errors';
 import { BookingModel } from '../../../models/src/booking';
+import { TowingBookingModel } from '../../../models/src/towingBooking';
+import { DriverBookingModel } from '../../../models/src/driverBooking';
+import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import { userRepository } from '../userRepository';
 import { UserModel } from '../../../models/src/user';
 import { VehicleModel } from '../../../models/src/vehicle';
@@ -13,16 +16,20 @@ import { logActivity } from './activityLogger';
 import { getEntityActivities } from './entityActivities';
 import { NotFoundError } from '../../../utils/src/errors';
 
-function mapCustomer(user: {
-  _id: Types.ObjectId;
-  customerCode?: string;
-  fullName?: string;
-  mobileNumber: string;
-  email?: string;
-  address?: { city?: string; state?: string };
-  accountStatus?: string;
-  createdAt: Date;
-}, vehicleCount = 0, totalBookings = 0) {
+function mapCustomer(
+  user: {
+    _id: Types.ObjectId;
+    customerCode?: string;
+    fullName?: string;
+    mobileNumber: string;
+    email?: string;
+    address?: { city?: string; state?: string };
+    accountStatus?: string;
+    createdAt: Date;
+  },
+  vehicleCount = 0,
+  totalBookings = 0,
+) {
   return {
     id: user._id.toString(),
     customerId: user.customerCode ?? `CUST${user._id.toString().slice(-6).toUpperCase()}`,
@@ -36,6 +43,41 @@ function mapCustomer(user: {
     status: (user.accountStatus ?? 'ACTIVE') as 'ACTIVE' | 'SUSPENDED' | 'INACTIVE',
     joinedAt: user.createdAt.toISOString(),
   };
+}
+
+async function bookingCountsByCustomer(customerIds: Types.ObjectId[]) {
+  if (customerIds.length === 0) return new Map<string, number>();
+
+  const [legacy, towing, driver] = await Promise.all([
+    BookingModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { customerId: { $in: customerIds } } },
+      { $group: { _id: '$customerId', count: { $sum: 1 } } },
+    ]),
+    TowingBookingModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { customerId: { $in: customerIds } } },
+      { $group: { _id: '$customerId', count: { $sum: 1 } } },
+    ]),
+    DriverBookingModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+      { $match: { customerId: { $in: customerIds } } },
+      { $group: { _id: '$customerId', count: { $sum: 1 } } },
+    ]),
+  ]);
+
+  const map = new Map<string, number>();
+  for (const row of [...legacy, ...towing, ...driver]) {
+    const key = row._id.toString();
+    map.set(key, (map.get(key) ?? 0) + row.count);
+  }
+  return map;
+}
+
+async function vehicleCountsByCustomer(customerIds: Types.ObjectId[]) {
+  if (customerIds.length === 0) return new Map<string, number>();
+  const rows = await VehicleModel.aggregate<{ _id: Types.ObjectId; count: number }>([
+    { $match: { customerId: { $in: customerIds } } },
+    { $group: { _id: '$customerId', count: { $sum: 1 } } },
+  ]);
+  return new Map(rows.map((row) => [row._id.toString(), row.count]));
 }
 
 export const adminCustomersService = {
@@ -66,27 +108,142 @@ export const adminCustomersService = {
       ];
     }
 
-    return paginate(UserModel, query, filters, (doc) => mapCustomer(doc as never));
+    const page = await paginate(UserModel, query, filters, (doc) => mapCustomer(doc as never));
+    const ids = page.items.map((item) => new Types.ObjectId(item.id));
+    const [bookingMap, vehicleMap] = await Promise.all([
+      bookingCountsByCustomer(ids),
+      vehicleCountsByCustomer(ids),
+    ]);
+
+    return {
+      ...page,
+      items: page.items.map((item) => ({
+        ...item,
+        totalBookings: bookingMap.get(item.id) ?? 0,
+        vehicleCount: vehicleMap.get(item.id) ?? item.vehicleCount ?? 0,
+      })),
+    };
   },
 
   async getById(id: string) {
     const user = await UserModel.findOne({ _id: id, role: 'customer' });
     if (!user) throw new NotFoundError('Customer not found');
 
-    const [vehicleCount, bookings, payments, transactions, subscriptions, activities] = await Promise.all([
-      VehicleModel.countDocuments({ customerId: user._id }),
-      BookingModel.find({ customerId: user._id }).sort({ createdAt: -1 }).limit(20).lean(),
+    const customerObjectId = user._id;
+
+    const [
+      vehicleCount,
+      legacyBookings,
+      towingBookings,
+      driverBookings,
+      legacySpend,
+      paymentSpend,
+      transactions,
+      subscriptions,
+      activities,
+    ] = await Promise.all([
+      VehicleModel.countDocuments({ customerId: customerObjectId }),
+      BookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
+      TowingBookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
+      DriverBookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
       BookingModel.aggregate([
-        { $match: { customerId: user._id } },
+        { $match: { customerId: customerObjectId } },
         { $group: { _id: null, total: { $sum: '$invoice.total' } } },
       ]),
-      TransactionModel.find({ customerId: user._id }).sort({ createdAt: -1 }).limit(20).lean(),
-      UserSubscriptionModel.find({ userId: user._id }).sort({ createdAt: -1 }).lean(),
+      PaymentTransactionModel.aggregate([
+        {
+          $match: {
+            customerId: customerObjectId,
+            paymentType: { $in: ['advance', 'final'] },
+            status: 'success',
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      TransactionModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
+      UserSubscriptionModel.find({ userId: customerObjectId }).sort({ createdAt: -1 }).lean(),
       getEntityActivities('customer', id),
     ]);
 
-    const vendorIds = [...new Set(bookings.map((b) => b.vendorId?.toString()).filter(Boolean))];
-    const vendors = await UserModel.find({ _id: { $in: vendorIds }, role: 'vendor' }).lean();
+    type UnifiedBookingRow = {
+      id: string;
+      bookingNumber: string;
+      service: string;
+      status: string;
+      amount: number;
+      date: string;
+      vendorId?: string;
+      driverName?: string;
+      bookingType: 'legacy' | 'towing' | 'driver';
+    };
+
+    const unified: UnifiedBookingRow[] = [
+      ...legacyBookings.map((b) => ({
+        id: b._id.toString(),
+        bookingNumber: b.bookingNumber,
+        service: b.serviceLabel ?? 'Roadside',
+        status: b.status,
+        amount: b.invoice?.total ?? 0,
+        date: b.createdAt.toISOString(),
+        vendorId: b.vendorId?.toString(),
+        driverName: b.driver?.name,
+        bookingType: 'legacy' as const,
+      })),
+      ...towingBookings.map((b) => ({
+        id: b._id.toString(),
+        bookingNumber: b.bookingNumber,
+        service: 'Towing',
+        status: b.status,
+        amount: b.estimatedFare ?? 0,
+        date: b.createdAt.toISOString(),
+        vendorId: b.vendorId?.toString(),
+        driverName: undefined,
+        bookingType: 'towing' as const,
+      })),
+      ...driverBookings.map((b) => ({
+        id: b._id.toString(),
+        bookingNumber: b.bookingNumber,
+        service: 'Driver Service',
+        status: b.status,
+        amount: b.estimatedFare ?? 0,
+        date: b.createdAt.toISOString(),
+        vendorId: b.vendorId?.toString(),
+        driverName: undefined,
+        bookingType: 'driver' as const,
+      })),
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 40);
+
+    const driverIds = [
+      ...new Set(
+        [...towingBookings, ...driverBookings]
+          .map((b) => b.driverId?.toString())
+          .filter(Boolean) as string[],
+      ),
+    ];
+    const drivers = driverIds.length
+      ? await UserModel.find({ _id: { $in: driverIds }, role: 'driver' }).lean()
+      : [];
+    const driverMap = new Map(
+      drivers.map((d) => [d._id.toString(), d.fullName ?? 'Driver'] as const),
+    );
+
+    for (const row of unified) {
+      if (row.bookingType === 'towing' || row.bookingType === 'driver') {
+        const source =
+          row.bookingType === 'towing'
+            ? towingBookings.find((b) => b._id.toString() === row.id)
+            : driverBookings.find((b) => b._id.toString() === row.id);
+        const driverId = source?.driverId?.toString();
+        if (driverId) row.driverName = driverMap.get(driverId);
+      }
+    }
+
+    const vendorIds = [...new Set(unified.map((b) => b.vendorId).filter(Boolean))] as string[];
+    const vendors = vendorIds.length
+      ? await UserModel.find({ _id: { $in: vendorIds }, role: 'vendor' }).lean()
+      : [];
     const vendorMap = new Map(
       vendors.map((v) => [
         v._id.toString(),
@@ -94,7 +251,7 @@ export const adminCustomersService = {
       ]),
     );
 
-    const base = mapCustomer(user, vehicleCount, bookings.length);
+    const base = mapCustomer(user, vehicleCount, unified.length);
 
     return {
       ...base,
@@ -105,16 +262,17 @@ export const adminCustomersService = {
       emergencyContact: user.emergencyContact
         ? `${user.emergencyContact.name} (${user.emergencyContact.mobileNumber})`
         : undefined,
-      totalSpent: payments[0]?.total ?? 0,
-      bookings: bookings.map((b) => ({
-        id: b._id.toString(),
+      totalSpent: (legacySpend[0]?.total ?? 0) + (paymentSpend[0]?.total ?? 0),
+      bookings: unified.map((b) => ({
+        id: b.id,
         bookingNumber: b.bookingNumber,
-        service: b.serviceLabel,
+        service: b.service,
         status: b.status,
-        amount: b.invoice?.total ?? 0,
-        date: b.createdAt.toISOString(),
-        vendorName: b.vendorId ? vendorMap.get(b.vendorId.toString()) : undefined,
-        driverName: b.driver?.name,
+        amount: b.amount,
+        date: b.date,
+        vendorName: b.vendorId ? vendorMap.get(b.vendorId) : undefined,
+        driverName: b.driverName,
+        bookingType: b.bookingType,
       })),
       payments: transactions.map((t) => ({
         id: t._id.toString(),
@@ -136,14 +294,17 @@ export const adminCustomersService = {
     };
   },
 
-  async create(input: {
-    name: string;
-    phone: string;
-    email?: string;
-    city?: string;
-    state?: string;
-    status?: string;
-  }, actor: { id: string; name: string }) {
+  async create(
+    input: {
+      name: string;
+      phone: string;
+      email?: string;
+      city?: string;
+      state?: string;
+      status?: string;
+    },
+    actor: { id: string; name: string },
+  ) {
     const mobileNumber = normalizeMobileNumber(input.phone);
     const existing = await userRepository.findByMobile(mobileNumber);
     if (existing) {
@@ -174,14 +335,18 @@ export const adminCustomersService = {
     return mapCustomer(user);
   },
 
-  async update(id: string, input: Partial<{
-    name: string;
-    phone: string;
-    email: string;
-    city: string;
-    state: string;
-    status: string;
-  }>, actor: { id: string; name: string }) {
+  async update(
+    id: string,
+    input: Partial<{
+      name: string;
+      phone: string;
+      email: string;
+      city: string;
+      state: string;
+      status: string;
+    }>,
+    actor: { id: string; name: string },
+  ) {
     const user = await UserModel.findOne({ _id: id, role: 'customer' });
     if (!user) throw new NotFoundError('Customer not found');
 
@@ -199,7 +364,11 @@ export const adminCustomersService = {
     if (input.email) user.email = input.email;
     if (input.status) user.accountStatus = input.status as never;
     if (input.city || input.state) {
-      user.address = { ...user.address, city: input.city ?? user.address?.city, state: input.state ?? user.address?.state };
+      user.address = {
+        ...user.address,
+        city: input.city ?? user.address?.city,
+        state: input.state ?? user.address?.state,
+      };
     }
     await user.save();
 
@@ -215,7 +384,11 @@ export const adminCustomersService = {
     return mapCustomer(user);
   },
 
-  async setStatus(id: string, status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE', actor: { id: string; name: string }) {
+  async setStatus(
+    id: string,
+    status: 'ACTIVE' | 'SUSPENDED' | 'INACTIVE',
+    actor: { id: string; name: string },
+  ) {
     const user = await UserModel.findOneAndUpdate(
       { _id: id, role: 'customer' },
       { accountStatus: status },
@@ -255,7 +428,10 @@ export const adminCustomersService = {
   },
 
   async getCities() {
-    const cities = await UserModel.distinct('address.city', { role: 'customer', 'address.city': { $ne: null } });
+    const cities = await UserModel.distinct('address.city', {
+      role: 'customer',
+      'address.city': { $ne: null },
+    });
     return cities.filter(Boolean).sort();
   },
 };

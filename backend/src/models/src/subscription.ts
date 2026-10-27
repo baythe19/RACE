@@ -104,6 +104,12 @@ const UserSubscriptionSchema = new Schema<IUserSubscription>(
 
 UserSubscriptionSchema.index({ userId: 1, audience: 1, category: 1, status: 1 });
 
+/** P1: one ACTIVE subscription per user+audience+category — double-tap safe. */
+UserSubscriptionSchema.index(
+  { userId: 1, audience: 1, category: 1 },
+  { unique: true, partialFilterExpression: { status: 'active' } },
+);
+
 export const SubscriptionPlanModel = model<ISubscriptionPlan>(
   'SubscriptionPlan',
   SubscriptionPlanSchema,

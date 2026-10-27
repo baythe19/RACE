@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS = {
     smsEnabled: true,
     pushEnabled: true,
   },
+  useMockData: false,
 };
 
 export const adminSettingsService = {
@@ -45,6 +46,9 @@ export const adminSettingsService = {
       },
       appearance: settings.appearance,
       notifications: settings.notifications,
+      demo: {
+        useMockData: Boolean(settings.useMockData),
+      },
     };
   },
 
@@ -70,6 +74,10 @@ export const adminSettingsService = {
     }
     if (payload.appearance) settings.appearance = { ...settings.appearance, ...(payload.appearance as object) };
     if (payload.notifications) settings.notifications = { ...settings.notifications, ...(payload.notifications as object) };
+    const demo = payload.demo as Record<string, unknown> | undefined;
+    if (demo && demo.useMockData != null) {
+      settings.useMockData = Boolean(demo.useMockData);
+    }
     settings.updatedBy = actor.id;
     await settings.save();
 

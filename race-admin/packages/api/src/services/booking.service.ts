@@ -90,6 +90,7 @@ export async function exportBookingsCsv(filters: BookingListFilters = {}) {
 
 export function getBookingServiceTypes() {
   return [
+    { label: 'All services', value: 'ALL' },
     { label: 'Towing', value: 'towing' },
     { label: 'Roadside', value: 'roadside' },
     { label: 'Driver', value: 'driver' },

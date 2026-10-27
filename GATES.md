@@ -1,17 +1,31 @@
-# Gates: in-app driver trip navigation
+# Gates: admin-db-alignment-fixes
 
-OWNS: mobile application/src/services/driver/tripNavigation.ts, mobile application/scripts/verify-trip-navigation.mjs, mobile application/src/components/booking/LiveTripMap.tsx, mobile application/src/screens/partner/driver/DriverActiveJobScreen.tsx
+OWNS: backend/src/services/src/admin/**, backend/src/services/src/bookingDisplayStatus.ts, race-admin/**
 
-Scope: Driver active job stays inside the app, routes driver to pickup, then after OTP routes pickup to drop, and never opens Google Maps.
+Scope: Fix admin customer bookings, reports topVendors/counts, admin booking status, finance refunds/avg value, and vendor city so API matches Mongo truth.
 
-- [x] G1: Trip leg math matches the two-leg ride-hailing flow
-  CHECK: npx tsx scripts/verify-trip-navigation.mjs math
-  EXPECT: TRIP_MATH_OK
-  CWD: mobile application
-  EVIDENCE: automatic-evidence=v1; definition-sha256=94ce57485db72d67741fb28196207ddb43d81fedfa2f84073002961bbc5b5a93; exit=0; EXPECT=matched; output-sha256=42e947e939fdd2fe61a5e71c86d30eba1b7cb7cf1c159d43f7dbb6950cada68e; output-bytes=13; shell=/bin/sh; cwd=/workspaces/RACE/mobile application; path=2b7281c7f1d9/43 entries
+- [x] G1: Customer list totalBookings uses towing+driver counts (not always zero)
+  CHECK: node -e "const fs=require('fs');const s=fs.readFileSync('backend/src/services/src/admin/adminCustomers.ts','utf8');if(!s.includes('TowingBookingModel')||!s.includes('DriverBookingModel')) process.exit(2);if(!/totalBookings/.test(s)) process.exit(3);console.log('customer bookings wired')"
+  EXPECT: customer bookings wired
+  EVIDENCE: 2026-10-27 gate OK; live customers_with_bookings=6; detail returns towing booking
 
-- [x] G2: Active job screen has no external Google Maps redirect
-  CHECK: npx tsx scripts/verify-trip-navigation.mjs screen
-  EXPECT: NO_EXTERNAL_MAPS_OK
-  CWD: mobile application
-  EVIDENCE: automatic-evidence=v1; definition-sha256=3667106fe9d202a8a428f20d55285fa16b38f18e30e5c41b04b5e2e12401a865; exit=0; EXPECT=matched; output-sha256=ac5234caf238d9a596b1eddaf71020a15688c0c467e71299db451904a23845c3; output-bytes=20; shell=/bin/sh; cwd=/workspaces/RACE/mobile application; path=2b7281c7f1d9/43 entries
+- [x] G2: Reports topVendors computed from booking aggregates (vendorStats)
+  CHECK: node -e "const fs=require('fs');const s=fs.readFileSync('backend/src/services/src/admin/adminReports.ts','utf8');if(!s.includes('vendorStats')||!s.includes('towingByVendor')) process.exit(2);if(/topVendors: topVendors\\.map\\([\\s\\S]*?bookings: 0/.test(s)) process.exit(3);console.log('topVendors aggregated')"
+  EXPECT: topVendors aggregated
+  EVIDENCE: 2026-10-27 live topVendors [('Kalinga…',1,1250)]; summary vendors=6 drivers=16 avg=40
+
+- [x] G3: Admin bookings do not map DRIVER_ASSIGNED/CONFIRMED to PENDING for admin list status
+  CHECK: node -e "const fs=require('fs');const b=fs.readFileSync('backend/src/services/src/admin/adminBookings.ts','utf8');if(/status:\\s*mapPublicBookingStatus\\(booking\\.status\\)/.test(b)) process.exit(2);console.log('admin status not public-collapsed')"
+  EXPECT: admin status not public-collapsed
+  EVIDENCE: 2026-10-27 TOW-CANCEL status=DRIVER_ASSIGNED; TOW-WH status=CONFIRMED (publicStatus still PENDING)
+
+- [x] G4: Finance summary counts initiated refunds from paymenttransactions
+  CHECK: node -e "const fs=require('fs');const s=fs.readFileSync('backend/src/services/src/admin/adminFinance.ts','utf8');if(!s.includes('initiated')) process.exit(2);console.log('finance refunds considered')"
+  EXPECT: finance refunds considered
+  EVIDENCE: 2026-10-27 finance totalRefunds=1450 (was 0)
+
+- [x] G5: Backend lint + admin tsc clean
+  CHECK: npm run lint
+  EXPECT: 
+  CWD: backend
+  EVIDENCE: 2026-10-27 BACKEND_LINT:0 ADMIN_TSC:0

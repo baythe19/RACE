@@ -31,5 +31,11 @@ router.post(
   requireAdminPermission(AdminPermission.NOTIFICATIONS_VIEW),
   adminNotificationsController.markAllRead,
 );
+router.delete(
+  '/notifications/:id',
+  adminAuthMiddleware,
+  requireAdminPermission(AdminPermission.NOTIFICATIONS_VIEW),
+  adminNotificationsController.delete,
+);
 
 export default router;

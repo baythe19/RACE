@@ -52,4 +52,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     sidebarTheme: 'light',
     compactMode: false,
   },
+  demo: {
+    useMockData: false,
+  },
 };

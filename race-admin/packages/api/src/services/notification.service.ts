@@ -1,6 +1,6 @@
 import type { AdminNotification, PaginatedResponse } from '@race/types';
 
-import { apiGet, apiPatch, apiPost } from '../http';
+import { apiDelete, apiGet, apiPatch, apiPost } from '../http';
 
 const CATEGORY_TO_TYPE: Record<string, AdminNotification['type']> = {
   vendor: 'VENDOR',
@@ -49,6 +49,6 @@ export async function getUnreadNotificationCount(): Promise<number> {
   return result.count;
 }
 
-export async function deleteNotification(_id: string) {
-  throw new Error('Delete notification is not supported via API');
+export async function deleteNotification(id: string) {
+  await apiDelete(`/notifications/${id}`);
 }

@@ -88,9 +88,12 @@ export const NAV_SECTIONS = [
   },
 ] as const;
 
+/** RACE brand red (logo flame) — for comparison series, alerts, secondary accents */
+export const BRAND_RED = '#E23744' as const;
+
 export const CHART_COLORS = {
   primary: THEME.primary,
-  secondary: '#E5E7EB',
+  secondary: BRAND_RED,
   towing: THEME.primary,
   driver: THEME.info,
   roadside: THEME.success,

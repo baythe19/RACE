@@ -69,6 +69,23 @@ function GeneralForm({
           <option value="or">Odia</option>
         </select>
       </Field>
+      <label className="race-toggle-row cursor-pointer sm:col-span-2">
+        <input
+          type="checkbox"
+          checked={settings.demo.useMockData}
+          onChange={(e) =>
+            onChange({ demo: { ...settings.demo, useMockData: e.target.checked } })
+          }
+          className="h-4 w-4 rounded border-border text-primary focus:ring-primary/30"
+        />
+        <div>
+          <span className="block text-sm font-medium text-heading">Demo / mock data</span>
+          <span className="block text-xs text-muted">
+            Off by default. When on, dashboard charts and alerts may show sample demo figures for
+            presentations. Live partner, customer, booking, and finance lists stay API-backed.
+          </span>
+        </div>
+      </label>
     </div>
   );
 }

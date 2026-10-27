@@ -10,9 +10,15 @@ interface SubscriptionCardProps {
   plan: SubscriptionPlan;
   selected?: boolean;
   onSelect: () => void;
+  disabled?: boolean;
 }
 
-export default function SubscriptionCard({ plan, selected, onSelect }: SubscriptionCardProps) {
+export default function SubscriptionCard({
+  plan,
+  selected,
+  onSelect,
+  disabled = false,
+}: SubscriptionCardProps) {
   const isPremium = plan.popular;
 
   return (
@@ -52,9 +58,10 @@ export default function SubscriptionCard({ plan, selected, onSelect }: Subscript
         ))}
       </View>
       <PrimaryButton
-        label={plan.popular ? 'Get Premium →' : 'Get Started'}
+        label={disabled ? 'Processing…' : plan.popular ? 'Get Premium →' : 'Get Started'}
         onPress={onSelect}
         variant={isPremium ? 'primary' : 'outline'}
+        disabled={disabled}
       />
     </View>
   );

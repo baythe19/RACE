@@ -81,6 +81,7 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
               <SubscriptionCard
                 key={plan.id}
                 plan={plan}
+                disabled={subscribe.isPending}
                 onSelect={() => handleSelect(plan.slug ?? plan.id, plan.actionType)}
               />
             ))}

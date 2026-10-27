@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 
+import { assertSeedAllowed } from './seed-guard';
+
 import { connectDatabase, disconnectDatabase } from './connection';
 import { ensureDatabaseIndexes } from './indexes';
 import { brandRepository } from '../../services/src/brandRepository';
@@ -14,6 +16,8 @@ import servicesData from '../seed-data/services.json';
 import { seedAdminPlatform } from './admin-seed';
 
 dotenv.config();
+
+assertSeedAllowed("seed");
 
 interface SeedCategory {
   id: 'towing' | 'driver' | 'roadside' | 'future';
