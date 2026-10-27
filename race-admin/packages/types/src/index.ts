@@ -111,6 +111,18 @@ export interface RecentVendorRow {
   city: string;
 }
 
+export interface DashboardAlert {
+  id: string;
+  message: string;
+  href: string;
+  urgent: boolean;
+}
+
+export interface DriverPerformancePoint {
+  metric: string;
+  value: number;
+}
+
 export interface DashboardData {
   stats: StatMetric[];
   revenueChart: ChartDataPoint[];
@@ -119,6 +131,12 @@ export interface DashboardData {
   recentActivities: ActivityItem[];
   recentBookings: RecentBookingRow[];
   recentVendors: RecentVendorRow[];
+  alerts?: DashboardAlert[];
+  driverPerformance?: DriverPerformancePoint[];
+  useMockData?: boolean;
+  activeBookings?: number;
+  totalBookings?: number;
+  totalRevenue?: number;
 }
 
 export interface ApiSuccessResponse<T> {
@@ -762,6 +780,11 @@ export interface ServiceSettings {
   enableSubscriptions: boolean;
 }
 
+/** Demo overlay for admin UI. Default OFF — live partner/customer data only. */
+export interface DemoSettings {
+  useMockData: boolean;
+}
+
 export interface TermsSettings {
   termsUrl: string;
   privacyUrl: string;
@@ -791,6 +814,7 @@ export interface AppSettings {
   terms: TermsSettings;
   emailSms: EmailSmsSettings;
   appearance: AppearanceSettings;
+  demo: DemoSettings;
 }
 
 export interface AuditLogEntry {

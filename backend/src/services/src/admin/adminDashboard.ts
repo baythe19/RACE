@@ -6,7 +6,9 @@ import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { UserModel } from '../../../models/src/user';
 import { ActivityLogModel } from '../../../models/src/activityLog';
 import { TransactionModel } from '../../../models/src/transaction';
+import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import { PlatformSettingsModel } from '../../../models/src/platformSettings';
+import { UserSubscriptionModel } from '../../../models/src/subscription';
 
 function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-IN', {
@@ -35,7 +37,6 @@ function monthRange(offsetMonths: number) {
 export const adminDashboardService = {
   async getDashboard() {
     const settings = await PlatformSettingsModel.findOne().lean();
-    const commissionRate = settings?.commissionRate ?? 12.5;
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
@@ -180,8 +181,6 @@ export const adminDashboardService = {
       driverPending,
       towingActive,
       driverActive,
-      towingRevenueAgg,
-      driverRevenueAgg,
     ] = await Promise.all([
       BookingModel.countDocuments(),
       TowingBookingModel.countDocuments(),
@@ -192,50 +191,118 @@ export const adminDashboardService = {
       DriverBookingModel.countDocuments({ status: 'PENDING' }),
       TowingBookingModel.countDocuments({ status: 'IN_PROGRESS' }),
       DriverBookingModel.countDocuments({ status: 'IN_PROGRESS' }),
-      TowingBookingModel.aggregate([
-        { $match: { paymentStatus: 'FULLY_PAID' } },
-        { $group: { _id: null, total: { $sum: '$estimatedFare' } } },
-      ]),
-      DriverBookingModel.aggregate([
-        { $match: { paymentStatus: 'FULLY_PAID' } },
-        { $group: { _id: null, total: { $sum: '$estimatedFare' } } },
-      ]),
     ]);
 
-    const totalRevenue = revenueAgg[0]?.total ?? 0;
     const totalCommission = commissionAgg[0]?.total ?? 0;
-    const prevRevenue = prevRevenueAgg[0]?.total ?? 0;
 
-    const currentMonthCustomers = await UserModel.countDocuments({
-      role: 'customer',
-      createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
-    });
-    const currentMonthVendors = await UserModel.countDocuments({
-      role: 'vendor',
-      createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
-    });
-    const currentMonthDrivers = await UserModel.countDocuments({
-      role: 'driver',
-      createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
-    });
-    const [currLegacy, currTowing, currDriver] = await Promise.all([
+    const [
+      currentMonthCustomers,
+      currentMonthVendors,
+      currentMonthDrivers,
+      currLegacy,
+      currTowing,
+      currDriver,
+      currentMonthLegacyRevenueAgg,
+      currentMonthBookingRevenueAgg,
+      prevBookingRevenueAgg,
+      bookingPaymentRevenueAgg,
+      expiringSubscriptions,
+      driverFleetStats,
+      cancelledTowing,
+      cancelledDriver,
+      verifiedPoliceDrivers,
+    ] = await Promise.all([
+      UserModel.countDocuments({
+        role: 'customer',
+        createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
+      }),
+      UserModel.countDocuments({
+        role: 'vendor',
+        createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
+      }),
+      UserModel.countDocuments({
+        role: 'driver',
+        createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
+      }),
       BookingModel.countDocuments({ createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } }),
       TowingBookingModel.countDocuments({ createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } }),
       DriverBookingModel.countDocuments({ createdAt: { $gte: currentMonth.start, $lte: currentMonth.end } }),
-    ]);
-    const currentMonthBookings = currLegacy + currTowing + currDriver;
-
-    const currentMonthRevenueAgg = await TransactionModel.aggregate([
-      {
-        $match: {
-          type: 'PAYMENT',
-          status: 'COMPLETED',
-          createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
+      TransactionModel.aggregate([
+        {
+          $match: {
+            type: 'PAYMENT',
+            status: 'COMPLETED',
+            createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
+          },
         },
-      },
-      { $group: { _id: null, total: { $sum: '$amount' } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      PaymentTransactionModel.aggregate([
+        {
+          $match: {
+            paymentType: { $in: ['advance', 'final'] },
+            status: 'success',
+            createdAt: { $gte: currentMonth.start, $lte: currentMonth.end },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      PaymentTransactionModel.aggregate([
+        {
+          $match: {
+            paymentType: { $in: ['advance', 'final'] },
+            status: 'success',
+            createdAt: { $gte: previousMonth.start, $lte: previousMonth.end },
+          },
+        },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      PaymentTransactionModel.aggregate([
+        { $match: { paymentType: { $in: ['advance', 'final'] }, status: 'success' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      UserSubscriptionModel.countDocuments({
+        status: 'active',
+        expiresAt: {
+          $gte: new Date(),
+          $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      }),
+      UserModel.aggregate<{
+        _id: null;
+        avgRating: number;
+        total: number;
+        approved: number;
+      }>([
+        { $match: { role: 'driver', driverProfile: { $exists: true } } },
+        {
+          $group: {
+            _id: null,
+            avgRating: { $avg: '$driverProfile.rating' },
+            total: { $sum: 1 },
+            approved: {
+              $sum: { $cond: [{ $eq: ['$driverProfile.status', 'APPROVED'] }, 1, 0] },
+            },
+          },
+        },
+      ]),
+      TowingBookingModel.countDocuments({ status: 'CANCELLED' }),
+      DriverBookingModel.countDocuments({ status: 'CANCELLED' }),
+      UserModel.countDocuments({
+        role: 'driver',
+        'driverProfile.policeVerificationStatus': 'VERIFIED',
+      }),
     ]);
-    const currentMonthRevenue = currentMonthRevenueAgg[0]?.total ?? 0;
+
+    const currentMonthBookings = currLegacy + currTowing + currDriver;
+    // Align with adminFinance.getSummary (ledger payments + booking payment sessions).
+    const totalRevenue =
+      (revenueAgg[0]?.total ?? 0) + (bookingPaymentRevenueAgg[0]?.total ?? 0);
+    const prevRevenue =
+      (prevRevenueAgg[0]?.total ?? 0) + (prevBookingRevenueAgg[0]?.total ?? 0);
+    const currentMonthRevenue =
+      (currentMonthLegacyRevenueAgg[0]?.total ?? 0) +
+      (currentMonthBookingRevenueAgg[0]?.total ?? 0);
 
     const weekMap = new Map<number, number>();
     for (const row of [...legacyBookingsByWeek, ...towingBookingsByWeek, ...driverBookingsByWeek]) {
@@ -260,15 +327,82 @@ export const adminDashboardService = {
     const todayBookings = towingToday + driverToday;
     const pendingBookings = towingPending + driverPending;
     const activeServiceBookings = towingActive + driverActive;
-    const newRevenue = (towingRevenueAgg[0]?.total ?? 0) + (driverRevenueAgg[0]?.total ?? 0);
+    const serviceCountTotal = serviceDistribution.reduce((sum, row) => sum + (row.count ?? 0), 0);
+    const topServices = serviceDistribution.map((row, i) => ({
+      name: row._id ?? 'Other',
+      value: serviceCountTotal
+        ? Math.round(((row.count ?? 0) / serviceCountTotal) * 100)
+        : 0,
+      color: colors[i % colors.length],
+    }));
+
+    const fleet = driverFleetStats[0];
+    const avgRating = fleet?.avgRating ?? 0;
+    const approvedDrivers = fleet?.approved ?? 0;
+    const fleetTotal = fleet?.total ?? 0;
+    const cancelledBookings = cancelledTowing + cancelledDriver;
+    const completionDenom = completedBookings + cancelledBookings;
+    const completionPct = completionDenom
+      ? Math.round((completedBookings / completionDenom) * 100)
+      : 0;
+    const approvalPct = fleetTotal ? Math.round((approvedDrivers / fleetTotal) * 100) : 0;
+    const ratingPct = Math.min(100, Math.round((avgRating / 5) * 100));
+    const safetyPct = fleetTotal
+      ? Math.round((verifiedPoliceDrivers / fleetTotal) * 100)
+      : 0;
+    // On-time proxy: share of completed service bookings among settled (completed+cancelled).
+    const onTimePct = completionPct;
+
+    const alerts: Array<{ id: string; message: string; href: string; urgent: boolean }> = [];
+    if (pendingVendors > 0) {
+      alerts.push({
+        id: 'pending-vendors',
+        message: `${pendingVendors} vendor approval${pendingVendors === 1 ? '' : 's'} pending review`,
+        href: '/vendors',
+        urgent: true,
+      });
+    }
+    if (pendingDrivers > 0) {
+      alerts.push({
+        id: 'pending-drivers',
+        message: `${pendingDrivers} driver verification${pendingDrivers === 1 ? '' : 's'} awaiting action`,
+        href: '/drivers',
+        urgent: true,
+      });
+    }
+    if (expiringSubscriptions > 0) {
+      alerts.push({
+        id: 'expiring-subs',
+        message: `${expiringSubscriptions} subscription${expiringSubscriptions === 1 ? '' : 's'} expiring within 30 days`,
+        href: '/subscriptions',
+        urgent: false,
+      });
+    }
+    if (pendingBookings > 0) {
+      alerts.push({
+        id: 'pending-bookings',
+        message: `${pendingBookings} booking${pendingBookings === 1 ? '' : 's'} still pending assignment`,
+        href: '/bookings',
+        urgent: true,
+      });
+    }
 
     return {
       totalBookings: totalServiceBookings,
       todayBookings,
       pendingBookings,
       activeBookings: activeServiceBookings,
-      totalRevenue: newRevenue,
+      totalRevenue,
       legacyBookings,
+      useMockData: Boolean(settings?.useMockData),
+      alerts,
+      driverPerformance: [
+        { metric: 'On-time', value: onTimePct },
+        { metric: 'Rating', value: ratingPct },
+        { metric: 'Acceptance', value: approvalPct },
+        { metric: 'Completion', value: completionPct },
+        { metric: 'Safety', value: safetyPct },
+      ],
       stats: [
         {
           id: 'customers',
@@ -320,7 +454,7 @@ export const adminDashboardService = {
         {
           id: 'commission',
           label: 'Platform Commission',
-          value: formatCurrency(totalCommission || Math.round(totalRevenue * (commissionRate / 100))),
+          value: formatCurrency(totalCommission),
           icon: 'Percent',
         },
         {
@@ -338,21 +472,18 @@ export const adminDashboardService = {
           icon: 'Hourglass',
         },
       ],
+      // Charts: current series from live aggregates; previous = prior month totals (honest, not invented %).
       revenueChart: revenueByWeek.map((row, i) => ({
         label: `Week ${i + 1}`,
         current: row.total,
-        previous: Math.round(row.total * 0.9),
+        previous: i === 0 ? prevRevenue : 0,
       })),
       bookingsChart: bookingsByWeek.map((row, i) => ({
         label: `Week ${i + 1}`,
         current: row.total,
-        previous: Math.max(0, row.total - 20),
+        previous: i === 0 ? prevBookings : 0,
       })),
-      topServices: serviceDistribution.map((row, i) => ({
-        name: row._id ?? 'Other',
-        value: row.count,
-        color: colors[i % colors.length],
-      })),
+      topServices,
       recentActivities: recentActivities.map((log) => ({
         id: log._id.toString(),
         title: log.title,
@@ -422,7 +553,15 @@ export const adminDashboardService = {
         type: vendor.vendorProfile?.vendorType ?? 'towing_company',
         status: mapVendorStatus(vendor.vendorProfile?.status ?? 'pending'),
         submittedAt: (vendor.vendorProfile?.submittedAt ?? vendor.createdAt).toISOString(),
-        city: vendor.vendorProfile?.address?.split(',')[0] ?? vendor.address?.city ?? 'Odisha',
+        city: (() => {
+          if (vendor.address?.city?.trim()) return vendor.address.city.trim();
+          const address = vendor.vendorProfile?.address ?? '';
+          const parts = address
+            .split(',')
+            .map((part: string) => part.trim())
+            .filter(Boolean);
+          return parts[parts.length - 1] || 'Odisha';
+        })(),
       })),
     };
   },

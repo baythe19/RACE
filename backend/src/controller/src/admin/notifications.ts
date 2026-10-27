@@ -23,4 +23,9 @@ export const adminNotificationsController = {
     await adminNotificationsService.markAllRead();
     sendSuccess(res, { message: 'All marked read' });
   }),
+
+  delete: asyncHandler(async (req: Request, res: Response) => {
+    await adminNotificationsService.delete(routeParam(req.params.id));
+    sendSuccess(res, { message: 'Notification deleted' });
+  }),
 };

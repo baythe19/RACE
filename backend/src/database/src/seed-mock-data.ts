@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 
+import { assertSeedAllowed } from './seed-guard';
+
 import { connectDatabase, disconnectDatabase } from './connection';
 import { ensureDatabaseIndexes } from './indexes';
 import { brandRepository } from '../../services/src/brandRepository';
@@ -21,6 +23,8 @@ import colorsData from '../seed-data/colors.json';
 import servicesData from '../seed-data/services.json';
 
 dotenv.config();
+
+assertSeedAllowed("seed:mock");
 
 export const MOCK_USERS = {
   admin: {

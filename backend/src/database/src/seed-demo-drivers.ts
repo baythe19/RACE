@@ -1,11 +1,15 @@
 import dotenv from 'dotenv';
 
+import { assertSeedAllowed } from './seed-guard';
+
 import { connectDatabase, disconnectDatabase } from './connection';
 import { driverRepository } from '../../services/src/driverRepository';
 import { UserModel } from '../../models/src/user';
 import { logger } from '../../utils/src/logger';
 
 dotenv.config();
+
+assertSeedAllowed("seed:demo-drivers");
 
 const DEMO_DRIVERS = [
   {

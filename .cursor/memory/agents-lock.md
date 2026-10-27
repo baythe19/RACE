@@ -7,4 +7,5 @@ If the surface you need is already claimed, **stop** and tell the user. Do not s
 True isolation (optional, user must ask): git worktrees — one branch/worktree per agent. Still update this file.
 
 | Claimed | Surface | Task | Session note |
-|---------|---------|------|----------------|
+|---------|---------|------|--------------|
+| Claude (this session) | backend + mobile application | Render deploy prep + partner APK build | HanuSMS live-verified; audit 41/41; user approved build start |
