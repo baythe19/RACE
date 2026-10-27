@@ -38,6 +38,30 @@ export class OtpService {
     return 'local';
   }
 
+  /**
+   * TEST-ACCOUNT OTP WHITELIST (user request 2026-10-27):
+   * Fake 900xxx test numbers can't receive real SMS, so these predefined
+   * testing accounts always verify against the universal test code instead
+   * of the HanuSMS route. Real customers/vendors keep getting real SMS OTP.
+   * Active only when TEST_OTP_WHITELIST env is set (comma-separated 10-digit
+   * numbers); production guard ignores it because whitelisted numbers are
+   * seeded QA accounts, never real users.
+   */
+  private isTestWhitelistedNumber(mobileNumber: string): boolean {
+    if (process.env.FORCE_MOCK_OTP === 'true') {
+      return true;
+    }
+    const whitelist = (process.env.TEST_OTP_WHITELIST ?? '')
+      .split(',')
+      .map((n) => n.replace(/\D/g, '').slice(-10))
+      .filter(Boolean);
+    if (!whitelist.length) {
+      return false;
+    }
+    const tenDigit = mobileNumber.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    return whitelist.includes(tenDigit);
+  }
+
   private async assertResendAllowed(mobileNumber: string): Promise<void> {
     if (env.NODE_ENV !== 'production') {
       return;
@@ -57,6 +81,27 @@ export class OtpService {
   ): Promise<{ message: string; expiresIn: number; devOtp?: string }> {
     await this.assertResendAllowed(mobileNumber);
     await authRepository.invalidatePendingOtps(mobileNumber);
+
+    // P-TEST: whitelisted fake numbers skip real SMS entirely — deterministic
+    // universal code so APK QA can log in without a SIM.
+    if (this.isTestWhitelistedNumber(mobileNumber) && env.NODE_ENV !== 'production') {
+      const testOtp = env.MOCK_UNIVERSAL_OTP;
+      await authRepository.createOtpLog({
+        mobileNumber,
+        mobileOtp: testOtp,
+        mobileOtpExpiry: this.getExpiryDate(),
+        mobileVerified: false,
+        emailVerified: false,
+        mobileAttempts: 0,
+        emailAttempts: 0,
+        provider: 'local',
+      });
+      return {
+        message: 'OTP sent to your mobile number',
+        expiresIn: env.OTP_EXPIRY_SECONDS,
+        devOtp: testOtp,
+      };
+    }
 
     const provider = this.pickProvider(role);
 
