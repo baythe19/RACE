@@ -126,3 +126,11 @@ Peach browser sim: `docs/DEVICE_FREE_PREVIEW.md`; runbook `.cursor/memory/partne
 
 
 **2026-10-27 (forms + storage RECHECKED done):** (1) EntityFormModal upgraded: sections+legend, date type, `showWhen` conditional + visible-only submit. (2) Admin forms real-feel: Customer 4 sections (Personal: gender/DOB; Address: line1/pincode; Emergency; Account), Vendor 3 sections (Business: vendorType 5 options; Address; Account), Driver 4 sections (Personal: email/experience; Licence&Work: vehicle reg; Emergency; Account). (3) Backend: adminCustomers create/update + mapCustomer now handle gender/DOB/addressLine/pincode/emergency; adminVendors create address = [line,city,pincode,state] joined (no hardcoded ", Odisha"); driverRepository.create + adminDrivers create pass experienceYears + emergencyContact. (4) `deriveVendorCity`: PIN strip + 24-state dictionary → Bhopal/Bhubaneswar correct. (5) Placeholder driver docs ab PENDING + no-url (kabhi VERIFIED nahi dikhenge bina file). (6) Storage: `UPLOADS_DIR` env (Render disk ready), GCS flip = env-only. Verified live: form UI sections, submit→DB→list roundtrip, all endpoints 200, tsc 0 (backend+admin). QA accounts (9000000001-4) user-approved testing ke liye chhODE hain.
+
+## 2026-10-27 — Pre-APK deploy chain complete (apk-builds-in-queue)
+- 3 commits pushed: 814ffc9 (pre-apk hardening), 004535c (admin optional-fields tsc fix), 914d7f6 (versionCode partner 3 / customer 6 + partner timeout 30s)
+- Upstream teamwebstarts-cmyk: v2.5.2-development + v7.0.0-major-update both at 914d7f6 (push via PAT; fork origin also synced)
+- Render race-api live on 814ffc9 (backend untouched by later admin-only commits); health 200, OTP whitelist smoke OK (9000000005 devOtp 123456, onboardingRequired)
+- Vercel race-admin READY dpl_5vs1Wom8GTViMe9cyvve5EXMLjor (004535c); alias race-admin-six.vercel.app serves 200
+- expo doctor 21/21 both apps (expo ~57.0.31, expo-location ~57.0.22, expo-asset ~57.0.20)
+- EAS builds submitted (no-wait): partner production-test 47499981-... (vCode 3), customer preview 51dff6ca-... (vCode 6) — both IN_QUEUE
