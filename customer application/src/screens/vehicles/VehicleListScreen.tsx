@@ -178,29 +178,49 @@ function VehicleListCard({
 }
 
 function AddVehicleCard({ px, onPress }: { px: (n: number) => number; onPress: () => void }) {
+  // Empty-state hero card — only visible when the user has no vehicles yet
+  // (with vehicles present the Add action lives in the header button).
   return (
     <Pressable
       onPress={onPress}
       style={{
-        borderRadius: px(16),
+        borderRadius: px(18),
         borderWidth: 1.5,
         borderColor: VEHICLE_YELLOW,
         borderStyle: 'dashed',
-        paddingVertical: px(28),
+        paddingVertical: px(36),
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: px(14),
-        backgroundColor: colors.background,
+        backgroundColor: '#FFFBEB',
       }}>
-      <Plus size={px(28)} color={VEHICLE_YELLOW} strokeWidth={2.5} />
+      <View
+        style={{
+          width: px(56),
+          height: px(56),
+          borderRadius: px(28),
+          backgroundColor: VEHICLE_YELLOW,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginBottom: px(10),
+        }}>
+        <Plus size={px(26)} color={colors.dark} strokeWidth={2.8} />
+      </View>
       <Text
         style={{
-          marginTop: px(6),
-          fontSize: px(14),
+          fontSize: px(15),
           fontWeight: typography.weights.bold,
-          color: VEHICLE_YELLOW,
+          color: colors.dark,
         }}>
-        Add New Vehicle
+        Add your first vehicle
+      </Text>
+      <Text
+        style={{
+          marginTop: px(3),
+          fontSize: px(12),
+          color: colors.grey,
+        }}>
+        Tap to register — takes under a minute
       </Text>
     </Pressable>
   );
@@ -283,7 +303,35 @@ export default function VehicleListScreen({ navigation }: Props) {
   return (
     <ProfileSubScreenLayout
       title="My Vehicles"
-      subtitle="Manage your registered vehicles">
+      subtitle="Manage your registered vehicles"
+      headerRight={
+        <Pressable
+          onPress={() => navigation.navigate('AddVehicle')}
+          style={({ pressed }) => [
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: px(5),
+              backgroundColor: VEHICLE_YELLOW,
+              borderRadius: px(20),
+              paddingVertical: px(8),
+              paddingHorizontal: px(13),
+            },
+            pressed && { opacity: 0.85 },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Add vehicle">
+          <Plus size={px(15)} color={colors.dark} strokeWidth={2.8} />
+          <Text
+            style={{
+              fontSize: px(12),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            Add Vehicle
+          </Text>
+        </Pressable>
+      }>
       {isLoading && !safeVehicles.length ? (
         <DataSkeleton variant="cards" />
       ) : (
@@ -300,9 +348,12 @@ export default function VehicleListScreen({ navigation }: Props) {
             </Text>
           ) : null}
 
-          {safeVehicles.map(renderVehicle)}
+          {safeVehicles.length === 0 ? (
+            <AddVehicleCard px={px} onPress={() => navigation.navigate('AddVehicle')} />
+          ) : (
+            safeVehicles.map(renderVehicle)
+          )}
 
-          <AddVehicleCard px={px} onPress={() => navigation.navigate('AddVehicle')} />
           <QrInfoBanner px={px} />
         </>
       )}

@@ -192,7 +192,6 @@ export default function CreateAccountScreen({ navigation }: Props) {
               borderRadius={px(14)}
               disabled={isLoading}
             />
-
           </View>
 
           <View style={[styles.footer, { paddingTop: px(16) }]}>

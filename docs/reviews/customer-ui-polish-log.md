@@ -133,3 +133,47 @@ screens. Source material: 9 live screenshots from the user's iOS simulator.
 | 8. Select Relationship native alert | Same as above, plus keyboard behind | Round 2 items 1–2 |
 | 9. Relationship picker over keyboard | Same root cause as 5 | Round 2 items 1–2 |
 
+
+### Round 3 — Page transitions + edit redirect (2026-10-29, user feedback)
+
+User report: moving between pages felt "घटिया" — one page floating over
+another instead of a proper push; and saving an edit (e.g. Personal
+Information) did not return you anywhere sensible.
+
+| # | Change | Where |
+|---|--------|-------|
+| 1 | Every stack now uses the professional standard push: `animation: 'slide_from_right'`, 280ms, `gestureDirection: 'horizontal'` — new card slides in from the right, previous page eases left. Applied to **Profile (16 screens), Bookings, Call, and the shared `stackScreenOptions`** (Home + Services inherit) | `AppNavigator.tsx` |
+| 2 | Personal Information save → profile store refreshed (`fetchProfile`) → "Saved" alert OK → **`goBack()` to Profile**, so the edited data is visible immediately. Standard form-pop flow | `PersonalInformationScreen.tsx` |
+
+Verification: `tsc --noEmit` clean (excluding the two pre-existing
+booking-flow errors), Metro bundle 200.
+
+Note: profile stack previously had NO animation config — it used the native
+default (modal-ish float on iOS), which is what the user described as "one
+page over another".
+
+### Round 4 — half-screen slide artifact + keyboard scroll (2026-10-29)
+
+User screenshot during Profile → Personal Information push showed the new
+page sliding over a **half-rendered previous page** (skeleton) — looked broken.
+
+| # | Finding | Fix |
+|---|---------|-----|
+| 1 | Profile stack had no `contentStyle` background — during the slide the transparent gap exposed the previous skeleton | `contentStyle: { backgroundColor: colors.background }` + `animationTypeForReplace: 'push'` on Profile stack and shared stack options |
+| 2 | Inputs could hide behind the keyboard — `keyboardAvoiding` was opt-in and only AddVehicle/PersonalInformation passed it | `ProfileSubScreenLayout` now **defaults `keyboardAvoiding = true`** (forms everywhere get it; screens without inputs can opt out). `AppScreenLayout` KAV documented — iOS padding, native adjustResize on Android |
+| 3 | Keyboard must never open for read-only pickers (kept from round 2) | Already covered by `showSoftInputOnFocus={false}` + `focusable={false}` in FormField |
+
+Verification: `tsc --noEmit` clean (excluding 2 pre-existing booking-flow
+errors), Metro bundle 200.
+
+### Round 5 — Vehicle screens keyboard flow (2026-10-29)
+
+User: "vehicle page me har input, har form keyboard ke saath properly respond kare — kuch bhi gadbad nahi hona chahiye."
+
+| Screen | What was fixed |
+|--------|----------------|
+| AddVehicle | 3 टेक्स्ट inputs (Number → Brand → Model) में **next-flow** wired: `returnKeyType` next/done, `submitBehavior`, `onSubmitEditing` अगले इनपुट पर फोकस, आखिरी (Model) से सीधे **submit**। Number field: `autoCorrect={false}`। Custom Color: पहले बेकार Alert आता था → अब "More" टैप करते ही input दिखता है और **ऑटो-फोकस** होता है (120ms setTimeout)। सब inputs में `autoCorrect={false}` |
+| EditVehicle | Field component अपग्रेड: ref + `returnKeyType` + `submitBehavior` + `onSubmitEditing` सपोर्ट। Number → Brand → Model → Color → submit **चेन** कि गई। `keyboardShouldPersistTaps="handled"` पहले से था ✅ |
+| Layout | `AppScreenLayout` का स्क्रॉलव्यू `keyboardShouldPersistTaps="handled"` पहले से है ✅; `ProfileSubScreenLayout` डिफ़ॉल्ट `keyboardAvoiding: true` (राउंड 4) से AddVehicle/EditVehicle कवर हैं |
+
+टाइप-चेक क्लीन है (2 पहले से मौजूद बुकिंग-फ़्लो त्रुटियों के अलावा)। मेट्रो बंडल 200.

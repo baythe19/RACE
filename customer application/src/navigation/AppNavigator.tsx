@@ -138,6 +138,7 @@ const stackScreenOptions = {
   animation: 'slide_from_right' as const,
   animationDuration: 280,
   gestureDirection: 'horizontal' as const,
+  animationTypeForReplace: 'push' as const,
 };
 
 const towingBookingScreenOptions = { headerShown: false as const };
@@ -477,6 +478,10 @@ function ProfileStackNavigator() {
         animation: 'slide_from_right',
         animationDuration: 280,
         gestureDirection: 'horizontal',
+        // Solid page backgrounds so the underlying screen never shows through
+        // mid-slide (the "half page over half page" artifact).
+        contentStyle: { backgroundColor: colors.background },
+        animationTypeForReplace: 'push',
       }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="PersonalInformation" component={PersonalInformationScreen} />

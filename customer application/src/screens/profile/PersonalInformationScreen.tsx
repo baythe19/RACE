@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import {
   Camera,
   ChevronDown,
@@ -38,6 +39,7 @@ function formatRelationship(value?: string): string {
 
 export default function PersonalInformationScreen() {
   const px = useProfilePx();
+  const navigation = useNavigation();
   const { profile, fetchProfile, updateProfile, isLoading } = useProfileStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -137,7 +139,12 @@ export default function PersonalInformationScreen() {
           country: profile?.address?.country,
         }),
       );
-      Alert.alert('Saved', 'Your profile has been updated.');
+      // Saved → refresh upstream pages, then return to Profile (standard
+      // push/pop flow instead of leaving the user stuck on the form).
+      void fetchProfile();
+      Alert.alert('Saved', 'Your profile has been updated.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
     } catch (error) {
       Alert.alert('Profile', getApiErrorMessage(error, 'Unable to update profile'));
     }
@@ -156,7 +163,10 @@ export default function PersonalInformationScreen() {
   }
 
   return (
-    <ProfileSubScreenLayout title="Personal Information" subtitle="Update your details">
+    <ProfileSubScreenLayout
+      title="Personal Information"
+      subtitle="Update your details"
+      keyboardAvoiding>
       <Pressable
         style={{
           alignSelf: 'center',

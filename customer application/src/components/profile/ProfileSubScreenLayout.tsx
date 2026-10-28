@@ -13,6 +13,8 @@ type Props = {
   footer?: ReactNode;
   children: ReactNode;
   onBack?: () => void;
+  /** Defaults to true — every profile form has inputs that must stay above
+   * the keyboard. Pass false only for screens with no inputs. */
   keyboardAvoiding?: boolean;
 };
 
@@ -27,7 +29,7 @@ export default function ProfileSubScreenLayout({
   footer,
   children,
   onBack,
-  keyboardAvoiding,
+  keyboardAvoiding = true,
 }: Props) {
   const navigation = useNavigation();
   const handleBack = onBack ?? (() => navigation.goBack());

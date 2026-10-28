@@ -94,7 +94,11 @@ export default function AppScreenLayout({
         {keyboardAvoiding ? (
           <KeyboardAvoidingView
             style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
+            // Android: react-native's automatic "adjustResize" handles it when
+            // the activity is configured; no KAV wrapper needed there.
+          >
             {content}
           </KeyboardAvoidingView>
         ) : (

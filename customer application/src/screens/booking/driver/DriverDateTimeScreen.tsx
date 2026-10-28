@@ -1,17 +1,22 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { AlarmClock, ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from 'lucide-react-native';
+import { AlarmClock, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
-import { DRIVER_CALENDAR_WEEKDAYS, DRIVER_DURATION_OPTIONS } from '../../../constants/driverBooking';
+import {
+  DRIVER_ACCENT,
+  DRIVER_BOOKING_STEP_LABELS,
+  DRIVER_DURATION_OPTIONS,
+  DRIVER_PACKAGES,
+} from '../../../constants/driverBooking';
 import { useDriverBooking } from '../../../context/DriverBookingContext';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { DriverDurationId } from '../../../types/driverBooking';
+import type { DriverPackageHours } from '../../../types/fare';
 import {
-  buildMonthGrid,
+  buildUpcomingDateStrip,
   formatMonthYear,
-  isPastDate,
   parseISODate,
   parseStoredDate,
 } from '../../../utils/driverCalendar';
@@ -26,29 +31,53 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'DriverDateTime'>;
 
 const TIME_SLOTS = generateTimeSlots(30);
 const TIME_COLUMNS = 3;
+const CUSTOM_HOUR_OPTIONS = DRIVER_PACKAGES.map(pkg => pkg.hours);
+
+function durationToPackageHours(
+  durationId: DriverDurationId,
+  customHours: DriverPackageHours,
+): DriverPackageHours {
+  if (durationId === 'custom') {
+    return customHours;
+  }
+  return Number(durationId) as DriverPackageHours;
+}
 
 export default function DriverDateTimeScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
   const timeScrollRef = useRef<ScrollView>(null);
+  const dateScrollRef = useRef<ScrollView>(null);
 
+  const dateStrip = useMemo(() => buildUpcomingDateStrip(14), []);
   const initialDate = parseStoredDate(booking.dateId);
-  const initialParsed = parseISODate(initialDate);
+  const safeInitialDate = dateStrip.some(chip => chip.iso === initialDate)
+    ? initialDate
+    : dateStrip[0]?.iso ?? initialDate;
 
-  const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [viewYear, setViewYear] = useState(initialParsed.getFullYear());
-  const [viewMonth, setViewMonth] = useState(initialParsed.getMonth());
+  const [selectedDate, setSelectedDate] = useState(safeInitialDate);
   const [durationId, setDurationId] = useState<DriverDurationId>(booking.durationId);
-  const [startTime, setStartTime] = useState(parseStoredTime(booking.startTime));
-  const [showTimePicker, setShowTimePicker] = useState(false);
-
-  const calendarCells = useMemo(
-    () => buildMonthGrid(viewYear, viewMonth),
-    [viewYear, viewMonth],
+  const [customHours, setCustomHours] = useState<DriverPackageHours>(
+    booking.packageHours === 12 || booking.packageHours === 24 ? booking.packageHours : 12,
   );
+  const [startTime, setStartTime] = useState(parseStoredTime(booking.startTime));
+  const [showTimePicker, setShowTimePicker] = useState(true);
 
+  const selectedChip = dateStrip.find(chip => chip.iso === selectedDate) ?? dateStrip[0];
+  const selectedParsed = parseISODate(selectedDate);
   const selectedTimeIndex = TIME_SLOTS.indexOf(startTime);
-  const timeRowHeight = t.px(42);
+  const timeRowHeight = t.px(40);
+
+  useEffect(() => {
+    const index = dateStrip.findIndex(chip => chip.iso === selectedDate);
+    if (index < 0) {
+      return;
+    }
+    dateScrollRef.current?.scrollTo({
+      x: Math.max(0, index * t.px(64) - t.px(24)),
+      animated: false,
+    });
+  }, [dateStrip, selectedDate, t]);
 
   useEffect(() => {
     if (!showTimePicker || selectedTimeIndex < 0) {
@@ -62,127 +91,107 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
     });
   }, [showTimePicker, selectedTimeIndex, timeRowHeight]);
 
-  const goToPreviousMonth = () => {
-    if (viewMonth === 0) {
-      setViewYear(year => year - 1);
-      setViewMonth(11);
-      return;
+  const selectDate = (iso: string) => {
+    setSelectedDate(iso);
+    if (isTimeSlotPast(iso, startTime)) {
+      const nextSlot = TIME_SLOTS.find(slot => !isTimeSlotPast(iso, slot));
+      if (nextSlot) {
+        setStartTime(nextSlot);
+      }
     }
-    setViewMonth(month => month - 1);
-  };
-
-  const goToNextMonth = () => {
-    if (viewMonth === 11) {
-      setViewYear(year => year + 1);
-      setViewMonth(0);
-      return;
-    }
-    setViewMonth(month => month + 1);
   };
 
   return (
     <TowingBookingLayout
-      title="When do you need a driver?"
+      title="Pick date & time"
       step={1}
-      scrollable={showTimePicker}
+      stepLabels={DRIVER_BOOKING_STEP_LABELS}
+      accentColor={DRIVER_ACCENT}
+      scrollable
       onBack={() => navigation.goBack()}
       onContinue={() => {
-        updateBooking({ dateId: selectedDate, durationId, startTime });
+        const packageHours = durationToPackageHours(durationId, customHours);
+        updateBooking({
+          dateId: selectedDate,
+          durationId,
+          startTime,
+          packageHours,
+          hours: packageHours,
+        });
         navigation.navigate('DriverPickup');
       }}>
-      <View style={{ gap: t.px(20) }}>
+      <View style={{ gap: t.px(16) }}>
         <View>
-          <View
+          <Text
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: t.px(14),
+              fontSize: t.sectionTitle,
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+              marginBottom: t.px(4),
             }}>
-            <Pressable hitSlop={8} onPress={goToPreviousMonth}>
-              <ChevronLeft size={t.iconSm} color={colors.dark} />
-            </Pressable>
-            <Text
-              style={{
-                fontSize: t.labelBold,
-                fontWeight: typography.weights.bold,
-                color: colors.dark,
-              }}>
-              {formatMonthYear(viewYear, viewMonth)}
-            </Text>
-            <Pressable hitSlop={8} onPress={goToNextMonth}>
-              <ChevronRight size={t.iconSm} color={colors.dark} />
-            </Pressable>
-          </View>
+            Date
+          </Text>
+          <Text
+            style={{
+              fontSize: t.caption,
+              color: colors.grey,
+              marginBottom: t.px(10),
+            }}>
+            {selectedChip?.isToday
+              ? `Today · ${formatMonthYear(selectedParsed.getFullYear(), selectedParsed.getMonth())}`
+              : formatMonthYear(selectedParsed.getFullYear(), selectedParsed.getMonth())}
+          </Text>
 
-          <View style={{ flexDirection: 'row', marginBottom: t.px(10) }}>
-            {DRIVER_CALENDAR_WEEKDAYS.map(day => (
-              <Text
-                key={day}
-                style={{
-                  flex: 1,
-                  textAlign: 'center',
-                  fontSize: t.caption,
-                  fontWeight: typography.weights.semibold,
-                  color: colors.grey,
-                }}>
-                {day}
-              </Text>
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {calendarCells.map(cell => {
-              const selected = selectedDate === cell.iso;
-              const muted = !cell.currentMonth;
-              const disabled = isPastDate(cell.date);
-
+          <ScrollView
+            ref={dateScrollRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: t.px(8), paddingRight: t.px(8) }}>
+            {dateStrip.map(chip => {
+              const selected = selectedDate === chip.iso;
               return (
                 <Pressable
-                  key={cell.key}
-                  disabled={disabled}
-                  onPress={() => {
-                    setSelectedDate(cell.iso);
-                    if (!cell.currentMonth) {
-                      setViewYear(cell.date.getFullYear());
-                      setViewMonth(cell.date.getMonth());
-                    }
-                    if (isTimeSlotPast(cell.iso, startTime)) {
-                      const nextSlot = TIME_SLOTS.find(slot => !isTimeSlotPast(cell.iso, slot));
-                      if (nextSlot) {
-                        setStartTime(nextSlot);
-                      }
-                    }
-                  }}
+                  key={chip.key}
+                  onPress={() => selectDate(chip.iso)}
                   style={{
-                    width: `${100 / 7}%`,
-                    height: t.px(40),
+                    width: t.px(58),
+                    height: t.px(72),
+                    borderRadius: t.px(12),
+                    borderWidth: selected ? 1.5 : 1,
+                    borderColor: selected ? DRIVER_ACCENT : colors.border,
+                    backgroundColor: selected ? DRIVER_ACCENT : colors.background,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    opacity: disabled ? 0.35 : 1,
+                    gap: t.px(2),
                   }}>
-                  <View
+                  <Text
                     style={{
-                      width: t.px(34),
-                      height: t.px(34),
-                      borderRadius: t.px(17),
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: selected ? colors.primary : 'transparent',
+                      fontSize: t.px(11),
+                      fontWeight: typography.weights.semibold,
+                      color: selected ? colors.dark : colors.grey,
                     }}>
-                    <Text
-                      style={{
-                        fontSize: t.label,
-                        fontWeight: typography.weights.semibold,
-                        color: muted ? colors.grey : colors.dark,
-                      }}>
-                      {cell.day}
-                    </Text>
-                  </View>
+                    {chip.isToday ? 'Today' : chip.weekday}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: t.labelBold,
+                      fontWeight: typography.weights.bold,
+                      color: colors.dark,
+                    }}>
+                    {chip.dayNumber}
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: t.px(10),
+                      fontWeight: typography.weights.medium,
+                      color: selected ? colors.dark : colors.grey,
+                    }}>
+                    {chip.monthShort}
+                  </Text>
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
         </View>
 
         <View>
@@ -204,18 +213,21 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
                   onPress={() => setDurationId(option.id)}
                   style={{
                     flex: 1,
+                    aspectRatio: 1.15,
+                    maxHeight: t.px(64),
                     alignItems: 'center',
-                    paddingVertical: t.px(12),
-                    borderRadius: t.px(24),
-                    borderWidth: 1,
-                    borderColor: selected ? colors.primary : colors.border,
-                    backgroundColor: selected ? colors.primary : colors.background,
+                    justifyContent: 'center',
+                    borderRadius: t.px(12),
+                    borderWidth: selected ? 1.5 : 1,
+                    borderColor: selected ? DRIVER_ACCENT : colors.border,
+                    backgroundColor: selected ? DRIVER_ACCENT : colors.background,
                   }}>
                   <Text
                     style={{
                       fontSize: t.caption,
                       fontWeight: typography.weights.bold,
-                      color: selected ? colors.background : colors.dark,
+                      color: colors.dark,
+                      textAlign: 'center',
                     }}>
                     {option.label}
                   </Text>
@@ -223,6 +235,48 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
               );
             })}
           </View>
+
+          {durationId === 'custom' ? (
+            <View style={{ marginTop: t.px(10), gap: t.px(8) }}>
+              <Text
+                style={{
+                  fontSize: t.caption,
+                  color: colors.grey,
+                  fontWeight: typography.weights.medium,
+                }}>
+                Choose package hours
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(8) }}>
+                {CUSTOM_HOUR_OPTIONS.map(hours => {
+                  const selected = customHours === hours;
+                  return (
+                    <Pressable
+                      key={hours}
+                      onPress={() => setCustomHours(hours)}
+                      style={{
+                        width: t.px(64),
+                        height: t.px(44),
+                        borderRadius: t.px(10),
+                        borderWidth: selected ? 1.5 : 1,
+                        borderColor: selected ? DRIVER_ACCENT : colors.border,
+                        backgroundColor: selected ? '#FEF3C7' : colors.background,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: t.caption,
+                          fontWeight: typography.weights.bold,
+                          color: colors.dark,
+                        }}>
+                        {hours} hrs
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <View>
@@ -231,47 +285,64 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
               fontSize: t.sectionTitle,
               fontWeight: typography.weights.bold,
               color: colors.dark,
+              marginBottom: t.px(4),
+            }}>
+            Start time
+          </Text>
+          <Text
+            style={{
+              fontSize: t.caption,
+              color: colors.grey,
               marginBottom: t.px(10),
             }}>
-            Start Time
+            Driver arrives at this time
           </Text>
           <Pressable
             onPress={() => setShowTimePicker(open => !open)}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              borderRadius: t.inputRadius,
+              borderRadius: t.px(12),
               borderWidth: 1.5,
-              borderColor: colors.primary,
+              borderColor: DRIVER_ACCENT,
               backgroundColor: colors.background,
-              paddingHorizontal: t.px(16),
-              paddingVertical: t.px(14),
+              paddingHorizontal: t.px(14),
+              paddingVertical: t.px(12),
             }}>
             <View
               style={{
                 width: t.px(36),
                 height: t.px(36),
-                borderRadius: t.px(18),
-                backgroundColor: colors.goldLight,
+                borderRadius: t.px(10),
+                backgroundColor: '#FEF3C7',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <AlarmClock size={t.px(20)} color={colors.primary} strokeWidth={2.4} />
+              <AlarmClock size={t.px(18)} color={DRIVER_ACCENT} strokeWidth={2.4} />
             </View>
-            <Text
-              style={{
-                flex: 1,
-                marginLeft: t.px(12),
-                fontSize: t.labelBold,
-                fontWeight: typography.weights.bold,
-                color: colors.primary,
-              }}>
-              {startTime}
-            </Text>
+            <View style={{ flex: 1, marginLeft: t.px(12) }}>
+              <Text
+                style={{
+                  fontSize: t.px(11),
+                  fontWeight: typography.weights.medium,
+                  color: colors.grey,
+                }}>
+                Selected time
+              </Text>
+              <Text
+                style={{
+                  fontSize: t.labelBold,
+                  fontWeight: typography.weights.bold,
+                  color: colors.dark,
+                  marginTop: t.px(1),
+                }}>
+                {startTime}
+              </Text>
+            </View>
             {showTimePicker ? (
-              <ChevronUp size={t.iconSm} color={colors.primary} strokeWidth={2.5} />
+              <ChevronUp size={t.iconSm} color={DRIVER_ACCENT} strokeWidth={2.5} />
             ) : (
-              <ChevronDown size={t.iconSm} color={colors.primary} strokeWidth={2.5} />
+              <ChevronDown size={t.iconSm} color={DRIVER_ACCENT} strokeWidth={2.5} />
             )}
           </Pressable>
 
@@ -280,11 +351,11 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
               style={[
                 {
                   marginTop: t.px(10),
-                  borderRadius: t.inputRadius,
+                  borderRadius: t.px(12),
                   borderWidth: 1,
                   borderColor: colors.border,
                   backgroundColor: colors.background,
-                  maxHeight: t.px(252),
+                  maxHeight: t.px(200),
                   overflow: 'hidden',
                 },
                 shadows.card,
@@ -317,8 +388,8 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
                             minHeight: timeRowHeight - t.px(8),
                             borderRadius: t.px(10),
                             borderWidth: selected ? 1.5 : 1,
-                            borderColor: selected ? colors.primary : colors.border,
-                            backgroundColor: selected ? colors.goldLight : colors.background,
+                            borderColor: selected ? DRIVER_ACCENT : colors.border,
+                            backgroundColor: selected ? '#FEF3C7' : colors.background,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}>
@@ -326,7 +397,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
                             style={{
                               fontSize: t.caption,
                               fontWeight: typography.weights.bold,
-                              color: selected ? colors.primary : colors.dark,
+                              color: selected ? DRIVER_ACCENT : colors.dark,
                             }}>
                             {slot}
                           </Text>

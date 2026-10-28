@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import GoldButton from '../auth/GoldButton';
 import { BookingScreenShell } from './BookingFlowHeader';
 import { BOOKING_REF_W, createBookingTheme } from './bookingTheme';
+import { TOWING_BOOKING_STEP_LABELS } from '../../constants/towingBooking';
 import { colors, typography } from '../../theme';
 
 interface TowingBookingLayoutProps {
@@ -39,7 +40,7 @@ interface TowingBookingLayoutProps {
   accentColor?: string;
 }
 
-const DEFAULT_STEPPER_LABELS = ['Vehicle & Tow', 'Pickup & Drop', 'Review'] as const;
+const DEFAULT_STEPPER_LABELS = TOWING_BOOKING_STEP_LABELS;
 
 export default function TowingBookingLayout({
   title,

@@ -20,7 +20,7 @@ import { formatRupee } from '../../../utils/driverPricing';
 import { parseStoredDate } from '../../../utils/driverCalendar';
 import { buildDriverBookingRequest } from '../../../utils/serviceBookingPayload';
 import type { DriverFareBreakdown } from '../../../types/fare';
-import { colors, shadows, typography } from '../../../theme';
+import { colors, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingPayment'>;
 
@@ -78,6 +78,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
     { label: 'Service', value: getDriverTypeLabel(booking.driverType) },
     { label: 'Pickup', value: getShortLocation(booking.pickup, booking.pickupLabel) },
     { label: 'Date', value: getDateReviewLabel(parseStoredDate(booking.dateId)) },
+    { label: 'Start', value: booking.startTime },
     { label: 'Duration', value: `${booking.packageHours} hours` },
     { label: 'Total', value: formatRupee(booking.totalPrice) },
   ];
@@ -171,18 +172,15 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
       hideFooter>
       <Pressable
         onPress={() => setSummaryExpanded(prev => !prev)}
-        style={[
-          {
-            borderRadius: t.cardRadius,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.background,
-            paddingHorizontal: t.px(16),
-            paddingVertical: t.px(14),
-            marginBottom: t.px(16),
-          },
-          shadows.card,
-        ]}>
+        style={{
+          borderRadius: t.px(12),
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          paddingHorizontal: t.px(16),
+          paddingVertical: t.px(14),
+          marginBottom: t.px(16),
+        }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Text
             style={{
@@ -190,7 +188,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
               fontWeight: typography.weights.bold,
               color: colors.dark,
             }}>
-            Booking Summary
+            Booking summary
           </Text>
           {summaryExpanded ? (
             <ChevronUp size={t.iconSm} color={colors.dark} />
@@ -199,7 +197,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
           )}
         </View>
         {summaryExpanded ? (
-          <View style={{ marginTop: t.px(12), gap: t.px(8) }}>
+          <View style={{ marginTop: t.px(12), gap: t.px(10) }}>
             {summaryRows.map(row => (
               <View
                 key={row.label}
@@ -212,38 +210,48 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
                     color: colors.dark,
                     textAlign: 'right',
                     flex: 1,
-                  }}>
+                  }}
+                  numberOfLines={2}>
                   {row.value}
                 </Text>
               </View>
             ))}
           </View>
-        ) : null}
+        ) : (
+          <Text style={{ marginTop: t.px(6), fontSize: t.caption, color: colors.grey }}>
+            Tap to see pickup, date & duration
+          </Text>
+        )}
       </Pressable>
 
       <View
         style={{
-          borderRadius: t.cardRadius,
+          borderRadius: t.px(12),
           backgroundColor: DRIVER_LIGHT_BG,
           borderWidth: 1,
           borderColor: DRIVER_ACCENT,
           paddingVertical: t.px(16),
           paddingHorizontal: t.px(16),
-          marginBottom: t.px(20),
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          marginBottom: t.px(8),
         }}>
-        <Text style={{ fontSize: t.bodyLarge, fontWeight: typography.weights.semibold, color: colors.dark }}>
-          Pay now
+        <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(4) }}>
+          Advance due now (30%)
         </Text>
-        <Text
-          style={{
-            fontSize: t.px(22),
-            fontWeight: typography.weights.extrabold,
-            color: DRIVER_ACCENT,
-          }}>
-          {formatRupee(advance)}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: t.bodyLarge, fontWeight: typography.weights.semibold, color: colors.dark }}>
+            Pay now
+          </Text>
+          <Text
+            style={{
+              fontSize: t.px(22),
+              fontWeight: typography.weights.extrabold,
+              color: DRIVER_ACCENT,
+            }}>
+            {formatRupee(advance)}
+          </Text>
+        </View>
+        <Text style={{ marginTop: t.px(6), fontSize: t.caption, color: colors.grey }}>
+          Remaining balance when the driver arrives
         </Text>
       </View>
 
@@ -271,21 +279,28 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
             <Pressable
               key={method.id}
               onPress={() => setPaymentMethod(method.id)}
-              style={[
-                {
-                  flexDirection: 'row',
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: t.px(12),
+                borderRadius: t.px(12),
+                borderWidth: selected ? 1.5 : 1,
+                borderColor: selected ? DRIVER_ACCENT : colors.border,
+                backgroundColor: selected ? DRIVER_LIGHT_BG : colors.background,
+                paddingHorizontal: t.px(16),
+                paddingVertical: t.px(14),
+              }}>
+              <View
+                style={{
+                  width: t.px(36),
+                  height: t.px(36),
+                  borderRadius: t.px(10),
+                  backgroundColor: selected ? colors.background : DRIVER_LIGHT_BG,
                   alignItems: 'center',
-                  gap: t.px(12),
-                  borderRadius: t.inputRadius,
-                  borderWidth: selected ? 2 : 1,
-                  borderColor: selected ? DRIVER_ACCENT : colors.border,
-                  backgroundColor: selected ? DRIVER_LIGHT_BG : colors.background,
-                  paddingHorizontal: t.px(16),
-                  paddingVertical: t.px(14),
-                },
-                shadows.card,
-              ]}>
-              <Icon size={t.iconSm} color={selected ? DRIVER_ACCENT : colors.dark} strokeWidth={2} />
+                  justifyContent: 'center',
+                }}>
+                <Icon size={t.iconSm} color={selected ? DRIVER_ACCENT : colors.dark} strokeWidth={2} />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text
                   style={{
@@ -299,16 +314,16 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
               </View>
               <View
                 style={{
-                  width: t.px(20),
-                  height: t.px(20),
-                  borderRadius: t.px(10),
+                  width: t.px(22),
+                  height: t.px(22),
+                  borderRadius: t.px(6),
                   borderWidth: selected ? 0 : 1.5,
                   borderColor: colors.border,
                   backgroundColor: selected ? DRIVER_ACCENT : colors.background,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
-                {selected ? <Check size={t.px(12)} color={colors.background} strokeWidth={3} /> : null}
+                {selected ? <Check size={t.px(12)} color={colors.dark} strokeWidth={3} /> : null}
               </View>
             </Pressable>
           );
@@ -321,8 +336,11 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
           color: colors.grey,
           textAlign: 'center',
           marginBottom: t.px(10),
+          lineHeight: t.px(17),
         }}>
-        Secure advance payment for verified driver dispatch.
+        {__DEV__
+          ? 'Dev mode: confirms booking without a real charge.'
+          : 'Advance reserves a verified driver for your schedule.'}
       </Text>
 
       <Pressable
@@ -330,7 +348,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
         disabled={isConfirming || !readyToPay}
         style={{
           minHeight: t.buttonHeight,
-          borderRadius: t.cardRadius,
+          borderRadius: t.px(12),
           backgroundColor: isConfirming || !readyToPay ? colors.grey : DRIVER_ACCENT,
           alignItems: 'center',
           justifyContent: 'center',
@@ -345,9 +363,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
             fontWeight: typography.weights.bold,
             color: colors.dark,
           }}>
-          {isConfirming
-            ? 'Processing...'
-            : 'Confirm & Pay ' + formatRupee(advance)}
+          {isConfirming ? 'Processing…' : `Confirm & pay ${formatRupee(advance)}`}
         </Text>
       </Pressable>
 

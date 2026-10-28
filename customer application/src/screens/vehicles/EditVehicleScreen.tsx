@@ -35,6 +35,10 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
   const [fuelType, setFuelType] = useState<FuelType>('petrol');
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const numberRef = React.useRef<TextInput | null>(null);
+  const brandRef = React.useRef<TextInput | null>(null);
+  const modelRef = React.useRef<TextInput | null>(null);
+  const colorRef = React.useRef<TextInput | null>(null);
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [color, setColor] = useState('');
@@ -99,10 +103,10 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
               <ChipRow label="Vehicle Type" options={VEHICLE_TYPES} value={vehicleType} onChange={setVehicleType} />
               <ChipRow label="Fuel Type" options={FUEL_TYPES} value={fuelType} onChange={setFuelType} />
 
-              <Field label="Vehicle Number" value={vehicleNumber} onChangeText={setVehicleNumber} placeholder="e.g. OD02AB1234" autoCapitalize="characters" />
-              <Field label="Brand" value={brand} onChangeText={setBrand} placeholder="e.g. Hyundai" />
-              <Field label="Model" value={model} onChangeText={setModel} placeholder="e.g. i20" />
-              <Field label="Color (optional)" value={color} onChangeText={setColor} placeholder="e.g. White" />
+              <Field label="Vehicle Number" value={vehicleNumber} onChangeText={setVehicleNumber} placeholder="e.g. OD02AB1234" autoCapitalize="characters" returnKeyType="next" inputRef={numberRef} onSubmitEditing={() => brandRef.current?.focus()} />
+              <Field label="Brand" value={brand} onChangeText={setBrand} placeholder="e.g. Hyundai" returnKeyType="next" inputRef={brandRef} onSubmitEditing={() => modelRef.current?.focus()} />
+              <Field label="Model" value={model} onChangeText={setModel} placeholder="e.g. i20" returnKeyType="next" inputRef={modelRef} onSubmitEditing={() => colorRef.current?.focus()} />
+              <Field label="Color (optional)" value={color} onChangeText={setColor} placeholder="e.g. White" returnKeyType="done" inputRef={colorRef} onSubmitEditing={() => void handleSubmit()} />
 
               <AuthToast message={error || storeError || ''} />
 
@@ -125,23 +129,37 @@ function Field({
   onChangeText,
   placeholder,
   autoCapitalize = 'sentences',
+  keyboardType = 'default',
+  returnKeyType = 'next',
+  inputRef,
+  onSubmitEditing,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   placeholder?: string;
   autoCapitalize?: 'none' | 'sentences' | 'characters';
+  keyboardType?: 'default' | 'number-pad';
+  returnKeyType?: 'next' | 'done';
+  inputRef?: React.RefObject<TextInput | null>;
+  onSubmitEditing?: () => void;
 }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={FORM_PLACEHOLDER_COLOR}
         autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+        keyboardType={keyboardType}
+        returnKeyType={returnKeyType}
+        submitBehavior="blurAndSubmit"
+        onSubmitEditing={onSubmitEditing}
       />
     </View>
   );

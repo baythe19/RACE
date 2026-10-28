@@ -140,3 +140,37 @@ export function getDateReviewLabel(iso: string): string {
 
   return label;
 }
+
+const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export interface UpcomingDateChip {
+  key: string;
+  iso: string;
+  date: Date;
+  weekday: string;
+  dayNumber: number;
+  monthShort: string;
+  isToday: boolean;
+}
+
+/** Compact strip of upcoming bookable days (avoids full-month calendar density). */
+export function buildUpcomingDateStrip(count = 14): UpcomingDateChip[] {
+  const today = startOfDay(new Date());
+  const chips: UpcomingDateChip[] = [];
+
+  for (let offset = 0; offset < count; offset += 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + offset);
+    chips.push({
+      key: toISODate(date),
+      iso: toISODate(date),
+      date,
+      weekday: WEEKDAY_SHORT[date.getDay()],
+      dayNumber: date.getDate(),
+      monthShort: MONTH_SHORT[date.getMonth()],
+      isToday: offset === 0,
+    });
+  }
+
+  return chips;
+}

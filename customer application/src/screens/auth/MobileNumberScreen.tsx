@@ -245,7 +245,10 @@ export default function MobileNumberScreen({ navigation }: Props) {
           setError('Could not sign you in automatically. Try Continue again.');
           return;
         }
-        const verifyResult = await verifyOtpMutation.mutateAsync({ mobileNumber: digits, otp });
+        const verifyResult = await verifyOtpMutation.mutateAsync({
+          mobileNumber: digits,
+          otp,
+        });
         if (isExistingUser || verifyResult.user.isProfileCompleted) {
           dispatch(clearSignupPath());
         }

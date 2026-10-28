@@ -63,6 +63,10 @@ export default function AddVehicleScreen({ navigation }: Props) {
   const [customColor, setCustomColor] = useState('');
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const numberInputRef = React.useRef<TextInput | null>(null);
+  const brandInputRef = React.useRef<TextInput | null>(null);
+  const modelInputRef = React.useRef<TextInput | null>(null);
+  const customColorInputRef = React.useRef<TextInput | null>(null);
   const [error, setError] = useState('');
   const [vehiclePhotoUri, setVehiclePhotoUri] = useState<string | null>(null);
 
@@ -181,16 +185,11 @@ export default function AddVehicleScreen({ navigation }: Props) {
   };
 
   const handleMoreColor = () => {
-    Alert.alert('Custom Color', 'Enter a custom color name', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Use Custom',
-        onPress: () => {
-          setShowCustomColor(true);
-          setColor('');
-        },
-      },
-    ]);
+    // Show the custom color input and focus it right away — no intermediate
+    // alert dialog (user asked for direct, keyboard-friendly flows).
+    setShowCustomColor(true);
+    setColor('');
+    setTimeout(() => customColorInputRef.current?.focus(), 120);
   };
 
   return (
@@ -312,11 +311,17 @@ export default function AddVehicleScreen({ navigation }: Props) {
         }}>
         <IndFlagBadge px={px} />
         <TextInput
+          ref={numberInputRef}
           value={vehicleNumber}
           onChangeText={text => setVehicleNumber(normalizeVehicleNumberInput(text))}
           placeholder="OD 05 AB 1234"
           placeholderTextColor={FORM_PLACEHOLDER_COLOR}
           autoCapitalize="characters"
+          autoCorrect={false}
+          keyboardType="default"
+          returnKeyType="next"
+          submitBehavior="submit"
+          onSubmitEditing={() => brandInputRef.current?.focus()}
           onFocus={() => setFocusedField('number')}
           onBlur={() => setFocusedField(null)}
           style={{
@@ -331,6 +336,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
 
       <LabeledInput
         px={px}
+        inputRef={brandInputRef}
         label="Vehicle Brand"
         required
         value={brand}
@@ -339,10 +345,13 @@ export default function AddVehicleScreen({ navigation }: Props) {
         focused={focusedField === 'brand'}
         onFocus={() => setFocusedField('brand')}
         onBlur={() => setFocusedField(null)}
+        returnKeyType="next"
+        onSubmitEditing={() => modelInputRef.current?.focus()}
       />
 
       <LabeledInput
         px={px}
+        inputRef={modelInputRef}
         label="Vehicle Model"
         required
         value={model}
@@ -351,6 +360,8 @@ export default function AddVehicleScreen({ navigation }: Props) {
         focused={focusedField === 'model'}
         onFocus={() => setFocusedField('model')}
         onBlur={() => setFocusedField(null)}
+        returnKeyType="done"
+        onSubmitEditing={() => void handleSubmit()}
       />
 
       <SectionLabel px={px} label="Vehicle Color" required />
@@ -409,6 +420,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
       {showCustomColor ? (
         <LabeledInput
           px={px}
+          inputRef={customColorInputRef}
           label="Custom Color"
           required
           value={customColor}
@@ -417,6 +429,8 @@ export default function AddVehicleScreen({ navigation }: Props) {
           focused={focusedField === 'customColor'}
           onFocus={() => setFocusedField('customColor')}
           onBlur={() => setFocusedField(null)}
+          returnKeyType="done"
+          onSubmitEditing={() => void handleSubmit()}
         />
       ) : null}
 
@@ -566,6 +580,9 @@ function LabeledInput({
   focused,
   onFocus,
   onBlur,
+  inputRef,
+  returnKeyType = 'next',
+  onSubmitEditing,
 }: {
   px: (n: number) => number;
   label: string;
@@ -576,17 +593,25 @@ function LabeledInput({
   focused?: boolean;
   onFocus?: () => void;
   onBlur?: () => void;
+  inputRef?: React.RefObject<TextInput | null>;
+  returnKeyType?: 'next' | 'done';
+  onSubmitEditing?: () => void;
 }) {
   return (
     <View style={{ marginBottom: px(18) }}>
       <SectionLabel px={px} label={label} required={required} />
       <TextInput
+        ref={inputRef}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={FORM_PLACEHOLDER_COLOR}
         onFocus={onFocus}
         onBlur={onBlur}
+        autoCorrect={false}
+        returnKeyType={returnKeyType}
+        submitBehavior="blurAndSubmit"
+        onSubmitEditing={onSubmitEditing}
         style={{
           height: px(52),
           borderRadius: px(12),

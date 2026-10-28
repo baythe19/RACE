@@ -91,6 +91,20 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
         navigation.navigate('TowingPickupDrop');
       }}>
       <View style={{ gap: t.px(12) }}>
+        {/* Section: Choose your vehicle */}
+        <View style={{ marginBottom: -t.px(2) }}>
+          <Text
+            style={{
+              fontSize: t.sectionTitle,
+              fontWeight: typography.weights.extrabold,
+              color: colors.dark,
+            }}>
+            Choose your vehicle
+          </Text>
+          <Text style={{ fontSize: t.caption, color: colors.grey, marginTop: t.px(2) }}>
+            Which vehicle needs to be towed?
+          </Text>
+        </View>
         {safeVehicles.length === 0 ? (
           <View
             style={[
@@ -227,17 +241,20 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
         )}
       </View>
 
-      <Text
-        style={{
-          marginTop: t.px(20),
-          marginBottom: t.px(10),
-          fontSize: t.sectionTitle,
-          fontWeight: typography.weights.bold,
-          color: colors.dark,
-        }}>
-        How should we tow it?
-      </Text>
-      <View style={{ flexDirection: 'row', gap: t.px(10) }}>
+      <View style={{ marginTop: t.px(22), marginBottom: t.px(10) }}>
+        <Text
+          style={{
+            fontSize: t.sectionTitle,
+            fontWeight: typography.weights.extrabold,
+            color: colors.dark,
+          }}>
+          Select tow type
+        </Text>
+        <Text style={{ fontSize: t.caption, color: colors.grey, marginTop: t.px(2) }}>
+          How should we tow your vehicle?
+        </Text>
+      </View>
+      <View style={{ flexDirection: 'row', gap: t.px(12) }}>
         {TOWING_TYPES.map(type => {
           const selected = towType === type.id;
           return (
@@ -277,27 +294,35 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
               </View>
               <View
                 style={{
-                  height: t.px(72),
-                  backgroundColor: selected ? '#FDF0C8' : colors.goldLight,
+                  height: t.px(84),
+                  backgroundColor: '#FFFFFF',
+                  borderBottomWidth: 1,
+                  borderBottomColor: selected ? '#F3E3B8' : colors.border,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}>
                 <Image
                   source={type.image}
-                  style={{ width: t.px(120), height: t.px(58) }}
+                  style={{ width: t.px(132), height: t.px(66) }}
                   resizeMode="contain"
                 />
               </View>
-              <View style={{ padding: t.px(12) }}>
+              <View style={{ padding: t.px(12), paddingTop: t.px(10) }}>
                 <Text
                   style={{
-                    fontSize: t.body,
-                    fontWeight: typography.weights.bold,
+                    fontSize: t.bodyLarge,
+                    fontWeight: typography.weights.extrabold,
                     color: colors.dark,
                   }}>
                   {type.id === 'flatbed' ? 'Flatbed' : 'Wheel lift'}
                 </Text>
-                <Text style={{ marginTop: t.px(4), fontSize: t.caption, color: colors.grey, lineHeight: t.px(17) }}>
+                <Text
+                  style={{
+                    marginTop: t.px(4),
+                    fontSize: t.caption,
+                    color: colors.grey,
+                    lineHeight: t.px(18),
+                  }}>
                   {type.description}
                 </Text>
               </View>
@@ -307,17 +332,22 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
       </View>
 
       {isScheduled ? (
-        <View style={{ marginTop: t.px(18) }}>
+        <View style={{ marginTop: t.px(22), marginBottom: t.px(10) }}>
           <Text
             style={{
-              marginBottom: t.px(10),
               fontSize: t.sectionTitle,
-              fontWeight: typography.weights.bold,
+              fontWeight: typography.weights.extrabold,
               color: colors.dark,
             }}>
-            When?
+            When do you need it?
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(8) }}>
+          <Text style={{ fontSize: t.caption, color: colors.grey, marginTop: t.px(2) }}>
+            Pick a preferred day
+          </Text>
+        </View>
+      ) : null}
+      {isScheduled ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(8) }}>
             {TOWING_DATE_OPTIONS.slice(0, 4).map(option => {
               const selected = dateId === option.id;
               return (
@@ -343,7 +373,6 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                 </Pressable>
               );
             })}
-          </View>
         </View>
       ) : null}
     </TowingBookingLayout>

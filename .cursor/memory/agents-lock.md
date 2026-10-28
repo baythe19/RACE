@@ -8,5 +8,4 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
-| 2026-10-29 GLM | customer towing booking flow (screens/booking/towing + TowingBookingLayout + navigator + constants) | 4-step stepper redesign, combine steps, hide advance-pay UI | branch v8.0.0---custumer-app |
-| 2026-10-29 agent | customer-app page transitions + profile edit redirect | slide transitions profile stack, redirect fix | session: nav polish |
+| 2026-10-29 agent | MyVehicles list redesign + AddVehicle form organize | add-btn header right, form sections | session: vehicle UI |
