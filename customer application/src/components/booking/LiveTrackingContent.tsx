@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Linking,
   Pressable,
   StyleSheet,
@@ -23,6 +22,7 @@ import LiveTripMap, { type MapPoint } from './LiveTripMap';
 import TripOtpCard from './TripOtpCard';
 import DriverAvatar from '../bookings/DriverAvatar';
 import AppStackHeader from '../ui/AppStackHeader';
+import DataSkeleton from '../ui/DataSkeleton';
 import GoldButton from '../auth/GoldButton';
 import { brand } from '../../theme/brand';
 import { shouldShowTripStartOtp } from '../../utils/bookingDisplay';
@@ -124,7 +124,7 @@ export default function LiveTrackingContent({
       <SafeAreaView style={styles.safe} edges={['top']}>
         <AppStackHeader title={title} subtitle={subtitle ?? bookingNumberLabel} onBack={onBack} />
         <View style={styles.loadingWrap}>
-          <ActivityIndicator color={colors.primary} size="large" />
+          <DataSkeleton variant="detail" />
           <Text style={styles.loadingText}>Loading trip…</Text>
         </View>
       </SafeAreaView>

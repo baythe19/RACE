@@ -38,6 +38,7 @@ export default function EmergencySosScreen({}: Props) {
     action: 'sos' | 'towing' | 'ambulance' | 'share_location' | 'notify_contacts',
     successTitle: string,
   ) => {
+    if (sosAlert.isPending) return;
     sosAlert.mutate(
       { action, vehicleId, address: 'Current location' },
       {

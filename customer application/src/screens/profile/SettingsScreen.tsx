@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, Switch, Text, View } from 'react-native';
 import { ChevronRight, Lock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import {
   SETTINGS_SECTIONS,
   type SettingsToggleId,
@@ -15,6 +16,7 @@ import {
   useUpdateNotificationPrefMutation,
 } from '../../services/profile/useProfileQueries';
 import type { ProfileStackParamList } from '../../types/navigation';
+import { brand } from '../../theme/brand';
 import { colors, shadows, typography } from '../../theme';
 
 const SETTINGS_ROUTES: Partial<Record<string, keyof ProfileStackParamList>> = {
@@ -60,6 +62,7 @@ export default function SettingsScreen() {
   }, [initialToggles]);
 
   const setToggle = (id: SettingsToggleId, value: boolean) => {
+    if (updatePref.isPending) return;
     setToggles(prev => ({ ...prev, [id]: value }));
     if (id === 'emergency') return;
 
@@ -78,25 +81,56 @@ export default function SettingsScreen() {
   };
 
   const handleNavPress = (id: string, title: string, danger?: boolean) => {
-    if (danger) {
-      Alert.alert(title, 'This action requires confirmation. Coming soon.');
+    if (id === 'version') return;
+
+    if (id === 'terms') {
+      void Linking.openURL('https://www.raceservice.in/terms.html');
       return;
     }
+    if (id === 'privacy') {
+      void Linking.openURL('https://www.raceservice.in/terms.html');
+      return;
+    }
+
+    if (danger || id === 'delete') {
+      Alert.alert(
+        'Delete account',
+        `To permanently remove your account, call ${brand.phone} or email ${brand.email}. Our team will verify and delete your data.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Call support',
+            onPress: () => void Linking.openURL(`tel:${brand.phoneRaw}`),
+          },
+          {
+            text: 'Email',
+            onPress: () =>
+              void Linking.openURL(
+                `mailto:${brand.email}?subject=${encodeURIComponent('Account deletion request')}`,
+              ),
+          },
+        ],
+      );
+      return;
+    }
+
     const route = SETTINGS_ROUTES[id];
     if (route) {
       navigation.navigate(route as never);
       return;
     }
-    Alert.alert(title, 'Coming soon.');
   };
+
+  if (prefsLoading) {
+    return (
+      <ProfileSubScreenLayout title="Settings" subtitle="App settings and privacy">
+        <DataSkeleton variant="list" />
+      </ProfileSubScreenLayout>
+    );
+  }
 
   return (
     <ProfileSubScreenLayout title="Settings" subtitle="App settings and privacy">
-      {prefsLoading ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(20) }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      ) : null}
       {SETTINGS_SECTIONS.map(section => (
         <View key={section.title} style={{ marginBottom: px(16) }}>
           <Text
@@ -173,6 +207,7 @@ export default function SettingsScreen() {
                       <Switch
                         value={toggles[item.id]}
                         onValueChange={value => setToggle(item.id, value)}
+                        disabled={updatePref.isPending && item.id !== 'emergency'}
                         trackColor={{ false: colors.lightGrey, true: colors.primary }}
                         thumbColor={colors.background}
                       />

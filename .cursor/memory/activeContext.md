@@ -1,5 +1,17 @@
 ## Current focus
 
+**2026-10-29 (overnight DONE — C-05..C-09 polish):** Google Sign-In removed (Login+CreateAccount). Settings: dropped Language/Location/Visibility/Licences placeholders; Terms/Privacy → raceservice.in; Delete → call/email support. Help: Call Us + WhatsApp `wa.me` + Email; FAQs with real answers. Onboarding QR: info chips (not fake buttons); Emergency → tel:112; Share via system sheet. MyQr fake gallery download removed. C-08 already had image-picker. Customer `tsc` 0, backend `/health` 200. Audit doc register updated.
+
+**Next when user wakes (recommend):**
+1. Live E2E customer→partner→admin one booking (or GLM lock clear → towing stepper hygiene).
+2. C-01 roadside product call (implement vs hide).
+3. C-02 Razorpay when keys arrive.
+4. Partner Stage 2 device GPS/push.
+
+**Do not next:** fake live payments; recreate deleted web apps; frozen branches.
+
+**2026-10-29 (double-tap + skeletons app-wide):** New `DataSkeleton` (list/cards/detail/profile/wallet). Wired on Bookings, Detail, Profile, Vehicles, Notifications, Saved Locations, Payment Methods, Settings, Personal Info, My QR, ServiceList, Live Tracking. Double-tap / in-flight guards: SOS, DropoffPayment, Login/Mobile OTP, AddVehicle, DriverEnquiry, PaymentMethods, SavedLocations, Notifications mark-all, Choose/Subscription plans, Settings toggles, Personal save. Store fetch dedupe: profile/vehicles/catalog. Skipped GLM-locked towing stepper screens. Customer `tsc` 0.
+
 **2026-10-29 (booking API hygiene):** Removed Bookings `useFocusEffect` double-refetch. List/detail queries: sensible `staleTime`, slower ongoing polls (12–15s). `useBookingQuery` = detail query (dedupe). Tracking poll: typed path only + in-flight skip, 8s. Cancel/pay multi-click guards. Detail shows payment status honestly. Customer `tsc` 0. Did not re-audit admin live UI this pass (backend health 200). DropoffPaymentModal untouched.
 
 **2026-10-29 (Bookings list cleanup):** Removed Active/History section titles; filters carry meaning; soft “No past bookings yet”.
@@ -205,3 +217,5 @@ Peach browser sim: `docs/DEVICE_FREE_PREVIEW.md`; runbook `.cursor/memory/partne
 
 
 **2026-10-29 (customer profile UI polish):** ProfileScreen: (1) head card — avatar+name+phone+email left column, Verified badge w/ subtle border, Premium ab standalone gold pill (crown+"Premium Member"+chevron vertical) — pehle split-column+divider tha; (2) Wallet card — gold-tinted bg + ₹ icon circle left + balance 19px extrabold dark + "Top Up" pill right (PaymentMethods navigate same). AppStackHeader rewritten for consistency with TabRootHeader (Bookings): 18px extrabold left-aligned title + 11px grey subtitle below (pehle centered tha) + back button ab white circle w/ border. 14 profile sub-screens + AuthFormLayout automatically inherit. customer tsc 0, customer Metro 8081 running.
+
+**2026-10-29 (customer UX fixes round 2):** (1) FormField picker-fields (onPress wale — DOB/Gender/Relationship): `showSoftInputOnFocus={false} + focusable={false}` — ab keyboard open NAHI hota picker ke saath (reported bug: DOB pe keyboard+calendar dono). (2) Naya `SelectOptionModal` (centered dialog, check-mark selected, cancel) — Gender + Relationship alerts replaced. (3) AppStackHeader back arrow — circle-outline hata ke plain ArrowLeft (user: koi outline nahi, sirf arrow). (4) Premium pill compact: crown + "PREMIUM" single line (3-line wrap + stray chevron fix). (5) Verified badge: pill-rounded → square-ish radius 6, "Verified User"→"Verified". customer tsc clean (2 pre-existing errors BookingFlowHeader/TowingAdvancePayment janmate hain dusre agent ke — mere files me nahi).

@@ -86,6 +86,12 @@ export default function FormField({
         autoCorrect={false}
         editable={editable && !onPress}
         pointerEvents={onPress ? 'none' : 'auto'}
+        // Picker-style fields (DOB, gender, …): never spawn the software keyboard.
+        // Without these Android can keep the old keyboard open while the picker
+        // modal opens on top (reported on the profile form).
+        showSoftInputOnFocus={false}
+        focusable={false}
+        importantForAutofill={onPress ? 'no' : undefined}
         {...inputProps}
       />
       {rightElement}

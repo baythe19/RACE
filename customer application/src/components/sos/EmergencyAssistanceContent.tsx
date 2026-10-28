@@ -130,6 +130,7 @@ export default function EmergencyAssistanceContent({
         Alert.alert('Sign in required', 'Please log in to use emergency alerts.');
         return;
       }
+      if (sosAlert.isPending) return;
 
       const location = await resolveLocation();
       sosAlert.mutate(

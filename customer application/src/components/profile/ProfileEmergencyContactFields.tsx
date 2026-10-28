@@ -1,8 +1,9 @@
-import React from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import { ChevronDown, Phone, User } from 'lucide-react-native';
 
 import FormField from '../auth/FormField';
+import SelectOptionModal from '../auth/SelectOptionModal';
 import { EMERGENCY_RELATIONSHIP_OPTIONS, FORM_PLACEHOLDER_COLOR } from '../../constants/profileForm';
 import { colors, typography } from '../../theme';
 import { getPhoneDigits } from '../../utils/phone';
@@ -29,23 +30,12 @@ export default function ProfileEmergencyContactFields({
   scale = 1,
 }: ProfileEmergencyContactFieldsProps) {
   const px = (n: number) => Math.round(n * scale);
+  const [relationPickerOpen, setRelationPickerOpen] = useState(false);
 
-  const handleRelationshipPress = () => {
-    Alert.alert(
-      'Select Relationship',
-      '',
-      [
-        ...EMERGENCY_RELATIONSHIP_OPTIONS.map(option => ({
-          text: option,
-          onPress: () => {
-            onChange({ relationship: option });
-            onClearError?.('emergencyRelationship');
-          },
-        })),
-        { text: 'Cancel', style: 'cancel' as const },
-      ],
-    );
-  };
+  const relationshipOptions = EMERGENCY_RELATIONSHIP_OPTIONS.map(option => ({
+    label: option,
+    value: option,
+  }));
 
   return (
     <View>
@@ -106,13 +96,25 @@ export default function ProfileEmergencyContactFields({
         placeholder="Select relationship"
         placeholderTextColor={FORM_PLACEHOLDER_COLOR}
         editable={false}
-        onPress={handleRelationshipPress}
+        onPress={() => setRelationPickerOpen(true)}
         error={errors.emergencyRelationship}
         rightElement={
-          <Pressable onPress={handleRelationshipPress} hitSlop={8}>
+          <Pressable onPress={() => setRelationPickerOpen(true)} hitSlop={8}>
             <ChevronDown size={px(18)} color={colors.grey} />
           </Pressable>
         }
+      />
+
+      <SelectOptionModal
+        visible={relationPickerOpen}
+        title="Select Relationship"
+        options={relationshipOptions}
+        selectedValue={values.relationship}
+        onSelect={value => {
+          onChange({ relationship: value });
+          onClearError?.('emergencyRelationship');
+        }}
+        onClose={() => setRelationPickerOpen(false)}
       />
     </View>
   );

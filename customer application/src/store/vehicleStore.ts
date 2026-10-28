@@ -55,6 +55,10 @@ export const DEFAULT_VEHICLES: Vehicle[] = [
   },
 ];
 
+/** Shared in-flight list fetch — Home / Vehicles / booking review remounts share one GET. */
+let vehiclesFetchInFlight: Promise<void> | null = null;
+let vehicleMutating = false;
+
 export const useVehicleStore = create<VehicleState>((set, get) => ({
   vehicles: DEFAULT_VEHICLES,
   selectedVehicle: null,
@@ -62,18 +66,24 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
   error: null,
 
   fetchVehicles: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const vehicles = await vehicleService.getVehicles();
-      const list = Array.isArray(vehicles) && vehicles.length > 0 ? vehicles : DEFAULT_VEHICLES;
-      set({ vehicles: list, isLoading: false });
-    } catch (error) {
-      set(state => ({
-        vehicles: Array.isArray(state.vehicles) && state.vehicles.length > 0 ? state.vehicles : DEFAULT_VEHICLES,
-        isLoading: false,
-        error: getApiErrorMessage(error, 'Unable to load vehicles'),
-      }));
-    }
+    if (vehiclesFetchInFlight) return vehiclesFetchInFlight;
+    vehiclesFetchInFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const vehicles = await vehicleService.getVehicles();
+        const list = Array.isArray(vehicles) && vehicles.length > 0 ? vehicles : DEFAULT_VEHICLES;
+        set({ vehicles: list, isLoading: false });
+      } catch (error) {
+        set(state => ({
+          vehicles: Array.isArray(state.vehicles) && state.vehicles.length > 0 ? state.vehicles : DEFAULT_VEHICLES,
+          isLoading: false,
+          error: getApiErrorMessage(error, 'Unable to load vehicles'),
+        }));
+      } finally {
+        vehiclesFetchInFlight = null;
+      }
+    })();
+    return vehiclesFetchInFlight;
   },
 
   fetchVehicle: async id => {
@@ -91,6 +101,10 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
   },
 
   addVehicle: async data => {
+    if (vehicleMutating) {
+      throw new Error('Vehicle save already in progress');
+    }
+    vehicleMutating = true;
     set({ isLoading: true, error: null });
     try {
       const vehicle = await vehicleService.addVehicle(data);
@@ -105,10 +119,16 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
         error: getApiErrorMessage(error, 'Unable to add vehicle'),
       });
       throw error;
+    } finally {
+      vehicleMutating = false;
     }
   },
 
   updateVehicle: async (id, data) => {
+    if (vehicleMutating) {
+      throw new Error('Vehicle save already in progress');
+    }
+    vehicleMutating = true;
     set({ isLoading: true, error: null });
     try {
       const vehicle = await vehicleService.updateVehicle(id, data);
@@ -124,10 +144,16 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
         error: getApiErrorMessage(error, 'Unable to update vehicle'),
       });
       throw error;
+    } finally {
+      vehicleMutating = false;
     }
   },
 
   deleteVehicle: async id => {
+    if (vehicleMutating) {
+      throw new Error('Vehicle delete already in progress');
+    }
+    vehicleMutating = true;
     set({ isLoading: true, error: null });
     try {
       await vehicleService.deleteVehicle(id);
@@ -142,6 +168,8 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
         error: getApiErrorMessage(error, 'Unable to delete vehicle'),
       });
       throw error;
+    } finally {
+      vehicleMutating = false;
     }
   },
 

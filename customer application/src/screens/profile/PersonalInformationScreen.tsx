@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import {
   Camera,
   ChevronDown,
@@ -11,6 +11,9 @@ import {
 import FormField from '../../components/auth/FormField';
 import DateOfBirthField from '../../components/auth/DateOfBirthField';
 import GoldButton from '../../components/auth/GoldButton';
+import SelectOptionModal, {
+  type SelectOption,
+} from '../../components/auth/SelectOptionModal';
 import ProfileAddressFields, {
   type AddressFormValues,
 } from '../../components/profile/ProfileAddressFields';
@@ -18,6 +21,7 @@ import ProfileEmergencyContactFields, {
   type EmergencyContactFormValues,
 } from '../../components/profile/ProfileEmergencyContactFields';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import { EMERGENCY_RELATIONSHIP_OPTIONS } from '../../constants/profileForm';
 import { useProfileStore } from '../../store/profileStore';
 import { getApiErrorMessage } from '../../services/api';
@@ -52,6 +56,14 @@ export default function PersonalInformationScreen() {
     pincode: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [genderPickerOpen, setGenderPickerOpen] = useState(false);
+  const [relationPickerOpen, setRelationPickerOpen] = useState(false);
+
+  const genderOptions: SelectOption[] = [
+    { label: 'Male', value: 'Male' },
+    { label: 'Female', value: 'Female' },
+    { label: 'Other', value: 'Other' },
+  ];
 
   useEffect(() => {
     void fetchProfile();
@@ -88,6 +100,7 @@ export default function PersonalInformationScreen() {
   };
 
   const handleSave = async () => {
+    if (isLoading) return;
     const nextErrors = validateProfileForm({
       fullName: name,
       email,
@@ -136,9 +149,9 @@ export default function PersonalInformationScreen() {
 
   if (isLoading && !profile) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <ProfileSubScreenLayout title="Personal Information" subtitle="Update your details">
+        <DataSkeleton variant="profile" />
+      </ProfileSubScreenLayout>
     );
   }
 
@@ -237,14 +250,7 @@ export default function PersonalInformationScreen() {
           variant="outlined"
           compact
           editable={false}
-          onPress={() =>
-            Alert.alert('Select Gender', '', [
-              { text: 'Male', onPress: () => setGender('Male') },
-              { text: 'Female', onPress: () => setGender('Female') },
-              { text: 'Other', onPress: () => setGender('Other') },
-              { text: 'Cancel', style: 'cancel' },
-            ])
-          }
+          onPress={() => setGenderPickerOpen(true)}
           rightElement={
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(6) }}>
               {optionalTag}
@@ -271,6 +277,18 @@ export default function PersonalInformationScreen() {
         onPress={() => void handleSave()}
         style={shadows.card}
         disabled={isLoading}
+      />
+
+      <SelectOptionModal
+        visible={genderPickerOpen}
+        title="Select Gender"
+        options={genderOptions}
+        selectedValue={gender}
+        onSelect={value => {
+          setGender(value);
+          clearError('gender');
+        }}
+        onClose={() => setGenderPickerOpen(false)}
       />
     </ProfileSubScreenLayout>
   );

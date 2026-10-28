@@ -17,7 +17,6 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
-import GoogleIcon from '../../components/auth/GoogleIcon';
 import { AuthBackHeader } from '../../components/auth/StepHeader';
 import { useAuthActions } from '../../hooks/useAuth';
 import { getApiErrorMessage } from '../../services/api';
@@ -194,43 +193,6 @@ export default function CreateAccountScreen({ navigation }: Props) {
               disabled={isLoading}
             />
 
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginVertical: px(20),
-              }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              <Text style={{ marginHorizontal: px(12), fontSize: px(13), color: colors.grey }}>
-                or continue with
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-            </View>
-
-            <Pressable
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: px(54),
-                borderRadius: px(14),
-                borderWidth: 1.5,
-                borderColor: colors.border,
-                backgroundColor: colors.background,
-                paddingHorizontal: px(16),
-                gap: px(10),
-              }}
-              onPress={() => Alert.alert('Google Sign-In', 'Google sign-in coming soon')}>
-              <GoogleIcon size={px(24)} />
-              <Text
-                style={{
-                  fontSize: px(16),
-                  fontWeight: typography.weights.semibold,
-                  color: colors.dark,
-                }}>
-                Continue with Google
-              </Text>
-            </Pressable>
           </View>
 
           <View style={[styles.footer, { paddingTop: px(16) }]}>

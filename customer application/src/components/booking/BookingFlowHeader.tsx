@@ -143,6 +143,7 @@ interface BookingFlowHeaderProps {
   stepLabels?: readonly string[];
   onBack?: () => void;
   theme: BookingTheme;
+  variant?: 'centered' | 'inline';
   accentColor?: string;
   showStep?: boolean;
 }
@@ -153,10 +154,31 @@ export default function BookingFlowHeader({
   stepLabels,
   onBack,
   theme: t,
+  variant = 'centered',
   accentColor = colors.primary,
   showStep = true,
 }: BookingFlowHeaderProps) {
   const showStepper = showStep && step > 0 && Array.isArray(stepLabels) && stepLabels.length > 0;
+
+  if (variant === 'inline') {
+    return (
+      <View style={[styles.wrap, { marginBottom: t.headerBottom }]}>
+        <View style={styles.row}>
+          {onBack ? (
+            <Pressable onPress={onBack} hitSlop={12} style={styles.side}>
+              <ArrowLeft size={t.iconMd} color={colors.dark} strokeWidth={2.5} />
+            </Pressable>
+          ) : (
+            <View style={styles.side} />
+          )}
+          <Text style={[styles.inlineTitle, { fontSize: t.screenTitle }]} numberOfLines={2}>
+            {title}
+          </Text>
+          <View style={styles.side} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.centeredWrap, { marginBottom: t.headerBottom, paddingTop: t.px(4) }]}>
@@ -219,6 +241,25 @@ export function BookingScreenShell({
 }
 
 const styles = StyleSheet.create({
+  wrap: {
+    width: '100%',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  side: {
+    width: 32,
+    alignItems: 'flex-start',
+  },
+  inlineTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontWeight: typography.weights.extrabold,
+    color: colors.dark,
+    paddingHorizontal: 8,
+  },
   centeredWrap: {
     alignItems: 'center',
     position: 'relative',

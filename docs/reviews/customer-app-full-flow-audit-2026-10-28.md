@@ -218,11 +218,11 @@ if (error.name === 'CastError') {
 | C-02 | **Critical (prod)** | Payments | Payment is a stub; `verifyFinalPayment({status:'success'})` is unconditional | `serviceBookingApi.ts:190-205`; stub gateway ref | Integrate Razorpay (keys absent from `.env`) |
 | C-03 | **Medium** | Serviceability | Backend has no service-area check; only 2 client cities configured | `serviceableAreas.ts` (75 lines); Bhopal booking succeeded | Server-side geofence + expand city list |
 | C-04 | **Medium** | Error handling | ~~Malformed booking id → 500~~ **FIXED 2026-10-28:** `CastError` branch added to `middleware/src/error.ts` → now returns 400 `"Invalid identifier"`. Verified live: `GET /bookings/towing/GO` → **400**. | Live API + backend log | ✅ Done |
-| C-05 | **Low** | Settings | 6 rows are dead-end Alerts (Language, Location, Visibility, Delete Account) | `SettingsScreen.tsx:82,90`; `SETTINGS_ROUTES` has 2 keys | Implement or remove rows |
-| C-06 | **Low** | Support | Live Chat / WhatsApp are placeholder Alerts | `HelpSupportScreen.tsx:140,164` | Wire to support channel |
-| C-07 | **Low** | Auth | Google Sign-In is a placeholder Alert | `LoginScreen.tsx:256`, `CreateAccountScreen.tsx:222` | Hide button until implemented |
-| C-08 | **Low** | Vehicles | Camera capture in Add Vehicle is a placeholder | `vehicles/AddVehicleScreen.tsx:398` (+3 duplicates) | Use `expo-image-picker` like partner app |
-| C-09 | **Low** | Onboarding | QR screen action buttons are placeholder Alerts | `onboarding/QRCodeScreen.tsx:214,245` | Wire to real flows |
+| C-05 | **Low** | Settings | ~~6 rows are dead-end Alerts~~ **FIXED 2026-10-29:** removed Language/Location/Visibility/Licences placeholders; Terms/Privacy → raceservice.in; Delete → call/email support | Settings + `profileSubScreens` | ✅ Done |
+| C-06 | **Low** | Support | ~~Live Chat / WhatsApp placeholders~~ **FIXED 2026-10-29:** Call Us (tel) + WhatsApp `wa.me` + Email; FAQs show real answers | `HelpSupportScreen.tsx` | ✅ Done |
+| C-07 | **Low** | Auth | ~~Google Sign-In placeholder~~ **FIXED 2026-10-29:** button removed from Login + CreateAccount (OTP-only) | Login/CreateAccount | ✅ Done |
+| C-08 | **Low** | Vehicles | ~~Camera placeholder~~ **FIXED earlier:** `expo-image-picker` wired on Add Vehicle | `AddVehicleScreen.tsx` | ✅ Done |
+| C-09 | **Low** | Onboarding | ~~QR action placeholders~~ **FIXED 2026-10-29:** action chips info-only; Emergency → tel:112; Share via system sheet (no fake gallery save) | `QRCodeScreen.tsx` | ✅ Done |
 | C-10 | **Info** | Backend | `GET /bookings/upcoming` does not exist (route check returned "Route not found"); app uses `/bookings` instead | Live API | None — app already uses the right route |
 | ~~C-11~~ | — | Profile | **FALSE POSITIVE — retracted.** Change Password IS wired: calls `POST /profile/password/change` via `profileService.changePassword` (`ChangePasswordScreen.tsx:10`). Live test confirmed the endpoint enforces current-password verification for repeat changes. First-time set (OTP-only customers) works without current password. | `profileService.ts:19`; live API | None |
 | ~~C-12~~ | — | Profile | **FALSE POSITIVE — retracted.** Change Mobile Number IS wired: two-step flow calls `POST /profile/mobile/change-request` (returns pendingToken + OTP) then `POST /profile/mobile/change-confirm` (`ChangeMobileNumberScreen.tsx:11`). Live test: request returned pendingToken successfully. | `profileService.ts:32,36`; live API | None |
@@ -247,11 +247,11 @@ if (error.name === 'CastError') {
 
 ## 6. Recommended fix order
 
-1. **C-02 Payments** — production blocker; any trip can complete unpaid.
-2. **C-01 Roadside** — largest product gap vs marketing; 4 advertised services unusable.
-3. ~~**C-04 CastError → 400**~~ — **FIXED 2026-10-28** (one-line fix, verified live: invalid id now returns 400 `"Invalid identifier"`).
-4. **C-03 Serviceability** — prevents unfulfillable orders outside Bhubaneswar/Cuttack.
-5. **C-05..C-10 placeholders** — polish; each is a small screen-level change.
+1. **C-02 Payments** — production blocker; any trip can complete unpaid. (Blocked on Razorpay keys.)
+2. **C-01 Roadside** — largest product gap vs marketing; 4 advertised services unusable. (Needs product A/B.)
+3. ~~**C-04 CastError → 400**~~ — **FIXED 2026-10-28**.
+4. **C-03 Serviceability** — expand cities / keep server gate honest.
+5. ~~**C-05..C-09 placeholders**~~ — **FIXED 2026-10-29** overnight polish pack.
 
 > Correction (same day): C-11/C-12/C-13 (profile placebos) were **retracted** after source re-inspection — the three screens are properly wired to `POST /profile/password/change`, `POST /profile/mobile/change-request|confirm`, and `POST /profile/pin/set`. The initial grep pattern missed `profileService` imports.
 

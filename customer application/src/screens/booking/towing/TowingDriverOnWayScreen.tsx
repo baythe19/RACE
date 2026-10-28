@@ -42,7 +42,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
 
   if (bookingId && !booking && !hasDriver) {
     return (
-      <TowingBookingLayout title="Your driver is on the way" step={8} headerVariant="inline" hideFooter>
+      <TowingBookingLayout title="Your driver is on the way" step={0} headerVariant="inline" hideFooter>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -53,7 +53,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
   return (
     <TowingBookingLayout
       title="Your driver is on the way"
-      step={8}
+      step={0}
       headerVariant="inline"
       onBack={() => navigation.goBack()}
       buttonLabel="Continue"

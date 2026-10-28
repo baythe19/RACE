@@ -134,6 +134,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
   };
 
   const handleSubmit = async () => {
+    if (isLoading) return;
     setError('');
     if (!vehicleNumber.trim() || !brand.trim() || !model.trim()) {
       setError('Vehicle number, brand, and model are required');

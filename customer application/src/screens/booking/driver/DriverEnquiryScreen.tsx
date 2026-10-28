@@ -42,6 +42,7 @@ export default function DriverEnquiryScreen({ navigation }: Props) {
   }, [profile, fetchProfile]);
 
   const handleCreateEnquiry = async () => {
+    if (submitting) return;
     try {
       setSubmitting(true);
       setErrorMsg(null);
@@ -109,7 +110,12 @@ export default function DriverEnquiryScreen({ navigation }: Props) {
             <Text style={{ fontSize: 14, color: colors.grey, textAlign: 'center', marginTop: 8, marginBottom: 24 }}>
               {errorMsg}
             </Text>
-            <GoldButton label="Try Again" onPress={handleCreateEnquiry} />
+            <GoldButton
+              label={submitting ? 'Submitting...' : 'Try Again'}
+              onPress={() => void handleCreateEnquiry()}
+              disabled={submitting}
+              loading={submitting}
+            />
           </View>
         ) : (
           <>

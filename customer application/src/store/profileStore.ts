@@ -18,26 +18,40 @@ interface ProfileState {
   clearProfile: () => void;
 }
 
+/** Shared in-flight promise so remount / focus cannot stack duplicate GETs. */
+let profileFetchInFlight: Promise<void> | null = null;
+let profileUpdateInFlight = false;
+
 export const useProfileStore = create<ProfileState>((set) => ({
   profile: null,
   isLoading: false,
   error: null,
 
   fetchProfile: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const profile = await profileService.getProfile();
-      set({ profile, isLoading: false });
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: getApiErrorMessage(error, 'Unable to load profile'),
-      });
-      throw error;
-    }
+    if (profileFetchInFlight) return profileFetchInFlight;
+    profileFetchInFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const profile = await profileService.getProfile();
+        set({ profile, isLoading: false });
+      } catch (error) {
+        set({
+          isLoading: false,
+          error: getApiErrorMessage(error, 'Unable to load profile'),
+        });
+        throw error;
+      } finally {
+        profileFetchInFlight = null;
+      }
+    })();
+    return profileFetchInFlight;
   },
 
   updateProfile: async (data, options) => {
+    if (profileUpdateInFlight) {
+      throw new Error('Profile update already in progress');
+    }
+    profileUpdateInFlight = true;
     set({ isLoading: true, error: null });
     try {
       const profile = await profileService.updateProfile(data);
@@ -52,6 +66,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
         error: getApiErrorMessage(error, 'Unable to update profile'),
       });
       throw error;
+    } finally {
+      profileUpdateInFlight = false;
     }
   },
 

@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Pressable,
@@ -25,6 +24,7 @@ import TripOtpCard from '../../components/booking/TripOtpCard';
 import CancellationRefundPolicyModal from '../../components/booking/CancellationRefundPolicyModal';
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import GoldButton from '../../components/auth/GoldButton';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import { useBookingDetailQuery } from '../../services/bookings/useBookingQueries';
 import {
   cancelServiceBooking,
@@ -154,7 +154,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
               </Pressable>
             </>
           ) : (
-            <ActivityIndicator color={colors.primary} />
+            <DataSkeleton variant="detail" />
           )}
         </View>
       </ProfileSubScreenLayout>

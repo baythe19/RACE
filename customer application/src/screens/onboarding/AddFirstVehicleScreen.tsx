@@ -56,6 +56,7 @@ export default function AddFirstVehicleScreen({ navigation }: Props) {
   };
 
   const handleSubmit = async () => {
+    if (createMutation.isPending) return;
     setError('');
     if (isUiPreviewAuthFlow()) {
       navigation.replace('VehicleSuccess', {

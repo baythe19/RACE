@@ -18,6 +18,9 @@ interface CatalogState {
 const DEFAULT_SERVICES = (fallbackServices as unknown as ServiceCategory[]) ?? [];
 const DEFAULT_BRAND = (fallbackBrand as unknown as Brand) ?? null;
 
+let servicesFetchInFlight: Promise<void> | null = null;
+let brandFetchInFlight: Promise<void> | null = null;
+
 export const useCatalogStore = create<CatalogState>((set) => ({
   services: DEFAULT_SERVICES,
   brand: DEFAULT_BRAND,
@@ -25,31 +28,43 @@ export const useCatalogStore = create<CatalogState>((set) => ({
   error: null,
 
   fetchServices: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const services = await catalogService.getServices();
-      set({
-        services: Array.isArray(services) && services.length > 0 ? services : DEFAULT_SERVICES,
-        isLoading: false,
-      });
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: getApiErrorMessage(error, 'Unable to load services'),
-      });
-    }
+    if (servicesFetchInFlight) return servicesFetchInFlight;
+    servicesFetchInFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const services = await catalogService.getServices();
+        set({
+          services: Array.isArray(services) && services.length > 0 ? services : DEFAULT_SERVICES,
+          isLoading: false,
+        });
+      } catch (error) {
+        set({
+          isLoading: false,
+          error: getApiErrorMessage(error, 'Unable to load services'),
+        });
+      } finally {
+        servicesFetchInFlight = null;
+      }
+    })();
+    return servicesFetchInFlight;
   },
 
   fetchBrand: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const brand = await catalogService.getBrand();
-      set({ brand: brand ?? DEFAULT_BRAND, isLoading: false });
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: getApiErrorMessage(error, 'Unable to load brand'),
-      });
-    }
+    if (brandFetchInFlight) return brandFetchInFlight;
+    brandFetchInFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const brand = await catalogService.getBrand();
+        set({ brand: brand ?? DEFAULT_BRAND, isLoading: false });
+      } catch (error) {
+        set({
+          isLoading: false,
+          error: getApiErrorMessage(error, 'Unable to load brand'),
+        });
+      } finally {
+        brandFetchInFlight = null;
+      }
+    })();
+    return brandFetchInFlight;
   },
 }));

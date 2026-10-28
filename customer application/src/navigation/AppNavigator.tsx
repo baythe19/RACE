@@ -29,12 +29,10 @@ import TowingServiceScreen from '../screens/TowingServiceScreen';
 import TowingChooseVehicleScreen from '../screens/booking/towing/TowingChooseVehicleScreen';
 import TowingConfirmedScreen from '../screens/booking/towing/TowingConfirmedScreen';
 import TowingCompletedScreen from '../screens/booking/towing/TowingCompletedScreen';
-import TowingDateTimeScreen from '../screens/booking/towing/TowingDateTimeScreen';
 import TowingDriverOnWayScreen from '../screens/booking/towing/TowingDriverOnWayScreen';
 import TowingPickupDropScreen from '../screens/booking/towing/TowingPickupDropScreen';
 import TowingRateScreen from '../screens/booking/towing/TowingRateScreen';
 import TowingReviewScreen from '../screens/booking/towing/TowingReviewScreen';
-import TowingSelectTypeScreen from '../screens/booking/towing/TowingSelectTypeScreen';
 import TowingAdvancePaymentScreen from '../screens/booking/towing/TowingAdvancePaymentScreen';
 import TowingTrackScreen from '../screens/booking/towing/TowingTrackScreen';
 import DriverServiceScreen from '../screens/DriverServiceScreen';
@@ -135,6 +133,11 @@ const stackScreenOptions = {
   headerBackButtonDisplayMode: 'minimal' as const,
   headerLeft: (props: Parameters<typeof StackBackButton>[0]) => <StackBackButton {...props} />,
   contentStyle: { backgroundColor: colors.background },
+  // Professional standard push across every stack — card slides from the
+  // right, previous screen eases left. One consistent feel app-wide.
+  animation: 'slide_from_right' as const,
+  animationDuration: 280,
+  gestureDirection: 'horizontal' as const,
 };
 
 const towingBookingScreenOptions = { headerShown: false as const };
@@ -156,16 +159,6 @@ const towingBookingScreens = (
     <Stack.Screen
       name="TowingPickupDrop"
       component={TowingPickupDropScreen}
-      options={towingBookingScreenOptions}
-    />
-    <Stack.Screen
-      name="TowingSelectType"
-      component={TowingSelectTypeScreen}
-      options={towingBookingScreenOptions}
-    />
-    <Stack.Screen
-      name="TowingDateTime"
-      component={TowingDateTimeScreen}
       options={towingBookingScreenOptions}
     />
     <Stack.Screen
@@ -440,7 +433,13 @@ function ServicesStackNavigator() {
 
 function BookingsStackNavigator() {
   return (
-    <BookingsStack.Navigator screenOptions={{ headerShown: false }}>
+    <BookingsStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        animation: 'slide_from_right' as const,
+        animationDuration: 280,
+        gestureDirection: 'horizontal' as const,
+      }}>
       <BookingsStack.Screen name="BookingsMain" component={BookingsScreen} />
       <BookingsStack.Screen name="BookingDetail" component={BookingDetailScreen} />
       <BookingsStack.Screen name="TowingTrack" component={TowingTrackScreen} />
@@ -456,6 +455,9 @@ function CallStackNavigator() {
       screenOptions={{
         headerShown: false,
         contentStyle: { backgroundColor: '#000000' },
+        animation: 'slide_from_right' as const,
+        animationDuration: 280,
+        gestureDirection: 'horizontal' as const,
       }}>
       <CallStack.Screen name="CallMain" component={CallScreen} />
       <CallStack.Screen name="QRScan" component={QRScanScreen} />
@@ -467,7 +469,15 @@ function CallStackNavigator() {
 
 function ProfileStackNavigator() {
   return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Navigator
+      screenOptions={{
+        headerShown: false,
+        // Standard professional push: new card slides in from the right while
+        // the previous page eases slightly left — no modal float, no flash.
+        animation: 'slide_from_right',
+        animationDuration: 280,
+        gestureDirection: 'horizontal',
+      }}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
       <ProfileStack.Screen name="MyVehicles" component={MyVehiclesScreen} />

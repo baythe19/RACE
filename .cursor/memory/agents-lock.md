@@ -9,6 +9,4 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
 | 2026-10-29 GLM | customer towing booking flow (screens/booking/towing + TowingBookingLayout + navigator + constants) | 4-step stepper redesign, combine steps, hide advance-pay UI | branch v8.0.0---custumer-app |
-|---------|---------|------|--------------|
-| 2026-10-29 agent | customer-app DatePicker/GenderDropdown/BackArrow/premium-pill fixes | DOB keyboard bug, dropdowns, header arrows | session: ux fixes |
-| 2026-10-29 Auto | customer (not towing-flow / not DatePicker locks) | double-tap API guards + skeleton loaders throughout | session: api-hygiene-skeletons |
+| 2026-10-29 agent | customer-app page transitions + profile edit redirect | slide transitions profile stack, redirect fix | session: nav polish |

@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Bell, CheckCircle, IndianRupee, Star, Tag, Truck, type LucideIcon } from 'lucide-react-native';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import { getApiErrorMessage } from '../../services/api';
 import {
   useMarkAllNotificationsReadMutation,
@@ -111,6 +112,7 @@ export default function NotificationsScreen() {
   const groups = useMemo(() => groupByDay(items), [items]);
 
   const handleMarkAllRead = () => {
+    if (markAllRead.isPending) return;
     markAllRead.mutate(undefined, {
       onError: err => {
         Alert.alert('Error', getApiErrorMessage(err, 'Unable to mark notifications as read'));
@@ -136,9 +138,7 @@ export default function NotificationsScreen() {
         ) : null
       }>
       {isLoading ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DataSkeleton variant="list" />
       ) : isError ? (
         <View style={{ alignItems: 'center', paddingVertical: px(24), gap: px(10) }}>
           <Text style={{ fontSize: px(13), color: colors.grey, textAlign: 'center' }}>

@@ -30,6 +30,7 @@ export default function ChoosePlanScreen() {
   const cancelSub = useCancelSubscriptionMutation();
 
   const handleSelect = (planSlug: string, actionType?: string) => {
+    if (subscribe.isPending) return;
     if (actionType === 'contact') {
       Alert.alert('Corporate Plan', 'Please contact RACE support to activate corporate billing.');
       return;
@@ -49,12 +50,14 @@ export default function ChoosePlanScreen() {
   };
 
   const handleCancel = () => {
+    if (cancelSub.isPending) return;
     Alert.alert('Cancel subscription', 'Are you sure you want to cancel your current plan?', [
       { text: 'Keep plan', style: 'cancel' },
       {
         text: 'Cancel plan',
         style: 'destructive',
         onPress: () => {
+          if (cancelSub.isPending) return;
           cancelSub.mutate(undefined, {
             onSuccess: () => Alert.alert('Cancelled', 'Your subscription has been cancelled.'),
             onError: error => Alert.alert('Cancel failed', getApiErrorMessage(error)),

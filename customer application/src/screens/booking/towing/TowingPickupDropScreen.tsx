@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { ChevronRight, MapPin } from 'lucide-react-native';
+import { ArrowRight, MapPin, Navigation } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
@@ -30,14 +30,12 @@ const PLACEHOLDER = 'Select location';
 function LocationCard({
   label,
   value,
-  pinColor,
   isPickup,
   onPress,
   t,
 }: {
   label: string;
   value: string;
-  pinColor: string;
   isPickup: boolean;
   onPress: () => void;
   t: ReturnType<typeof useBookingTheme>['t'];
@@ -45,48 +43,56 @@ function LocationCard({
   const hasValue = value.trim().length > 0 && value !== PLACEHOLDER;
 
   return (
-    <Pressable onPress={onPress}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: t.px(12),
+        borderRadius: t.cardRadius,
+        borderWidth: isPickup ? 1.5 : 1,
+        borderColor: hasValue ? (isPickup ? colors.primary : TOWING_ACCENT) : colors.border,
+        backgroundColor: hasValue ? (isPickup ? colors.goldLight : colors.background) : colors.lightGrey,
+        paddingHorizontal: t.px(14),
+        paddingVertical: t.px(14),
+        opacity: pressed ? 0.85 : 1,
+      })}>
+      {/* Icon badge */}
       <View
         style={{
-          flexDirection: 'row',
+          width: t.px(38),
+          height: t.px(38),
+          borderRadius: isPickup ? t.px(19) : t.px(10),
+          backgroundColor: isPickup ? colors.primary : colors.error,
           alignItems: 'center',
-          gap: t.px(8),
-          marginBottom: t.px(8),
+          justifyContent: 'center',
         }}>
-        <MapPin size={t.iconSm} color={pinColor} fill={pinColor} />
+        {isPickup ? (
+          <Navigation size={t.px(16)} color={colors.background} strokeWidth={2.4} />
+        ) : (
+          <MapPin size={t.px(16)} color={colors.background} strokeWidth={2.4} />
+        )}
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <Text
           style={{
-            fontSize: t.labelBold,
-            fontWeight: typography.weights.bold,
-            color: colors.dark,
+            fontSize: t.caption,
+            fontWeight: typography.weights.semibold,
+            color: colors.grey,
           }}>
           {label}
         </Text>
-      </View>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          borderRadius: t.inputRadius,
-          borderWidth: isPickup ? 1.5 : 1,
-          borderColor: isPickup ? colors.primary : colors.border,
-          backgroundColor: isPickup ? colors.goldLight : colors.background,
-          paddingHorizontal: t.px(14),
-          paddingVertical: t.px(14),
-          gap: t.px(10),
-        }}>
         <Text
           style={{
-            flex: 1,
-            fontSize: t.bodyLarge,
+            fontSize: t.body,
             fontWeight: hasValue ? typography.weights.semibold : typography.weights.regular,
             color: hasValue ? colors.dark : colors.grey,
-            lineHeight: t.px(22),
+            lineHeight: t.px(20),
+            marginTop: t.px(1),
           }}
           numberOfLines={2}>
           {hasValue ? value : PLACEHOLDER}
         </Text>
-        <ChevronRight size={t.iconSm} color={colors.grey} />
       </View>
     </Pressable>
   );
@@ -240,6 +246,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         });
         navigation.navigate('TowingReview');
       }}>
+      {/* Route card: pickup → drop connected by a dashed line */}
       <View
         style={[
           {
@@ -247,47 +254,55 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor: colors.background,
-            paddingHorizontal: t.px(18),
-            paddingTop: t.px(18),
-            paddingBottom: t.px(16),
+            padding: t.px(14),
           },
           shadows.card,
         ]}>
         <LocationCard
-          label="Pickup"
+          label="PICKUP"
           value={
             pickup !== PLACEHOLDER
               ? pickupLabel || formatReadableLocation(pickup)
               : pickup
           }
-          pinColor={colors.primary}
           isPickup
           onPress={() => setShowPickupPicker(true)}
           t={t}
         />
 
+        {/* Dashed connector between the two cards */}
         <View
           style={{
-            height: t.px(28),
-            marginLeft: t.px(9),
-            borderLeftWidth: 2,
-            borderLeftColor: '#F5D78A',
-            borderStyle: 'dashed',
-          }}
-        />
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingLeft: t.px(26),
+            marginVertical: t.px(4),
+            gap: t.px(10),
+          }}>
+          <View
+            style={{
+              width: 2,
+              height: t.px(18),
+              borderLeftWidth: 2,
+              borderLeftColor: '#F5D78A',
+              borderStyle: 'dashed',
+            }}
+          />
+          <Text style={{ fontSize: t.caption, color: colors.grey }}>Route</Text>
+        </View>
 
         <LocationCard
-          label="Drop"
+          label="DROP"
           value={
             drop !== PLACEHOLDER ? dropLabel || formatReadableLocation(drop) : drop
           }
-          pinColor={colors.error}
           isPickup={false}
           onPress={() => setShowDropPicker(true)}
           t={t}
         />
       </View>
 
+      {/* Distance / fare preview */}
       {pickupLat && pickupLng && dropLat && dropLng ? (
         <View
           style={{
@@ -297,30 +312,40 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
             borderColor: TOWING_ACCENT,
             backgroundColor: '#FEF3C7',
             padding: t.px(14),
-            gap: t.px(6),
+            flexDirection: 'row',
+            alignItems: 'center',
           }}>
           {isLoadingFare ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(8) }}>
               <ActivityIndicator color={TOWING_ACCENT} size="small" />
-              <Text style={{ fontSize: t.caption, color: colors.grey }}>
+              <Text style={{ fontSize: t.body, color: colors.grey }}>
                 Calculating route distance...
               </Text>
             </View>
           ) : (
             <>
-              {distanceKm != null ? (
-                <Text style={{ fontSize: t.body, color: colors.dark }}>
-                  Distance: <Text style={{ fontWeight: typography.weights.bold }}>{distanceKm} km</Text>
-                </Text>
-              ) : null}
-              {farePreview != null ? (
-                <Text style={{ fontSize: t.body, color: colors.dark }}>
-                  Estimated fare:{' '}
-                  <Text style={{ fontWeight: typography.weights.bold, color: TOWING_ACCENT }}>
-                    {formatRupee(farePreview)}
+              <View style={{ flex: 1 }}>
+                {distanceKm != null ? (
+                  <Text style={{ fontSize: t.body, color: colors.dark }}>
+                    Distance:{' '}
+                    <Text style={{ fontWeight: typography.weights.bold }}>{distanceKm} km</Text>
                   </Text>
-                </Text>
-              ) : null}
+                ) : null}
+                {farePreview != null ? (
+                  <Text
+                    style={{
+                      fontSize: t.body,
+                      color: colors.dark,
+                      marginTop: distanceKm != null ? t.px(3) : 0,
+                    }}>
+                    Estimated fare:{' '}
+                    <Text style={{ fontWeight: typography.weights.bold, color: TOWING_ACCENT }}>
+                      {formatRupee(farePreview)}
+                    </Text>
+                  </Text>
+                ) : null}
+              </View>
+              <ArrowRight size={t.iconSm} color={TOWING_ACCENT} strokeWidth={2.4} />
             </>
           )}
         </View>
@@ -361,6 +386,9 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
                   setPickupLng(lng);
                 }}
                 style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: t.px(6),
                   paddingHorizontal: t.px(12),
                   paddingVertical: t.px(8),
                   borderRadius: t.px(20),
@@ -368,6 +396,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
                   borderColor: colors.border,
                   backgroundColor: colors.goldLight,
                 }}>
+                <MapPin size={t.px(13)} color={colors.primary} strokeWidth={2.2} />
                 <Text style={{ fontSize: t.caption, fontWeight: typography.weights.semibold, color: colors.dark }}>
                   {loc.label}
                 </Text>

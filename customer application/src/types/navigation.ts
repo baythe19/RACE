@@ -25,8 +25,6 @@ export type TowingBookingParamList = {
   TowingService: undefined;
   TowingChooseVehicle: undefined;
   TowingPickupDrop: undefined;
-  TowingSelectType: undefined;
-  TowingDateTime: undefined;
   TowingReview: undefined;
   TowingAdvancePayment: undefined;
   BookingPayment: BookingPaymentParams;

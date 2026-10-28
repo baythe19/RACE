@@ -28,6 +28,7 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
   const subscribe = useSubscribeMutation();
 
   const handleSelect = (planSlug: string, actionType?: string) => {
+    if (subscribe.isPending) return;
     if (actionType === 'contact') {
       Alert.alert('Corporate Plan', 'Please contact RACE support to activate corporate billing.');
       return;

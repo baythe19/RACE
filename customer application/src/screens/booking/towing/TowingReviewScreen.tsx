@@ -1,6 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { CalendarClock, Car, MapPin, Truck, Wrench } from 'lucide-react-native';
+import {
+  CalendarClock,
+  Car,
+  MapPin,
+  Navigation,
+  Siren,
+  Truck,
+  Wrench,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { TowingFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
@@ -17,7 +27,6 @@ import { estimateTowingFare } from '../../../services/bookings/fareApi';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { TowingFareBreakdown } from '../../../types/fare';
 import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
-import { formatRupee } from '../../../utils/towingPricing';
 import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
 import {
   getTowingWalkthroughFare,
@@ -28,6 +37,12 @@ import { colors, shadows, typography } from '../../../theme';
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingReview'>;
 
 const TOWING_ACCENT = '#F59E0B';
+
+const MODE_BADGES: Record<string, { label: string; Icon: LucideIcon }> = {
+  instant: { label: 'Instant', Icon: Zap },
+  scheduled: { label: 'Scheduled', Icon: CalendarClock },
+  emergency: { label: 'Emergency', Icon: Siren },
+};
 
 function SummaryRow({
   Icon,
@@ -45,11 +60,21 @@ function SummaryRow({
       style={{
         flexDirection: 'row',
         alignItems: 'flex-start',
-        paddingVertical: t.px(10),
+        paddingVertical: t.px(11),
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
       }}>
-      <Icon size={t.px(18)} color={colors.grey} strokeWidth={2} style={{ marginTop: t.px(2) }} />
+      <View
+        style={{
+          width: t.px(32),
+          height: t.px(32),
+          borderRadius: t.px(16),
+          backgroundColor: colors.goldLight,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon size={t.px(15)} color={TOWING_ACCENT} strokeWidth={2.2} />
+      </View>
       <View style={{ flex: 1, marginLeft: t.px(12), minWidth: 0 }}>
         <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>{label}</Text>
         <Text
@@ -153,7 +178,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
   };
 
   const totalPrice = fareBreakdown?.totalFare ?? booking.totalPrice;
-  const advancePayment = fareBreakdown?.advanceAmount ?? booking.advancePayment;
+  const modeBadge = MODE_BADGES[booking.serviceMode] ?? MODE_BADGES.instant;
 
   return (
     <TowingBookingLayout
@@ -162,22 +187,37 @@ export default function TowingReviewScreen({ navigation }: Props) {
       accentColor={TOWING_ACCENT}
       scrollable
       onBack={() => navigation.goBack()}
-      buttonLabel="Pay advance"
+      buttonLabel="Continue to payment"
       onContinue={handleContinue}
-      continueDisabled={isLoadingFare || !fareBreakdown}
-      footerNoteBelow={
-        <Text
-          style={{
-            fontSize: t.caption,
-            color: colors.grey,
-            textAlign: 'center',
-            marginTop: t.px(2),
-            marginBottom: t.px(4),
-          }}>
-          You won't be charged until service begins
-        </Text>
-      }>
+      continueDisabled={isLoadingFare || !fareBreakdown}>
       <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>
+        {/* Service mode badge */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(8) }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: t.px(5),
+              paddingHorizontal: t.px(10),
+              paddingVertical: t.px(5),
+              borderRadius: t.px(999),
+              backgroundColor: colors.goldLight,
+              borderWidth: 1,
+              borderColor: TOWING_ACCENT,
+            }}>
+            <modeBadge.Icon size={t.px(13)} color={TOWING_ACCENT} strokeWidth={2.4} />
+            <Text
+              style={{
+                fontSize: t.caption,
+                fontWeight: typography.weights.bold,
+                color: TOWING_ACCENT,
+              }}>
+              {modeBadge.label} towing
+            </Text>
+          </View>
+        </View>
+
+        {/* Booking summary */}
         <View
           style={[
             {
@@ -186,21 +226,11 @@ export default function TowingReviewScreen({ navigation }: Props) {
               borderColor: colors.border,
               backgroundColor: colors.background,
               paddingHorizontal: t.px(16),
-              paddingTop: t.px(4),
+              paddingTop: t.px(14),
               paddingBottom: t.px(4),
             },
             shadows.card,
           ]}>
-          <Text
-            style={{
-              fontSize: t.labelBold,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              paddingVertical: t.px(10),
-            }}>
-            Booking Details
-          </Text>
-          <SummaryRow Icon={Wrench} label="Service Type" value="Towing" t={t} />
           <SummaryRow
             Icon={Car}
             label="Vehicle"
@@ -208,7 +238,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
             t={t}
           />
           <SummaryRow
-            Icon={MapPin}
+            Icon={Navigation}
             label="Pickup"
             value={getShortLocation(booking.pickup, booking.pickupLabel)}
             t={t}
@@ -225,14 +255,19 @@ export default function TowingReviewScreen({ navigation }: Props) {
             value={getTowingTypeLabel(booking.towingType)}
             t={t}
           />
-          <View style={{ paddingVertical: t.px(10) }}>
+          <View style={{ paddingVertical: t.px(11) }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-              <CalendarClock
-                size={t.px(18)}
-                color={colors.grey}
-                strokeWidth={2}
-                style={{ marginTop: t.px(2) }}
-              />
+              <View
+                style={{
+                  width: t.px(32),
+                  height: t.px(32),
+                  borderRadius: t.px(16),
+                  backgroundColor: colors.goldLight,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <CalendarClock size={t.px(15)} color={TOWING_ACCENT} strokeWidth={2.2} />
+              </View>
               <View style={{ flex: 1, marginLeft: t.px(12) }}>
                 <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>
                   Date & Time
@@ -252,15 +287,43 @@ export default function TowingReviewScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* Fare */}
         {isLoadingFare ? (
-          <View style={{ alignItems: 'center', paddingVertical: t.px(20) }}>
+          <View
+            style={[
+              {
+                alignItems: 'center',
+                paddingVertical: t.px(24),
+                borderRadius: t.cardRadius,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+              shadows.card,
+            ]}>
             <ActivityIndicator color={TOWING_ACCENT} />
             <Text style={{ marginTop: t.px(8), fontSize: t.caption, color: colors.grey }}>
               Calculating fare from route distance...
             </Text>
           </View>
         ) : fareBreakdown ? (
-          <TowingFareBreakdownCard breakdown={fareBreakdown} accentColor={TOWING_ACCENT} />
+          <View>
+            <TowingFareBreakdownCard
+              breakdown={fareBreakdown}
+              accentColor={TOWING_ACCENT}
+              compact
+            />
+            <Text
+              style={{
+                marginTop: t.px(10),
+                fontSize: t.caption,
+                color: colors.grey,
+                textAlign: 'center',
+                lineHeight: t.px(18),
+              }}>
+              Advance is adjusted in the final bill. Pay the rest after service is done.
+            </Text>
+          </View>
         ) : (
           <View
             style={{
@@ -285,7 +348,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
                 fontWeight: typography.weights.extrabold,
                 color: TOWING_ACCENT,
               }}>
-              {totalPrice > 0 ? formatRupee(totalPrice) : '—'}
+              {totalPrice > 0 ? `₹${totalPrice}` : '—'}
             </Text>
           </View>
         )}

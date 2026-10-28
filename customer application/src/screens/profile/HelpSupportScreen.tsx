@@ -2,7 +2,6 @@ import React, { type ReactNode } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import { ChevronRight, Mail, Phone, Siren } from 'lucide-react-native';
 
-import LiveChatIcon from '../../components/icons/LiveChatIcon';
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import { HELP_FAQ_ITEMS } from '../../constants/profileSubScreens';
@@ -133,11 +132,23 @@ export default function HelpSupportScreen() {
       </Text>
       <View style={{ flexDirection: 'row', gap: px(8), marginBottom: px(18) }}>
         <QuickHelpCard
-          label="Live Chat"
-          icon={<LiveChatIcon size={px(26)} />}
+          label="Call Us"
+          icon={
+            <View
+              style={{
+                width: px(32),
+                height: px(32),
+                borderRadius: px(8),
+                backgroundColor: colors.goldLight,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Phone size={px(18)} color={colors.primary} strokeWidth={2.2} />
+            </View>
+          }
           online
           px={px}
-          onPress={() => Alert.alert('Live Chat', 'Support channel coming soon.')}
+          onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
         />
         <QuickHelpCard
           label="Email Us"
@@ -161,7 +172,13 @@ export default function HelpSupportScreen() {
           label="WhatsApp"
           icon={<WhatsAppIcon size={px(28)} />}
           px={px}
-          onPress={() => Alert.alert('WhatsApp', 'WhatsApp support coming soon.')}
+          onPress={() =>
+            void Linking.openURL(
+              `https://wa.me/91${brand.phoneRaw.replace(/\D/g, '')}?text=${encodeURIComponent(
+                'Hi RACE Support, I need help with my booking.',
+              )}`,
+            )
+          }
         />
       </View>
 
@@ -183,10 +200,10 @@ export default function HelpSupportScreen() {
           marginBottom: px(16),
           overflow: 'hidden',
         }}>
-        {HELP_FAQ_ITEMS.map((question, index) => (
+        {HELP_FAQ_ITEMS.map((item, index) => (
           <Pressable
-            key={question}
-            onPress={() => Alert.alert('FAQ', question)}
+            key={item.question}
+            onPress={() => Alert.alert(item.question, item.answer)}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -197,7 +214,7 @@ export default function HelpSupportScreen() {
               borderBottomColor: colors.border,
             }}>
             <Text style={{ flex: 1, fontSize: px(13), color: colors.dark, paddingRight: px(8) }}>
-              {question}
+              {item.question}
             </Text>
             <ChevronRight size={px(16)} color={colors.grey} />
           </Pressable>

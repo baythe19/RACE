@@ -42,7 +42,7 @@ export default function TowingRateScreen({ navigation, route }: Props) {
 
   if (bookingId && !booking) {
     return (
-      <TowingBookingLayout title="Rate Your Experience" step={10} hideFooter>
+      <TowingBookingLayout title="Rate Your Experience" step={0} hideFooter>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -53,7 +53,7 @@ export default function TowingRateScreen({ navigation, route }: Props) {
   return (
     <TowingBookingLayout
       title="Rate Your Experience"
-      step={10}
+      step={0}
       onBack={() => navigation.goBack()}
       buttonLabel={isSubmitting ? 'Submitting...' : 'Submit Review'}
       continueDisabled={!canSubmit}

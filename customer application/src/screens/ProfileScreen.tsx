@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -26,6 +25,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PROFILE_MENU_ITEMS } from '../constants/profileScreen';
 import { PROFILE_MENU_ROUTES } from '../constants/profileSubScreens';
 import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { getProfileFirstName } from '../utils/profileDisplay';
 import { useAuthActions } from '../hooks/useAuth';
@@ -121,8 +121,8 @@ export default function ProfileScreen() {
             showActions={false}
           />
         }>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={{ flex: 1, paddingTop: 8 }}>
+          <DataSkeleton variant="profile" />
         </View>
       </AppScreenLayout>
     );
@@ -212,9 +212,9 @@ export default function ProfileScreen() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: px(4),
-                      paddingHorizontal: px(8),
-                      paddingVertical: px(3.5),
-                      borderRadius: px(12),
+                      paddingHorizontal: px(7),
+                      paddingVertical: px(4),
+                      borderRadius: px(6),
                       backgroundColor: '#E8F8EE',
                       marginTop: px(7),
                       borderWidth: 1,
@@ -227,39 +227,36 @@ export default function ProfileScreen() {
                         fontWeight: typography.weights.bold,
                         color: colors.success,
                       }}>
-                      Verified User
+                      Verified
                     </Text>
                   </View>
                 </View>
-                {/* Premium chip — vertical pill instead of split column */}
+                {/* Premium chip — compact pill, single text line, no stray arrow */}
                 <Pressable
                   onPress={() => navigation.navigate('SubscriptionPlans')}
-                  style={[
-                    {
-                      alignSelf: 'center',
-                      alignItems: 'center',
-                      flexShrink: 0,
-                      gap: px(3),
-                      paddingHorizontal: px(10),
-                      paddingVertical: px(10),
-                      borderRadius: px(14),
-                      backgroundColor: colors.goldLight,
-                      borderWidth: 1,
-                      borderColor: 'rgba(245,166,35,0.35)',
-                    },
-                  ]}>
-                  <Crown size={px(20)} color={colors.primary} fill={colors.primary} />
+                  style={{
+                    alignSelf: 'center',
+                    alignItems: 'center',
+                    flexShrink: 0,
+                    gap: px(4),
+                    paddingHorizontal: px(10),
+                    paddingVertical: px(9),
+                    borderRadius: px(14),
+                    backgroundColor: colors.goldLight,
+                    borderWidth: 1,
+                    borderColor: 'rgba(245,166,35,0.35)',
+                  }}>
+                  <Crown size={px(18)} color={colors.primary} fill={colors.primary} />
                   <Text
+                    numberOfLines={1}
                     style={{
-                      fontSize: px(9),
+                      fontSize: px(8.5),
                       fontWeight: typography.weights.bold,
                       color: colors.primary,
-                      lineHeight: px(11),
-                      textAlign: 'center',
+                      lineHeight: px(10),
                     }}>
-                    Premium{'\n'}Member
+                    PREMIUM
                   </Text>
-                  <ChevronRight size={px(12)} color={colors.primary} strokeWidth={2.5} />
                 </Pressable>
               </View>
             </View>

@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   Text,
@@ -10,6 +9,7 @@ import { Circle, Info, Plus } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import {
   formatFuelLabel,
   formatVehicleTypeWithSubtype,
@@ -285,7 +285,7 @@ export default function VehicleListScreen({ navigation }: Props) {
       title="My Vehicles"
       subtitle="Manage your registered vehicles">
       {isLoading && !safeVehicles.length ? (
-        <ActivityIndicator size="large" color={VEHICLE_YELLOW} style={{ marginTop: px(40) }} />
+        <DataSkeleton variant="cards" />
       ) : (
         <>
           {error && !safeVehicles.length ? (

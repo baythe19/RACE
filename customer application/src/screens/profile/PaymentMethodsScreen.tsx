@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Check, CreditCard, Plus, Trash2, Wallet } from 'lucide-react-native';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import { getApiErrorMessage } from '../../services/api';
 import {
   useCreatePaymentMethodMutation,
@@ -37,6 +38,7 @@ export default function PaymentMethodsScreen() {
   const [upiId, setUpiId] = useState('');
 
   const handleAddUpi = () => {
+    if (createMethod.isPending) return;
     if (!upiId.trim()) {
       Alert.alert('Missing UPI ID', 'Enter a valid UPI ID.');
       return;
@@ -54,12 +56,14 @@ export default function PaymentMethodsScreen() {
   };
 
   const handleDelete = (method: PaymentMethod) => {
+    if (deleteMethod.isPending) return;
     Alert.alert('Remove method', `Remove ${method.label}?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
         onPress: () => {
+          if (deleteMethod.isPending) return;
           deleteMethod.mutate(method.id, {
             onError: err => Alert.alert('Remove failed', getApiErrorMessage(err)),
           });
@@ -123,7 +127,7 @@ export default function PaymentMethodsScreen() {
       </Text>
 
       {isLoading ? (
-        <ActivityIndicator color={colors.primary} style={{ marginVertical: px(20) }} />
+        <DataSkeleton variant="wallet" />
       ) : methodsError ? (
         <View style={{ marginBottom: px(16) }}>
           <Text style={{ fontSize: px(13), color: colors.grey }}>Unable to load payment methods</Text>
@@ -162,8 +166,15 @@ export default function PaymentMethodsScreen() {
                 <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }}>{method.details}</Text>
               </View>
               {method.isDefault ? <Check size={px(16)} color={colors.success} /> : null}
-              <Pressable onPress={() => handleDelete(method)} hitSlop={8}>
-                <Trash2 size={px(18)} color={colors.error} />
+              <Pressable
+                onPress={() => handleDelete(method)}
+                hitSlop={8}
+                disabled={deleteMethod.isPending}
+                accessibilityState={{ disabled: deleteMethod.isPending }}>
+                <Trash2
+                  size={px(18)}
+                  color={deleteMethod.isPending ? colors.grey : colors.error}
+                />
               </Pressable>
             </View>
           ))}

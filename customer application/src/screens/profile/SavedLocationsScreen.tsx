@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { Building2, ChevronRight, Home, MapPin, Plus, Trash2 } from 'lucide-react-native';
 
 import LocationPickerModal from '../../components/common/LocationPickerModal';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import { getApiErrorMessage } from '../../services/api';
 import {
   useCreateLocationMutation,
@@ -66,6 +67,7 @@ export default function SavedLocationsScreen() {
   };
 
   const handleSave = () => {
+    if (createLocation.isPending || updateLocation.isPending) return;
     if (!label.trim() || !address.trim()) {
       Alert.alert('Missing fields', 'Please enter a label and address.');
       return;
@@ -97,12 +99,14 @@ export default function SavedLocationsScreen() {
   };
 
   const handleDelete = (location: SavedLocation) => {
+    if (deleteLocation.isPending) return;
     Alert.alert('Delete location', `Remove "${location.label}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
+          if (deleteLocation.isPending) return;
           deleteLocation.mutate(location.id, {
             onError: err => Alert.alert('Delete failed', getApiErrorMessage(err)),
           });
@@ -116,9 +120,7 @@ export default function SavedLocationsScreen() {
   return (
     <ProfileSubScreenLayout title="Saved Locations" subtitle="Your frequently used locations">
       {isLoading ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DataSkeleton variant="list" />
       ) : isError ? (
         <View style={{ alignItems: 'center', paddingVertical: px(24), gap: px(10) }}>
           <Text style={{ fontSize: px(13), color: colors.grey, textAlign: 'center' }}>
@@ -177,8 +179,14 @@ export default function SavedLocationsScreen() {
                     {formatLocationDisplay(location.address)}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => handleDelete(location)} hitSlop={8}>
-                  <Trash2 size={px(18)} color={colors.error} />
+                <Pressable
+                  onPress={() => handleDelete(location)}
+                  hitSlop={8}
+                  disabled={deleteLocation.isPending}>
+                  <Trash2
+                    size={px(18)}
+                    color={deleteLocation.isPending ? colors.grey : colors.error}
+                  />
                 </Pressable>
               </View>
             );

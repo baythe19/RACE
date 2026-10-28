@@ -46,7 +46,7 @@ export default function TowingCompletedScreen({ navigation, route }: Props) {
   return (
     <TowingBookingLayout
       title="Service Completed"
-      step={9}
+      step={0}
       onBack={() => navigation.goBack()}
       buttonLabel="Book Again"
       onContinue={() => {

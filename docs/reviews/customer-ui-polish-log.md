@@ -72,3 +72,64 @@ Splash
 - `customer application/src/screens/auth/MobileNumberScreen.tsx`
 - `customer application/src/navigation/RootNavigator.tsx`
 - `customer application/src/navigation/AuthNavigator.tsx`
+
+## Profile stack polish — 2026-10-27/29 (agent session)
+
+Scope requested by user: Profile page (head card + wallet + menu), and header
+consistency across Personal Information / My Vehicles / all profile stack
+screens. Source material: 9 live screenshots from the user's iOS simulator.
+
+### Round 1 — Profile page structure
+
+| # | Item | What changed | File |
+|---|------|--------------|------|
+| 1 | Profile head card | Avatar left; name 16px extrabold + inline pencil edit; phone and email as clean grey lines below; Verified badge moved into the left column with a subtle green border; Premium block converted from a split column plus divider into a standalone gold pill on the right | `ProfileScreen.tsx` |
+| 2 | Wallet card | Grey flat box → brand gold-tinted card: rupee icon inside a white circle on the left, balance in 19px extrabold dark text (was small orange), and a "Top Up" pill button on the right (same Payment Methods destination) | `ProfileScreen.tsx` |
+| 3 | Header unification | `AppStackHeader` rewritten to match `TabRootHeader` (the Bookings header): 18px extrabold left-aligned title, 11px grey subtitle directly beneath, matching line heights and paddings. Previously the title was centered, which clashed with every tab page | `AppStackHeader.tsx` |
+| 4 | Reach | All 14 profile sub-screens (Personal Information, My Vehicles, SOS Details, Saved Locations, Payment Methods, Notifications, Help & Support, QR, Settings, Change mobile/password/PIN, subscription screens) inherit the new header automatically; auth flow (`AuthFormLayout`) also uses it | layout + screens |
+
+### Round 2 — UX defects from live testing (9 screenshots)
+
+| # | Defect observed | Fix |
+|---|-----------------|-----|
+| 1 | Tapping Date of Birth opened the calendar **and** the text keyboard stayed open on top (screenshot pair) | `FormField.tsx`: picker-style fields (`onPress` present) now set `showSoftInputOnFocus={false}` and `focusable={false}` — the keyboard can never open for read-only fields, and any previously open keyboard blurs when the picker opens |
+| 2 | Gender used a native `Alert.alert` action sheet; Relationship likewise; both also fought with the keyboard | New `SelectOptionModal` — a centered dialog in the same design language as the DOB calendar (white card, rounded 18, options with a gold border and check mark on the selected value, Cancel row). Gender on Personal Information and Relationship in Emergency Contact now use it |
+| 3 | Back arrow inconsistent across headers — some bare, some inside an outlined circle | Removed the circle/border; every stack header now shows the plain `ArrowLeft` (22px, dark, 2.4 stroke) — user directive: "कहीं पे भी outline नहीं होना चाहिए, सिर्फ back arrow" |
+| 4 | Premium pill rendered wrapped onto three lines with a stray chevron | Compact pill: crown icon + single-line "PREMIUM" label (8.5px bold, numberOfLines=1), chevron removed |
+| 5 | Verified badge too rounded | Radius 12 → 6 (square-ish), label shortened to "Verified" |
+| 6 | Large avatar icon felt odd next to no photo | Kept as the avatar placeholder (UserRound in gold circle, 62px) — placeholder is intentional; it only appears when no photo is uploaded. Sized so the card contents align |
+
+### Verification
+
+- `tsc --noEmit` on customer app: **clean for all files touched in this session**
+  (two pre-existing errors exist in `BookingFlowHeader.tsx` /
+  `TowingAdvancePaymentScreen.tsx` from a parallel booking-flow workstream —
+  not introduced here)
+- Metro bundle build: 200 on port 8081
+- Backend untouched in this round; admin panel untouched in this round
+
+### Open items carried forward (from user, not yet done)
+
+- [ ] Page-to-page **transitions** should use a professional standard animation
+      across the profile stack (partially exists for auth stack: `slide_from_right`)
+- [ ] Any screen still showing **mock data** must show real data, with a loader
+      while loading and a proper empty/error state when the API fails
+- [ ] My Vehicles screen: header now consistent, but the list/cards themselves
+      have not been re-polished in this pass
+- [ ] Payment Methods: gold wallet banner exists; card list empty state could
+      use the same Treatment as the wallet card (gold icon circle)
+
+### Context ledger — screenshots ↔ fixes (nothing dropped)
+
+| Screenshot (user, 2026-10-29 ~00:22–00:35) | What it showed | Covered by |
+|-------------------------------------------|----------------|-----------|
+| 1. Profile page ( notifications row highlighted ) | Head card misalignment, Premium split-column, flat wallet | Round 1 items 1–2 |
+| 2. Payment Methods | Gold banner already fine; noted for list state | Open item, carried forward |
+| 3. Personal Information (form top) | Header centered vs Bookings; fields fine | Round 1 item 3 |
+| 4. Bookings page (reference — copy this header) | 18px extrabold left title + grey subtitle | Round 1 item 3 (matched) |
+| 5. DOB calendar + keyboard both open | Keyboard did not close on picker open | Round 2 item 1 |
+| 6. DOB calendar closed state (clean) | Confirmed desired end state | Round 2 item 1 (achieved) |
+| 7. Select Gender native alert | Alert-based picker felt cheap | Round 2 item 2 |
+| 8. Select Relationship native alert | Same as above, plus keyboard behind | Round 2 items 1–2 |
+| 9. Relationship picker over keyboard | Same root cause as 5 | Round 2 items 1–2 |
+

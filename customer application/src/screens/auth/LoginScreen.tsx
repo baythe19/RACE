@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Linking,
@@ -26,7 +25,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { images } from '../../assets';
-import GoogleIcon from '../../components/auth/GoogleIcon';
 import { sendOtp } from '../../services/authService';
 import { getApiErrorMessage } from '../../services/api';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
@@ -67,6 +65,7 @@ export default function LoginScreen({ navigation }: Props) {
   };
 
   const handleContinue = async () => {
+    if (isSubmitting) return;
     if (!isValid) {
       setPhoneError('Enter a valid 10-digit mobile number');
       return;
@@ -237,26 +236,6 @@ export default function LoginScreen({ navigation }: Props) {
               <Send size={px(18)} color={colors.dark} strokeWidth={2.4} />
               <Text style={[styles.sendButtonLabel, { fontSize: px(16) }]}>
                 {isSubmitting ? 'Sending OTP...' : 'Send OTP'}
-              </Text>
-            </Pressable>
-
-            <View style={[styles.dividerRow, { marginVertical: px(20) }]}>
-              <View style={styles.divider} />
-              <Text style={{ marginHorizontal: px(12), fontSize: px(13), color: colors.grey }}>
-                or
-              </Text>
-              <View style={styles.divider} />
-            </View>
-
-            <Pressable
-              style={[
-                styles.googleButton,
-                { minHeight: px(54), borderRadius: px(14), gap: px(10) },
-              ]}
-              onPress={() => Alert.alert('Google Sign-In', 'Google sign-in coming soon')}>
-              <GoogleIcon size={px(24)} />
-              <Text style={{ fontSize: px(16), fontWeight: typography.weights.semibold, color: colors.dark }}>
-                Continue with Google
               </Text>
             </Pressable>
 

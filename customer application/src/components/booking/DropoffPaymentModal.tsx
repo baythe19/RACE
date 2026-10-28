@@ -84,7 +84,7 @@ export default function DropoffPaymentModal({
   const activeMode = localConfirmedMode || serverMode || selectedMode;
 
   const handleConfirmPayment = async () => {
-    if (!bookingId) return;
+    if (!bookingId || isSubmitting) return;
     setIsSubmitting(true);
     setErrorMessage(null);
 

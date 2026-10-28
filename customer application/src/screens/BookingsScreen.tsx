@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ActiveBookingCard from '../components/bookings/ActiveBookingCard';
 import BookingHistoryRow from '../components/bookings/BookingHistoryRow';
 import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import EmptyState from '../components/ui/EmptyState';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { BOOKING_TABS, type BookingTabId } from '../constants/bookingsScreen';
@@ -211,7 +211,7 @@ export default function BookingsScreen() {
 
       {isLoading && bookings.length === 0 ? (
         <View style={styles.centeredFill}>
-          <ActivityIndicator color={colors.primary} />
+          <DataSkeleton variant="cards" />
         </View>
       ) : null}
 

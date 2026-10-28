@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AuthToast from '../../components/auth/AuthToast';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import Screen, { ScreenContent } from '../../components/ui/Screen';
 import { useVehicleStore } from '../../store/vehicleStore';
@@ -80,7 +80,7 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
     return (
       <Screen>
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <DataSkeleton variant="detail" />
         </View>
       </Screen>
     );

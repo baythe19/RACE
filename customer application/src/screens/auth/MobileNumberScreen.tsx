@@ -198,6 +198,8 @@ export default function MobileNumberScreen({ navigation }: Props) {
   }, [chromeOpacity, heroFactor]);
 
   const handleContinue = async () => {
+    if (loading || sendOtpMutation.isPending) return;
+
     if (isUiPreviewAuthFlow()) {
       Keyboard.dismiss();
       setError('');
@@ -406,7 +408,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
             isSignup={isSignup}
             marginTop={keyboardOpen ? 12 : 22}
             onPress={() => void handleContinue()}
-            disabled={loading}
+            disabled={loading || sendOtpMutation.isPending}
           />
 
           <Animated.View

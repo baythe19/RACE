@@ -36,20 +36,16 @@ export default function AppStackHeader({
             onPress={onBack}
             hitSlop={10}
             style={{
-              width: px(38),
-              height: px(38),
-              borderRadius: px(19),
+              width: px(40),
+              height: px(40),
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: colors.background,
-              borderWidth: 1,
-              borderColor: colors.border,
-              marginRight: px(10),
+              marginRight: px(6),
             }}>
-            <ArrowLeft size={px(20)} color={colors.dark} strokeWidth={2.4} />
+            <ArrowLeft size={px(22)} color={colors.dark} strokeWidth={2.4} />
           </Pressable>
         ) : (
-          <View style={{ width: px(38) }} />
+          <View style={{ width: px(40) }} />
         )}
         <View style={{ flex: 1, minWidth: 0 }}>
           {title ? (
