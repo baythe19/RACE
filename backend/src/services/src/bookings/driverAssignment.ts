@@ -656,8 +656,8 @@ export async function claimOpenBookingOffer(
 
   const existing =
     bookingType === 'towing'
-      ? await TowingBookingModel.findById(bookingId).exec()
-      : await DriverBookingModel.findById(bookingId).exec();
+      ? await TowingBookingModel.findById(bookingId).select('+tripStartOtpEncrypted').exec()
+      : await DriverBookingModel.findById(bookingId).select('+tripStartOtpEncrypted').exec();
   if (!existing) {
     throw new NotFoundError('Booking not found');
   }

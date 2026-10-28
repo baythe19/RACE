@@ -137,7 +137,7 @@ export class TowingBookingService {
     customerId: string,
     status?: UnifiedBookingStatus,
   ): Promise<TowingBookingResponseDto[]> {
-    const bookings = await towingBookingRepository.findByCustomer(customerId, { status });
+    const bookings = await towingBookingRepository.findByCustomerWithOtp(customerId, { status });
     return Promise.all(
       bookings.map(async (booking) => {
         const mapped = await mapTowingBookingWithDriver(booking);
@@ -151,7 +151,7 @@ export class TowingBookingService {
     bookingId: string,
     requestingUser: { id: string; role: string },
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -163,6 +163,10 @@ export class TowingBookingService {
     const mapped = await mapTowingBookingWithDriver(booking);
     if (requestingUser.role === 'customer') {
       mapped.tripStartOtp = customerTripOtp(booking);
+      mapped.completionOtp = customerCompletionOtp(booking);
+    } else {
+      mapped.tripStartOtp = undefined;
+      mapped.completionOtp = undefined;
     }
     return mapped;
   }
@@ -172,7 +176,7 @@ export class TowingBookingService {
     newStatus: UnifiedBookingStatus,
     actor: { id: string; role: string },
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -223,7 +227,7 @@ export class TowingBookingService {
     bookingId: string,
     requestingUser: { id: string; role: string },
   ): Promise<TowingTrackingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -283,7 +287,7 @@ export class TowingBookingService {
     bookingId: string,
     customerId: string,
   ): Promise<CancellationResult> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -308,7 +312,7 @@ export class TowingBookingService {
     refundStatus: string;
     policy: CancellationResult;
   }> {
-    let booking = await towingBookingRepository.findById(bookingId);
+    let booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -404,7 +408,7 @@ export class TowingBookingService {
     bookingId: string,
     update: Partial<ITowingBooking>,
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -455,7 +459,7 @@ export class TowingBookingService {
     requestingUser: { id: string; role: string },
     dto: SubmitServiceBookingRatingDto,
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }

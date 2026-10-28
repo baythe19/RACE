@@ -305,14 +305,14 @@ export class DriverService {
     });
 
     if (bookingType === 'towing') {
-      const booking = await towingBookingRepository.findById(bookingId);
+      const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
       if (!booking) {
         return { active: false as const };
       }
       return { active: true as const, booking: mapBooking('towing', booking) };
     }
 
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       return { active: false as const };
     }
@@ -337,7 +337,7 @@ export class DriverService {
         ? towingBookingRepository
         : driverBookingRepository;
 
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Booking not found');
     }
@@ -429,8 +429,8 @@ export class DriverService {
       const tripStartOtp = booking.tripStartOtp
         ? getTripOtpValue(booking.tripStartOtp, booking.tripStartOtpEncrypted) ?? generateTripStartOtp()
         : generateTripStartOtp();
-      if (!booking.tripStartOtp) {
-        await Model.updateStatus(bookingId, 'DRIVER_EN_ROUTE', 'DRIVER_EN_ROUTE', {
+      if (!booking.tripStartOtp || !booking.tripStartOtpEncrypted) {
+        await Model.updateById(bookingId, {
           tripStartOtp: hashTripOtpForStorage(tripStartOtp),
           tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
         });
@@ -484,7 +484,7 @@ export class DriverService {
     }
 
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
 
     if (booking.status === 'CONFIRMED' && !booking.driverId) {
@@ -506,7 +506,7 @@ export class DriverService {
     await assertDriverApproved(driverId);
 
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
     if (!booking.driverId || booking.driverId.toString() !== driverId) {
       throw new ForbiddenError('This booking is not assigned to you');
@@ -529,7 +529,7 @@ export class DriverService {
     await assertDriverApproved(driverId);
 
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
     if (!booking.driverId || booking.driverId.toString() !== driverId) {
       throw new ForbiddenError('This booking is not assigned to you');

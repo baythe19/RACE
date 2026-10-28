@@ -14,7 +14,8 @@ export class DriverBookingRepository {
   }
 
   async findByIdWithOtp(id: string): Promise<IDriverBooking | null> {
-    return DriverBookingModel.findById(id).select('+tripStartOtpEncrypted +completionOtpEncrypted');
+    return DriverBookingModel.findById(id)
+      .select('+tripStartOtp +tripStartOtpEncrypted +completionOtp +completionOtpEncrypted');
   }
 
   async findByIdForCustomer(id: string, customerId: string): Promise<IDriverBooking | null> {
@@ -39,7 +40,7 @@ export class DriverBookingRepository {
     const filter: Record<string, unknown> = { customerId };
     if (options?.status) filter.status = options.status;
     return DriverBookingModel.find(filter)
-      .select('+tripStartOtpEncrypted +completionOtpEncrypted')
+      .select('+tripStartOtp +tripStartOtpEncrypted +completionOtp +completionOtpEncrypted')
       .sort({ createdAt: -1 });
   }
 
@@ -54,22 +55,12 @@ export class DriverBookingRepository {
     return DriverBookingModel.find(filter).sort({ createdAt: -1 });
   }
 
-  async findByDriverWithOtp(
-    driverId: string,
-    options?: { status?: UnifiedBookingStatus },
-  ): Promise<IDriverBooking[]> {
-    const filter: Record<string, unknown> = { driverId };
-    if (options?.status) filter.status = options.status;
-    return DriverBookingModel.find(filter)
-      .select('+tripStartOtpEncrypted +completionOtpEncrypted')
-      .sort({ createdAt: -1 });
-  }
-
   async updateById(
     id: string,
     update: Partial<IDriverBooking>,
   ): Promise<IDriverBooking | null> {
-    return DriverBookingModel.findByIdAndUpdate(id, update, { new: true });
+    return DriverBookingModel.findByIdAndUpdate(id, update, { new: true })
+      .select('+tripStartOtp +tripStartOtpEncrypted +completionOtp +completionOtpEncrypted');
   }
 
   async updateStatus(
@@ -86,7 +77,6 @@ export class DriverBookingRepository {
         $push: { statusHistory: { status, timestamp: new Date() } },
       },
       { new: true, runValidators: true },
-    );
   }
 
   async countAll(): Promise<number> {

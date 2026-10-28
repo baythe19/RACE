@@ -115,18 +115,18 @@ export class CombinedBookingService {
     let repo: typeof towingBookingRepository | typeof driverBookingRepository = towingBookingRepository;
 
     if (bookingType === 'driver') {
-      booking = await driverBookingRepository.findById(bookingId);
+      booking = await driverBookingRepository.findByIdWithOtp(bookingId);
       repo = driverBookingRepository;
     } else if (bookingType === 'towing') {
-      booking = await towingBookingRepository.findById(bookingId);
+      booking = await towingBookingRepository.findByIdWithOtp(bookingId);
       repo = towingBookingRepository;
     } else {
-      booking = await towingBookingRepository.findById(bookingId);
+      booking = await towingBookingRepository.findByIdWithOtp(bookingId);
       if (booking) {
         type = 'towing';
         repo = towingBookingRepository;
       } else {
-        booking = await driverBookingRepository.findById(bookingId);
+        booking = await driverBookingRepository.findByIdWithOtp(bookingId);
         type = 'driver';
         repo = driverBookingRepository;
       }
@@ -166,13 +166,16 @@ export class CombinedBookingService {
     const completionOtp = generateCompletionOtp();
     const paymentCollectedAt = new Date();
 
-    await repo.updateById(bookingId, {
+    const updatedBooking = await repo.updateById(bookingId, {
       paymentCollectionMode: paymentMode,
       paymentConfirmedByCustomer: true,
       paymentCollectedAt,
       completionOtp: hashTripOtpForStorage(completionOtp),
       completionOtpEncrypted: encryptTripOtpForStorage(completionOtp),
     });
+    if (!updatedBooking) {
+      throw new NotFoundError('Booking not found');
+    }
 
     // SMS goes out only after the customer confirms cash, UPI, or in-app payment.
     const customer = await userRepository.findById(customerId);
