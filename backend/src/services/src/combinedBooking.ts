@@ -122,13 +122,24 @@ export class CombinedBookingService {
       repo = towingBookingRepository;
     } else {
       booking = await towingBookingRepository.findByIdWithOtp(bookingId);
-      if (booking) {
-        type = 'towing';
-        repo = towingBookingRepository;
-      } else {
+      if (!booking) {
         booking = await driverBookingRepository.findByIdWithOtp(bookingId);
         type = 'driver';
         repo = driverBookingRepository;
+      }
+      if (!booking) {
+        booking = await towingBookingRepository.findById(bookingId);
+        if (booking) {
+          type = 'towing';
+          repo = towingBookingRepository;
+        }
+      }
+      if (!booking) {
+        booking = await driverBookingRepository.findById(bookingId);
+        if (booking) {
+          type = 'driver';
+          repo = driverBookingRepository;
+        }
       }
     }
 
@@ -152,6 +163,10 @@ export class CombinedBookingService {
         : booking.estimatedFare;
 
     if (booking.paymentConfirmedByCustomer && booking.completionOtp) {
+      const existingOtp = getTripOtpValue(
+        booking.completionOtp,
+        booking.completionOtpEncrypted,
+      );
       return {
         success: true,
         bookingId,
@@ -159,7 +174,7 @@ export class CombinedBookingService {
         bookingType: type,
         paymentMode: booking.paymentCollectionMode ?? paymentMode,
         amount: fare,
-        completionOtp: getTripOtpValue(booking.completionOtp, booking.completionOtpEncrypted),
+        completionOtp: existingOtp,
       };
     }
 
@@ -173,7 +188,13 @@ export class CombinedBookingService {
       completionOtp: hashTripOtpForStorage(completionOtp),
       completionOtpEncrypted: encryptTripOtpForStorage(completionOtp),
     });
+
     if (!updatedBooking) {
+      throw new NotFoundError('Booking not found');
+    }
+
+    const refetched = await repo.findByIdWithOtp(bookingId);
+    if (!refetched) {
       throw new NotFoundError('Booking not found');
     }
 
@@ -184,17 +205,16 @@ export class CombinedBookingService {
         try {
           await hanuSendOtp(customer.mobileNumber, completionOtp);
         } catch (smsErr) {
-          logger.warn('Failed to send completion OTP via HanuSMS', { error: smsErr });
+          logger.warn("Failed to send completion OTP via HanuSMS", { error: smsErr });
         }
       }
-      logger.info(`[COMPLETION OTP SMS] Sent completion code for booking #${booking.bookingNumber}`);
     }
 
     // Emit socket event to Driver
-    if (booking.driverId) {
-      emitToDriver(booking.driverId.toString(), 'booking:payment_confirmed', {
+    if (updatedBooking.driverId) {
+      emitToDriver(updatedBooking.driverId.toString(), 'booking:payment_confirmed', {
         bookingId,
-        bookingNumber: booking.bookingNumber,
+        bookingNumber: updatedBooking.bookingNumber,
         paymentMode,
         amount: fare,
         paymentStatus: 'CONFIRMED',
@@ -202,7 +222,7 @@ export class CombinedBookingService {
     }
 
     // Emit socket event to Booking Room
-    emitBookingStatusUpdate(bookingId, booking.status, {
+    emitBookingStatusUpdate(bookingId, updatedBooking.status, {
       paymentMode,
       paymentConfirmed: true,
       amount: fare,
@@ -211,11 +231,14 @@ export class CombinedBookingService {
     return {
       success: true,
       bookingId,
-      bookingNumber: booking.bookingNumber,
+      bookingNumber: updatedBooking.bookingNumber,
       bookingType: type,
       paymentMode,
       amount: fare,
-      completionOtp,
+      completionOtp: getTripOtpValue(
+        refetched.completionOtp,
+        refetched.completionOtpEncrypted,
+      ),
     };
   }
 }

@@ -13,11 +13,6 @@ export class DriverBookingRepository {
     return DriverBookingModel.findById(id);
   }
 
-  async findByIdWithOtp(id: string): Promise<IDriverBooking | null> {
-    return DriverBookingModel.findById(id)
-      .select('+tripStartOtp +tripStartOtpEncrypted +completionOtp +completionOtpEncrypted');
-  }
-
   async findByIdForCustomer(id: string, customerId: string): Promise<IDriverBooking | null> {
     return DriverBookingModel.findOne({ _id: id, customerId });
   }
@@ -33,17 +28,6 @@ export class DriverBookingRepository {
     return DriverBookingModel.find(filter).sort({ createdAt: -1 });
   }
 
-  async findByCustomerWithOtp(
-    customerId: string,
-    options?: { status?: UnifiedBookingStatus },
-  ): Promise<IDriverBooking[]> {
-    const filter: Record<string, unknown> = { customerId };
-    if (options?.status) filter.status = options.status;
-    return DriverBookingModel.find(filter)
-      .select('+tripStartOtp +tripStartOtpEncrypted +completionOtp +completionOtpEncrypted')
-      .sort({ createdAt: -1 });
-  }
-
   async findByDriver(
     driverId: string,
     options?: { status?: UnifiedBookingStatus },
@@ -55,12 +39,37 @@ export class DriverBookingRepository {
     return DriverBookingModel.find(filter).sort({ createdAt: -1 });
   }
 
+  async findByIdWithOtp(id: string): Promise<IDriverBooking | null> {
+    return DriverBookingModel.findById(id).select('+tripStartOtpEncrypted +completionOtpEncrypted');
+  }
+
+  async findByCustomerWithOtp(
+    customerId: string,
+    options?: { status?: UnifiedBookingStatus },
+  ): Promise<IDriverBooking[]> {
+    const filter: Record<string, unknown> = { customerId };
+    if (options?.status) filter.status = options.status;
+    return DriverBookingModel.find(filter)
+      .select('+tripStartOtpEncrypted +completionOtpEncrypted')
+      .sort({ createdAt: -1 });
+  }
+
+  async findByDriverWithOtp(
+    driverId: string,
+    options?: { status?: UnifiedBookingStatus },
+  ): Promise<IDriverBooking[]> {
+    const filter: Record<string, unknown> = { driverId };
+    if (options?.status) filter.status = options.status;
+    return DriverBookingModel.find(filter)
+      .select('+tripStartOtpEncrypted +completionOtpEncrypted')
+      .sort({ createdAt: -1 });
+  }
+
   async updateById(
     id: string,
     update: Partial<IDriverBooking>,
   ): Promise<IDriverBooking | null> {
-    return DriverBookingModel.findByIdAndUpdate(id, update, { new: true })
-      .select('+tripStartOtp +tripStartOtpEncrypted +completionOtp +completionOtpEncrypted');
+    return DriverBookingModel.findByIdAndUpdate(id, update, { new: true });
   }
 
   async updateStatus(
@@ -77,6 +86,7 @@ export class DriverBookingRepository {
         $push: { statusHistory: { status, timestamp: new Date() } },
       },
       { new: true, runValidators: true },
+    );
   }
 
   async countAll(): Promise<number> {
@@ -85,3 +95,4 @@ export class DriverBookingRepository {
 }
 
 export const driverBookingRepository = new DriverBookingRepository();
+

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Image,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -10,7 +11,8 @@ import {
   UIManager,
   View,
 } from 'react-native';
-import { Camera } from 'lucide-react-native';
+import { Camera, X } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AuthToast from '../../components/auth/AuthToast';
@@ -25,6 +27,7 @@ import {
 } from '../../components/vehicles/vehicleUi';
 import { FORM_PLACEHOLDER_COLOR } from '../../constants/profileForm';
 import { getVehicleSubtypes, hasVehicleSubtypes } from '../../constants/vehicleSubtypes';
+import { uploadVehiclePhoto } from '../../services/vehicleService';
 import { useVehicleStore } from '../../store/vehicleStore';
 import type { ProfileStackParamList } from '../../types/navigation';
 import type { FuelType, VehicleType } from '../../types/vehicle';
@@ -61,11 +64,60 @@ export default function AddVehicleScreen({ navigation }: Props) {
   const [showCustomColor, setShowCustomColor] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [vehiclePhotoUri, setVehiclePhotoUri] = useState<string | null>(null);
 
   const resolvedColor = showCustomColor ? customColor.trim() : color;
   const resolvedFuelType = vehicleType === 'ev' ? 'electric' : fuelType;
   const subtypeOptions = getVehicleSubtypes(vehicleType);
   const showSubtypeSection = hasVehicleSubtypes(vehicleType);
+
+  const pickVehiclePhoto = async (source: 'camera' | 'library') => {
+    try {
+      const perm =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        setError(
+          source === 'camera'
+            ? 'Camera permission is required to take a photo'
+            : 'Photo library permission is required',
+        );
+        return;
+      }
+      const result =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.7,
+              allowsEditing: true,
+              aspect: [4, 3],
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.7,
+              allowsEditing: true,
+              aspect: [4, 3],
+            });
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        setVehiclePhotoUri(result.assets[0].uri);
+        setError('');
+      }
+    } catch {
+      setError('Could not pick the photo. Try again.');
+    }
+  };
+
+  const handlePhotoPress = () => {
+    Alert.alert('Add Vehicle Photo', 'Choose a source', [
+      { text: 'Camera', onPress: () => void pickVehiclePhoto('camera') },
+      { text: 'Photo Library', onPress: () => void pickVehiclePhoto('library') },
+      ...(vehiclePhotoUri
+        ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: () => setVehiclePhotoUri(null) }]
+        : []),
+      { text: 'Cancel', style: 'cancel' as const },
+    ]);
+  };
 
   const handleVehicleTypeChange = (type: VehicleType) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -97,7 +149,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
     }
 
     try {
-      await addVehicle({
+      const created = await addVehicle({
         vehicleType,
         ...(vehicleSubtype ? { vehicleSubtype } : {}),
         fuelType: resolvedFuelType,
@@ -106,6 +158,21 @@ export default function AddVehicleScreen({ navigation }: Props) {
         model: model.trim(),
         color: resolvedColor,
       });
+      // Optional photo upload after the vehicle exists (POST /vehicles/:id/photo).
+      if (vehiclePhotoUri) {
+        try {
+          const createdId = created?.id ?? null;
+          if (createdId) {
+            await uploadVehiclePhoto(createdId, {
+              uri: vehiclePhotoUri,
+              name: 'vehicle-photo.jpg',
+              mimeType: 'image/jpeg',
+            });
+          }
+        } catch {
+          // Photo is optional — keep the vehicle even if the upload fails.
+        }
+      }
       navigation.goBack();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to add vehicle');
@@ -395,27 +462,69 @@ export default function AddVehicleScreen({ navigation }: Props) {
       ) : null}
 
       <Pressable
-        onPress={() => Alert.alert('Photo', 'Camera coming soon')}
+        onPress={handlePhotoPress}
         style={{
           borderRadius: px(14),
           borderWidth: 1.5,
           borderColor: VEHICLE_YELLOW,
           borderStyle: 'dashed',
-          paddingVertical: px(28),
+          paddingVertical: vehiclePhotoUri ? px(12) : px(28),
           alignItems: 'center',
           justifyContent: 'center',
           marginBottom: px(16),
         }}>
-        <Camera size={px(28)} color={VEHICLE_YELLOW} strokeWidth={2} />
-        <Text
-          style={{
-            marginTop: px(8),
-            fontSize: px(13),
-            fontWeight: typography.weights.bold,
-            color: VEHICLE_YELLOW,
-          }}>
-          Add Vehicle Photo (Optional)
-        </Text>
+        {vehiclePhotoUri ? (
+          <View style={{ width: '100%', alignItems: 'center' }}>
+            <Image
+              source={{ uri: vehiclePhotoUri }}
+              style={{ width: px(160), height: px(120), borderRadius: px(10) }}
+              resizeMode="cover"
+            />
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: px(6),
+                marginTop: px(8),
+              }}>
+              <Camera size={px(14)} color={VEHICLE_YELLOW} strokeWidth={2} />
+              <Text
+                style={{
+                  fontSize: px(12),
+                  fontWeight: typography.weights.bold,
+                  color: VEHICLE_YELLOW,
+                }}>
+                Tap to change or remove
+              </Text>
+              <Pressable
+                hitSlop={8}
+                onPress={() => setVehiclePhotoUri(null)}
+                style={{
+                  width: px(20),
+                  height: px(20),
+                  borderRadius: px(10),
+                  backgroundColor: colors.error ?? '#DC2626',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <X size={px(12)} color="#FFFFFF" strokeWidth={3} />
+              </Pressable>
+            </View>
+          </View>
+        ) : (
+          <>
+            <Camera size={px(28)} color={VEHICLE_YELLOW} strokeWidth={2} />
+            <Text
+              style={{
+                marginTop: px(8),
+                fontSize: px(13),
+                fontWeight: typography.weights.bold,
+                color: VEHICLE_YELLOW,
+              }}>
+              Add Vehicle Photo (Optional)
+            </Text>
+          </>
+        )}
       </Pressable>
 
       <AuthToast message={error || storeError || ''} />

@@ -69,8 +69,7 @@ export class TowingBookingRepository {
     id: string,
     update: Partial<ITowingBooking>,
   ): Promise<ITowingBooking | null> {
-    return TowingBookingModel.findByIdAndUpdate(id, update, { new: true })
-      .select('+tripStartOtpEncrypted +completionOtpEncrypted');
+    return TowingBookingModel.findByIdAndUpdate(id, update, { new: true });
   }
 
   async updateStatus(
@@ -87,7 +86,7 @@ export class TowingBookingRepository {
         $push: { statusHistory: { status, timestamp: new Date() } },
       },
       { new: true, runValidators: true },
-    ).select('+tripStartOtpEncrypted +completionOtpEncrypted');
+    );
   }
 
   async countAll(): Promise<number> {

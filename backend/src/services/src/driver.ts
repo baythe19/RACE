@@ -18,8 +18,6 @@ import { logger } from '../../utils/src/logger';
 import { UserModel } from '../../models/src/user';
 import { TowingBookingModel } from '../../models/src/towingBooking';
 import { DriverBookingModel } from '../../models/src/driverBooking';
-import type { ITowingBooking } from '../../models/src/towingBooking';
-import type { IDriverBooking } from '../../models/src/driverBooking';
 import type { UnifiedBookingStatus } from './bookingStatusConstants';
 import type {
   DriverBookingsQueryDto,
