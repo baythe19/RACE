@@ -1,6 +1,10 @@
 ## Current focus
 
-**2026-10-29 (Live Tracking collapse + OTP gate):** Map tap / web press collapses bottom sheet; handle / “Details” expands. Trip-start OTP UI only when `DRIVER_ARRIVED` (`shouldShowTripStartOtp`) — Track/list/detail/OnWay. Completion OTP stays in DropoffPaymentModal after dropoff+payment. `tsc` 0.
+**2026-10-29 (booking API hygiene):** Removed Bookings `useFocusEffect` double-refetch. List/detail queries: sensible `staleTime`, slower ongoing polls (12–15s). `useBookingQuery` = detail query (dedupe). Tracking poll: typed path only + in-flight skip, 8s. Cancel/pay multi-click guards. Detail shows payment status honestly. Customer `tsc` 0. Did not re-audit admin live UI this pass (backend health 200). DropoffPaymentModal untouched.
+
+**2026-10-29 (Bookings list cleanup):** Removed Active/History section titles; filters carry meaning; soft “No past bookings yet”.
+
+**2026-10-29 (Live Tracking collapse + OTP gate):** Map tap collapses sheet; trip-start OTP only at `DRIVER_ARRIVED`. Completion OTP in DropoffPaymentModal. `tsc` 0.
 
 **2026-10-29 (Live Tracking layout fix):** Dup booking ID removed; LIVE square-curve; sheet content-sized (no CTA gap).
 
@@ -199,3 +203,5 @@ Peach browser sim: `docs/DEVICE_FREE_PREVIEW.md`; runbook `.cursor/memory/partne
 - Metro web server: port 8081 (background).
 - Overnight EAS: partner vCode3 + customer vCode6 APKs both FINISHED OK.
 
+
+**2026-10-29 (customer profile UI polish):** ProfileScreen: (1) head card — avatar+name+phone+email left column, Verified badge w/ subtle border, Premium ab standalone gold pill (crown+"Premium Member"+chevron vertical) — pehle split-column+divider tha; (2) Wallet card — gold-tinted bg + ₹ icon circle left + balance 19px extrabold dark + "Top Up" pill right (PaymentMethods navigate same). AppStackHeader rewritten for consistency with TabRootHeader (Bookings): 18px extrabold left-aligned title + 11px grey subtitle below (pehle centered tha) + back button ab white circle w/ border. 14 profile sub-screens + AuthFormLayout automatically inherit. customer tsc 0, customer Metro 8081 running.

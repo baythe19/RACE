@@ -13,6 +13,12 @@ type Props = {
   showBack?: boolean;
 };
 
+/**
+ * Stack header used across Profile sub-screens (Personal Information,
+ * My Vehicles, …). Styled to match the tab root headers (Bookings/Home):
+ * same 18px extrabold title weight, 11px grey subtitle, left-aligned copy —
+ * so moving between a tab page and a stack page feels like one system.
+ */
 export default function AppStackHeader({
   title,
   subtitle,
@@ -24,49 +30,60 @@ export default function AppStackHeader({
 
   return (
     <View style={[styles.wrap, { backgroundColor: colors.pageBg }]}>
-      <View style={[styles.row, { paddingHorizontal: px(20), minHeight: px(44), paddingBottom: subtitle ? px(2) : px(10) }]}>
+      <View style={[styles.row, { paddingHorizontal: px(20), minHeight: px(48), paddingTop: px(6), paddingBottom: subtitle ? px(4) : px(10) }]}>
         {showBack && onBack ? (
-          <Pressable onPress={onBack} hitSlop={10} style={{ width: px(40), height: px(40), alignItems: 'center', justifyContent: 'center' }}>
-            <ArrowLeft size={px(22)} color={colors.dark} strokeWidth={2.4} />
+          <Pressable
+            onPress={onBack}
+            hitSlop={10}
+            style={{
+              width: px(38),
+              height: px(38),
+              borderRadius: px(19),
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.background,
+              borderWidth: 1,
+              borderColor: colors.border,
+              marginRight: px(10),
+            }}>
+            <ArrowLeft size={px(20)} color={colors.dark} strokeWidth={2.4} />
           </Pressable>
         ) : (
-          <View style={{ width: px(40) }} />
+          <View style={{ width: px(38) }} />
         )}
-        {title ? (
-          <Text
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              textAlign: 'center',
-              fontSize: px(18),
-              fontWeight: typography.weights.extrabold,
-              color: colors.dark,
-              lineHeight: px(22),
-            }}>
-            {title}
-          </Text>
-        ) : (
-          <View style={{ flex: 1 }} />
-        )}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          {title ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: px(18),
+                fontWeight: typography.weights.extrabold,
+                color: colors.dark,
+                lineHeight: px(22),
+                letterSpacing: -0.3,
+                textAlign: 'left',
+              }}>
+              {title}
+            </Text>
+          ) : null}
+          {subtitle ? (
+            <Text
+              style={{
+                marginTop: px(2),
+                fontSize: px(11),
+                color: colors.grey,
+                lineHeight: px(15),
+                textAlign: 'left',
+              }}
+              numberOfLines={2}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
         {headerRight ? (
-          <View style={{ minWidth: px(72), alignItems: 'flex-end' }}>{headerRight}</View>
-        ) : (
-          <View style={{ width: px(40) }} />
-        )}
+          <View style={{ marginLeft: px(10), alignItems: 'flex-end' }}>{headerRight}</View>
+        ) : null}
       </View>
-      {subtitle ? (
-        <Text
-          style={{
-            textAlign: 'center',
-            fontSize: px(11),
-            color: colors.grey,
-            lineHeight: px(16),
-            marginBottom: px(10),
-            paddingHorizontal: px(20),
-          }}>
-          {subtitle}
-        </Text>
-      ) : null}
     </View>
   );
 }

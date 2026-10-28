@@ -63,6 +63,7 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
   // paying always runs the (stub) advance flow regardless of selection, so if a
   // coming-soon method is picked, fall back to UPI and tell the user.
   const handlePay = async () => {
+    if (payMutation.isPending) return;
     if (!bookingId || !bookingType) {
       Alert.alert('Payment unavailable', 'Booking details are missing. Please retry from booking review.');
       return;

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import ActiveBookingCard from '../components/bookings/ActiveBookingCard';
@@ -44,12 +44,6 @@ export default function BookingsScreen() {
   const [activeTab, setActiveTab] = useState<BookingTabId>('all');
   const { data: bookings = [], isLoading, refetch, isRefetching } = useBookingsQuery();
 
-  useFocusEffect(
-    React.useCallback(() => {
-      void refetch();
-    }, [refetch]),
-  );
-
   const typeFiltered = useMemo(() => {
     if (activeTab === 'towing') {
       return bookings.filter(b => (b.bookingType ?? 'towing') === 'towing');
@@ -79,16 +73,17 @@ export default function BookingsScreen() {
     [typeFiltered],
   );
 
-  const showOngoingSection =
+  const historyItems = useMemo(() => [...otherList, ...historyList], [otherList, historyList]);
+
+  /** Filters already say Ongoing / Done / Towing / Driver — no redundant section titles. */
+  const showOngoingCards =
     (activeTab === 'all' ||
       activeTab === 'ongoing' ||
       activeTab === 'towing' ||
       activeTab === 'driver') &&
     ongoingList.length > 0;
 
-  const historyItems = useMemo(() => [...otherList, ...historyList], [otherList, historyList]);
-
-  const showHistorySection =
+  const showHistoryCards =
     (activeTab === 'all' ||
       activeTab === 'completed' ||
       activeTab === 'towing' ||
@@ -107,8 +102,16 @@ export default function BookingsScreen() {
     navigation.navigate('BookingDetail', { bookingId, bookingType });
   };
 
-  const hasVisibleBookings = showOngoingSection || showHistorySection;
+  const hasVisibleBookings = showOngoingCards || showHistoryCards;
   const showEmptyScene = !isLoading && !isRefetching && !hasVisibleBookings;
+
+  /** On All: active trips exist but no past jobs — soft hint under the list. */
+  const showPastEmptyHint =
+    activeTab === 'all' &&
+    showOngoingCards &&
+    !showHistoryCards &&
+    !isLoading &&
+    !isRefetching;
 
   const emptyCopy = (() => {
     if (bookings.length === 0) {
@@ -158,7 +161,9 @@ export default function BookingsScreen() {
       onRefresh={() => {
         void refetch();
       }}
-      contentStyle={showEmptyScene || (isLoading && bookings.length === 0) ? styles.fillContent : undefined}
+      contentStyle={
+        showEmptyScene || (isLoading && bookings.length === 0) ? styles.fillContent : undefined
+      }
       header={
         <TabRootHeader
           title="Bookings"
@@ -221,19 +226,8 @@ export default function BookingsScreen() {
         />
       ) : null}
 
-      {showOngoingSection ? (
-        <View style={{ marginBottom: px(8) }}>
-          <Text
-            style={{
-              fontSize: px(15),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(10),
-            }}>
-            {activeTab === 'ongoing' ? 'Ongoing bookings' : 'Active bookings'}
-            {` (${ongoingList.length})`}
-          </Text>
-          {ongoingList.map(booking => (
+      {showOngoingCards
+        ? ongoingList.map(booking => (
             <ActiveBookingCard
               key={booking.id}
               booking={booking}
@@ -241,30 +235,31 @@ export default function BookingsScreen() {
               onTrack={() => openTrack(booking.id, booking.bookingType)}
               onPress={() => openDetail(booking.id, booking.bookingType)}
             />
-          ))}
-        </View>
-      ) : null}
+          ))
+        : null}
 
-      {showHistorySection ? (
-        <View>
-          <Text
-            style={{
-              fontSize: px(15),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(10),
-            }}>
-            Booking history
-          </Text>
-          {historyItems.map(item => (
+      {showHistoryCards
+        ? historyItems.map(item => (
             <BookingHistoryRow
               key={item.id}
               item={item}
               px={px}
               onPress={() => openDetail(item.id, item.bookingType)}
             />
-          ))}
-        </View>
+          ))
+        : null}
+
+      {showPastEmptyHint ? (
+        <Text
+          style={{
+            marginTop: px(8),
+            marginBottom: px(4),
+            fontSize: px(12),
+            color: colors.grey,
+            textAlign: 'center',
+          }}>
+          No past bookings yet
+        </Text>
       ) : null}
     </AppScreenLayout>
   );

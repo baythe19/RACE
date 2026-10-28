@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
@@ -29,14 +29,27 @@ export function useServiceBookingPayment() {
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirmingRef = useRef(false);
   const refreshBookings = useCallback(
     () => queryClient.invalidateQueries({ queryKey: ['bookings'] }),
     [queryClient],
   );
 
-  const confirmTowing = useCallback(async (payload: CreateTowingBookingRequest) => {
+  const beginConfirm = () => {
+    if (confirmingRef.current) return false;
+    confirmingRef.current = true;
     setIsConfirming(true);
     setError(null);
+    return true;
+  };
+
+  const endConfirm = () => {
+    confirmingRef.current = false;
+    setIsConfirming(false);
+  };
+
+  const confirmTowing = useCallback(async (payload: CreateTowingBookingRequest) => {
+    if (!beginConfirm()) return undefined;
     try {
       // BUG-C1: wizard vehicles are local preview ids the real backend
       // rejects; in preview mode the whole confirm is demoed locally.
@@ -56,13 +69,12 @@ export function useServiceBookingPayment() {
       Alert.alert('Booking failed', message);
       throw err;
     } finally {
-      setIsConfirming(false);
+      endConfirm();
     }
   }, [refreshBookings]);
 
   const confirmDriver = useCallback(async (payload: CreateDriverBookingRequest) => {
-    setIsConfirming(true);
-    setError(null);
+    if (!beginConfirm()) return undefined;
     try {
       if (__DEV__ && isPreviewBookingMode()) {
         const booking = previewDriverBooking(payload);
@@ -80,14 +92,13 @@ export function useServiceBookingPayment() {
       Alert.alert('Booking failed', message);
       throw err;
     } finally {
-      setIsConfirming(false);
+      endConfirm();
     }
   }, [refreshBookings]);
 
   const confirmExistingBooking = useCallback(
     async (bookingId: string, bookingType: ServiceBookingType) => {
-      setIsConfirming(true);
-      setError(null);
+      if (!beginConfirm()) return;
       try {
         if (__DEV__ && isPreviewBookingMode()) {
           previewAdvancePayment(bookingId, bookingType);
@@ -102,7 +113,7 @@ export function useServiceBookingPayment() {
         Alert.alert('Payment failed', message);
         throw err;
       } finally {
-        setIsConfirming(false);
+        endConfirm();
       }
     },
     [refreshBookings],

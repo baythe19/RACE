@@ -176,6 +176,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const serviceKind = bookingType === 'driver' ? 'Driver hire' : 'Towing';
 
   const openCancelModal = async () => {
+    if (policyLoading || cancelSubmitting) return;
     try {
       setPolicyLoading(true);
       const preview = await getServiceBookingCancelPreview(booking.id, bookingType);
@@ -190,10 +191,14 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   };
 
   const confirmCancel = async () => {
+    if (cancelSubmitting) return;
     try {
       setCancelSubmitting(true);
       const result = await cancelServiceBooking(booking.id, bookingType, cancelReason);
       await queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      await queryClient.invalidateQueries({
+        queryKey: ['bookings', bookingType, booking.id],
+      });
       setShowCancelModal(false);
       setCancelReason('');
       Alert.alert(
@@ -513,8 +518,19 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
           px={px}
         />
         <DetailRow
+          label="Payment status"
+          value={
+            booking.paymentStatus?.replace(/_/g, ' ') ??
+            (booking.advancePaid ? 'Advance paid' : 'Pending')
+          }
+          px={px}
+        />
+        <DetailRow
           label="Payment method"
-          value={booking.invoice?.paymentMethod ?? (booking.advancePaid ? 'UPI' : '—')}
+          value={
+            booking.invoice?.paymentMethod ??
+            (booking.advancePaid ? 'UPI / wallet' : 'Not selected yet')
+          }
           px={px}
           last
         />

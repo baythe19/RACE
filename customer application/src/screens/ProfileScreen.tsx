@@ -14,6 +14,7 @@ import {
   Check,
   ChevronRight,
   Crown,
+  IndianRupee,
   LogOut,
   Pencil,
   Shield,
@@ -271,31 +272,66 @@ export default function ProfileScreen() {
                 }
                 navigation.navigate('PaymentMethods');
               }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderRadius: px(14),
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.background,
-                paddingVertical: px(14),
-                paddingHorizontal: px(16),
-                marginBottom: px(14),
-              }}>
-              <View>
+              style={[
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderRadius: px(16),
+                  borderWidth: 1,
+                  borderColor: 'rgba(245,166,35,0.35)',
+                  backgroundColor: colors.goldLight,
+                  paddingVertical: px(13),
+                  paddingHorizontal: px(14),
+                  marginBottom: px(14),
+                  gap: px(10),
+                },
+                shadows.card,
+              ]}>
+              <View
+                style={{
+                  width: px(42),
+                  height: px(42),
+                  borderRadius: px(21),
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: 'rgba(245,166,35,0.25)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                <IndianRupee size={px(20)} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: px(11), color: colors.grey }}>Wallet Balance</Text>
                 <Text
                   style={{
-                    marginTop: px(4),
-                    fontSize: px(18),
-                    fontWeight: typography.weights.bold,
-                    color: colors.primary,
+                    marginTop: px(2),
+                    fontSize: px(19),
+                    fontWeight: typography.weights.extrabold,
+                    color: colors.dark,
+                    letterSpacing: -0.3,
                   }}>
                   {walletLabel}
                 </Text>
               </View>
-              <ChevronRight size={px(18)} color={colors.primary} strokeWidth={2} />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: px(2),
+                  backgroundColor: colors.background,
+                  borderRadius: px(12),
+                  paddingHorizontal: px(10),
+                  paddingVertical: px(7),
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}>
+                <Text style={{ fontSize: px(11), fontWeight: typography.weights.bold, color: colors.dark }}>
+                  Top Up
+                </Text>
+                <ChevronRight size={px(13)} color={colors.dark} strokeWidth={2.4} />
+              </View>
             </Pressable>
 
             <View

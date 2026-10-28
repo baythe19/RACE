@@ -18,8 +18,16 @@ import { isBookingOngoing } from '../../utils/bookingDisplay';
 
 export const bookingKeys = {
   all: ['bookings'] as const,
-  detail: (id: string, bookingType?: ServiceBookingType) => ['bookings', bookingType ?? 'legacy', id] as const,
+  detail: (id: string, bookingType?: ServiceBookingType) =>
+    ['bookings', bookingType ?? 'legacy', id] as const,
 };
+
+/** List: avoid hammering API on every tab focus — pull-to-refresh still works. */
+const LIST_STALE_MS = 20_000;
+/** Detail: tracking socket/poll owns live location; HTTP refresh can be slower. */
+const DETAIL_STALE_MS = 15_000;
+const ONGOING_LIST_POLL_MS = 12_000;
+const ONGOING_DETAIL_POLL_MS = 15_000;
 
 export function useBookingsQuery() {
   const dispatch = useAppDispatch();
@@ -36,69 +44,31 @@ export function useBookingsQuery() {
         dispatch(setBookingsLoading(false));
       }
     },
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: LIST_STALE_MS,
+    refetchOnMount: true,
     retry: 2,
     retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
-    refetchInterval: (query) => {
+    refetchInterval: query => {
       if (isCustomerMockDataEnabled()) return false;
       const data = query.state.data;
       if (data?.some(isBookingOngoing)) {
-        return 5_000;
+        return ONGOING_LIST_POLL_MS;
       }
       return false;
     },
   });
-}
-
-export function useBookingQuery(bookingId: string, bookingType?: ServiceBookingType) {
-  const dispatch = useAppDispatch();
-  const localBooking = useAppSelector((state) => {
-    const matches = state.bookings.items.filter(
-      booking => booking.id === bookingId && (!bookingType || booking.bookingType === bookingType),
-    );
-    return matches.length === 1 ? matches[0] : undefined;
-  });
-
-  const query = useQuery({
-    queryKey: bookingKeys.detail(bookingId, bookingType),
-    queryFn: async () => {
-      const remote = await getBooking(bookingId, bookingType);
-      if (remote) {
-        dispatch(updateBooking(remote));
-        return remote;
-      }
-      if (localBooking) {
-        return localBooking;
-      }
-      throw new Error('Failed to load booking');
-    },
-    enabled: Boolean(bookingId),
-    initialData: localBooking,
-    refetchOnMount: 'always',
-    refetchInterval: (query) => {
-      const data = query.state.data;
-      if (data && isBookingOngoing(data)) {
-        return 5_000;
-      }
-      return false;
-    },
-  });
-
-  return query.data ?? null;
 }
 
 /**
- * D-16 (audit 2026-10-28): BookingDetailScreen needs to distinguish
- * "loading" from "failed" — previously an errored query rendered an infinite
- * spinner. Returns the full query object so the screen can show an error +
- * retry state.
+ * D-16: full query object so Booking Detail can show error + retry.
+ * Track/OnWay screens can use `.data` via useBookingQuery helper.
  */
 export function useBookingDetailQuery(bookingId: string, bookingType?: ServiceBookingType) {
   const dispatch = useAppDispatch();
-  const localBooking = useAppSelector((state) => {
+  const localBooking = useAppSelector(state => {
     const matches = state.bookings.items.filter(
-      booking => booking.id === bookingId && (!bookingType || booking.bookingType === bookingType),
+      booking =>
+        booking.id === bookingId && (!bookingType || booking.bookingType === bookingType),
     );
     return matches.length === 1 ? matches[0] : undefined;
   });
@@ -118,17 +88,25 @@ export function useBookingDetailQuery(bookingId: string, bookingType?: ServiceBo
     },
     enabled: Boolean(bookingId),
     initialData: localBooking,
-    refetchOnMount: 'always',
+    staleTime: DETAIL_STALE_MS,
+    refetchOnMount: true,
     retry: 2,
     retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
-    refetchInterval: (query) => {
+    refetchInterval: query => {
+      if (isCustomerMockDataEnabled()) return false;
       const data = query.state.data;
       if (data && isBookingOngoing(data)) {
-        return 5_000;
+        return ONGOING_DETAIL_POLL_MS;
       }
       return false;
     },
   });
+}
+
+/** Convenience wrapper — same query key as detail (deduped by TanStack Query). */
+export function useBookingQuery(bookingId: string, bookingType?: ServiceBookingType) {
+  const query = useBookingDetailQuery(bookingId, bookingType);
+  return query.data ?? null;
 }
 
 export function useCreateBookingMutation() {
@@ -157,10 +135,12 @@ export function useSubmitRatingMutation() {
       const bookingType = params.bookingType ?? 'towing';
       return submitBookingRating(params.bookingId, bookingType, params.payload);
     },
-    onSuccess: (booking) => {
+    onSuccess: (booking, vars) => {
       dispatch(updateBooking(booking));
       void queryClient.invalidateQueries({ queryKey: bookingKeys.all });
-      void queryClient.invalidateQueries({ queryKey: bookingKeys.detail(booking.id) });
+      void queryClient.invalidateQueries({
+        queryKey: bookingKeys.detail(booking.id, vars.bookingType ?? booking.bookingType),
+      });
     },
   });
 }

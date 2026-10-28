@@ -18,7 +18,10 @@ import { colors, typography } from '../../theme';
 
 interface TowingBookingLayoutProps {
   title: string;
+  /** 1-based wizard step (1–3). Pass 0 for non-wizard screens (confirmation, tracking, rate). */
   step: number;
+  /** Labels for the horizontal stepper. Defaults to the 3-step towing wizard labels. */
+  stepLabels?: readonly string[];
   onBack?: () => void;
   children: ReactNode;
   buttonLabel?: string;
@@ -36,9 +39,12 @@ interface TowingBookingLayoutProps {
   accentColor?: string;
 }
 
+const DEFAULT_STEPPER_LABELS = ['Vehicle & Tow', 'Pickup & Drop', 'Review'] as const;
+
 export default function TowingBookingLayout({
   title,
   step,
+  stepLabels,
   onBack,
   children,
   buttonLabel = 'Continue',
@@ -140,6 +146,7 @@ export default function TowingBookingLayout({
           <BookingScreenShell
             title={title}
             step={step}
+            stepLabels={stepLabels ?? DEFAULT_STEPPER_LABELS}
             onBack={onBack}
             theme={t}
             footer={footer}

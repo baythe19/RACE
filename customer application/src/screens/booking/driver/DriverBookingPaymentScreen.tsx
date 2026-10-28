@@ -88,7 +88,9 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
 
     try {
       const payload = buildDriverBookingRequest(booking, vehicles);
-      const { booking: created } = await confirmDriver(payload);
+      const confirmed = await confirmDriver(payload);
+      if (!confirmed) return;
+      const { booking: created } = confirmed;
       const breakdown =
         (created.fareBreakdown as DriverFareBreakdown | undefined) ?? booking.fareBreakdown ?? null;
       setConfirmedFare(breakdown);

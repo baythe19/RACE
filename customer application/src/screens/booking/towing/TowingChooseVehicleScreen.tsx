@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { Car, Check } from 'lucide-react-native';
+import { Image, Pressable, Text, View } from 'react-native';
+import { Car, Check, Plus } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
@@ -90,31 +90,34 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
         });
         navigation.navigate('TowingPickupDrop');
       }}>
-      <Text
-        style={{
-          fontSize: t.bodyLarge,
-          color: colors.grey,
-          textAlign: 'center',
-          marginBottom: t.px(16),
-        }}>
-        Choose which of your vehicles needs towing
-      </Text>
-
       <View style={{ gap: t.px(12) }}>
         {safeVehicles.length === 0 ? (
           <View
-            style={{
-              borderRadius: t.cardRadius,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: t.px(20),
-              alignItems: 'center',
-              backgroundColor: colors.background,
-            }}>
-            <Car size={t.px(36)} color={colors.grey} strokeWidth={2} />
+            style={[
+              {
+                borderRadius: t.cardRadius,
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: t.px(22),
+                alignItems: 'center',
+                backgroundColor: colors.background,
+              },
+              shadows.card,
+            ]}>
+            <View
+              style={{
+                width: t.px(52),
+                height: t.px(52),
+                borderRadius: t.px(26),
+                backgroundColor: colors.goldLight,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Car size={t.px(26)} color={colors.primary} strokeWidth={2.2} />
+            </View>
             <Text
               style={{
-                marginTop: t.px(10),
+                marginTop: t.px(12),
                 fontSize: t.body,
                 color: colors.grey,
                 textAlign: 'center',
@@ -133,11 +136,15 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
               }}
               style={{
                 marginTop: t.px(14),
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: t.px(6),
                 paddingHorizontal: t.px(16),
                 paddingVertical: t.px(10),
                 borderRadius: t.inputRadius,
                 backgroundColor: colors.primary,
               }}>
+              <Plus size={t.px(15)} color={colors.dark} strokeWidth={2.6} />
               <Text
                 style={{
                   fontSize: t.body,
@@ -164,7 +171,7 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                     borderWidth: isSelected ? 2 : 1,
                     borderColor: isSelected ? colors.primary : colors.border,
                     backgroundColor: isSelected ? colors.goldLight : colors.background,
-                    padding: t.px(16),
+                    padding: t.px(14),
                   },
                   shadows.card,
                 ]}>
@@ -173,6 +180,8 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                     width: t.px(44),
                     height: t.px(44),
                     borderRadius: t.px(22),
+                    borderWidth: 1,
+                    borderColor: isSelected ? colors.primary : colors.border,
                     backgroundColor: isSelected ? colors.background : colors.goldLight,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -203,7 +212,7 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                     height: t.checkSize,
                     borderRadius: t.checkSize / 2,
                     borderWidth: isSelected ? 0 : 1.5,
-                    borderColor: colors.border,
+                    borderColor: isSelected ? colors.primary : colors.border,
                     backgroundColor: isSelected ? colors.primary : colors.background,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -235,25 +244,63 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
             <Pressable
               key={type.id}
               onPress={() => setTowType(type.id)}
-              style={{
-                flex: 1,
-                borderRadius: t.cardRadius,
-                borderWidth: selected ? 2 : 1,
-                borderColor: selected ? colors.primary : colors.border,
-                backgroundColor: selected ? colors.goldLight : colors.background,
-                padding: t.px(12),
-              }}>
-              <Text
+              style={[
+                {
+                  flex: 1,
+                  borderRadius: t.cardRadius,
+                  borderWidth: selected ? 2 : 1,
+                  borderColor: selected ? colors.primary : colors.border,
+                  backgroundColor: selected ? colors.goldLight : colors.background,
+                  overflow: 'hidden',
+                },
+                shadows.card,
+              ]}>
+              {/* Selection badge floats over the image */}
+              <View
                 style={{
-                  fontSize: t.body,
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
+                  position: 'absolute',
+                  top: t.px(8),
+                  right: t.px(8),
+                  zIndex: 2,
+                  width: t.checkSize,
+                  height: t.checkSize,
+                  borderRadius: t.checkSize / 2,
+                  borderWidth: selected ? 0 : 1.5,
+                  borderColor: selected ? colors.primary : colors.border,
+                  backgroundColor: selected ? colors.primary : colors.background,
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                {type.id === 'flatbed' ? 'Flatbed' : 'Wheel lift'}
-              </Text>
-              <Text style={{ marginTop: t.px(4), fontSize: t.caption, color: colors.grey }}>
-                {type.description}
-              </Text>
+                {selected ? (
+                  <Check size={t.px(13)} color={colors.background} strokeWidth={3} />
+                ) : null}
+              </View>
+              <View
+                style={{
+                  height: t.px(72),
+                  backgroundColor: selected ? '#FDF0C8' : colors.goldLight,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <Image
+                  source={type.image}
+                  style={{ width: t.px(120), height: t.px(58) }}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={{ padding: t.px(12) }}>
+                <Text
+                  style={{
+                    fontSize: t.body,
+                    fontWeight: typography.weights.bold,
+                    color: colors.dark,
+                  }}>
+                  {type.id === 'flatbed' ? 'Flatbed' : 'Wheel lift'}
+                </Text>
+                <Text style={{ marginTop: t.px(4), fontSize: t.caption, color: colors.grey, lineHeight: t.px(17) }}>
+                  {type.description}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -281,15 +328,15 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                     paddingHorizontal: t.px(12),
                     paddingVertical: t.px(8),
                     borderRadius: t.px(999),
-                    borderWidth: 1,
+                    borderWidth: selected ? 1.5 : 1,
                     borderColor: selected ? colors.primary : colors.border,
                     backgroundColor: selected ? colors.goldLight : colors.background,
                   }}>
                   <Text
                     style={{
                       fontSize: t.caption,
-                      fontWeight: typography.weights.semibold,
-                      color: colors.dark,
+                      fontWeight: selected ? typography.weights.bold : typography.weights.semibold,
+                      color: selected ? colors.primary : colors.dark,
                     }}>
                     {option.day}
                   </Text>

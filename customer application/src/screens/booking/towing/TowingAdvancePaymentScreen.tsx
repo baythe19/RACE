@@ -183,7 +183,9 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     }
 
     try {
-      const { booking: created } = await confirmTowing(payload);
+      const confirmed = await confirmTowing(payload);
+      if (!confirmed) return;
+      const { booking: created } = confirmed;
       const breakdown =
         (created.fareBreakdown as TowingFareBreakdown | undefined) ??
         activeBreakdown ??

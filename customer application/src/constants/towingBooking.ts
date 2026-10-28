@@ -9,7 +9,24 @@ import type {
 } from '../types/towingBooking';
 import { formatLocationDisplay } from '../utils/readableAddress';
 
-export const TOWING_BOOKING_STEPS = 10;
+/** Canonical 4-phase booking flow. Steps 1–3 are wizard screens; step 4 is the confirmation screen. */
+export const TOWING_BOOKING_STEPS = 4;
+
+/** Labels shown in the horizontal stepper on wizard screens (steps 1–3). */
+export const TOWING_BOOKING_STEP_LABELS = ['Vehicle & Tow', 'Pickup & Drop', 'Review'] as const;
+
+export function getTowingStepTitle(step: number): string {
+  switch (step) {
+    case 1:
+      return 'Vehicle & tow type';
+    case 2:
+      return 'Pickup & drop';
+    case 3:
+      return 'Confirm booking';
+    default:
+      return 'Towing booking';
+  }
+}
 
 export const TOWING_SERVICE_LIST: Array<{
   id: TowingServiceModeId;
