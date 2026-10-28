@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   UIManager,
@@ -216,7 +217,9 @@ export default function AddVehicleScreen({ navigation }: Props) {
           />
         </View>
       }>
-      <SectionLabel px={px} label="Vehicle Type" required />
+      {/* ─── Section 1: Vehicle identity ─── */}
+      <View style={styles.sectionCard}>
+        <SectionLabel px={px} label="Vehicle Type" required />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(10), marginBottom: px(20) }}>
         {VEHICLE_TYPE_OPTIONS.map(option => {
           const selected = vehicleType === option.id;
@@ -363,7 +366,10 @@ export default function AddVehicleScreen({ navigation }: Props) {
         returnKeyType="done"
         onSubmitEditing={() => void handleSubmit()}
       />
+      </View>
 
+      {/* ─── Section 2: Colour ─── */}
+      <View style={styles.sectionCard}>
       <SectionLabel px={px} label="Vehicle Color" required />
       <View
         style={{
@@ -437,7 +443,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
       {vehicleType !== 'ev' ? (
         <>
           <SectionLabel px={px} label="Fuel Type" required />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(10), marginBottom: px(20) }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(10), marginBottom: px(4) }}>
             {FUEL_TYPE_OPTIONS.map(option => {
               const selected = fuelType === option.id;
               const Icon = option.Icon;
@@ -475,7 +481,10 @@ export default function AddVehicleScreen({ navigation }: Props) {
           </View>
         </>
       ) : null}
+      </View>
 
+      {/* ─── Section 3: Photo ─── */}
+      <View style={styles.sectionCard}>
       <Pressable
         onPress={handlePhotoPress}
         style={{
@@ -541,6 +550,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
           </>
         )}
       </Pressable>
+      </View>
 
       <AuthToast message={error || storeError || ''} />
     </ProfileSubScreenLayout>
@@ -559,10 +569,12 @@ function SectionLabel({
   return (
     <Text
       style={{
-        fontSize: px(14),
-        fontWeight: typography.weights.bold,
+        fontSize: px(13),
+        fontWeight: typography.weights.extrabold,
         color: colors.dark,
-        marginBottom: px(10),
+        marginBottom: px(12),
+        letterSpacing: 0.2,
+        textTransform: 'uppercase',
       }}>
       {label}
       {required ? <Text style={{ color: colors.error }}> *</Text> : null}
@@ -627,3 +639,14 @@ function LabeledInput({
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  sectionCard: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 14,
+  },
+});

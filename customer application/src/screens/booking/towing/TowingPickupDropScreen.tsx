@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { ArrowRight, MapPin, Navigation } from 'lucide-react-native';
+import { MapPin } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
@@ -9,6 +9,7 @@ import { useTowingBooking } from '../../../context/TowingBookingContext';
 import { estimateTowingFare } from '../../../services/bookings/fareApi';
 import { useSavedLocationsQuery } from '../../../services/profile/useProfileQueries';
 import { useLocationStore } from '../../../store/locationStore';
+import { useUserLocationStore } from '../../../store/userLocationStore';
 import type { LocationResult } from '../../../types/location';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
@@ -25,76 +26,136 @@ import { colors, shadows, typography } from '../../../theme';
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingPickupDrop'>;
 
 const TOWING_ACCENT = '#F59E0B';
+const PICKUP_GREEN = '#10B981';
 const PLACEHOLDER = 'Select location';
 
-function LocationCard({
-  label,
-  value,
-  isPickup,
-  onPress,
+/**
+ * Ride-hailing style search card (Uber/Rapido/Ola pattern):
+ * one card, left rail with colored dots connected by a dotted line,
+ * pickup pre-filled with the user's current location, drop prompts a search.
+ */
+function LocationSearchCard({
+  pickupValue,
+  dropValue,
+  onPickupPress,
+  onDropPress,
   t,
 }: {
-  label: string;
-  value: string;
-  isPickup: boolean;
-  onPress: () => void;
+  pickupValue: string;
+  dropValue: string;
+  onPickupPress: () => void;
+  onDropPress: () => void;
   t: ReturnType<typeof useBookingTheme>['t'];
 }) {
-  const hasValue = value.trim().length > 0 && value !== PLACEHOLDER;
+  const pickupHasValue = pickupValue.trim().length > 0 && pickupValue !== PLACEHOLDER;
+  const dropHasValue = dropValue.trim().length > 0 && dropValue !== PLACEHOLDER;
+
+  const rowStyle = (focused: boolean) => ({
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    flex: 1,
+    paddingVertical: t.px(12),
+  });
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: t.px(12),
-        borderRadius: t.cardRadius,
-        borderWidth: isPickup ? 1.5 : 1,
-        borderColor: hasValue ? (isPickup ? colors.primary : TOWING_ACCENT) : colors.border,
-        backgroundColor: hasValue ? (isPickup ? colors.goldLight : colors.background) : colors.lightGrey,
-        paddingHorizontal: t.px(14),
-        paddingVertical: t.px(14),
-        opacity: pressed ? 0.85 : 1,
-      })}>
-      {/* Icon badge */}
+    <View
+      style={[
+        {
+          borderRadius: t.cardRadius,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          paddingHorizontal: t.px(14),
+        },
+        shadows.card,
+      ]}>
+      {/* Pickup row */}
+      <Pressable
+        onPress={onPickupPress}
+        style={({ pressed }) => [rowStyle(true), { opacity: pressed ? 0.8 : 1 }]}>
+        <View
+          style={{
+            width: t.px(34),
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <View
+            style={{
+              width: t.px(11),
+              height: t.px(11),
+              borderRadius: t.px(6),
+              backgroundColor: PICKUP_GREEN,
+              borderWidth: 2,
+              borderColor: '#D1FAE5',
+            }}
+          />
+        </View>
+        <View style={{ flex: 1, marginLeft: t.px(12), minWidth: 0 }}>
+          <Text style={{ fontSize: t.caption, color: colors.grey }}>Pickup</Text>
+          <Text
+            style={{
+              fontSize: t.body,
+              fontWeight: typography.weights.semibold,
+              color: pickupHasValue ? colors.dark : colors.grey,
+              lineHeight: t.px(19),
+              marginTop: t.px(1),
+            }}
+            numberOfLines={1}>
+            {pickupHasValue ? pickupValue : 'Your current location'}
+          </Text>
+        </View>
+        {pickupHasValue ? null : (
+          <ActivityIndicator size="small" color={PICKUP_GREEN} style={{ marginRight: t.px(2) }} />
+        )}
+      </Pressable>
+
+      {/* Dotted connector between the two dots */}
       <View
         style={{
-          width: t.px(38),
-          height: t.px(38),
-          borderRadius: isPickup ? t.px(19) : t.px(10),
-          backgroundColor: isPickup ? colors.primary : colors.error,
+          width: t.px(34),
           alignItems: 'center',
           justifyContent: 'center',
+          height: t.px(16),
         }}>
-        {isPickup ? (
-          <Navigation size={t.px(16)} color={colors.background} strokeWidth={2.4} />
-        ) : (
-          <MapPin size={t.px(16)} color={colors.background} strokeWidth={2.4} />
-        )}
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text
+        <View
           style={{
-            fontSize: t.caption,
-            fontWeight: typography.weights.semibold,
-            color: colors.grey,
-          }}>
-          {label}
-        </Text>
-        <Text
-          style={{
-            fontSize: t.body,
-            fontWeight: hasValue ? typography.weights.semibold : typography.weights.regular,
-            color: hasValue ? colors.dark : colors.grey,
-            lineHeight: t.px(20),
-            marginTop: t.px(1),
+            width: 0,
+            height: t.px(16),
+            borderLeftWidth: 2,
+            borderLeftColor: colors.border,
+            borderStyle: 'dashed',
           }}
-          numberOfLines={2}>
-          {hasValue ? value : PLACEHOLDER}
-        </Text>
+        />
       </View>
-    </Pressable>
+
+      {/* Drop row */}
+      <Pressable
+        onPress={onDropPress}
+        style={({ pressed }) => [rowStyle(false), { opacity: pressed ? 0.8 : 1 }]}>
+        <View
+          style={{
+            width: t.px(34),
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <MapPin size={t.px(17)} color={colors.error} fill={colors.error} strokeWidth={2} />
+        </View>
+        <View style={{ flex: 1, marginLeft: t.px(12), minWidth: 0 }}>
+          <Text style={{ fontSize: t.caption, color: colors.grey }}>Drop</Text>
+          <Text
+            style={{
+              fontSize: t.body,
+              fontWeight: dropHasValue ? typography.weights.semibold : typography.weights.regular,
+              color: dropHasValue ? colors.dark : colors.grey,
+              lineHeight: t.px(19),
+              marginTop: t.px(1),
+            }}
+            numberOfLines={1}>
+            {dropHasValue ? dropValue : 'Search drop location'}
+          </Text>
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
@@ -106,6 +167,8 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useTowingBooking();
   const selectedLocation = useLocationStore(state => state.selectedLocation);
+  const userLocation = useUserLocationStore(state => state.location);
+  const fetchCurrentLocation = useUserLocationStore(state => state.fetchCurrentLocation);
   const [pickup, setPickup] = useState(booking.pickup || PLACEHOLDER);
   const [pickupLabel, setPickupLabel] = useState(booking.pickupLabel ?? '');
   const [pickupLat, setPickupLat] = useState(booking.pickupLat);
@@ -120,6 +183,41 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
   const [farePreview, setFarePreview] = useState<number | null>(null);
   const [isLoadingFare, setIsLoadingFare] = useState(false);
   const { data: savedLocations = [] } = useSavedLocationsQuery();
+
+  // Ride-hailing pattern: pickup defaults to the user's current location.
+  useEffect(() => {
+    if (isTowingWalkthroughEnabled()) return;
+    if (pickupLat != null && pickupLat !== undefined) return;
+    let cancelled = false;
+
+    async function autoFillPickup() {
+      const stored = userLocation;
+      if (stored?.latitude != null && stored?.longitude != null) {
+        const resolved = resolveLocationSelection(stored);
+        if (!cancelled) {
+          setPickup(resolved.address);
+          setPickupLabel(resolved.displayLabel);
+          setPickupLat(stored.latitude);
+          setPickupLng(stored.longitude);
+        }
+        return;
+      }
+      const fetched = await fetchCurrentLocation();
+      if (cancelled || !fetched?.latitude || !fetched?.longitude) return;
+      const resolved = resolveLocationSelection(fetched);
+      if (!cancelled) {
+        setPickup(resolved.address);
+        setPickupLabel(resolved.displayLabel);
+        setPickupLat(fetched.latitude);
+        setPickupLng(fetched.longitude);
+      }
+    }
+
+    void autoFillPickup();
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchCurrentLocation, pickupLat, userLocation]);
 
   useEffect(() => {
     if (!isTowingWalkthroughEnabled()) return;
@@ -246,61 +344,13 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         });
         navigation.navigate('TowingReview');
       }}>
-      {/* Route card: pickup → drop connected by a dashed line */}
-      <View
-        style={[
-          {
-            borderRadius: t.cardRadius,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.background,
-            padding: t.px(14),
-          },
-          shadows.card,
-        ]}>
-        <LocationCard
-          label="PICKUP"
-          value={
-            pickup !== PLACEHOLDER
-              ? pickupLabel || formatReadableLocation(pickup)
-              : pickup
-          }
-          isPickup
-          onPress={() => setShowPickupPicker(true)}
-          t={t}
-        />
-
-        {/* Dashed connector between the two cards */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingLeft: t.px(26),
-            marginVertical: t.px(4),
-            gap: t.px(10),
-          }}>
-          <View
-            style={{
-              width: 2,
-              height: t.px(18),
-              borderLeftWidth: 2,
-              borderLeftColor: '#F5D78A',
-              borderStyle: 'dashed',
-            }}
-          />
-          <Text style={{ fontSize: t.caption, color: colors.grey }}>Route</Text>
-        </View>
-
-        <LocationCard
-          label="DROP"
-          value={
-            drop !== PLACEHOLDER ? dropLabel || formatReadableLocation(drop) : drop
-          }
-          isPickup={false}
-          onPress={() => setShowDropPicker(true)}
-          t={t}
-        />
-      </View>
+      <LocationSearchCard
+        pickupValue={pickup !== PLACEHOLDER ? pickupLabel || formatReadableLocation(pickup) : pickup}
+        dropValue={drop !== PLACEHOLDER ? dropLabel || formatReadableLocation(drop) : drop}
+        onPickupPress={() => setShowPickupPicker(true)}
+        onDropPress={() => setShowDropPicker(true)}
+        t={t}
+      />
 
       {/* Distance / fare preview */}
       {pickupLat && pickupLng && dropLat && dropLng ? (
@@ -323,30 +373,27 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
               </Text>
             </View>
           ) : (
-            <>
-              <View style={{ flex: 1 }}>
-                {distanceKm != null ? (
-                  <Text style={{ fontSize: t.body, color: colors.dark }}>
-                    Distance:{' '}
-                    <Text style={{ fontWeight: typography.weights.bold }}>{distanceKm} km</Text>
+            <View style={{ flex: 1 }}>
+              {distanceKm != null ? (
+                <Text style={{ fontSize: t.body, color: colors.dark }}>
+                  Distance:{' '}
+                  <Text style={{ fontWeight: typography.weights.bold }}>{distanceKm} km</Text>
+                </Text>
+              ) : null}
+              {farePreview != null ? (
+                <Text
+                  style={{
+                    fontSize: t.body,
+                    color: colors.dark,
+                    marginTop: distanceKm != null ? t.px(3) : 0,
+                  }}>
+                  Estimated fare:{' '}
+                  <Text style={{ fontWeight: typography.weights.bold, color: TOWING_ACCENT }}>
+                    {formatRupee(farePreview)}
                   </Text>
-                ) : null}
-                {farePreview != null ? (
-                  <Text
-                    style={{
-                      fontSize: t.body,
-                      color: colors.dark,
-                      marginTop: distanceKm != null ? t.px(3) : 0,
-                    }}>
-                    Estimated fare:{' '}
-                    <Text style={{ fontWeight: typography.weights.bold, color: TOWING_ACCENT }}>
-                      {formatRupee(farePreview)}
-                    </Text>
-                  </Text>
-                ) : null}
-              </View>
-              <ArrowRight size={t.iconSm} color={TOWING_ACCENT} strokeWidth={2.4} />
-            </>
+                </Text>
+              ) : null}
+            </View>
           )}
         </View>
       ) : null}
@@ -380,10 +427,10 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
                     placeId: '',
                     displayLabel: loc.label,
                   });
-                  setPickup(mapped.address);
-                  setPickupLabel(mapped.displayLabel);
-                  setPickupLat(lat);
-                  setPickupLng(lng);
+                  setDrop(mapped.address);
+                  setDropLabel(mapped.displayLabel);
+                  setDropLat(lat);
+                  setDropLng(lng);
                 }}
                 style={{
                   flexDirection: 'row',
@@ -410,7 +457,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         visible={showPickupPicker}
         title="Confirm pickup spot"
         confirmLabel="Confirm pickup"
-        accentColor={TOWING_ACCENT}
+        accentColor={PICKUP_GREEN}
         initialLocation={
           pickupLat && pickupLng
             ? { latitude: pickupLat, longitude: pickupLng, address: pickup }
