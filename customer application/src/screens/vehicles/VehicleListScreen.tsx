@@ -83,7 +83,7 @@ function VehicleListCard({
       ) : null}
 
       <View style={{ flexDirection: 'row', gap: px(12) }}>
-        <VehiclePlaceholderImage type={vehicle.vehicleType} size={px(96)} />
+        <VehiclePlaceholderImage type={vehicle.vehicleType} size={px(84)} />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View
@@ -93,7 +93,7 @@ function VehicleListCard({
               justifyContent: 'space-between',
               gap: px(8),
             }}>
-            <View style={{ flex: 1, minWidth: 0, paddingRight: isPrimary ? px(72) : px(4) }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text
                 numberOfLines={2}
                 style={{
@@ -108,7 +108,7 @@ function VehicleListCard({
                 {formatVehicleNumber(vehicle.vehicleNumber)}
               </Text>
 
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(12) }}>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(10) }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4) }}>
                   <FuelTypeIcon type={vehicle.fuelType} size={px(12)} />
                   <Text style={{ fontSize: px(11), color: colors.grey }}>
@@ -128,16 +128,19 @@ function VehicleListCard({
               </View>
             </View>
 
+            {/* QR chip sits under the Primary badge, right-aligned column */}
             <View
               style={{
-                padding: px(4),
-                borderRadius: px(6),
+                padding: px(5),
+                borderRadius: px(8),
                 borderWidth: 1,
                 borderColor: colors.border,
                 backgroundColor: colors.background,
                 flexShrink: 0,
+                alignSelf: 'flex-start',
+                marginTop: isPrimary ? px(26) : 0,
               }}>
-              <MiniQrCode size={px(40)} />
+              <MiniQrCode size={px(38)} />
             </View>
           </View>
 
@@ -146,8 +149,11 @@ function VehicleListCard({
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'flex-end',
-              gap: px(10),
+              gap: px(14),
               marginTop: px(10),
+              paddingTop: px(8),
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
             }}>
             <Pressable onPress={onViewQr}>
               <Text
