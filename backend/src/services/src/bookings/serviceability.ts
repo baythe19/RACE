@@ -58,8 +58,16 @@ interface LocationWithCoords {
 }
 
 export function isServiceableLocation(location: LocationWithCoords | undefined): boolean {
-  if (!location || location.latitude == null || location.longitude == null) {
-    return true; // Coordinates absent — nothing to geofence on yet.
+  if (!location) {
+    return true; // Optional dropoff locations are not geofenced.
+  }
+  if (
+    !Number.isFinite(location.latitude) ||
+    !Number.isFinite(location.longitude) ||
+    Math.abs(location.latitude) > 90 ||
+    Math.abs(location.longitude) > 180
+  ) {
+    throw new BadRequestError('Valid location coordinates are required');
   }
   const city = findServiceableCity(location.latitude, location.longitude);
   return city != null;

@@ -6,6 +6,7 @@ import { hashDriverPassword, verifyDriverPassword } from '../../utils/src/driver
 import { userRepository } from './userRepository';
 import { otpService } from './otp';
 import { getCache } from '../../config/cache';
+import { OtpLogModel } from '../../models/src/otpLog';
 import { normalizeMobileNumber } from '../../utils/src/otp';
 import type {
   MobileChangeConfirmDto,
@@ -141,20 +142,22 @@ export class ProfileCredentialsService {
 
     await otpService.verifyOtp(pending.newMobile, dto.code);
 
-    const user = await userRepository.findById(userId);
-    if (!user) {
-      throw new NotFoundError('User not found');
-    }
-
+    // Claim the unique number atomically so concurrent confirmations cannot
+    // attach the same verified phone to two accounts.
     const claimed = await userRepository.findByMobile(pending.newMobile);
-    if (claimed && claimed.id !== user.id) {
+    if (claimed && claimed.id !== userId) {
       throw new ConflictError('This number is already registered — log in with it instead');
     }
-
-    user.mobileNumber = pending.newMobile;
-    user.phoneVerifiedAt = new Date();
-    await user.save();
+    const updated = await userRepository.updateById(userId, {
+      mobileNumber: pending.newMobile,
+      phoneVerifiedAt: new Date(),
+    });
+    if (!updated) {
+      throw new NotFoundError('User not found');
+    }
+    await OtpLogModel.deleteMany({ mobileNumber: pending.newMobile }).exec();
   }
+
 
   async setPin(userId: string, dto: PinSetDto): Promise<void> {
     await rateLimit(`pin-set:${userId}`, 5, 60 * 60 * 1000);
