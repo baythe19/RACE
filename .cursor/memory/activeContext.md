@@ -134,3 +134,10 @@ Peach browser sim: `docs/DEVICE_FREE_PREVIEW.md`; runbook `.cursor/memory/partne
 - Vercel race-admin READY dpl_5vs1Wom8GTViMe9cyvve5EXMLjor (004535c); alias race-admin-six.vercel.app serves 200
 - expo doctor 21/21 both apps (expo ~57.0.31, expo-location ~57.0.22, expo-asset ~57.0.20)
 - EAS builds submitted (no-wait): partner production-test 47499981-... (vCode 3), customer preview 51dff6ca-... (vCode 6) — both IN_QUEUE
+
+## 2026-10-28 — Customer app web QA (current)
+- Customer app now runs in browser: react-native-web + react-dom installed, metro.config.js web shims (react-native-maps, expo-secure-store) copied from partner; commit 7b4b389 pushed (origin v7).
+- Live-tested against prod Render: OTP login (9000000005 devOtp), ProfileWizard 4 steps (name/email -> emergency -> vehicle OD02AB1234 -> home) all pass; tokens persist in localStorage.
+- Metro web server: port 8081 (background).
+- Overnight EAS: partner vCode3 + customer vCode6 APKs both FINISHED OK.
+
