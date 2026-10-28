@@ -15,7 +15,12 @@ import { mapLocationPoint } from './responseMappers';
 import { generateBookingFinancials, generateRefund } from './transactionEngine';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
 import { generatePrefixedBookingNumber } from '../bookings/booking';
-import { generateTripStartOtp, generateCompletionOtp } from '../bookings/tripOtp';
+import {
+  encryptTripOtpForStorage,
+  generateTripStartOtp,
+  generateCompletionOtp,
+  hashTripOtpForStorage,
+} from '../bookings/tripOtp';
 import { BadRequestError, NotFoundError } from '../../../utils/src/errors';
 
 const LEGACY_ADMIN_TRANSITIONS: Record<string, string[]> = {
@@ -633,6 +638,8 @@ export const adminBookingsService = {
       const bookingNumber = await generatePrefixedBookingNumber('DRV', () =>
         DriverBookingModel.countDocuments(),
       );
+      const tripStartOtp = generateTripStartOtp();
+      const completionOtp = generateCompletionOtp();
       createdBooking = await DriverBookingModel.create({
         customerId: customer._id,
         bookingNumber,
@@ -648,8 +655,10 @@ export const adminBookingsService = {
         paymentStatus: 'PENDING',
         status: vendorId ? 'DRIVER_ASSIGNED' : 'CONFIRMED',
         vendorId,
-        tripStartOtp: generateTripStartOtp(),
-        completionOtp: generateCompletionOtp(),
+        tripStartOtp: hashTripOtpForStorage(tripStartOtp),
+        tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
+        completionOtp: hashTripOtpForStorage(completionOtp),
+        completionOtpEncrypted: encryptTripOtpForStorage(completionOtp),
         statusHistory: [
           {
             status: vendorId ? 'DRIVER_ASSIGNED' : 'CONFIRMED',
@@ -664,6 +673,8 @@ export const adminBookingsService = {
       const bookingNumber = await generatePrefixedBookingNumber('TOW', () =>
         TowingBookingModel.countDocuments(),
       );
+      const tripStartOtp = generateTripStartOtp();
+      const completionOtp = generateCompletionOtp();
       createdBooking = await TowingBookingModel.create({
         customerId: customer._id,
         bookingNumber,
@@ -680,8 +691,10 @@ export const adminBookingsService = {
         paymentStatus: 'PENDING',
         status: vendorId ? 'CONFIRMED' : 'PENDING',
         vendorId,
-        tripStartOtp: generateTripStartOtp(),
-        completionOtp: generateCompletionOtp(),
+        tripStartOtp: hashTripOtpForStorage(tripStartOtp),
+        tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
+        completionOtp: hashTripOtpForStorage(completionOtp),
+        completionOtpEncrypted: encryptTripOtpForStorage(completionOtp),
         statusHistory: [
           {
             status: vendorId ? 'CONFIRMED' : 'PENDING',

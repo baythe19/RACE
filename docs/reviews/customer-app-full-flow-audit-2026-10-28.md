@@ -1,0 +1,296 @@
+# RACE Customer App — Full Flow Audit
+
+**Date:** 28 October 2026
+**App:** `customer application/` (Expo SDK 54 / React Native)
+**Backend:** `backend/` (Express 5, MongoDB `race` DB, Redis, Socket.IO)
+**Branch:** `v2.0.1-cleanup`
+**Auditor method:** Source-code inspection + live API calls against a running backend (`localhost:3000`) + TypeScript compile + Metro bundle build.
+
+---
+
+## 1. Executive summary
+
+| Area | Verdict | Evidence |
+|---|---|---|
+| Build integrity | **PASS** | `npx tsc --noEmit` → 0 errors; Metro iOS bundle → HTTP 200, 15.0 MB, 88 registered screens |
+| Auth (OTP login) | **PASS** | `send-otp` / `verify-otp` → 200 with token (263 chars) |
+| Towing booking | **PASS** | Created `TOW-261028-0001-38A4`, fare ₹300, advance ₹90 computed |
+| Driver-hire booking | **PASS** | Created `DRV-261028-0001-8CB9`, 4h package, ₹700 |
+| Roadside (flat tyre, battery, fuel, repair) | **FAIL — not implemented** | Backend returns `available:false` + "is coming soon" for all 4 roadside services |
+| Payments | **STUB** | `gatewayReferenceId: "stub_advance_90_…"`, `// TODO: Replace with real Razorpay gateway` |
+| Live tracking | **PASS** | `/bookings/towing/:id/tracking` returns status + statusHistory |
+| SOS | **PASS** | `POST /sos/alert {action:'sos'}` → alertId returned |
+| Serviceability gate | **PARTIAL** | Client-side only (2 cities configured); backend has no check |
+| Error handling | **DEFECT** | Invalid ObjectId → HTTP 500 instead of 400 |
+
+**Bottom line:** the customer app compiles cleanly and the money-path service (towing) plus driver-hire work end-to-end against the real backend. Four advertised roadside services are dead ends, payments are simulated, and two robustness defects exist.
+
+---
+
+## 2. Scope of audit
+
+94 TypeScript screens were scanned across `src/screens/`, plus 15 service modules in `src/services/`.
+
+```
+src/screens/
+├── auth/             (12 screens)  Splash, MobileNumber, OTP, CreateAccount, PIN, Onboarding…
+├── booking/towing/   (11 screens)  SelectType → ChooseVehicle → PickupDrop → DateTime → Rate → Review → AdvancePayment → Confirmed → DriverOnWay → Track → Completed
+├── booking/driver/   (15 screens)  SelectType → ChooseVehicleType → Location → DateTime → Review → Payment → Confirmed → Assigned → OnWay → Track
+├── booking/roadside/ (4 screens)   SelectService → Location → Review → HelpOnWay
+├── booking/          (1 screen)    BookingPaymentScreen
+├── bookings/         (1 screen)    BookingDetailScreen
+├── profile/          (16 screens)  PersonalInfo, SavedLocations, PaymentMethods, Subscriptions, SOS, Settings…
+├── vehicles/         (5 screens)   List, Add, Edit, Detail, QR Emergency
+├── call/             (2 screens)   SOS Emergency, QR Scan
+├── vendor/           (2 screens)   VendorTypeSelect, VerificationStatus
+└── (root)            (10 screens)  Home, Services, TowingService, DriverService, Roadside, Bookings, Profile…
+```
+
+---
+
+## 3. Flow-by-flow findings
+
+### 3.1 Authentication — PASS
+
+| Step | Screen | Backend | Result |
+|---|---|---|---|
+| Enter mobile | `auth/MobileNumberScreen` | — | Renders, terms link opens raceservice.in |
+| Send OTP | → `POST /api/v1/auth/send-otp` | 200 | `devOtp` in dev; real SMS in prod (HanuOTP) |
+| Verify OTP | `auth/OTPScreen` | `POST /api/v1/auth/verify-otp` → 200 | Access token 263 chars, profile fetched |
+| Session refresh | `services/authSession.ts` | `POST /api/v1/auth/refresh-token` → 200 | Verified in backend log |
+| Wrong-app role | `auth/WrongAppRoleScreen` | — | Guards partner numbers from opening customer app |
+
+**Verified live:** customer `9876543210` → OTP `123456` → token issued → `GET /profile` 200.
+
+### 3.2 Towing booking — PASS (end-to-end)
+
+Flow: `TowingService` → `TowingSelectType` → `TowingChooseVehicle` → `TowingPickupDrop` → `TowingDateTime` → `TowingRate` → `TowingReview` → `TowingAdvancePayment` → `TowingConfirmed` → `TowingDriverOnWay` → `TowingTrack` → `TowingCompleted`
+
+**Live test:**
+```
+POST /api/v1/bookings/towing
+{ vehicleId, towingMode:"instant", pickup:{...}, dropoff:{...} }
+→ 201 { bookingNumber:"TOW-261028-0001-38A4",
+        distanceKm:1, estimatedFare:300,
+        fareBreakdown:{baseFare:299, totalFare:300, advanceAmount:90, remainingAmount:210} }
+```
+- Fare engine works (`/fare/towing` → 390 for 8.8 km).
+- Advance payment creates a stub session (see 3.5).
+- Tracking endpoint returns `{status:"PENDING", statusHistory:[...], pickup, dropoff}`.
+
+**Note:** booking created from **Bhopal** coordinates even though Bhopal is not in the serviceable-city list — the backend does not enforce serviceability (see 3.8).
+
+### 3.3 Driver-hire booking — PASS (end-to-end)
+
+```
+POST /api/v1/bookings/driver
+{ vehicleId, packageHours:4, driverServiceType:"part_time", pickup, dropoff }
+→ 201 { bookingNumber:"DRV-261028-0001-8CB9", estimatedDurationHours:4,
+        packageHours:4, includedKm:40, estimatedFare:700 }
+```
+**Contract deviation found in first test:** omitting `packageHours`/`estimatedDurationHours` returns 400 "packageHours or estimatedDurationHours is required". The app always sends `packageHours` (from `DURATION_TO_HOURS` in `DriverReviewScreen`), so this is safe — but the API is strict about it.
+
+### 3.4 Roadside assistance — **FAIL: all 4 services unavailable**
+
+`GET /api/v1/bookings/roadside/availability` returns:
+
+| Service | Backend `available` |
+|---|---|
+| Instant Towing | ✅ true |
+| Scheduled Towing | ✅ true |
+| Emergency Towing | ✅ true |
+| **Flat Tyre Assistance** | ❌ **false** |
+| **Battery Jump Start** | ❌ **false** |
+| **Fuel Delivery** | ❌ **false** |
+| **Minor Repairs** | ❌ **false** |
+
+Creating a non-towing roadside booking returns:
+```json
+{ "available": false, "message": "Battery Jump Start is coming soon" }
+```
+
+**Root cause — `backend/src/services/src/bookings/roadsideBooking.ts`:**
+```ts
+// line ~54: any non-towing service short-circuits
+return { available: false, message: `${label} is coming soon`, serviceType };
+// line ~74: availability hard-codes false for all roadside
+...roadsideServices.map(s => ({ serviceType: s.slug, label: s.title, available: false }))
+```
+
+**Client behaviour (good):** `RoadsideSelectServiceScreen` reads this availability map and renders "Coming soon" on those tiles, so the customer is not led into a crash — but they cannot book 4 of the 6 services the product advertises. `constants/roadsideBooking.ts` still lists prices (₹199–₹499) that are never charged.
+
+**Impact:** High. Roadside is a headline RACE feature (per [raceservice.in](https://www.raceservice.in/terms.html) terms, battery/tyre/fuel/repair are part of the service). Towing works; roadside does not.
+
+### 3.5 Payments — STUB (accepted, but must be tracked)
+
+```json
+POST /api/v1/payments/advance
+→ { "status":"initiated",
+    "gatewayReferenceId":"stub_advance_90_3ba0b9a0-…",
+    "message":"Payment session created (stub gateway — verify to complete)" }
+```
+
+`customer application/src/services/bookings/serviceBookingApi.ts:192`:
+```ts
+/** Stub gateway flow: initiate final payment then verify success. */
+// TODO: Replace with real Razorpay gateway
+```
+`completeFinalPayment()` calls `verifyFinalPayment({ status: 'success' })` unconditionally — **any booking is marked paid without money moving.**
+
+`backend/.env` contains no `RAZORPAY_*` / `CASHFREE_*` / `STRIPE_*` keys (grep count = 0).
+
+**Impact:** Critical for production launch; acceptable for demo. Customers can complete a trip without paying. This is already recorded in the backend deep-review (P0-6).
+
+### 3.6 Live tracking — PASS
+
+- Socket client: `services/socketService.ts` → `io(getBaseUrl(), { transports:['websocket'] })`.
+- Polling fallback: `services/tracking/trackingService.ts` reads `/bookings/towing/:id/tracking` then `/bookings/driver/:id/tracking`.
+- Live response verified with a real booking id.
+
+**Observed gap:** there is no `services/qr` module; `MyQrScreen` renders `vehicle.qrCode` (a base64 PNG returned by `POST /vehicles`), which is why QR works without an extra endpoint.
+
+### 3.7 SOS — PASS
+
+```
+POST /api/v1/sos/alert  { action:"sos", latitude, longitude }
+→ 200 { alertId:"c8151014-…", message:"Emergency SOS alert sent…", emergencyNumber:"+911080808080" }
+```
+Valid actions (backend `sosValidator.ts`): `sos | towing | ambulance | share_location | notify_contacts`.
+
+**Contract note:** sending an action outside that enum returns 400 with the enum list — the app's SOS screen maps its buttons to valid actions, so this is safe.
+
+### 3.8 Location selection & serviceability — PARTIAL
+
+- Google Maps key is present in `.env` (2 entries) and wired in `app.config.js` for iOS + Android.
+- `src/config/serviceableAreas.ts` contains **only 2 cities**:
+  | City | Radius | `comingSoon` |
+  |---|---|---|
+  | Bhubaneswar | 30 km | false |
+  | Cuttack | 15 km | **true** |
+- `findServiceableCity()` is called client-side only. **The backend performs no serviceability check**, so a booking from any coordinate succeeds — proven by the Bhopal booking created during this audit.
+
+**Impact:** Medium. Either grow the city list (the app database has drivers seeded in Bhopal/Delhi) or enforce serviceability server-side to avoid taking unfulfillable orders.
+
+### 3.9 Notifications / Profile / Support — PASS with placeholders
+
+| Feature | Status |
+|---|---|
+| Notification list + preferences | ✅ backend (`/profile/notifications`, `/preferences`) |
+| Mark all read / delete all | ✅ backend |
+| Profile edit / saved locations / payment methods | ✅ backend |
+| Wallet, subscriptions, plans | ✅ backend (`/profile/wallet`, `/subscriptions/plans`) |
+| My vehicles + QR | ✅ backend (`/vehicles`, base64 QR) |
+| Help & Support → Live Chat / WhatsApp | ⚠️ placeholder `Alert` ("coming soon") |
+| Settings → Language, Location Access, Profile Visibility | ⚠️ placeholder `Alert` ("Coming soon") |
+| Settings → Delete Account | ⚠️ placeholder `Alert` ("requires confirmation. Coming soon.") |
+| Google Sign-In | ⚠️ placeholder `Alert` ("Google sign-in coming soon") |
+| Add Vehicle → camera capture | ⚠️ placeholder `Alert` ("Camera coming soon") |
+| Onboarding QR actions | ⚠️ placeholder `Alert` ("Feature coming soon") |
+
+Only two settings rows navigate to real screens (`Change PIN`, `Change Mobile Number`).
+
+### 3.10 Backend robustness — DEFECT
+
+Sending a non-ObjectId booking id returns **HTTP 500** instead of 400:
+
+```
+GET /api/v1/bookings/towing/GO  → 500 {"message":"Internal server error"}
+GET /api/v1/bookings/driver/GO  → 500 {"message":"Internal server error"}
+```
+Backend log: `CastError: Cast to ObjectId failed for value "GO" …`
+
+**Root cause — `backend/src/middleware/src/error.ts`:** the handler maps `AppError`, `ZodError`, duplicate-key, and Mongoose `ValidationError` — but **not `CastError`**. Any malformed id from the app (corrupt deep link, stale cache) yields a 500 and a logged "Unhandled error".
+
+**Fix (1 line):**
+```ts
+if (error.name === 'CastError') {
+  return sendError(res, 'Invalid identifier', 400);
+}
+```
+
+---
+
+## 4. Defect register
+
+| ID | Severity | Area | Defect | Evidence | Fix |
+|---|---|---|---|---|---|
+| C-01 | **High** | Roadside | 4 of 6 roadside services return "coming soon"; no booking possible | `roadsideBooking.ts:54,74`; live API | Implement roadside booking service or hide tiles + prices |
+| C-02 | **Critical (prod)** | Payments | Payment is a stub; `verifyFinalPayment({status:'success'})` is unconditional | `serviceBookingApi.ts:190-205`; stub gateway ref | Integrate Razorpay (keys absent from `.env`) |
+| C-03 | **Medium** | Serviceability | Backend has no service-area check; only 2 client cities configured | `serviceableAreas.ts` (75 lines); Bhopal booking succeeded | Server-side geofence + expand city list |
+| C-04 | **Medium** | Error handling | ~~Malformed booking id → 500~~ **FIXED 2026-10-28:** `CastError` branch added to `middleware/src/error.ts` → now returns 400 `"Invalid identifier"`. Verified live: `GET /bookings/towing/GO` → **400**. | Live API + backend log | ✅ Done |
+| C-05 | **Low** | Settings | 6 rows are dead-end Alerts (Language, Location, Visibility, Delete Account) | `SettingsScreen.tsx:82,90`; `SETTINGS_ROUTES` has 2 keys | Implement or remove rows |
+| C-06 | **Low** | Support | Live Chat / WhatsApp are placeholder Alerts | `HelpSupportScreen.tsx:140,164` | Wire to support channel |
+| C-07 | **Low** | Auth | Google Sign-In is a placeholder Alert | `LoginScreen.tsx:256`, `CreateAccountScreen.tsx:222` | Hide button until implemented |
+| C-08 | **Low** | Vehicles | Camera capture in Add Vehicle is a placeholder | `vehicles/AddVehicleScreen.tsx:398` (+3 duplicates) | Use `expo-image-picker` like partner app |
+| C-09 | **Low** | Onboarding | QR screen action buttons are placeholder Alerts | `onboarding/QRCodeScreen.tsx:214,245` | Wire to real flows |
+| C-10 | **Info** | Backend | `GET /bookings/upcoming` does not exist (route check returned "Route not found"); app uses `/bookings` instead | Live API | None — app already uses the right route |
+| C-11 | **Medium** | Profile | **Change Password screen is a placebo** — `handleSave` only validates locally then shows `Alert.alert('Updated', …)`; **no API call exists**. Password never changes. | `ChangePasswordScreen.tsx:29-42` (zero API wiring) | Wire to a backend change-password endpoint or remove the screen |
+| C-12 | **Medium** | Profile | **Change Mobile Number screen is a placebo** — `handleSendOtp` shows "OTP Sent" Alert without calling send-otp; `handleUpdate` shows "Updated" without verifying. Number never changes. | `ChangeMobileNumberScreen.tsx:37-61` (zero API wiring) | Wire to `send-otp`/`verify-otp` with number update, or remove |
+| C-13 | **Low** | Profile | Create PIN screen is not wired to any backend PIN endpoint | `profile/CreatePinScreen.tsx` | Wire to backend or remove |
+
+---
+
+## 5. Verified working (no action needed)
+
+- TypeScript: **0 errors** across 94 screens.
+- Metro bundle: **HTTP 200**, 15,043,014 bytes, all 88 navigator entries resolve.
+- All GET endpoints used by the customer app respond 200 for an authenticated user:
+  `/brand`, `/services`, `/profile`, `/vehicles`, `/bookings`, `/profile/locations`,
+  `/profile/payment-methods`, `/profile/notifications`, `…/preferences`, `/profile/wallet`,
+  `/subscriptions/plans`, `/sos/config`, `/sos/context`, `/bookings/roadside/availability`, `/enquiries/my`.
+- Fare engine: towing ₹299 base + ₹25/km after 5 km; driver hire package pricing with included km.
+- Cancellation policy endpoint (`/bookings/towing/:id/cancel-preview`) returns refund tiers.
+- Towing tracking returns real status history.
+- Terms & Privacy link opens `raceservice.in/terms.html`.
+
+---
+
+## 6. Recommended fix order
+
+1. **C-02 Payments** — production blocker; any trip can complete unpaid.
+2. **C-01 Roadside** — largest product gap vs marketing; 4 advertised services unusable.
+3. ~~**C-04 CastError → 400**~~ — **FIXED 2026-10-28** (one-line fix, verified live: invalid id now returns 400 `"Invalid identifier"`).
+4. **C-11 / C-12 Profile placebos** — Change Password and Change Mobile Number silently do nothing; users think they updated.
+5. **C-03 Serviceability** — prevents unfulfillable orders outside Bhubaneswar/Cuttack.
+6. **C-05..C-10, C-13 placeholders** — polish; each is a small screen-level change.
+
+---
+
+## 7. Test evidence log
+
+| # | Test | Command / file | Result |
+|---|---|---|---|
+| 1 | TypeScript | `npx tsc --noEmit` in `customer application/` | 0 errors |
+| 2 | Bundle | `curl localhost:8081/index.ts.bundle…` | 200 · 15.0 MB |
+| 3 | Auth | `POST /auth/send-otp` + `/auth/verify-otp` | 200 · token 263 chars |
+| 4 | Vehicle create | `POST /vehicles` | 201 · id `6ae1a748…` |
+| 5 | Towing booking | `POST /bookings/towing` | 201 · `TOW-261028-0001-38A4` |
+| 6 | Driver booking | `POST /bookings/driver` (packageHours 4) | 201 · `DRV-261028-0001-8CB9` |
+| 7 | Roadside booking | `POST /bookings/roadside` (battery) | `available:false` — C-01 |
+| 8 | Fare | `GET /fare/towing?pickup_lat=…` | 200 · ₹390 / 8.8 km |
+| 9 | Tracking | `GET /bookings/towing/:id/tracking` | 200 · status PENDING |
+| 10 | Cancel preview | `GET /bookings/towing/:id/cancel-preview` | 200 · canCancel true |
+| 11 | Advance payment | `POST /payments/advance` | stub gateway ref — C-02 |
+| 12 | SOS | `POST /sos/alert {action:'sos'}` | 200 · alertId |
+| 13 | Bad booking id | `GET /bookings/towing/GO` | **500** — C-04 |
+| 14 | Serviceability | Bhopal coords booking | succeeded → C-03 |
+
+Test data (vehicle `MP04AB1234`, bookings `TOW-261028-0001`, `DRV-261028-0001`) was removed from the database after the audit.
+
+---
+
+## 8. Files referenced
+
+| File | Relevance |
+|---|---|
+| `customer application/src/config/serviceableAreas.ts` | 2 cities only, client-side gate (C-03) |
+| `customer application/src/services/bookings/serviceBookingApi.ts` | Stub payment flow (C-02) |
+| `customer application/src/services/bookings/fareApi.ts` | Real fare contract (`pickup_lat`…) |
+| `customer application/src/services/tracking/trackingService.ts` | Polling-based tracking |
+| `customer application/src/screens/profile/SettingsScreen.tsx` | Dead-end rows (C-05) |
+| `customer application/src/screens/booking/roadside/RoadsideSelectServiceScreen.tsx` | Correctly renders "Coming soon" |
+| `backend/src/services/src/bookings/roadsideBooking.ts` | Roadside gate (C-01) |
+| `backend/src/middleware/src/error.ts` | Missing CastError branch (C-04) |
+| `backend/src/services/src/towingBookingValidator.ts` | create contract |
+| `backend/src/services/src/driverBookingValidator.ts` | requires `packageHours`/`estimatedDurationHours` |
+| `backend/src/services/src/sosValidator.ts` | SOS action enum |

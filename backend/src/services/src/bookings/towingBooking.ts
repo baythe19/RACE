@@ -29,6 +29,7 @@ import {
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
+import { ensureBookingServiceable } from './serviceability';
 
 function mapTowingBooking(
   booking: ITowingBooking,
@@ -99,6 +100,8 @@ export class TowingBookingService {
     if (!vehicle) {
       throw new NotFoundError('Vehicle not found');
     }
+
+    ensureBookingServiceable(dto.pickup);
 
     const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : undefined;
     const matrix = await getDistanceAndDuration(dto.pickup, dto.dropoff);

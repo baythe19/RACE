@@ -5,7 +5,14 @@ import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
-import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp } from './bookings/tripOtp';
+import {
+  assertTripStartOtp,
+  assertCompletionOtp,
+  encryptTripOtpForStorage,
+  generateTripStartOtp,
+  getTripOtpValue,
+  hashTripOtpForStorage,
+} from './bookings/tripOtp';
 import { processBookingCompletionEscrowSettlement } from './payments/escrowSettlement';
 import { logger } from '../../utils/src/logger';
 import { UserModel } from '../../models/src/user';
@@ -417,10 +424,13 @@ export class DriverService {
     // the driver accepts. Accepting (→ DRIVER_EN_ROUTE) is the trip-start gate,
     // so the driver-only trip OTP is delivered exactly here.
     if (dto.status === 'DRIVER_EN_ROUTE' && booking.status === 'DRIVER_ASSIGNED') {
-      const tripStartOtp = booking.tripStartOtp ?? generateTripStartOtp();
+      const tripStartOtp = booking.tripStartOtp
+        ? getTripOtpValue(booking.tripStartOtp, booking.tripStartOtpEncrypted) ?? generateTripStartOtp()
+        : generateTripStartOtp();
       if (!booking.tripStartOtp) {
         await Model.updateStatus(bookingId, 'DRIVER_EN_ROUTE', 'DRIVER_EN_ROUTE', {
-          tripStartOtp,
+          tripStartOtp: hashTripOtpForStorage(tripStartOtp),
+          tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
         });
       }
       emitToDriver(driverId, 'trip:otp', {

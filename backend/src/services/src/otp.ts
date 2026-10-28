@@ -159,6 +159,7 @@ export class OtpService {
       const alreadyUsed = await authRepository.findRecentlyVerifiedOtpLog(
         mobileNumber,
         otp,
+        hashOtp(otp),
         env.OTP_EXPIRY_SECONDS * 1000,
       );
       if (alreadyUsed) {

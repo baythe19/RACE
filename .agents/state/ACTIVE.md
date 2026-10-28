@@ -1,11 +1,19 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-26
+> **Updated:** 2026-10-28
 > **Read this first in every new session.**
 
 ---
 
-## Latest session — Universal HanuSMS Routing, Outer-App Lockscreen Notifications, Pre-Trip Vehicle Damage Inspection & Production Runbooks (2026-10-26, branch v7.0.0-major-update)
+## Latest session — Master Production Readiness Audit, All-Surface Read-Only (2026-10-28, branch v7.0.0-major-update)
+
+- **Read-only full-platform audit; NO code changes.** Output: `docs/reviews/race-platform-production-readiness-audit-2026-10-28.md`.
+  - Verifications [live/compile today]: customer app `tsc --noEmit` exit 0; backend `npm run lint` exit 0; CastError→400 fix verified live (`GET /bookings/towing/GO` → 400 "Invalid identifier"); roadside availability: `bookableCount 3`, battery/tyre/fuel/repairs still `false`; auth/devOtp 123456 dev-mode confirmed; collection+index census via mongosh (no TTL on otplogs/activitylogs; DB local name `race`, contradicts AGENTS.md `race-service`).
+  - Completion-OTP gating re-verified in source (`tripOtp.ts` `customerCompletionOtp` gated on `arrivedAtDropoffAt && paymentConfirmedByCustomer`).
+  - Payments: client stub auto-verify unchanged (`serviceBookingApi.ts`); backend fails closed in prod (`assertStubPaymentsEnabled`), webhook HMAC engine exists but **fail-open if `PAYMENT_WEBHOOK_SECRET` missing in prod** — new D-01 finding.
+  - Doc consolidates: C-01..C-13 (customer), S-1..S-16 (security status register), D-01..D-11 (new defects), 10-step launch gates. Placebo profile screens, stub payments, missing gateway keys => payments are launch blocker #1.
+
+## Previous session — Universal HanuSMS Routing, Outer-App Lockscreen Notifications, Pre-Trip Vehicle Damage Inspection & Production Runbooks (2026-10-26, branch v7.0.0-major-update)
 
 - **Complete Purge of MessageCentral & Legacy SMS Services (Solely HanuSMS):**
   - Completely removed all MessageCentral code (`mcSendOtp`, `mcValidateOtp`, `isMcConfigured`, `getMcConfig`, `isMcExpiredSignal`) from `backend/src/utils/src/sms.ts`.

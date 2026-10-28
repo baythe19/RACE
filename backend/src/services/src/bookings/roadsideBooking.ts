@@ -22,6 +22,16 @@ const ROADSIDE_SERVICE_LABELS: Record<string, string> = {
   roadside_minor_repair: 'Minor Repairs',
 };
 
+// D-15 (audit 2026-10-28): never echo an unvalidated client string back in a
+// user-facing message — accept only the known slugs, reject everything else.
+const KNOWN_SERVICE_TYPES = new Set([
+  ...TOWING_SERVICE_TYPES,
+  'roadside_flat_tyre',
+  'roadside_battery_jump',
+  'roadside_fuel_delivery',
+  'roadside_minor_repair',
+]);
+
 function resolveServiceLabel(serviceType: string): string {
   return ROADSIDE_SERVICE_LABELS[serviceType] ?? serviceType.replace(/_/g, ' ');
 }
@@ -29,6 +39,12 @@ function resolveServiceLabel(serviceType: string): string {
 export class RoadsideBookingService {
   async createBooking(customerId: string, dto: CreateRoadsideBookingDto) {
     const normalizedType = dto.serviceType.trim().toLowerCase();
+
+    if (!KNOWN_SERVICE_TYPES.has(normalizedType)) {
+      throw new BadRequestError(
+        'Unknown service type. Choose one of the advertised roadside services.',
+      );
+    }
 
     if (TOWING_SERVICE_TYPES.has(normalizedType)) {
       if (!dto.dropoff) {

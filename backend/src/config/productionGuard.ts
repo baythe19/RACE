@@ -13,6 +13,7 @@ import { logger } from '../utils/src/logger';
  *  - ADMIN_PASSWORD default ('Admin@123') must have been overridden
  *  - MC or Hanu OTP credentials must exist (someone can actually receive an OTP)
  *  - OTP_PEPPER (≥32 chars) required when Hanu OTP is configured
+ *  - PAYMENT_WEBHOOK_SECRET (≥32 chars) required — webhook must be HMAC-only
  */
 export function assertProductionConfig(): void {
   if (env.NODE_ENV !== 'production') {
@@ -38,6 +39,16 @@ export function assertProductionConfig(): void {
     if (pepper.length < 32) {
       problems.push('OTP_PEPPER must be set to at least 32 characters when HANU_API_KEY is configured');
     }
+  }
+
+  // Payment webhook (paymentWebhook.ts) 501s/verifies only when the secret is
+  // present. Without this guard a production deploy that forgets the secret
+  // silently runs an UNAUTHENTICATED booking-paid trigger (D-01).
+  const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET?.trim() ?? '';
+  if (webhookSecret.length < 32) {
+    problems.push(
+      'PAYMENT_WEBHOOK_SECRET must be set to at least 32 characters — without it /payments/webhook accepts unsigned calls',
+    );
   }
 
   if (problems.length) {

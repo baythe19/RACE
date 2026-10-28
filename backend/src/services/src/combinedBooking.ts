@@ -5,7 +5,7 @@ import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { userRepository } from './userRepository';
 import { BadRequestError, NotFoundError, ForbiddenError } from '../../utils/src/errors';
-import { generateCompletionOtp } from './bookings/tripOtp';
+import { encryptTripOtpForStorage, generateCompletionOtp, getTripOtpValue, hashTripOtpForStorage } from './bookings/tripOtp';
 import { emitBookingStatusUpdate, emitToDriver } from './socket';
 import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
 import { logger } from '../../utils/src/logger';
@@ -159,18 +159,19 @@ export class CombinedBookingService {
         bookingType: type,
         paymentMode: booking.paymentCollectionMode ?? paymentMode,
         amount: fare,
-        completionOtp: booking.completionOtp,
+        completionOtp: getTripOtpValue(booking.completionOtp, booking.completionOtpEncrypted),
       };
     }
 
-    const completionOtp = booking.completionOtp ?? generateCompletionOtp();
+    const completionOtp = generateCompletionOtp();
     const paymentCollectedAt = new Date();
 
     await repo.updateById(bookingId, {
       paymentCollectionMode: paymentMode,
       paymentConfirmedByCustomer: true,
       paymentCollectedAt,
-      completionOtp,
+      completionOtp: hashTripOtpForStorage(completionOtp),
+      completionOtpEncrypted: encryptTripOtpForStorage(completionOtp),
     });
 
     // SMS goes out only after the customer confirms cash, UPI, or in-app payment.

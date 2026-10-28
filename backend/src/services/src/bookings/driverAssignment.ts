@@ -10,7 +10,7 @@ import { DriverVendorMembershipModel } from '../../../models/src/driverVendorMem
 import { canTransition } from '../bookingStatusConstants';
 import { emitBookingStatusUpdate, emitToDriver } from '../socket';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
-import { generateTripStartOtp } from './tripOtp';
+import { encryptTripOtpForStorage, generateTripStartOtp, hashTripOtpForStorage } from './tripOtp';
 import type { ActiveBookingType } from '../../../models/src/user';
 
 const FALLBACK_DISTANCE_KM = 999;
@@ -739,7 +739,8 @@ export async function claimOpenBookingOffer(
   const $set: Record<string, unknown> = {
     driverId: driverObjectId,
     status: vendorDispatched ? 'DRIVER_ASSIGNED' : 'DRIVER_EN_ROUTE',
-    tripStartOtp,
+    tripStartOtp: hashTripOtpForStorage(tripStartOtp),
+    tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
     tripStartOtpVerified: false,
   };
   if (vendorId) {

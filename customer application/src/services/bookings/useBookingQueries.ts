@@ -86,6 +86,49 @@ export function useBookingQuery(bookingId: string, bookingType?: ServiceBookingT
   return query.data ?? null;
 }
 
+/**
+ * D-16 (audit 2026-10-28): BookingDetailScreen needs to distinguish
+ * "loading" from "failed" — previously an errored query rendered an infinite
+ * spinner. Returns the full query object so the screen can show an error +
+ * retry state.
+ */
+export function useBookingDetailQuery(bookingId: string, bookingType?: ServiceBookingType) {
+  const dispatch = useAppDispatch();
+  const localBooking = useAppSelector((state) => {
+    const matches = state.bookings.items.filter(
+      booking => booking.id === bookingId && (!bookingType || booking.bookingType === bookingType),
+    );
+    return matches.length === 1 ? matches[0] : undefined;
+  });
+
+  return useQuery({
+    queryKey: bookingKeys.detail(bookingId, bookingType),
+    queryFn: async () => {
+      const remote = await getBooking(bookingId, bookingType);
+      if (remote) {
+        dispatch(updateBooking(remote));
+        return remote;
+      }
+      if (localBooking) {
+        return localBooking;
+      }
+      throw new Error('Failed to load booking');
+    },
+    enabled: Boolean(bookingId),
+    initialData: localBooking,
+    refetchOnMount: 'always',
+    retry: 2,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (data && isBookingOngoing(data)) {
+        return 5_000;
+      }
+      return false;
+    },
+  });
+}
+
 export function useCreateBookingMutation() {
   const queryClient = useQueryClient();
 

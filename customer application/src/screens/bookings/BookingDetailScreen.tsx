@@ -27,7 +27,7 @@ import TripOtpCard from '../../components/booking/TripOtpCard';
 import CancellationRefundPolicyModal from '../../components/booking/CancellationRefundPolicyModal';
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import GoldButton from '../../components/auth/GoldButton';
-import { useBookingQuery } from '../../services/bookings/useBookingQueries';
+import { useBookingDetailQuery } from '../../services/bookings/useBookingQueries';
 import {
   cancelServiceBooking,
   getServiceBookingCancelPreview,
@@ -86,7 +86,8 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const { width } = useWindowDimensions();
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
-  const booking = useBookingQuery(route.params.bookingId, route.params.bookingType);
+  const bookingQuery = useBookingDetailQuery(route.params.bookingId, route.params.bookingType);
+  const booking = bookingQuery.data ?? null;
   const queryClient = useQueryClient();
 
   const isCompleted = booking ? isBookingCompleted(booking) : false;
@@ -117,10 +118,27 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   );
 
   if (!booking) {
+    // D-16: distinguish "loading" from "failed" — an errored query gets an
+    // explicit retry state instead of an infinite spinner.
     return (
       <ProfileSubScreenLayout title="Booking Detail" onBack={() => navigation.goBack()}>
         <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          <ActivityIndicator color={colors.primary} />
+          {bookingQuery.isError ? (
+            <>
+              <Text style={{ color: '#DC2626', fontWeight: '600' }}>
+                Unable to load this booking
+              </Text>
+              <Pressable
+                onPress={() => bookingQuery.refetch()}
+                style={{ marginTop: px(16), paddingHorizontal: px(24), paddingVertical: px(10) }}
+                accessibilityRole="button"
+              >
+                <Text style={{ color: colors.primary, fontWeight: '700' }}>Try again</Text>
+              </Pressable>
+            </>
+          ) : (
+            <ActivityIndicator color={colors.primary} />
+          )}
         </View>
       </ProfileSubScreenLayout>
     );

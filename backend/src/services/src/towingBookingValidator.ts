@@ -15,7 +15,9 @@ export const createTowingBookingSchema = z
     pickup: locationSchema,
     dropoff: locationSchema,
     towingMode: z.enum(['instant', 'scheduled', 'emergency']).optional(),
-    scheduledAt: z.string().datetime().optional(),
+    // D-12: accept UTC offsets ("+05:30") as well as "Z" so third-party callers
+    // with valid future dates are not rejected. Client always sends Z (toISOString).
+    scheduledAt: z.string().datetime({ offset: true }).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.scheduledAt && new Date(data.scheduledAt) <= new Date()) {

@@ -30,6 +30,7 @@ import {
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
+import { ensureBookingServiceable } from './serviceability';
 
 function mapDriverBooking(
   booking: IDriverBooking,
@@ -105,6 +106,8 @@ export class DriverBookingService {
     if (!vehicle) {
       throw new NotFoundError('Vehicle not found');
     }
+
+    ensureBookingServiceable(dto.pickup);
 
     const vehicleCategory = getVehicleCategory(vehicle.vehicleType, vehicle.vehicleSubtype);
     const packageHours = resolvePackageHours(dto.packageHours, dto.estimatedDurationHours);

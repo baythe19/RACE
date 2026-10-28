@@ -42,6 +42,48 @@ export const updateProfileSchema = completeProfileSchema
 
 export type UpdateProfileDto = z.infer<typeof updateProfileSchema>;
 
+/** ─── Identity credential endpoints (D-04: placebo screen wiring) ─── */
+
+// 10-digit Indian mobile, normalized server-side. Ownership checks live in the service.
+const mobileDigits = z
+  .string()
+  .trim()
+  .regex(/^(?:\+?91)?([6-9]\d{9})$/, 'Enter a valid 10-digit mobile number')
+  .transform((value) => value.replace(/\D/g, '').slice(-10));
+
+export const passwordChangeSchema = z
+  .object({
+    currentPassword: z.string().max(128).optional(),
+    newPassword: z.string().min(8, 'Password must be at least 8 characters').max(128),
+  })
+  .strict();
+
+export type PasswordChangeDto = z.infer<typeof passwordChangeSchema>;
+
+export const mobileChangeRequestSchema = z.object({ newMobile: mobileDigits }).strict();
+export type MobileChangeRequestDto = z.infer<typeof mobileChangeRequestSchema>;
+
+export const mobileChangeConfirmSchema = z
+  .object({
+    pendingToken: z.string().min(16),
+    code: z.string().regex(/^\d{6}$/, 'OTP must be 6 digits'),
+  })
+  .strict();
+export type MobileChangeConfirmDto = z.infer<typeof mobileChangeConfirmSchema>;
+
+export const pinSetSchema = z
+  .object({
+    currentPin: z.string().regex(/^\d{4,6}$/).optional(),
+    pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits'),
+  })
+  .strict();
+export type PinSetDto = z.infer<typeof pinSetSchema>;
+
+export const pinVerifySchema = z
+  .object({ pin: z.string().regex(/^\d{4,6}$/, 'PIN must be 4–6 digits') })
+  .strict();
+export type PinVerifyDto = z.infer<typeof pinVerifySchema>;
+
 export type DriverVerificationStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'SUSPENDED';
 export type DriverDocumentStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 
