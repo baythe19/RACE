@@ -8,5 +8,5 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
-| Buffy | Backend + Customer app | ~~Continue customer audit fixes; D-04 credential endpoints and screens~~ **DONE, session closed (user ne Freebuff band kiya)** | 2026-10-28 |
-| Claude (Cursor) | ~~Backend + Customer app~~ **DONE — cleanup + re-verify complete, commit fba624e** | Post-Freebuff cleanup: compile fixes + full re-verification loop | 2026-10-28, branch v8.0.0---custumer-app |
+| 2026-10-29 agent | customer-app Profile + Booking header/PersonalInfo/MyVehicles UI polish | profile card+wallet UI, header consistency | session: customer UI polish |
+|---------|---------|------|--------------|

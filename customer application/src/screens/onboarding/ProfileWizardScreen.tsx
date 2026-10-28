@@ -49,7 +49,7 @@ import {
 import { dismissOpenProfileDropdown } from '../../components/onboarding/profileDropdownDismiss';
 import { KeyboardFormView } from '../../components/ui/AppKeyboard';
 import { ensurePreviewAuthSession } from '../../config/uiPreviewAuth';
-import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { completeOnboarding } from '../../redux/auth/authSlice';
 import { finishVehicleOnboarding } from '../../redux/onboarding/onboardingSlice';
@@ -306,7 +306,7 @@ export default function ProfileWizardScreen({ navigation }: Props) {
   const finishToHome = async () => {
     dispatch(finishVehicleOnboarding());
 
-    if (UI_PREVIEW_AUTH_FLOW) {
+    if (isUiPreviewAuthFlow()) {
       ensurePreviewAuthSession(dispatch, true);
     }
 

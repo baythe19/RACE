@@ -19,7 +19,10 @@ import { BHUBANESWAR_DEFAULT, forwardGeocode, reverseGeocode } from '../../utils
 import { formatLocationDisplay } from '../../utils/readableAddress';
 import { colors, shadows, typography } from '../../theme';
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+const MAP_PROVIDER =
+  Platform.OS === 'android' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY)
+    ? PROVIDER_GOOGLE
+    : PROVIDER_DEFAULT;
 
 export interface SelectedLocation {
   address: string;

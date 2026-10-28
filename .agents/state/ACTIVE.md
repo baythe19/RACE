@@ -1,5 +1,29 @@
 # RACE — Active State
 
+> **Updated:** 2026-10-29 (customer UI recheck)
+> **Read this first in every new session.**
+
+---
+
+## Latest session — Customer Bookings/location UI recheck (2026-10-29)
+
+- Honest reaudit of prior Bookings + location + card asks on `v8.0.0---custumer-app`.
+- Fixed: Call→driver phone, Copy clipboard, Track OTP short copy, Detail `advancePaid`, Cancelled badge color.
+- Still open: mock Track vs live tracking APIs; Peach visual pass not re-run. Customer `tsc` 0.
+
+---
+
+## Latest session — Full stack restart + Peach CLI live (2026-10-28)
+
+- Mongo/Redis recreated after corrupt RWLayer; data volume kept (25 collections).
+- Backend `:3000` health 200; customer Metro `:8081`; partner Metro `:8082`.
+- Peach bridge `:7668`. CLI sims paint both apps (customer create-account, partner login). Cursor Browser Peach canvas may stay black — use Peach CLI.
+- API URL for both Expo apps: `http://localhost:3000`. Whitelist OTP `123456` for QA numbers.
+
+---
+
+# RACE — Active State
+
 > **Updated:** 2026-10-28
 > **Read this first in every new session.**
 

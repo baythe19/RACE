@@ -86,6 +86,8 @@ export default function CustomerDropoffPrompt() {
       completionOtp={due.completionOtp}
       paymentCollectionMode={due.paymentCollectionMode}
       paymentConfirmedByCustomer={due.paymentConfirmedByCustomer}
+      driverUpiId={due.driverUpiId}
+      driverName={due.driver?.name}
       onSuccess={() => {
         void queryClient.invalidateQueries({ queryKey: bookingKeys.all });
         void refetch();

@@ -71,21 +71,24 @@ export default function TabRootHeader({
             <>
               <Text
                 style={{
-                  fontSize: px(26),
+                  // Partner list screens (Fleet Vehicles) use ~18 extrabold heading.
+                  fontSize: px(18),
                   fontWeight: typography.weights.extrabold,
                   color: colors.dark,
-                  lineHeight: px(32),
+                  lineHeight: px(22),
+                  textAlign: 'left',
                 }}
-                numberOfLines={2}>
+                numberOfLines={1}>
                 {title}
               </Text>
               {subtitle ? (
                 <Text
                   style={{
-                    marginTop: px(4),
-                    fontSize: px(13),
+                    marginTop: px(2),
+                    fontSize: px(11),
                     color: colors.grey,
-                    lineHeight: px(18),
+                    lineHeight: px(16),
+                    textAlign: 'left',
                   }}
                   numberOfLines={2}>
                   {subtitle}
@@ -142,8 +145,9 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 44,
   },
   bellWrap: {
     position: 'relative',

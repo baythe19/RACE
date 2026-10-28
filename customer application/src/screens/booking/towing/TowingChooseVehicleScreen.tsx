@@ -10,7 +10,7 @@ import { useVehicleStore } from '../../../store/vehicleStore';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { TowingTypeId } from '../../../types/towingBooking';
 import type { Vehicle } from '../../../types/vehicle';
-import { TOWING_WALKTHROUGH_ENABLED } from '../../../utils/towingBookingWalkthrough';
+import { isTowingWalkthroughEnabled } from '../../../utils/towingBookingWalkthrough';
 import { getVehicleCategory } from '../../../utils/vehicleCategory';
 import { colors, shadows, typography } from '../../../theme';
 
@@ -46,7 +46,7 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
       setSelectedId(booking.vehicleId);
       return;
     }
-    if (safeVehicles.length >= 1 && (TOWING_WALKTHROUGH_ENABLED || safeVehicles.length === 1)) {
+    if (safeVehicles.length >= 1 && (isTowingWalkthroughEnabled() || safeVehicles.length === 1)) {
       setSelectedId(safeVehicles[0].id);
     }
   }, [booking.vehicleId, safeVehicles, selectedId]);

@@ -1,14 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Headphones, Phone } from 'lucide-react-native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
@@ -17,10 +16,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ActiveBookingCard from '../components/bookings/ActiveBookingCard';
 import BookingHistoryRow from '../components/bookings/BookingHistoryRow';
 import AppScreenLayout from '../components/ui/AppScreenLayout';
+import EmptyState from '../components/ui/EmptyState';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { BOOKING_TABS, type BookingTabId } from '../constants/bookingsScreen';
 import { useBookingsQuery } from '../services/bookings/useBookingQueries';
-import { brand } from '../theme/brand';
 import type { BookingsStackParamList, RootTabParamList } from '../types/navigation';
 import {
   isBookingCompleted,
@@ -28,7 +27,7 @@ import {
   mapBookingToActiveCard,
   mapBookingToHistoryRow,
 } from '../utils/bookingDisplay';
-import { colors, shadows, typography } from '../theme';
+import { colors, radius, typography } from '../theme';
 
 const REF_W = 390;
 
@@ -44,13 +43,10 @@ export default function BookingsScreen() {
   const px = (n: number) => Math.round(n * s);
   const [activeTab, setActiveTab] = useState<BookingTabId>('all');
   const { data: bookings = [], isLoading, refetch, isRefetching } = useBookingsQuery();
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   useFocusEffect(
     React.useCallback(() => {
-      void refetch().then(result => {
-        setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
-      });
+      void refetch();
     }, [refetch]),
   );
 
@@ -83,16 +79,21 @@ export default function BookingsScreen() {
     [typeFiltered],
   );
 
-  const showOngoing =
-    activeTab === 'all' ||
-    activeTab === 'ongoing' ||
-    activeTab === 'towing' ||
-    activeTab === 'driver';
-  const showHistory =
-    activeTab === 'all' ||
-    activeTab === 'completed' ||
-    activeTab === 'towing' ||
-    activeTab === 'driver';
+  const showOngoingSection =
+    (activeTab === 'all' ||
+      activeTab === 'ongoing' ||
+      activeTab === 'towing' ||
+      activeTab === 'driver') &&
+    ongoingList.length > 0;
+
+  const historyItems = useMemo(() => [...otherList, ...historyList], [otherList, historyList]);
+
+  const showHistorySection =
+    (activeTab === 'all' ||
+      activeTab === 'completed' ||
+      activeTab === 'towing' ||
+      activeTab === 'driver') &&
+    historyItems.length > 0;
 
   const openTrack = (bookingId: string, bookingType: 'towing' | 'driver') => {
     if (bookingType === 'driver') {
@@ -106,23 +107,58 @@ export default function BookingsScreen() {
     navigation.navigate('BookingDetail', { bookingId, bookingType });
   };
 
-  const isEmpty =
-    !isLoading &&
-    !isRefetching &&
-    !loadError && // UX fix: with a load error, show only the error card — the "No bookings yet" empty state must not appear alongside it.
-    ongoingList.length === 0 &&
-    historyList.length === 0 &&
-    otherList.length === 0;
+  const hasVisibleBookings = showOngoingSection || showHistorySection;
+  const showEmptyScene = !isLoading && !isRefetching && !hasVisibleBookings;
+
+  const emptyCopy = (() => {
+    if (bookings.length === 0) {
+      return {
+        title: 'No bookings yet',
+        subtitle: 'Book towing or a driver from Home. Active and past jobs will show up here.',
+        actionLabel: 'Browse services',
+      };
+    }
+    if (activeTab === 'ongoing') {
+      return {
+        title: 'No ongoing bookings',
+        subtitle: 'Nothing in progress right now. Check All or Done for other requests.',
+        actionLabel: undefined,
+      };
+    }
+    if (activeTab === 'completed') {
+      return {
+        title: 'No completed bookings',
+        subtitle: 'Finished jobs will appear here once a trip is done.',
+        actionLabel: undefined,
+      };
+    }
+    if (activeTab === 'towing' || activeTab === 'driver') {
+      return {
+        title: `No ${activeTab} bookings`,
+        subtitle: 'Try All, or book this service from Home.',
+        actionLabel: 'Browse services',
+      };
+    }
+    return {
+      title: 'No bookings to show',
+      subtitle: 'Pull down to refresh, or book a service from Home.',
+      actionLabel: 'Browse services',
+    };
+  })();
+
+  const goHomeServices = () => {
+    const tabNav = navigation.getParent();
+    tabNav?.navigate('Home' as never);
+  };
 
   return (
     <AppScreenLayout
       backgroundColor={colors.pageBg}
       refreshing={isRefetching}
       onRefresh={() => {
-        void refetch().then(result => {
-          setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
-        });
+        void refetch();
       }}
+      contentStyle={showEmptyScene || (isLoading && bookings.length === 0) ? styles.fillContent : undefined}
       header={
         <TabRootHeader
           title="Bookings"
@@ -133,7 +169,12 @@ export default function BookingsScreen() {
           }}
         />
       }>
-      <View style={[styles.tabsWrap, { marginTop: px(16), marginBottom: px(16), gap: px(8) }]}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.tabsRow, { gap: px(8), paddingBottom: px(4) }]}
+        style={{ marginTop: px(12), marginBottom: px(12) }}>
         {BOOKING_TABS.map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -145,7 +186,7 @@ export default function BookingsScreen() {
                 {
                   paddingVertical: px(8),
                   paddingHorizontal: px(14),
-                  borderRadius: px(20),
+                  borderRadius: radius.md,
                   borderColor: isActive ? colors.primary : colors.border,
                   backgroundColor: isActive ? colors.primary : colors.background,
                 },
@@ -161,308 +202,92 @@ export default function BookingsScreen() {
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       {isLoading && bookings.length === 0 ? (
-        <View style={{ marginBottom: px(12) }}>
-          {[0, 1].map(rowIndex => (
-            <View
-              key={rowIndex}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(12),
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1,
-                borderColor: '#ECEEF1',
-                borderRadius: px(14),
-                padding: px(12),
-                marginBottom: px(10),
-                opacity: 0.75,
-              }}>
-              <View
-                style={{
-                  width: px(46),
-                  height: px(46),
-                  borderRadius: px(23),
-                  backgroundColor: '#EEF0F3',
-                }}
-              />
-              <View style={{ flex: 1, gap: px(8) }}>
-                <View
-                  style={{
-                    width: '62%',
-                    height: px(13),
-                    borderRadius: px(7),
-                    backgroundColor: '#EEF0F3',
-                  }}
-                />
-                <View
-                  style={{
-                    width: '42%',
-                    height: px(11),
-                    borderRadius: px(6),
-                    backgroundColor: '#EEF0F3',
-                  }}
-                />
-              </View>
-            </View>
-          ))}
-          <Text
-            style={{
-              textAlign: 'center',
-              marginTop: px(4),
-              fontSize: px(12),
-              color: colors.grey,
-            }}>
-            Loading bookings…
-          </Text>
+        <View style={styles.centeredFill}>
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : null}
 
-      {loadError ? (
-        <View
-          style={{
-            borderRadius: px(12),
-            borderWidth: 1,
-            borderColor: colors.error,
-            backgroundColor: '#FEE2E2',
-            padding: px(14),
-            marginBottom: px(12),
-          }}>
-          <Text
-            style={{
-              color: colors.error,
-              fontSize: px(12.5),
-              fontWeight: typography.weights.semibold,
-              lineHeight: px(18),
-            }}>
-            {loadError}
-          </Text>
-          <Text
-            style={{
-              marginTop: px(4),
-              color: colors.grey,
-              fontSize: px(11),
-            }}>
-            Tip: the first request after a while can timeout while the server wakes up. Retrying
-            usually fixes it.
-          </Text>
-          <Pressable
-            onPress={() => {
-              setLoadError(null);
-              void refetch().then(result => {
-                setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
-              });
-            }}
-            style={({ pressed }) => ({
-              marginTop: px(10),
-              alignSelf: 'flex-start',
-              backgroundColor: colors.error,
-              borderRadius: px(10),
-              paddingHorizontal: px(16),
-              paddingVertical: px(8),
-              opacity: pressed ? 0.85 : 1,
-            })}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading bookings">
-            <Text style={{ color: '#FFFFFF', fontWeight: typography.weights.bold, fontSize: px(12.5) }}>
-              Retry now
-            </Text>
-          </Pressable>
-        </View>
+      {showEmptyScene ? (
+        <EmptyState
+          fill
+          icon="file-tray-outline"
+          title={emptyCopy.title}
+          subtitle={emptyCopy.subtitle}
+          actionLabel={emptyCopy.actionLabel}
+          onAction={emptyCopy.actionLabel ? goHomeServices : undefined}
+        />
       ) : null}
 
-      {isEmpty ? (
-        <View
-          style={[
-            styles.emptyCard,
-            shadows.card,
-            { borderRadius: px(16), padding: px(24), marginBottom: px(16) },
-          ]}>
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              textAlign: 'center',
-            }}>
-            No bookings yet
-          </Text>
-          <Text
-            style={{
-              marginTop: px(8),
-              fontSize: px(13),
-              color: colors.grey,
-              textAlign: 'center',
-              lineHeight: px(18),
-            }}>
-            Book a towing or driver service from Home. Once a vendor assigns a partner, it will
-            show here as active.
-          </Text>
-          <Pressable
-            onPress={() => {
-              const tabNav = navigation.getParent();
-              tabNav?.navigate('Home' as never);
-            }}
-            style={{
-              marginTop: px(16),
-              alignSelf: 'center',
-              backgroundColor: colors.primary,
-              borderRadius: px(12),
-              paddingHorizontal: px(18),
-              paddingVertical: px(12),
-            }}>
-            <Text style={{ fontWeight: typography.weights.bold, color: colors.dark }}>
-              Browse services
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {showOngoing && !isEmpty ? (
+      {showOngoingSection ? (
         <View style={{ marginBottom: px(8) }}>
           <Text
             style={{
-              fontSize: px(16),
+              fontSize: px(15),
               fontWeight: typography.weights.bold,
               color: colors.dark,
               marginBottom: px(10),
             }}>
             {activeTab === 'ongoing' ? 'Ongoing bookings' : 'Active bookings'}
-            {ongoingList.length > 0 ? ` (${ongoingList.length})` : ''}
+            {` (${ongoingList.length})`}
           </Text>
-          {ongoingList.length === 0 ? (
-            <Text style={{ fontSize: px(13), color: colors.grey, marginBottom: px(12) }}>
-              No ongoing bookings right now.
-            </Text>
-          ) : (
-            ongoingList.map(booking => (
-              <ActiveBookingCard
-                key={booking.id}
-                booking={booking}
-                px={px}
-                onTrack={() => openTrack(booking.id, booking.bookingType)}
-                onPress={() => openDetail(booking.id, booking.bookingType)}
-              />
-            ))
-          )}
+          {ongoingList.map(booking => (
+            <ActiveBookingCard
+              key={booking.id}
+              booking={booking}
+              px={px}
+              onTrack={() => openTrack(booking.id, booking.bookingType)}
+              onPress={() => openDetail(booking.id, booking.bookingType)}
+            />
+          ))}
         </View>
       ) : null}
 
-      {showHistory && !isEmpty ? (
+      {showHistorySection ? (
         <View>
           <Text
             style={{
-              fontSize: px(16),
+              fontSize: px(15),
               fontWeight: typography.weights.bold,
               color: colors.dark,
               marginBottom: px(10),
             }}>
             Booking history
           </Text>
-
-          {historyList.length === 0 && otherList.length === 0 ? (
-            <Text style={{ fontSize: px(13), color: colors.grey, marginBottom: px(12) }}>
-              Completed bookings will appear here.
-            </Text>
-          ) : (
-            [...otherList, ...historyList].map(item => (
-              <BookingHistoryRow
-                key={item.id}
-                item={item}
-                px={px}
-                onPress={() => openDetail(item.id, item.bookingType)}
-              />
-            ))
-          )}
+          {historyItems.map(item => (
+            <BookingHistoryRow
+              key={item.id}
+              item={item}
+              px={px}
+              onPress={() => openDetail(item.id, item.bookingType)}
+            />
+          ))}
         </View>
       ) : null}
-
-      <View
-        style={[
-          styles.supportCard,
-          {
-            marginTop: px(12),
-            borderRadius: px(14),
-            padding: px(14),
-            gap: px(12),
-          },
-        ]}>
-        <View
-          style={{
-            width: px(44),
-            height: px(44),
-            borderRadius: px(22),
-            backgroundColor: colors.goldLight,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-          <Headphones size={px(20)} color={colors.primary} strokeWidth={2} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            style={{
-              fontSize: px(14),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(2),
-            }}>
-            Need help with a booking?
-          </Text>
-          <Text style={{ fontSize: px(12), color: colors.grey }}>Support team available 24/7.</Text>
-        </View>
-        <Pressable
-          onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: px(6),
-            paddingHorizontal: px(12),
-            paddingVertical: px(10),
-            borderRadius: px(10),
-            borderWidth: 1.5,
-            borderColor: colors.primary,
-            backgroundColor: colors.background,
-            flexShrink: 0,
-          }}>
-          <Phone size={px(14)} color={colors.primary} strokeWidth={2.5} />
-          <Text
-            style={{
-              fontSize: px(12),
-              fontWeight: typography.weights.bold,
-              color: colors.primaryDark,
-            }}>
-            Call
-          </Text>
-        </Pressable>
-      </View>
     </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  tabsWrap: {
+  fillContent: {
+    flexGrow: 1,
+  },
+  centeredFill: {
+    flexGrow: 1,
+    alignSelf: 'stretch',
+    minHeight: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
   },
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-  },
-  emptyCard: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  supportCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: colors.background,
   },
 });

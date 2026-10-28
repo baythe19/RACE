@@ -151,7 +151,7 @@ export type CallStackParamList = {
 export type RootStackParamList = {
   Splash: undefined;
   Auth: NavigatorScreenParams<AuthStackParamList> | undefined;
-  Main: undefined;
+  Main: NavigatorScreenParams<RootTabParamList> | undefined;
   WrongApp: undefined;
 };
 

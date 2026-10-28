@@ -4,7 +4,7 @@ import { humanizeApiErrorMessage } from '../utils/humanizeApiError';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
-import { UI_PREVIEW_AUTH_FLOW } from '../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../config/uiPreviewMode';
 import type { ApiErrorResponse, ApiSuccessResponse } from '../types/auth';
 import { notifyUnauthorized } from './authSession';
 
@@ -76,7 +76,7 @@ api.interceptors.response.use(
     const refreshToken = await getRefreshToken();
     const accessToken = await getAccessToken();
     const previewSession =
-      UI_PREVIEW_AUTH_FLOW ||
+      isUiPreviewAuthFlow() ||
       accessToken === 'ui-preview-access' ||
       refreshToken === 'ui-preview-refresh';
     if (previewSession) {

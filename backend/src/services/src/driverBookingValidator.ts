@@ -130,6 +130,8 @@ export interface DriverTrackingResponseDto {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement deep-link. */
+  driverUpiId?: string;
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
   assignedFleetVehicleLabel?: string;

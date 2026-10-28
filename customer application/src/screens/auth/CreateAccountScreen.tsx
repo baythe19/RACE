@@ -146,10 +146,11 @@ export default function CreateAccountScreen({ navigation }: Props) {
               Icon={Phone}
               value={phone}
               onChangeText={text => {
-                setPhone(text);
+                setPhone(getPhoneDigits(text).slice(0, 10));
                 clearError('phone');
               }}
               keyboardType="phone-pad"
+              maxLength={10}
               placeholder="9876543210"
               error={errors.phone}
             />

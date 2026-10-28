@@ -21,7 +21,7 @@ import { formatRupee } from '../../../utils/towingPricing';
 import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
 import {
   getTowingWalkthroughFare,
-  TOWING_WALKTHROUGH_ENABLED,
+  isTowingWalkthroughEnabled,
 } from '../../../utils/towingBookingWalkthrough';
 import { colors, shadows, typography } from '../../../theme';
 
@@ -102,7 +102,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
         }
       } catch {
         if (!cancelled) {
-          setFareBreakdown(TOWING_WALKTHROUGH_ENABLED ? getTowingWalkthroughFare() : null);
+          setFareBreakdown(isTowingWalkthroughEnabled() ? getTowingWalkthroughFare() : null);
         }
       } finally {
         if (!cancelled) {

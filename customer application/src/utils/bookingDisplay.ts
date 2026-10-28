@@ -70,6 +70,15 @@ export function isBookingCompleted(booking: Booking): boolean {
   return ['SERVICE_COMPLETED', 'PAYMENT_PENDING', 'PAID'].includes(booking.status);
 }
 
+/**
+ * Trip-start OTP is only for pickup handover: driver has arrived, customer
+ * shares the code so the trip can move to IN_PROGRESS.
+ * Completion OTP (after dropoff payment) is a separate flow in DropoffPaymentModal.
+ */
+export function shouldShowTripStartOtp(status?: string): boolean {
+  return status === 'DRIVER_ARRIVED';
+}
+
 export function formatBookingDisplayId(bookingNumber: string): string {
   return bookingNumber.startsWith('#') ? bookingNumber : `#${bookingNumber}`;
 }
@@ -91,16 +100,18 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
     driver: booking.driver
       ? {
           name: booking.driver.name,
-          rating: booking.driver.rating,
           photo: booking.driver.avatarUrl ?? null,
           experience: booking.driver.experience,
+          phone: booking.driver.phone,
         }
       : {
           name: 'Finding a driver',
           photo: null,
         },
     bookingType: booking.bookingType ?? 'towing',
-    tripStartOtp: booking.tripStartOtp,
+    tripStartOtp: shouldShowTripStartOtp(booking.unifiedStatus)
+      ? booking.tripStartOtp
+      : undefined,
   };
 }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
-import { MessageCircle, Phone, Star } from 'lucide-react-native';
+import { MessageCircle, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LiveTripMap from '../../../components/booking/LiveTripMap';
@@ -11,6 +11,7 @@ import { useBookingTracking } from '../../../hooks/useBookingTracking';
 import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import { brand } from '../../../theme/brand';
 import type { HomeStackParamList } from '../../../types/navigation';
+import { shouldShowTripStartOtp } from '../../../utils/bookingDisplay';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import { colors, shadows, typography } from '../../../theme';
 
@@ -26,14 +27,16 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
     etaMinutes,
     driverName,
     driverPhone,
-    driverRating,
     driverLocation,
+    status,
     tripStartOtp: trackedOtp,
   } = useBookingTracking(bookingId, 'towing');
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
+  const showTripOtp = Boolean(
+    tripOtp && shouldShowTripStartOtp(booking?.unifiedStatus ?? status),
+  );
 
   const name = driverName ?? booking?.driver?.name ?? 'Assigning driver';
-  const rating = booking?.driver?.rating ?? driverRating;
   const phone = driverPhone ?? booking?.driver?.phone ?? brand.phoneRaw;
   const hasDriver = Boolean(driverName ?? booking?.driver?.name);
 
@@ -112,19 +115,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
                 }}>
                 {name}
               </Text>
-              {hasDriver && rating != null ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
-                  <Star size={t.px(16)} color={colors.primary} fill={colors.primary} />
-                  <Text
-                    style={{
-                      fontSize: t.body,
-                      fontWeight: typography.weights.semibold,
-                      color: colors.grey,
-                    }}>
-                    {rating.toFixed(1)}
-                  </Text>
-                </View>
-              ) : !hasDriver ? (
+              {!hasDriver ? (
                 <Text style={{ fontSize: t.caption, color: colors.grey }}>
                   Finding nearest tow driver…
                 </Text>
@@ -147,9 +138,12 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
               : 'ETA: ' + etaLabel}
           </Text>
 
-          {tripOtp ? (
+          {showTripOtp && tripOtp ? (
             <View style={{ marginTop: t.px(16) }}>
-              <TripOtpCard otp={tripOtp} />
+              <TripOtpCard
+                otp={tripOtp}
+                subtitle="Share with driver at pickup to start the trip."
+              />
             </View>
           ) : null}
 

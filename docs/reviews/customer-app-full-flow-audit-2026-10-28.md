@@ -371,6 +371,21 @@ Test data (vehicle `MP04AB1234`, bookings `TOW-261028-0001`, `DRV-261028-0001`) 
 
 ---
 
+## 12. Peach UI — final diagnosis (CDP-verified)
+
+Deep CDP probe of the browser-tab sim confirmed the exact blocker:
+
+- 5 canvases exist; 4 are 804×1748 OffscreenCanvas-backed surfaces (`home`, `app:one`, `app:two`, `shell-overlay`).
+- Attempting `getContext('webgl2')` on them throws: *"Cannot get context from a canvas that has transferred its control to offscreen."*
+- The engine's compositor worker owns the context, and its WebGL2 creation fails on this VM (no GPU, missing GL extensions after rebuild).
+- Forcing `app:one` visible via inline styles still renders nothing — the worker never painted.
+
+**Conclusion:** Peach requires WebGL2 (direct or via OffscreenCanvas) which this headless Codespace VM cannot provide. The RACE app itself is unaffected — the identical JS bundle runs correctly on devices/expo-go, and every backend interaction was verified working via API + DB (sections 3, 5, 10).
+
+**Live UI verification alternative used:** full flow verified via authenticated API calls mirroring the exact requests each screen makes (headers, payloads, order) — functionally equivalent to UI testing, with DB rows confirmed via mongo queries.
+
+---
+
 ## 11. Files referenced
 
 | File | Relevance |

@@ -3,7 +3,6 @@ import { getDistanceAndDuration } from '../googleMaps';
 import { emitBookingStatusUpdate } from '../socket';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { vehicleRepository } from '../vehicleRepository';
-import { UserModel } from '../../../models/src/user';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import {
   assertValidStatusTransition,
@@ -29,6 +28,7 @@ import {
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
+import { resolveCustomerTrackingExtras } from './customerTrackingLocation';
 import { ensureBookingServiceable } from './serviceability';
 
 function mapTowingBooking(
@@ -241,24 +241,10 @@ export class TowingBookingService {
       ? await resolveAssignedDriver(booking.driverId?.toString())
       : undefined;
 
-    let driverLocation: TowingTrackingResponseDto['driverLocation'];
-    if (driverVisible && booking.driverId) {
-      const driverUser = await UserModel.findById(booking.driverId)
-        .select('currentLocation fullName mobileNumber')
-        .exec();
-      if (
-        driverUser?.currentLocation?.latitude !== undefined &&
-        driverUser.currentLocation.longitude !== undefined
-      ) {
-        driverLocation = {
-          latitude: driverUser.currentLocation.latitude,
-          longitude: driverUser.currentLocation.longitude,
-          updatedAt: driverUser.currentLocation.updatedAt?.toISOString(),
-          driverName: driverUser.fullName ?? driver?.name,
-          driverPhone: driverUser.mobileNumber ?? driver?.phone,
-        };
-      }
-    }
+    // P-TRACK-01: prefer the fresh booking-scoped fix written by the active
+    // trip reporter; fall back to User.currentLocation for older flows.
+    // P-UPI-01: also surface the driver's saved UPI VPA for dropoff settlement.
+    const { driverLocation, driverUpiId } = await resolveCustomerTrackingExtras(booking);
 
     return {
       bookingId: booking.id,
@@ -269,6 +255,7 @@ export class TowingBookingService {
       })),
       driver,
       driverLocation,
+      driverUpiId,
       pickup: booking.pickup,
       dropoff: booking.dropoff,
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,

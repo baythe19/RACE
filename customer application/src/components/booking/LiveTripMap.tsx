@@ -1,5 +1,13 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import MapView, {
   Marker,
   Polyline,
@@ -7,11 +15,16 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps';
+import { MapPin, Navigation } from 'lucide-react-native';
 
 import { BHUBANESWAR_DEFAULT } from '../../utils/googleMaps';
-import { colors } from '../../theme';
+import { LOCATION_ACCENT } from '../../utils/googlePlaces';
+import { colors, typography } from '../../theme';
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+const MAP_PROVIDER =
+  Platform.OS === 'android' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY)
+    ? PROVIDER_GOOGLE
+    : PROVIDER_DEFAULT;
 
 export type MapPoint = {
   latitude: number;
@@ -26,6 +39,8 @@ type Props = {
   style?: StyleProp<ViewStyle>;
   borderRadius?: number;
   showsUserLocation?: boolean;
+  /** Fires when the user taps the map (native). Web fallback uses Pressable. */
+  onPress?: () => void;
 };
 
 function isValidPoint(point?: MapPoint | null): point is MapPoint {
@@ -67,6 +82,56 @@ function regionForPoints(points: MapPoint[]): Region {
   };
 }
 
+function RouteFallback({
+  pickup,
+  dropoff,
+  driver,
+}: {
+  pickup?: MapPoint | null;
+  dropoff?: MapPoint | null;
+  driver?: MapPoint | null;
+}) {
+  const rows = [
+    driver
+      ? { key: 'driver', color: LOCATION_ACCENT, label: driver.label || 'Partner', hint: 'Live position' }
+      : null,
+    pickup
+      ? { key: 'pickup', color: '#16A34A', label: pickup.label || 'Pickup', hint: 'Pickup' }
+      : null,
+    dropoff
+      ? { key: 'drop', color: colors.error, label: dropoff.label || 'Drop-off', hint: 'Drop-off' }
+      : null,
+  ].filter(Boolean) as Array<{ key: string; color: string; label: string; hint: string }>;
+
+  return (
+    <View style={styles.fallback}>
+      <View style={styles.fallbackHero}>
+        <Navigation size={28} color={LOCATION_ACCENT} strokeWidth={2.2} />
+        <Text style={styles.fallbackTitle}>
+          {rows.length ? 'Trip route' : 'Waiting for map points'}
+        </Text>
+        <Text style={styles.fallbackSubtitle}>
+          {rows.length
+            ? 'Live map tiles may be limited on this preview — route details below.'
+            : 'Pickup / partner coordinates will appear here once available.'}
+        </Text>
+      </View>
+      {rows.map(row => (
+        <View key={row.key} style={styles.fallbackRow}>
+          <View style={[styles.fallbackDot, { backgroundColor: row.color }]} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.fallbackHint}>{row.hint}</Text>
+            <Text style={styles.fallbackLabel} numberOfLines={2}>
+              {row.label}
+            </Text>
+          </View>
+          <MapPin size={16} color={row.color} strokeWidth={2.2} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export default function LiveTripMap({
   pickup,
   dropoff,
@@ -74,6 +139,7 @@ export default function LiveTripMap({
   style,
   borderRadius = 16,
   showsUserLocation = false,
+  onPress,
 }: Props) {
   const mapRef = useRef<MapView>(null);
 
@@ -106,6 +172,18 @@ export default function LiveTripMap({
     mapRef.current?.animateToRegion(regionForPoints(points), 450);
   }, [points]);
 
+  // Peach / RN-web often cannot paint Google Maps — show a clear route card instead of a blank white box.
+  if (Platform.OS === 'web') {
+    return (
+      <Pressable
+        style={[styles.wrap, { borderRadius }, style]}
+        onPress={onPress}
+        disabled={!onPress}>
+        <RouteFallback pickup={pickup} dropoff={dropoff} driver={driver} />
+      </Pressable>
+    );
+  }
+
   return (
     <View style={[styles.wrap, { borderRadius }, style]}>
       <MapView
@@ -113,6 +191,7 @@ export default function LiveTripMap({
         style={StyleSheet.absoluteFill}
         provider={MAP_PROVIDER}
         initialRegion={region}
+        onPress={onPress ? () => onPress() : undefined}
         showsUserLocation={showsUserLocation}
         showsMyLocationButton={false}
         showsCompass={false}
@@ -122,9 +201,8 @@ export default function LiveTripMap({
         {routeCoords.length >= 2 ? (
           <Polyline
             coordinates={routeCoords}
-            strokeColor={colors.primary}
+            strokeColor={LOCATION_ACCENT}
             strokeWidth={4}
-            lineDashPattern={[1]}
           />
         ) : null}
 
@@ -148,10 +226,16 @@ export default function LiveTripMap({
           <Marker
             coordinate={{ latitude: driver.latitude, longitude: driver.longitude }}
             title={driver.label || 'Partner'}
-            pinColor={colors.primary}
+            pinColor={LOCATION_ACCENT}
           />
         ) : null}
       </MapView>
+
+      {points.length === 0 ? (
+        <View style={styles.emptyOverlay} pointerEvents="none">
+          <Text style={styles.emptyOverlayText}>Waiting for live locations…</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -159,7 +243,71 @@ export default function LiveTripMap({
 const styles = StyleSheet.create({
   wrap: {
     overflow: 'hidden',
-    backgroundColor: colors.lightGrey,
+    backgroundColor: '#E8ECF0',
     minHeight: 180,
+  },
+  emptyOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(232,236,240,0.72)',
+  },
+  emptyOverlayText: {
+    fontSize: 13,
+    fontWeight: typography.weights.semibold,
+    color: colors.grey,
+  },
+  fallback: {
+    flex: 1,
+    padding: 16,
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: '#F3F4F6',
+  },
+  fallbackHero: {
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  fallbackTitle: {
+    fontSize: 16,
+    fontWeight: typography.weights.bold,
+    color: colors.dark,
+  },
+  fallbackSubtitle: {
+    fontSize: 12,
+    color: colors.grey,
+    textAlign: 'center',
+    lineHeight: 17,
+    paddingHorizontal: 12,
+  },
+  fallbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  fallbackDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  fallbackHint: {
+    fontSize: 10,
+    fontWeight: typography.weights.bold,
+    color: colors.grey,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  fallbackLabel: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: typography.weights.semibold,
+    color: colors.dark,
   },
 });

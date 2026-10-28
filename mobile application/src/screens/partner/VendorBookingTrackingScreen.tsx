@@ -31,6 +31,9 @@ function shortStatus(status: string) {
   if (status === 'DRIVER_ARRIVED') return 'At pickup';
   if (status === 'IN_PROGRESS') return 'On trip';
   if (status === 'DRIVER_ASSIGNED') return 'Assigned';
+  // P-05: pre-assignment jobs are meaningful states, not lowercase noise.
+  if (status === 'CONFIRMED') return 'Awaiting driver';
+  if (status === 'PENDING') return 'Awaiting assignment';
   return status.replace(/_/g, ' ').toLowerCase();
 }
 

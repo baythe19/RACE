@@ -8,6 +8,7 @@ import {
 } from '../../redux/bookings/bookingsSlice';
 import type { Booking, SubmitRatingRequest } from '../../types/booking';
 import type { ServiceBookingType } from '../../types/serviceBooking';
+import { isCustomerMockDataEnabled } from '../../config/customerQa';
 import {
   getBooking,
   listBookings,
@@ -40,6 +41,7 @@ export function useBookingsQuery() {
     retry: 2,
     retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),
     refetchInterval: (query) => {
+      if (isCustomerMockDataEnabled()) return false;
       const data = query.state.data;
       if (data?.some(isBookingOngoing)) {
         return 5_000;

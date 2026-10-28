@@ -38,6 +38,8 @@ export interface TrackingUpdate {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement. */
+  driverUpiId?: string;
   arrivedAtDropoffAt?: string;
   completionOtp?: string;
   paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
@@ -165,6 +167,7 @@ class TrackingService {
             status: towing.status,
             driver: towing.driver,
             driverLocation: towing.driverLocation,
+            driverUpiId: towing.driverUpiId,
             tripStartOtp: towing.tripStartOtp,
             assignedFleetVehicleLabel: towing.assignedFleetVehicleLabel,
             arrivedAtDropoffAt: towing.arrivedAtDropoffAt,
@@ -186,6 +189,7 @@ class TrackingService {
             status: driver.status,
             driver: driver.driver,
             driverLocation: driver.driverLocation,
+            driverUpiId: driver.driverUpiId,
             tripStartOtp: driver.tripStartOtp,
             assignedFleetVehicleLabel: driver.assignedFleetVehicleLabel,
             arrivedAtDropoffAt: driver.arrivedAtDropoffAt,

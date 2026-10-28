@@ -17,7 +17,7 @@ import { formatReadableLocation } from '../../../utils/readableAddress';
 import {
   TOWING_DEMO_DROP,
   TOWING_DEMO_PICKUP,
-  TOWING_WALKTHROUGH_ENABLED,
+  isTowingWalkthroughEnabled,
 } from '../../../utils/towingBookingWalkthrough';
 import { formatRupee } from '../../../utils/towingPricing';
 import { colors, shadows, typography } from '../../../theme';
@@ -116,7 +116,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
   const { data: savedLocations = [] } = useSavedLocationsQuery();
 
   useEffect(() => {
-    if (!TOWING_WALKTHROUGH_ENABLED) return;
+    if (!isTowingWalkthroughEnabled()) return;
     if (pickupLat != null && dropLat != null) return;
 
     setPickup(TOWING_DEMO_PICKUP.address);

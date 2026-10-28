@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react-native';
 
 import { formatBookingDate, getBookingServiceIcon } from '../../constants/bookingsScreen';
 import type { BookingHistoryItem } from '../../types/models';
-import { colors, typography } from '../../theme';
+import { colors, shadows, typography } from '../../theme';
 
 type Props = {
   item: BookingHistoryItem;
@@ -18,28 +18,31 @@ export default function BookingHistoryRow({ item, px, onPress }: Props) {
   return (
     <Pressable
       onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: px(12),
-        borderRadius: px(14),
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
-        padding: px(14),
-        marginBottom: px(10),
-      }}>
+      style={[
+        shadows.cardSoft,
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: px(10),
+          borderRadius: px(12),
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.background,
+          padding: px(12),
+          marginBottom: px(8),
+        },
+      ]}>
       <View
         style={{
-          width: px(44),
-          height: px(44),
-          borderRadius: px(22),
-          backgroundColor: colors.goldLight,
+          width: px(40),
+          height: px(40),
+          borderRadius: px(10),
+          backgroundColor: '#F3F4F6',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
         }}>
-        <ServiceIcon size={px(20)} color={colors.primary} strokeWidth={2.5} />
+        <ServiceIcon size={px(18)} color={colors.dark} strokeWidth={2.2} />
       </View>
 
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -73,14 +76,15 @@ export default function BookingHistoryRow({ item, px, onPress }: Props) {
             paddingHorizontal: px(8),
             paddingVertical: px(3),
             borderRadius: px(10),
-            backgroundColor: '#E8F8EE',
+            backgroundColor:
+              item.status === 'Cancelled' ? '#F3F4F6' : '#E8F8EE',
             marginBottom: px(6),
           }}>
           <Text
             style={{
               fontSize: px(10),
               fontWeight: typography.weights.bold,
-              color: colors.success,
+              color: item.status === 'Cancelled' ? colors.grey : colors.success,
             }}>
             {item.status}
           </Text>

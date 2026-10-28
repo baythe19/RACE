@@ -20,7 +20,12 @@ import { colors, shadows, typography } from '../../../theme';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverPickup'>;
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+// Prefer Google everywhere when a key is present. Peach iOS runtime rejects
+// PROVIDER_DEFAULT (Apple MapKit) without mapKit.token in peach.config.ts.
+const MAP_PROVIDER =
+  Platform.OS === 'android' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY)
+    ? PROVIDER_GOOGLE
+    : PROVIDER_DEFAULT;
 const PLACEHOLDER = 'Select pickup location';
 
 const LOCATION_ICONS = {

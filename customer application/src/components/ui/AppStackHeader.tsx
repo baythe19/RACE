@@ -23,14 +23,14 @@ export default function AppStackHeader({
   const px = useScreenPx();
 
   return (
-    <View style={styles.wrap}>
-      <View style={[styles.row, { paddingHorizontal: px(20), minHeight: px(44) }]}>
+    <View style={[styles.wrap, { backgroundColor: colors.pageBg }]}>
+      <View style={[styles.row, { paddingHorizontal: px(20), minHeight: px(44), paddingBottom: subtitle ? px(2) : px(10) }]}>
         {showBack && onBack ? (
-          <Pressable onPress={onBack} hitSlop={10} style={{ width: px(32) }}>
-            <ArrowLeft size={px(22)} color={colors.dark} strokeWidth={2.5} />
+          <Pressable onPress={onBack} hitSlop={10} style={{ width: px(40), height: px(40), alignItems: 'center', justifyContent: 'center' }}>
+            <ArrowLeft size={px(22)} color={colors.dark} strokeWidth={2.4} />
           </Pressable>
         ) : (
-          <View style={{ width: px(32) }} />
+          <View style={{ width: px(40) }} />
         )}
         {title ? (
           <Text
@@ -38,9 +38,10 @@ export default function AppStackHeader({
             style={{
               flex: 1,
               textAlign: 'center',
-              fontSize: px(17),
-              fontWeight: typography.weights.bold,
+              fontSize: px(18),
+              fontWeight: typography.weights.extrabold,
               color: colors.dark,
+              lineHeight: px(22),
             }}>
             {title}
           </Text>
@@ -50,30 +51,28 @@ export default function AppStackHeader({
         {headerRight ? (
           <View style={{ minWidth: px(72), alignItems: 'flex-end' }}>{headerRight}</View>
         ) : (
-          <View style={{ width: px(32) }} />
+          <View style={{ width: px(40) }} />
         )}
       </View>
       {subtitle ? (
         <Text
           style={{
             textAlign: 'center',
-            fontSize: px(12),
+            fontSize: px(11),
             color: colors.grey,
-            marginBottom: px(12),
+            lineHeight: px(16),
+            marginBottom: px(10),
             paddingHorizontal: px(20),
           }}>
           {subtitle}
         </Text>
-      ) : (
-        <View style={{ height: px(12) }} />
-      )}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    backgroundColor: colors.background,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },

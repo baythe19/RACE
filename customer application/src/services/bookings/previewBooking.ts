@@ -3,11 +3,11 @@ import type {
   CreateTowingBookingRequest,
   ServiceBooking,
 } from '../../types/serviceBooking';
-import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 
 /** Only allow local booking/payment previews in development builds. */
 export function isPreviewBookingMode(): boolean {
-  return __DEV__ && UI_PREVIEW_AUTH_FLOW;
+  return __DEV__ && isUiPreviewAuthFlow();
 }
 
 function previewId(prefix: string): string {

@@ -5,7 +5,6 @@ import {
   MapPin,
   Phone,
   ShieldCheck,
-  Star,
   Truck,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -100,15 +99,6 @@ export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
                     color: colors.dark,
                   }}>
                   {ROADSIDE_MECHANIC.name}
-                </Text>
-                <Star size={t.px(14)} color={ROADSIDE_ACCENT} fill={ROADSIDE_ACCENT} />
-                <Text
-                  style={{
-                    fontSize: t.body,
-                    fontWeight: typography.weights.semibold,
-                    color: colors.grey,
-                  }}>
-                  {ROADSIDE_MECHANIC.rating}
                 </Text>
               </View>
               <View

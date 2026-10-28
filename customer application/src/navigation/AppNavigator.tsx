@@ -3,13 +3,13 @@ import { StyleSheet, View } from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
-  type NavigationContainerRef,
 } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CustomerDropoffPrompt from '../components/booking/CustomerDropoffPrompt';
-import CustomTabBar from '../components/navigation/CustomTabBar';
+import { CustomerUiQaNavigator } from '../components/dev/CustomerUiQaNavigator';
+import { customerNavigationRef } from './customerNavigationRef';import CustomTabBar from '../components/navigation/CustomTabBar';
 import StackBackButton from '../components/navigation/StackBackButton';
 import { DriverBookingProvider } from '../context/DriverBookingContext';
 import { RoadsideBookingProvider } from '../context/RoadsideBookingContext';
@@ -561,15 +561,13 @@ export default function AppNavigator() {
     : showMainApp
       ? 'Main'
       : 'Auth';
-  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const lastRootRoute = useRef<'Auth' | 'Main' | 'WrongApp' | null>(null);
   const lastAuthenticated = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
 
-    const navigation = navigationRef.current;
-    if (!navigation?.isReady()) {
+    if (!customerNavigationRef.isReady()) {
       return;
     }
 
@@ -587,7 +585,7 @@ export default function AppNavigator() {
     }
 
     lastRootRoute.current = nextRootRoute;
-    navigation.reset({
+    customerNavigationRef.reset({
       index: 0,
       routes: [{ name: nextRootRoute }],
     });
@@ -599,22 +597,24 @@ export default function AppNavigator() {
 
   return (
     <View style={{ flex: 1 }}>
-    <NavigationContainer
-      ref={navigationRef}
-      theme={navigationTheme}
-      onReady={() => {
-        lastRootRoute.current = nextRootRoute;
-        lastAuthenticated.current = isAuthenticated;
-      }}>
-      <RootStack.Navigator
-        initialRouteName={nextRootRoute}
-        screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-        <RootStack.Screen name="Main" component={MainTabNavigator} />
-        <RootStack.Screen name="WrongApp" component={WrongAppRoleScreen} />
-      </RootStack.Navigator>
-    </NavigationContainer>
-    {showMainApp ? <CustomerDropoffPrompt /> : null}
+      <NavigationContainer
+        ref={customerNavigationRef}
+        theme={navigationTheme}
+        onReady={() => {
+          lastRootRoute.current = nextRootRoute;
+          lastAuthenticated.current = isAuthenticated;
+        }}>
+        {/* Inside NavigationContainer like partner UiTestNavigator — keeps FAB in the same RN tree. */}
+        <CustomerUiQaNavigator />
+        <RootStack.Navigator
+          initialRouteName={nextRootRoute}
+          screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Auth" component={AuthStackNavigator} />
+          <RootStack.Screen name="Main" component={MainTabNavigator} />
+          <RootStack.Screen name="WrongApp" component={WrongAppRoleScreen} />
+        </RootStack.Navigator>
+      </NavigationContainer>
+      {showMainApp ? <CustomerDropoffPrompt /> : null}
     </View>
   );
 }

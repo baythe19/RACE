@@ -10,6 +10,10 @@ export function humanizeApiErrorMessage(message: string, fallback = 'Something w
 
   const lower = text.toLowerCase();
 
+  if (lower.includes('already used')) {
+    return 'This code was already used. Tap Resend OTP for a fresh code.';
+  }
+
   if (lower.includes('expired') || lower.includes('verification_expired')) {
     return OTP_EXPIRED;
   }

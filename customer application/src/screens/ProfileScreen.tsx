@@ -156,8 +156,8 @@ export default function ProfileScreen() {
               style={[
                 {
                   marginTop: px(16),
-                  marginBottom: px(14),
-                  borderRadius: px(16),
+                  marginBottom: px(12),
+                  borderRadius: px(18),
                   borderWidth: 1,
                   borderColor: colors.border,
                   backgroundColor: colors.background,
@@ -165,23 +165,23 @@ export default function ProfileScreen() {
                 },
                 shadows.card,
               ]}>
-              <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: px(12) }}>
-                <ProfileAvatar size={px(64)} px={px} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(12) }}>
+                <ProfileAvatar size={px(62)} px={px} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: px(6),
-                      marginBottom: px(4),
                     }}>
                     <Text
                       numberOfLines={1}
                       style={{
                         flexShrink: 1,
                         fontSize: px(16),
-                        fontWeight: typography.weights.bold,
+                        fontWeight: typography.weights.extrabold,
                         color: colors.dark,
+                        letterSpacing: -0.2,
                       }}>
                       {displayName}
                     </Text>
@@ -193,14 +193,18 @@ export default function ProfileScreen() {
                       <Pencil size={px(14)} color={colors.grey} strokeWidth={2} />
                     </Pressable>
                   </View>
-                  <Text style={{ fontSize: px(12), color: colors.grey, marginBottom: px(2) }}>
-                    {displayPhone}
-                  </Text>
                   <Text
                     numberOfLines={1}
-                    style={{ fontSize: px(12), color: colors.grey, marginBottom: px(8) }}>
-                    {profile?.email ?? ''}
+                    style={{ fontSize: px(12.5), color: colors.grey, marginTop: px(3) }}>
+                    {displayPhone}
                   </Text>
+                  {profile?.email ? (
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: px(11.5), color: colors.grey, marginTop: px(1) }}>
+                      {profile.email}
+                    </Text>
+                  ) : null}
                   <View
                     style={{
                       alignSelf: 'flex-start',
@@ -208,9 +212,12 @@ export default function ProfileScreen() {
                       alignItems: 'center',
                       gap: px(4),
                       paddingHorizontal: px(8),
-                      paddingVertical: px(4),
+                      paddingVertical: px(3.5),
                       borderRadius: px(12),
                       backgroundColor: '#E8F8EE',
+                      marginTop: px(7),
+                      borderWidth: 1,
+                      borderColor: 'rgba(22,163,74,0.18)',
                     }}>
                     <Check size={px(11)} color={colors.success} strokeWidth={3} />
                     <Text
@@ -223,44 +230,34 @@ export default function ProfileScreen() {
                     </Text>
                   </View>
                 </View>
-                <View
-                  style={{
-                    width: 1,
-                    backgroundColor: colors.border,
-                    marginVertical: px(2),
-                  }}
-                />
+                {/* Premium chip — vertical pill instead of split column */}
                 <Pressable
                   onPress={() => navigation.navigate('SubscriptionPlans')}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    alignSelf: 'center',
-                    flexShrink: 0,
-                    gap: px(2),
-                  }}>
-                  <View style={{ alignItems: 'center' }}>
-                    <Crown size={px(20)} color={colors.primary} fill={colors.primary} />
-                    <Text
-                      style={{
-                        marginTop: px(3),
-                        fontSize: px(9),
-                        fontWeight: typography.weights.bold,
-                        color: colors.primary,
-                        lineHeight: px(11),
-                      }}>
-                      Premium
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: px(9),
-                        fontWeight: typography.weights.bold,
-                        color: colors.primary,
-                        lineHeight: px(11),
-                      }}>
-                      Member
-                    </Text>
-                  </View>
+                  style={[
+                    {
+                      alignSelf: 'center',
+                      alignItems: 'center',
+                      flexShrink: 0,
+                      gap: px(3),
+                      paddingHorizontal: px(10),
+                      paddingVertical: px(10),
+                      borderRadius: px(14),
+                      backgroundColor: colors.goldLight,
+                      borderWidth: 1,
+                      borderColor: 'rgba(245,166,35,0.35)',
+                    },
+                  ]}>
+                  <Crown size={px(20)} color={colors.primary} fill={colors.primary} />
+                  <Text
+                    style={{
+                      fontSize: px(9),
+                      fontWeight: typography.weights.bold,
+                      color: colors.primary,
+                      lineHeight: px(11),
+                      textAlign: 'center',
+                    }}>
+                    Premium{'\n'}Member
+                  </Text>
                   <ChevronRight size={px(12)} color={colors.primary} strokeWidth={2.5} />
                 </Pressable>
               </View>
