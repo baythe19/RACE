@@ -16,6 +16,8 @@ export interface ServiceBooking {
   pickup: BookingLocation;
   dropoff?: BookingLocation;
   towingMode?: 'instant' | 'scheduled' | 'emergency';
+  /** On-site roadside assist label from towing booking row. */
+  assistLabel?: string;
   driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   distanceKm?: number;
   estimatedDurationHours?: number;

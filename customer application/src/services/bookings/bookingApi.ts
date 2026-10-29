@@ -27,16 +27,51 @@ function mapUnifiedStatus(status: string): BookingStatus {
       return 'SERVICE_COMPLETED';
     case 'RATED':
       return 'PAID';
+    case 'CANCELLED':
+      return 'SERVICE_COMPLETED';
     default:
       return 'ASSIGNED';
   }
 }
 
-function toBookingLocation(point: { address: string; latitude: number; longitude: number }) {
-  const label = formatReadableAddress(point.address);
+function resolveServiceLabel(item: ServiceBooking, bookingType: 'towing' | 'driver'): string {
+  const labeled = item as ServiceBooking & { serviceLabel?: string };
+  if (labeled.serviceLabel?.trim()) {
+    return labeled.serviceLabel.trim();
+  }
+  if (bookingType === 'driver') {
+    switch (item.driverServiceType) {
+      case 'full_time':
+        return 'Full-Time Driver';
+      case 'part_time':
+        return 'Part-Time Driver';
+      case 'outstation':
+        return 'Outstation Driver';
+      case 'night':
+        return 'Night Driver';
+      default:
+        return 'Driver hire';
+    }
+  }
+  if (item.assistLabel?.trim()) {
+    return item.assistLabel.trim();
+  }
+  if (item.towingMode === 'emergency') return 'Emergency Towing';
+  if (item.towingMode === 'scheduled') return 'Scheduled Towing';
+  if (item.towingMode === 'instant') return 'Instant Towing';
+  return 'Towing';
+}
+
+function toBookingLocation(point: {
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+}) {
+  const address = point.address?.trim() ?? '';
+  const label = formatReadableAddress(address);
   return {
     label,
-    address: point.address,
+    address,
     latitude: point.latitude,
     longitude: point.longitude,
   };
@@ -45,8 +80,9 @@ function toBookingLocation(point: { address: string; latitude: number; longitude
 function mapServiceBookingToBooking(
   item: ServiceBooking,
   bookingType: 'towing' | 'driver',
-  serviceLabel: string,
+  serviceLabel?: string,
 ): Booking {
+  const resolvedLabel = serviceLabel?.trim() || resolveServiceLabel(item, bookingType);
   const status = mapUnifiedStatus(item.status);
   return {
     id: item.id,
@@ -55,7 +91,7 @@ function mapServiceBookingToBooking(
     unifiedStatus: item.status,
     categoryId: bookingType,
     serviceId: bookingType,
-    serviceLabel,
+    serviceLabel: resolvedLabel,
     status,
     vehicleId: item.vehicleId,
     vehicleNumber: '',
@@ -139,11 +175,11 @@ export async function getBooking(
 
   if (bookingType === 'towing') {
     const towing = await getTowingBooking(id);
-    return mapServiceBookingToBooking(towing, 'towing', 'Towing');
+    return mapServiceBookingToBooking(towing, 'towing');
   }
   if (bookingType === 'driver') {
     const driver = await getDriverBooking(id);
-    return mapServiceBookingToBooking(driver, 'driver', 'Driver Hire');
+    return mapServiceBookingToBooking(driver, 'driver');
   }
 
   // Legacy callers without a type resolve through the combined endpoint. Never
@@ -167,11 +203,7 @@ export async function submitBookingRating(
 ): Promise<Booking> {
   const { submitServiceBookingRating } = await import('./serviceBookingApi');
   const result = await submitServiceBookingRating(bookingId, bookingType, payload);
-  return mapServiceBookingToBooking(
-    result,
-    bookingType,
-    bookingType === 'towing' ? 'Towing' : 'Driver Hire',
-  );
+  return mapServiceBookingToBooking(result, bookingType);
 }
 
 export interface BookingTracking {
