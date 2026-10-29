@@ -60,20 +60,36 @@ export function jumpToMainTab(
 
 /**
  * Open a booking detail from anywhere (profile sub-screens, notifications).
- * Pushes BookingDetail onto the Bookings stack without resetting user tabs.
+ * Uses a full reset so the Bookings tab owns its stack cleanly — a plain
+ * nested navigate leaves the previous tab's stack mounted and a later tap
+ * on that tab lands on a stale screen (e.g. Notifications) instead of its
+ * root.
  */
 export function openBookingDetailFromAnywhere(bookingId: string, bookingType?: 'towing' | 'driver') {
   if (!customerNavigationRef.isReady()) return;
   customerNavigationRef.dispatch(
-    CommonActions.navigate({
-      name: 'Main',
-      params: {
-        screen: 'Bookings',
-        params: {
-          screen: 'BookingDetail',
-          params: { bookingId, bookingType },
+    CommonActions.reset({
+      index: 0,
+      routes: [
+        {
+          name: 'Main',
+          state: {
+            index: 0,
+            routes: [
+              {
+                name: 'Bookings',
+                state: {
+                  index: 1,
+                  routes: [
+                    { name: 'BookingsMain' },
+                    { name: 'BookingDetail', params: { bookingId, bookingType } },
+                  ],
+                },
+              },
+            ],
+          },
         },
-      },
+      ],
     }),
   );
 }
