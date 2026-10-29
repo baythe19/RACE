@@ -42,6 +42,8 @@ export interface AppNotification {
   category: NotificationCategory;
   read: boolean;
   createdAt: string;
+  /** Raw backend metadata — booking rows carry bookingId/bookingType for deep links. */
+  metadata?: Record<string, string>;
 }
 
 export interface AppSettings {

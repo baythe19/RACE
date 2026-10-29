@@ -57,3 +57,23 @@ export function jumpToMainTab(
     }),
   );
 }
+
+/**
+ * Open a booking detail from anywhere (profile sub-screens, notifications).
+ * Pushes BookingDetail onto the Bookings stack without resetting user tabs.
+ */
+export function openBookingDetailFromAnywhere(bookingId: string, bookingType?: 'towing' | 'driver') {
+  if (!customerNavigationRef.isReady()) return;
+  customerNavigationRef.dispatch(
+    CommonActions.navigate({
+      name: 'Main',
+      params: {
+        screen: 'Bookings',
+        params: {
+          screen: 'BookingDetail',
+          params: { bookingId, bookingType },
+        },
+      },
+    }),
+  );
+}
