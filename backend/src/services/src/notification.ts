@@ -81,6 +81,11 @@ export class NotificationService {
     return { updated };
   }
 
+  async markRead(userId: string, notificationId: string): Promise<{ updated: boolean }> {
+    const updated = await notificationRepository.markRead(userId, notificationId);
+    return { updated: Boolean(updated) };
+  }
+
   async deleteAllForUser(userId: string): Promise<{ deleted: number }> {
     const deleted = await notificationRepository.deleteAllForUser(userId);
     return { deleted };

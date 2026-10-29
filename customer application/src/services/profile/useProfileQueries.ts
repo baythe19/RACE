@@ -25,6 +25,7 @@ import {
 import {
   listNotifications,
   markAllNotificationsRead,
+  markNotificationRead,
   getNotificationPreferences,
   updateNotificationPreferences,
   mapMobilePrefToBackend,
@@ -154,6 +155,16 @@ export function useMarkAllNotificationsReadMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+    },
+  });
+}
+
+export function useMarkNotificationReadMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => markNotificationRead(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
     },
