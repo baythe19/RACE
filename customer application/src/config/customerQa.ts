@@ -49,4 +49,6 @@ export function subscribeCustomerMockData(listener: MockListener): () => void {
 
 /** QA whitelist mobile used across preview helpers. */
 export const CUSTOMER_QA_MOBILE = '9876543210';
+/** Also valid locally: any 9000000xxx → backend universal OTP 123456 */
+export const CUSTOMER_QA_MOBILE_ALT = '9000000000';
 export const CUSTOMER_QA_OTP = '123456';

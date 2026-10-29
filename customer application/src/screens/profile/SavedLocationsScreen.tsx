@@ -353,6 +353,8 @@ export default function SavedLocationsScreen() {
           setLongitude(location.longitude);
         }}
       />
+        </>
+      )}
     </ProfileSubScreenLayout>
   );
 }

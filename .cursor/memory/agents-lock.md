@@ -8,4 +8,3 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
-| this chat | customer profile UX | SOS inputs, notifications UI, logout, saved locations errors | 2026-10-29 |

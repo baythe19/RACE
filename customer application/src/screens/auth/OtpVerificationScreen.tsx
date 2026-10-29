@@ -29,7 +29,6 @@ import {
 } from '../../services/auth/useAuthMutations';
 import { ensurePreviewAuthSession, previewAdvanceFromOtp } from '../../config/uiPreviewAuth';
 import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
-import { CUSTOMER_QA_OTP } from '../../config/customerQa';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
@@ -221,8 +220,9 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
   };
 
   const fillTestingOtp = () => {
-    const code = testingOtp ?? (__DEV__ ? CUSTOMER_QA_OTP : null);
+    const code = testingOtp;
     if (!code) return;
+    if (verifyLockRef.current || verified) return;
     setError('');
     setOtp(code);
     setActiveOtpIndex(5);
@@ -315,7 +315,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
             />
           </View>
 
-          {testingOtp || __DEV__ ? (
+          {testingOtp ? (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Use testing OTP"
@@ -340,7 +340,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
                     textAlign: 'center',
                   },
                 ]}>
-                QA OTP {testingOtp ?? CUSTOMER_QA_OTP} — tap to fill & verify
+                QA OTP {testingOtp} — tap to fill & verify
               </Text>
               <Text
                 style={[
@@ -352,7 +352,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
                     textAlign: 'center',
                   },
                 ]}>
-                Whitelist numbers (e.g. 9876543210) use 123456 on local/dev API
+                Test numbers: 9876543210 or 9000000xxx → use code from API above
               </Text>
             </Pressable>
           ) : null}

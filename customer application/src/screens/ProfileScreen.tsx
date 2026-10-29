@@ -146,7 +146,13 @@ export default function ProfileScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Notifications">
                 <Bell size={px(22)} color={colors.dark} strokeWidth={2} />
-                {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
+                {unreadCount > 0 ? (
+                  <View style={styles.bellBadge}>
+                    <Text style={styles.bellBadgeText}>
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Text>
+                  </View>
+                ) : null}
               </Pressable>
               <ProfileAvatar size={px(40)} px={px} />
             </View>
@@ -383,7 +389,29 @@ export default function ProfileScreen() {
                       {item.subtitle}
                     </Text>
                   </View>
-                  <ChevronRight size={px(16)} color={colors.primary} strokeWidth={2} />
+                  {item.id === 'notifications' && unreadCount > 0 ? (
+                    <View
+                      style={{
+                        minWidth: px(22),
+                        height: px(22),
+                        borderRadius: px(11),
+                        paddingHorizontal: px(6),
+                        backgroundColor: colors.error,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: px(10),
+                          fontWeight: typography.weights.bold,
+                          color: colors.background,
+                        }}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  ) : (
+                    <ChevronRight size={px(16)} color={colors.primary} strokeWidth={2} />
+                  )}
                 </Pressable>
               ))}
             </View>
@@ -455,23 +483,31 @@ export default function ProfileScreen() {
 
             <Pressable
               onPress={handleLogout}
-              style={{
+              accessibilityRole="button"
+              accessibilityLabel="Log out of your account"
+              style={({ pressed }) => ({
+                marginTop: px(6),
+                marginBottom: px(16),
+                borderRadius: px(14),
+                borderWidth: 1,
+                borderColor: 'rgba(220,38,38,0.28)',
+                backgroundColor: pressed ? '#FEE2E2' : '#FEF2F2',
+                paddingVertical: px(14),
+                paddingHorizontal: px(16),
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: px(10),
-                paddingVertical: px(12),
-              }}>
+                justifyContent: 'center',
+                gap: px(8),
+              })}>
               <LogOut size={px(18)} color={colors.error} strokeWidth={2.2} />
               <Text
                 style={{
-                  flex: 1,
-                  fontSize: px(14),
+                  fontSize: px(15),
                   fontWeight: typography.weights.bold,
                   color: colors.error,
                 }}>
-                Logout
+                Log out
               </Text>
-              <ChevronRight size={px(16)} color={colors.error} strokeWidth={2} />
             </Pressable>
     </AppScreenLayout>
   );
@@ -481,15 +517,24 @@ const styles = StyleSheet.create({
   bellWrap: {
     position: 'relative',
   },
-  bellDot: {
+  bellBadge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
+    top: -5,
+    right: -8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.error,
     borderWidth: 1.5,
     borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  bellBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.background,
+    lineHeight: 11,
   },
 });

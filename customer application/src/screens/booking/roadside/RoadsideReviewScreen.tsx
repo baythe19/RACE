@@ -88,8 +88,19 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
     setIsSubmitting(true);
 
     try {
+      await useVehicleStore.getState().fetchVehicles().catch(() => undefined);
+      const latestVehicles = useVehicleStore.getState().vehicles;
       const serviceType = roadsideServiceIdToSlug(booking.serviceId);
-      const payload = buildRoadsideBookingRequest(booking, vehicles, serviceType);
+      const payload = buildRoadsideBookingRequest(
+        {
+          ...booking,
+          location: booking.landmark?.trim()
+            ? `${booking.location} (${booking.landmark.trim()})`
+            : booking.location,
+        },
+        latestVehicles.length ? latestVehicles : vehicles,
+        serviceType,
+      );
 
       if (__DEV__ && isPreviewBookingMode()) {
         const previewBooking = previewTowingBooking({

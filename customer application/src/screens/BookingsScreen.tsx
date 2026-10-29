@@ -20,6 +20,7 @@ import EmptyState from '../components/ui/EmptyState';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { BOOKING_TABS, type BookingTabId } from '../constants/bookingsScreen';
 import { useBookingsQuery } from '../services/bookings/useBookingQueries';
+import { useNotificationsQuery } from '../services/profile/useProfileQueries';
 import type { BookingsStackParamList, RootTabParamList } from '../types/navigation';
 import {
   isBookingCompleted,
@@ -43,6 +44,8 @@ export default function BookingsScreen() {
   const px = (n: number) => Math.round(n * s);
   const [activeTab, setActiveTab] = useState<BookingTabId>('all');
   const { data: bookings = [], isPending, isLoading, refetch, isRefetching } = useBookingsQuery();
+  const { data: notificationsData } = useNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
 
   const typeFiltered = useMemo(() => {
     if (activeTab === 'towing') {
@@ -170,6 +173,14 @@ export default function BookingsScreen() {
         <TabRootHeader
           title="Bookings"
           subtitle="Track and manage your service requests"
+          showNotificationBadge={unreadCount > 0}
+          onBellPress={() => {
+            const tabNav = navigation.getParent();
+            (tabNav as { navigate?: (name: string, params?: object) => void } | undefined)?.navigate(
+              'Profile',
+              { screen: 'Notifications' },
+            );
+          }}
           onAvatarPress={() => {
             const tabNav = navigation.getParent();
             tabNav?.navigate('Profile' as never);

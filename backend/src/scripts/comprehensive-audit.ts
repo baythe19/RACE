@@ -311,7 +311,7 @@ async function run() {
         headers: custHeaders,
         body: JSON.stringify({
           vehicleId,
-          serviceType: 'battery_jumpstart',
+          serviceType: 'roadside_battery_jump',
           pickup: {
             address: 'Jaydev Vihar, Bhubaneswar',
             latitude: 20.3012,
@@ -319,7 +319,7 @@ async function run() {
           },
         }),
       });
-      roadsideBookingId = rdsBkgRes.data?.data?.id;
+      roadsideBookingId = rdsBkgRes.data?.data?.booking?.id ?? rdsBkgRes.data?.data?.id;
       record('Customer', 'POST /bookings/roadside (Roadside Assistance Booking)', rdsBkgRes.ok, {
         bookingId: roadsideBookingId,
         status: rdsBkgRes.data?.data?.status,

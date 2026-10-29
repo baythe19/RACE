@@ -35,6 +35,10 @@ import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
 import { goBackWithinStack } from '../navigation/goBackWithinStack';
 import {
+  getRoadsideServiceLabel,
+  getRoadsideServicePrice,
+} from '../constants/roadsideBooking';
+import {
   openRoadsideLocation,
   roadsideCatalogIdToServiceId,
 } from '../utils/roadsideBookingFlow';
@@ -45,34 +49,34 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideAssistance'>;
 
 const ROADSIDE_OPTIONS = [
   {
-    id: 'flat_tyre',
+    id: 'flat_tyre' as const,
     slug: 'roadside_flat_tyre',
-    title: 'Flat Tyre Assistance',
-    price: 'From ₹199',
+    title: getRoadsideServiceLabel('flat_tyre'),
+    price: getRoadsideServicePrice('flat_tyre'),
     Icon: Disc,
   },
   {
-    id: 'battery_jumpstart',
+    id: 'battery_jumpstart' as const,
     slug: 'roadside_battery_jump',
-    title: 'Battery Jumpstart',
-    price: 'From ₹199',
+    title: getRoadsideServiceLabel('battery'),
+    price: getRoadsideServicePrice('battery'),
     Icon: BatteryCharging,
   },
   {
-    id: 'fuel_delivery',
+    id: 'fuel_delivery' as const,
     slug: 'roadside_fuel_delivery',
-    title: 'Fuel Delivery',
-    price: 'From ₹299',
+    title: getRoadsideServiceLabel('fuel'),
+    price: getRoadsideServicePrice('fuel'),
     Icon: Fuel,
   },
   {
-    id: 'minor_repair',
+    id: 'minor_repair' as const,
     slug: 'roadside_minor_repair',
-    title: 'Minor Mechanical Fix',
-    price: 'From ₹399',
+    title: getRoadsideServiceLabel('minor_repairs'),
+    price: getRoadsideServicePrice('minor_repairs'),
     Icon: Wrench,
   },
-] as const;
+];
 
 export default function RoadsideAssistanceScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
@@ -218,7 +222,7 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                     color: comingSoon ? colors.grey : colors.primary,
                     marginTop: px(3),
                   }}>
-                  {comingSoon ? 'Coming soon' : opt.price}
+                  {comingSoon ? 'Coming soon' : `From ₹${opt.price}`}
                 </Text>
               </View>
 

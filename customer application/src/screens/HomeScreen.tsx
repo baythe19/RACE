@@ -32,6 +32,7 @@ import { useTowingBooking } from '../context/TowingBookingContext';
 import { useCatalogStore } from '../store/catalogStore';
 import { useLocationStore } from '../store/locationStore';
 import { useProfileStore } from '../store/profileStore';
+import { useNotificationsQuery } from '../services/profile/useProfileQueries';
 import { getProfileFirstName } from '../utils/profileDisplay';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList, RootTabParamList } from '../types/navigation';
@@ -119,6 +120,8 @@ export default function HomeScreen({ navigation }: Props) {
   const { servicesReady, hasHydrated, isLoading: catalogLoading } = useCatalogStore();
   const profile = useProfileStore(state => state.profile);
   const authUser = useAuthStore(state => state.user);
+  const { data: notificationsData } = useNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
 
   useEffect(() => {
     if (isLocationHydrated && !hasSelectedLocation) {
@@ -286,17 +289,33 @@ export default function HomeScreen({ navigation }: Props) {
                     position: 'relative',
                   }}>
                   <Bell size={px(20)} color={colors.dark} strokeWidth={2} />
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: px(6),
-                      right: px(7),
-                      width: px(7),
-                      height: px(7),
-                      borderRadius: px(4),
-                      backgroundColor: colors.error,
-                    }}
-                  />
+                  {unreadCount > 0 ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: px(4),
+                        right: px(4),
+                        minWidth: px(16),
+                        height: px(16),
+                        borderRadius: px(8),
+                        paddingHorizontal: px(3),
+                        backgroundColor: colors.error,
+                        borderWidth: 1.5,
+                        borderColor: colors.background,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: px(9),
+                          fontWeight: typography.weights.bold,
+                          color: colors.background,
+                          lineHeight: px(11),
+                        }}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Pressable>
 
                 <Pressable
