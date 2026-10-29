@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import { useTowingBooking } from '../../../context/TowingBookingContext';
 import { estimateTowingFare } from '../../../services/bookings/fareApi';
 import { useSavedLocationsQuery } from '../../../services/profile/useProfileQueries';
@@ -376,6 +377,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         });
         navigation.navigate('TowingReview');
       }}>
+      <WizardStepFade>
       <LocationSearchCard
         pickupValue={pickup !== PLACEHOLDER ? pickupLabel || formatReadableLocation(pickup) : pickup}
         dropValue={drop !== PLACEHOLDER ? dropLabel || formatReadableLocation(drop) : drop}
@@ -578,6 +580,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           </View>
         </View>
       ) : null}
+      </WizardStepFade>
 
       <LocationPickerModal
         visible={showPickupPicker}

@@ -7,6 +7,7 @@ import { PaymentTransactionModel } from '../../../models/src/paymentTransaction'
 import {
   assertValidStatusTransition,
   calculateTowingFare,
+  calculateRoadsideFlatFare,
   createInitialStatusHistory,
   generatePrefixedBookingNumber,
 } from './booking';
@@ -133,6 +134,71 @@ export class TowingBookingService {
       status: 'PENDING',
       scheduledAt,
       statusHistory: createInitialStatusHistory('PENDING'),
+    });
+
+    void notifyAdminCustomerBookingCreated({
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+    }).catch(() => undefined);
+    void notifyCustomerBookingCreated({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+      advanceAmount: breakdown.advanceAmount,
+    }).catch(() => undefined);
+
+    return mapTowingBookingWithDriver(booking);
+  }
+
+  /** On-spot roadside assist — flat fare, uses towing dispatch pipeline. */
+  async createRoadsideOnSiteBooking(
+    customerId: string,
+    input: {
+      vehicleId: string;
+      pickup: CreateTowingBookingDto['pickup'];
+      serviceType: string;
+      serviceLabel: string;
+      flatFare: number;
+      scheduledAt?: string;
+    },
+  ): Promise<TowingBookingResponseDto> {
+    const vehicle = await vehicleRepository.findByIdForCustomer(input.vehicleId, customerId);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle not found');
+    }
+
+    ensureBookingServiceable(input.pickup);
+
+    const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : undefined;
+    const { fare, breakdown } = calculateRoadsideFlatFare(input.flatFare);
+    const bookingNumber = await generatePrefixedBookingNumber('RSV', () =>
+      towingBookingRepository.countAll(),
+    );
+
+    const onSiteLocation = input.pickup;
+
+    const booking = await towingBookingRepository.create({
+      customerId: customerId as unknown as ITowingBooking['customerId'],
+      bookingNumber,
+      vehicleId: vehicle.id as unknown as ITowingBooking['vehicleId'],
+      pickup: onSiteLocation,
+      dropoff: onSiteLocation,
+      towingMode: 'instant',
+      distanceKm: 0,
+      estimatedFare: fare,
+      fareBreakdown: breakdown,
+      advanceAmount: breakdown.advanceAmount,
+      remainingAmount: breakdown.remainingAmount,
+      paymentStatus: 'PENDING_ADVANCE',
+      status: 'PENDING',
+      scheduledAt,
+      statusHistory: createInitialStatusHistory('PENDING').map((entry, index) =>
+        index === 0
+          ? { ...entry, note: `${input.serviceLabel} · on-site assist` }
+          : entry,
+      ),
     });
 
     void notifyAdminCustomerBookingCreated({

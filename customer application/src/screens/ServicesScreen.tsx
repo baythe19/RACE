@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   Pressable,
   ScrollView,
   useWindowDimensions,
-  View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,11 +25,10 @@ export default function ServicesScreen({ navigation }: Props) {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
 
-  const { fetchServices, servicesReady } = useCatalogStore();
+  const { servicesReady, hasHydrated, isLoading: catalogLoading } = useCatalogStore();
 
-  useEffect(() => {
-    void fetchServices();
-  }, [fetchServices]);
+  const showServicesSkeleton =
+    !hasHydrated || (!servicesReady && catalogLoading);
 
   const openCategory = (categoryId: string, categoryTitle: string) => {
     openServiceCategory(navigation, categoryId, categoryTitle);
@@ -61,7 +59,7 @@ export default function ServicesScreen({ navigation }: Props) {
           gap: px(12),
         }}
         showsVerticalScrollIndicator={false}>
-        {!servicesReady ? (
+        {showServicesSkeleton ? (
           <DataSkeleton variant="services" testID="servicesSkeleton" />
         ) : (
           SERVICE_CATEGORY_CARDS.map(item => (

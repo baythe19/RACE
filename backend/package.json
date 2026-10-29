@@ -20,7 +20,8 @@
     "lint": "tsc --noEmit",
     "audit:partner-v6": "tsx src/scripts/partner-v6-offer-routing-audit.ts",
     "seed:test-accounts": "tsx src/scripts/seed-test-accounts.ts",
-    "ensure:test-accounts": "tsx src/scripts/ensure-test-accounts.ts"
+    "ensure:test-accounts": "tsx src/scripts/ensure-test-accounts.ts",
+    "mvp:smoke": "tsx src/scripts/mvp-local-smoke.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",

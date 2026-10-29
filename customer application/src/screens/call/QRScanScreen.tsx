@@ -23,8 +23,8 @@ const REF_W = 390;
 type Props = NativeStackScreenProps<CallStackParamList, 'QRScan'>;
 
 /** Extract clean vehicleId from plain IDs, deep link URLs, or JSON payloads */
-function extractVehicleId(raw: string): string {
-  if (!raw) return 'demo_veh_101';
+function extractVehicleId(raw: string): string | null {
+  if (!raw?.trim()) return null;
   const trimmed = raw.trim();
 
   // Case 1: JSON payload (e.g. {"vehicleId":"veh_123"} or {"id":"veh_123"})
@@ -93,6 +93,10 @@ export default function QRScanScreen({ navigation }: Props) {
     if (scanned) return;
     setScanned(true);
     const vehicleId = extractVehicleId(data);
+    if (!vehicleId) {
+      setScanned(false);
+      return;
+    }
     navigation.navigate('VehicleQrEmergency', { vehicleId });
   };
 

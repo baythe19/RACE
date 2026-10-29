@@ -75,38 +75,14 @@ export default function TowingBookingLayout({
       }}>
       {footerNote}
       {onContinue ? (
-        accentColor === colors.primary ? (
-          <GoldButton
-            label={buttonLabel}
-            onPress={onContinue}
-            height={t.buttonHeight}
-            borderRadius={t.cardRadius}
-            labelSize={t.buttonLabel}
-            disabled={continueDisabled}
-          />
-        ) : (
-          <Pressable
-            onPress={onContinue}
-            disabled={continueDisabled}
-            style={({ pressed }) => ({
-              minHeight: t.buttonHeight,
-              borderRadius: t.cardRadius,
-              backgroundColor: continueDisabled ? colors.border : accentColor,
-              opacity: continueDisabled ? 0.55 : pressed ? 0.9 : 1,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: t.px(20),
-            })}>
-            <Text
-              style={{
-                fontSize: t.buttonLabel,
-                fontWeight: typography.weights.bold,
-                color: continueDisabled ? colors.grey : colors.dark,
-              }}>
-              {buttonLabel}
-            </Text>
-          </Pressable>
-        )
+        <GoldButton
+          label={buttonLabel}
+          onPress={onContinue}
+          height={t.buttonHeight}
+          borderRadius={t.cardRadius}
+          labelSize={t.buttonLabel}
+          disabled={continueDisabled}
+        />
       ) : null}
       {secondaryLabel && onSecondary ? (
         <GoldButton
@@ -125,7 +101,7 @@ export default function TowingBookingLayout({
   const body = scrollable ? (
     <ScrollView
       style={styles.flex}
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: t.px(8) }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: t.px(20) }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}>
       {children}

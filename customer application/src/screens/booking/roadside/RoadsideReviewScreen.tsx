@@ -8,6 +8,7 @@ import TowingBookingLayout, { useBookingTheme } from '../../../components/bookin
 import {
   ROADSIDE_ACCENT,
   ROADSIDE_ACCENT_LIGHT,
+  ROADSIDE_BOOKING_STEP_LABELS,
   ROADSIDE_ETA_MINUTES,
   getRoadsideServiceLabel,
   getRoadsideServicePrice,
@@ -188,7 +189,8 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
   return (
     <TowingBookingLayout
       title="Review & Confirm"
-      step={3}
+      step={2}
+      stepLabels={ROADSIDE_BOOKING_STEP_LABELS}
       accentColor={ROADSIDE_ACCENT}
       onBack={() => goBackWithinStack(navigation)}
       buttonLabel={isBusy ? 'Confirming...' : 'Confirm & Get Help'}

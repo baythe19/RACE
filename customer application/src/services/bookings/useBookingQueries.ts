@@ -24,6 +24,7 @@ export const bookingKeys = {
 
 /** List: avoid hammering API on every tab focus — pull-to-refresh still works. */
 const LIST_STALE_MS = 20_000;
+const LIST_GC_MS = 30 * 60 * 1000;
 /** Detail: tracking socket/poll owns live location; HTTP refresh can be slower. */
 const DETAIL_STALE_MS = 15_000;
 const ONGOING_LIST_POLL_MS = 12_000;
@@ -45,6 +46,8 @@ export function useBookingsQuery() {
       }
     },
     staleTime: LIST_STALE_MS,
+    gcTime: LIST_GC_MS,
+    placeholderData: previousData => previousData,
     refetchOnMount: true,
     retry: 2,
     retryDelay: attempt => Math.min(1000 * 2 ** attempt, 4000),

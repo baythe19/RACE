@@ -103,7 +103,7 @@ export default function BookingsScreen() {
   };
 
   const hasVisibleBookings = showOngoingCards || showHistoryCards;
-  const showBookingsSkeleton = isPending || (isLoading && bookings.length === 0);
+  const showBookingsSkeleton = isPending && bookings.length === 0;
   const showEmptyScene = !showBookingsSkeleton && !isRefetching && !hasVisibleBookings;
 
   /** On All: active trips exist but no past jobs — soft hint under the list. */

@@ -65,25 +65,37 @@ export const TOWING_VEHICLE_TYPES: Array<{
   { id: 'bike', label: 'Bike', image: images.booking.vehicleBike },
 ];
 
+/** Same four fleet categories as partner `VendorVehicleRegistrationScreen` VEHICLE_TYPES. */
 export const TOWING_TYPES: Array<{
   id: TowingTypeId;
   label: string;
-  description: string;
-  descriptionLines?: [string, string];
+  /** Two-word card title on customer booking step 1. */
+  shortLabel: string;
   image: number;
 }> = [
   {
     id: 'flatbed',
-    label: 'Flatbed Towing',
-    description: 'Best for all vehicles. Safe & secure.',
-    descriptionLines: ['Best for all vehicles.', 'Safe & secure.'],
+    label: 'Flatbed Tow Truck',
+    shortLabel: 'Flatbed tow',
     image: images.booking.towingFlatbed,
   },
   {
     id: 'wheel_lift',
-    label: 'Wheel Lift Towing',
-    description: 'Suitable for small vehicles.',
+    label: 'Wheel-lift Tow Truck',
+    shortLabel: 'Wheel lift',
     image: images.booking.towingWheelLift,
+  },
+  {
+    id: 'heavy_tow',
+    label: 'Heavy Tow Truck',
+    shortLabel: 'Heavy tow',
+    image: images.booking.towingHeavy,
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    shortLabel: 'Other',
+    image: images.booking.towingOther,
   },
 ];
 
@@ -121,9 +133,7 @@ export function getVehicleLabel(id: TowingVehicleTypeId): string {
 }
 
 export function getTowingTypeLabel(id: TowingTypeId): string {
-  const type = TOWING_TYPES.find(t => t.id === id);
-  if (!type) return id;
-  return type.id === 'flatbed' ? 'Flatbed' : 'Wheel Lift';
+  return TOWING_TYPES.find(t => t.id === id)?.label ?? id;
 }
 
 export function getDateLabel(dateId: string): string {

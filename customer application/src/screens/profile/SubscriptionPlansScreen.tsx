@@ -60,7 +60,9 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={styles.scroll}>
           <ScreenContent>
             <Text style={styles.title}>Choose Your Plan</Text>
-            <Text style={styles.subtitle}>Get more with RACE Premium</Text>
+            <Text style={styles.subtitle}>
+              MVP pilot: plans activate with test billing only — no recurring card charge yet.
+            </Text>
 
             <View style={styles.toggle}>
               <Pressable

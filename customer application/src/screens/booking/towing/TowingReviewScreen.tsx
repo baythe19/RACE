@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { TowingFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   getDateLabel,
   getShortLocation,
@@ -191,6 +192,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
       buttonLabel="Confirm booking"
       onContinue={handleContinue}
       continueDisabled={isLoadingFare || !fareBreakdown}>
+      <WizardStepFade>
       <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>
         {/* Service mode badge */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(8) }}>
@@ -354,6 +356,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
           </View>
         )}
       </View>
+      </WizardStepFade>
     </TowingBookingLayout>
   );
 }

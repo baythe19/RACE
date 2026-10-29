@@ -1,32 +1,60 @@
-import React, { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
-import { Crosshair, MapPin } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Crosshair, Map as MapIcon } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
+import FormSectionLabel from '../../../components/booking/FormSectionLabel';
+import SinglePickupLocationCard from '../../../components/booking/SinglePickupLocationCard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
-import { ROADSIDE_ACCENT } from '../../../constants/roadsideBooking';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
+import {
+  getRoadsideServiceLabel,
+  ROADSIDE_ACCENT,
+  ROADSIDE_BOOKING_STEP_LABELS,
+} from '../../../constants/roadsideBooking';
 import { useRoadsideBooking } from '../../../context/RoadsideBookingContext';
+import { useLocationStore } from '../../../store/locationStore';
+import { useUserLocationStore } from '../../../store/userLocationStore';
 import type { LocationResult } from '../../../types/location';
+import { findServiceableCity } from '../../../config/serviceableAreas';
+import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
+import { ensureForegroundLocation } from '../../../utils/locationPermission';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import type { HomeStackParamList } from '../../../types/navigation';
+import type { RoadsideServiceId } from '../../../types/roadsideBooking';
 import { colors, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideLocation'>;
 
-const PLACEHOLDER = 'Select your location';
+const PLACEHOLDER = 'Enter pickup location';
 
-export default function RoadsideLocationScreen({ navigation }: Props) {
+export default function RoadsideLocationScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useRoadsideBooking();
+  const selectedLocation = useLocationStore(state => state.selectedLocation);
+  const userLocation = useUserLocationStore(state => state.location);
+  const fetchCurrentLocation = useUserLocationStore(state => state.fetchCurrentLocation);
+
+  const paramServiceId = route.params?.serviceId;
   const [location, setLocation] = useState(booking.location || PLACEHOLDER);
   const [locationLabel, setLocationLabel] = useState(booking.locationLabel ?? '');
   const [locationLat, setLocationLat] = useState(booking.locationLat);
   const [locationLng, setLocationLng] = useState(booking.locationLng);
   const [landmark, setLandmark] = useState(booking.landmark);
   const [showPicker, setShowPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'search' | 'map'>('search');
+  const [isLocating, setIsLocating] = useState(false);
+
+  useEffect(() => {
+    if (paramServiceId) {
+      updateBooking({ serviceId: paramServiceId });
+    }
+  }, [paramServiceId, updateBooking]);
+
+  const serviceId = (paramServiceId ?? booking.serviceId) as RoadsideServiceId;
 
   const hasLocation =
     location.trim().length > 0 &&
@@ -42,20 +70,71 @@ export default function RoadsideLocationScreen({ navigation }: Props) {
     setLocationLng(result.longitude);
   };
 
+  useEffect(() => {
+    if (locationLat != null) return;
+    let cancelled = false;
+
+    async function autoFill() {
+      const stored = userLocation;
+      const storedCity =
+        stored?.latitude != null && stored?.longitude != null
+          ? findServiceableCity(stored.latitude, stored.longitude)
+          : null;
+      if (stored?.latitude != null && stored?.longitude != null && storedCity && !storedCity.comingSoon) {
+        const resolved = resolveLocationSelection(stored);
+        if (!cancelled) {
+          setLocation(resolved.address);
+          setLocationLabel(resolved.displayLabel);
+          setLocationLat(stored.latitude);
+          setLocationLng(stored.longitude);
+        }
+        return;
+      }
+      if (!selectedLocation) return;
+      const resolved = resolveLocationSelection({
+        address: selectedLocation.address,
+        city: selectedLocation.city,
+        state: '',
+        pincode: '',
+        latitude: selectedLocation.latitude,
+        longitude: selectedLocation.longitude,
+        placeId: '',
+        displayLabel: selectedLocation.displayName,
+      });
+      if (!cancelled) {
+        setLocation(resolved.address);
+        setLocationLabel(resolved.displayLabel);
+        setLocationLat(selectedLocation.latitude);
+        setLocationLng(selectedLocation.longitude);
+      }
+    }
+
+    void autoFill();
+    return () => {
+      cancelled = true;
+    };
+  }, [locationLat, selectedLocation, userLocation]);
+
+  const displayValue = hasLocation
+    ? locationLabel || formatLocationDisplay(location)
+    : PLACEHOLDER;
+
   return (
     <TowingBookingLayout
-      title="Where are you?"
-      step={2}
+      title="Your location"
+      step={1}
+      stepLabels={ROADSIDE_BOOKING_STEP_LABELS}
       accentColor={ROADSIDE_ACCENT}
       scrollable
       onBack={() => goBackWithinStack(navigation)}
       continueDisabled={!hasLocation}
       onContinue={() => {
         if (!hasLocation) {
-          Alert.alert('Location required', 'Select your location on the map before continuing.');
+          Alert.alert('Location required', 'Pick your location before continuing.');
           return;
         }
         updateBooking({
+          serviceId,
           location,
           locationLabel: locationLabel || formatLocationDisplay(location),
           locationLat,
@@ -64,96 +143,128 @@ export default function RoadsideLocationScreen({ navigation }: Props) {
         });
         navigation.navigate('RoadsideReview');
       }}>
-      <View style={{ gap: t.px(16) }}>
-        <View>
-          <Text
-            style={{
-              fontSize: t.sectionTitle,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: t.px(8),
-            }}>
-            Location
-          </Text>
-          <Pressable onPress={() => setShowPicker(true)}>
-            <View
+      <WizardStepFade>
+      <View style={{ gap: t.px(8) }}>
+        <Text
+          style={{
+            fontSize: t.px(11),
+            fontWeight: typography.weights.semibold,
+            color: ROADSIDE_ACCENT,
+            marginBottom: t.px(2),
+          }}
+          numberOfLines={1}>
+          {getRoadsideServiceLabel(serviceId)}
+        </Text>
+
+        <FormSectionLabel title="Your spot" hint="Pick location" t={t} />
+
+        <SinglePickupLocationCard
+          value={displayValue}
+          placeholder={PLACEHOLDER}
+          onPress={() => {
+            setPickerMode('search');
+            setShowPicker(true);
+          }}
+          t={t}
+        />
+
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(8) }}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Use current location"
+            disabled={isLocating}
+            onPress={() => {
+              void (async () => {
+                setIsLocating(true);
+                try {
+                  const allowed = await ensureForegroundLocation();
+                  if (!allowed) return;
+                  const fetched = await fetchCurrentLocation();
+                  if (!fetched?.latitude || !fetched?.longitude) return;
+                  if (!assertServiceableBookingLocation(fetched.latitude, fetched.longitude)) return;
+                  applyLocation(fetched);
+                } finally {
+                  setIsLocating(false);
+                }
+              })();
+            }}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: t.px(6),
+              paddingHorizontal: t.px(12),
+              paddingVertical: t.px(8),
+              borderRadius: t.px(20),
+              borderWidth: 1,
+              borderColor: '#10B981',
+              backgroundColor: pressed ? '#ECFDF5' : colors.background,
+              opacity: isLocating ? 0.6 : 1,
+            })}>
+            {isLocating ? (
+              <ActivityIndicator size="small" color="#10B981" />
+            ) : (
+              <Crosshair size={t.px(14)} color="#10B981" strokeWidth={2.2} />
+            )}
+            <Text
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: t.px(10),
-                borderRadius: t.inputRadius,
-                borderWidth: 1.5,
-                borderColor: hasLocation ? ROADSIDE_ACCENT : colors.border,
-                backgroundColor: colors.background,
-                paddingHorizontal: t.px(14),
-                paddingVertical: t.px(14),
+                fontSize: t.px(11),
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
               }}>
-              <MapPin size={t.iconSm} color={ROADSIDE_ACCENT} fill={ROADSIDE_ACCENT} />
-              <Text
-                style={{
-                  flex: 1,
-                  fontSize: t.bodyLarge,
-                  fontWeight: hasLocation ? typography.weights.semibold : typography.weights.regular,
-                  color: hasLocation ? colors.dark : colors.grey,
-                }}
-                numberOfLines={2}>
-                {hasLocation ? locationLabel || formatLocationDisplay(location) : PLACEHOLDER}
-              </Text>
-            </View>
+              Current location
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose on map"
+            onPress={() => {
+              setPickerMode('map');
+              setShowPicker(true);
+            }}
+            style={({ pressed }) => ({
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: t.px(6),
+              paddingHorizontal: t.px(12),
+              paddingVertical: t.px(8),
+              borderRadius: t.px(20),
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: pressed ? colors.lightGrey : colors.background,
+            })}>
+            <MapIcon size={t.px(14)} color={ROADSIDE_ACCENT} strokeWidth={2.2} />
+            <Text
+              style={{
+                fontSize: t.px(11),
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
+              }}>
+              Choose on map
+            </Text>
           </Pressable>
         </View>
 
-        <Pressable
-          onPress={() => setShowPicker(true)}
+        <FormSectionLabel title="Landmark" hint="Optional note" t={t} topGap={6} />
+        <TextInput
+          value={landmark}
+          onChangeText={setLandmark}
+          placeholder="Near mall, signal…"
+          placeholderTextColor={colors.grey}
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: t.px(8),
             borderRadius: t.inputRadius,
-            backgroundColor: ROADSIDE_ACCENT,
-            paddingVertical: t.px(14),
-          }}>
-          <Crosshair size={t.iconSm} color={colors.background} strokeWidth={2.5} />
-          <Text
-            style={{
-              fontSize: t.labelBold,
-              fontWeight: typography.weights.bold,
-              color: colors.background,
-            }}>
-            Pick on Map
-          </Text>
-        </Pressable>
-
-        <View>
-          <Text
-            style={{
-              fontSize: t.sectionTitle,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: t.px(8),
-            }}>
-            Nearby Landmark (Optional)
-          </Text>
-          <TextInput
-            value={landmark}
-            onChangeText={setLandmark}
-            placeholder="e.g. Near Patia Square Mall"
-            placeholderTextColor={colors.grey}
-            style={{
-              borderRadius: t.inputRadius,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.background,
-              paddingHorizontal: t.px(14),
-              paddingVertical: t.px(14),
-              fontSize: t.bodyLarge,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-            }}
-          />
-        </View>
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.background,
+            paddingHorizontal: t.px(12),
+            paddingVertical: t.px(10),
+            fontSize: t.px(14),
+            fontWeight: typography.weights.semibold,
+            color: colors.dark,
+          }}
+        />
       </View>
+      </WizardStepFade>
 
       <LocationPickerModal
         visible={showPicker}
@@ -165,6 +276,7 @@ export default function RoadsideLocationScreen({ navigation }: Props) {
         title="Your location"
         confirmLabel="Use this location"
         accentColor={ROADSIDE_ACCENT}
+        initialMode={pickerMode}
         initialLocation={
           locationLat != null && locationLng != null
             ? { address: location, latitude: locationLat, longitude: locationLng }

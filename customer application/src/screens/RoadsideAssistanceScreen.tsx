@@ -27,6 +27,10 @@ import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
 import { goBackWithinStack } from '../navigation/goBackWithinStack';
+import {
+  openRoadsideLocation,
+  roadsideCatalogIdToServiceId,
+} from '../utils/roadsideBookingFlow';
 
 const REF_W = 390;
 
@@ -85,8 +89,19 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
     opt => availabilityBySlug.get(opt.slug) !== false,
   ).length;
 
-  const bookRoadside = () => {
-    navigation.navigate('RoadsideSelectService');
+  const startRoadside = (catalogId: (typeof ROADSIDE_OPTIONS)[number]['id']) => {
+    const serviceId = roadsideCatalogIdToServiceId(catalogId);
+    if (!serviceId) return;
+    const slug = ROADSIDE_OPTIONS.find(o => o.id === catalogId)?.slug;
+    if (slug && availabilityBySlug.get(slug) === false) return;
+    openRoadsideLocation(navigation, serviceId);
+  };
+
+  const bookFirstAvailable = () => {
+    const first = ROADSIDE_OPTIONS.find(opt => availabilityBySlug.get(opt.slug) !== false);
+    if (first) {
+      startRoadside(first.id);
+    }
   };
 
   const callSupport = () => {
@@ -188,7 +203,7 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
 
               <Pressable
                 onPress={() => {
-                  if (!comingSoon) bookRoadside();
+                  if (!comingSoon) startRoadside(opt.id);
                 }}
                 disabled={comingSoon}
                 style={{
@@ -256,7 +271,7 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
         </Pressable>
 
         <Pressable
-          onPress={() => bookRoadside()}
+          onPress={() => bookFirstAvailable()}
           disabled={bookableCount === 0}
           style={{
             flex: 1.5,

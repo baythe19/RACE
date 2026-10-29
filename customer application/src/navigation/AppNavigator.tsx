@@ -146,8 +146,8 @@ const stackScreenOptions = ({
 
 const towingBookingScreenOptions = { headerShown: false as const };
 
-/** Driver wizard keeps the stepper and Continue button planted; only the body changes. */
-const driverWizardScreenOptions = {
+/** Wizard steps: stepper + Continue stay fixed; only body updates (no stack slide). */
+const bookingWizardScreenOptions = {
   headerShown: false as const,
   animation: 'none' as const,
   animationDuration: 0,
@@ -165,22 +165,22 @@ const towingBookingScreens = (
     <Stack.Screen
       name="TowingChooseVehicle"
       component={TowingChooseVehicleScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingPickupDrop"
       component={TowingPickupDropScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingReview"
       component={TowingReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingAdvancePayment"
       component={TowingAdvancePaymentScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingConfirmed"
@@ -239,12 +239,12 @@ const driverBookingScreens = (
     <Stack.Screen
       name="DriverBookingReview"
       component={DriverBookingReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverBookingPayment"
       component={DriverBookingPaymentScreen}
-      options={driverWizardScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverBookingConfirmed"
@@ -264,22 +264,22 @@ const driverBookingScreens = (
     <Stack.Screen
       name="DriverDateTime"
       component={DriverDateTimeScreen}
-      options={driverWizardScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverPickup"
       component={DriverPickupScreen}
-      options={driverWizardScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverChooseVehicleType"
       component={DriverChooseVehicleTypeScreen}
-      options={driverWizardScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverReview"
       component={DriverReviewScreen}
-      options={driverWizardScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverAssigned"
@@ -318,12 +318,12 @@ const roadsideBookingScreens = (
     <Stack.Screen
       name="RoadsideLocation"
       component={RoadsideLocationScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="RoadsideReview"
       component={RoadsideReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="RoadsideHelpOnWay"

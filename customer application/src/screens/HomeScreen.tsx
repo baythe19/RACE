@@ -28,6 +28,7 @@ import DataSkeleton from '../components/ui/DataSkeleton';
 import LocationSelectorSheet from '../components/location/LocationSelectorSheet';
 import NotServiceableScreen from '../components/location/NotServiceableScreen';
 import { useAuthStore } from '../store/authStore';
+import { useTowingBooking } from '../context/TowingBookingContext';
 import { useCatalogStore } from '../store/catalogStore';
 import { useLocationStore } from '../store/locationStore';
 import { useProfileStore } from '../store/profileStore';
@@ -35,6 +36,10 @@ import { getProfileFirstName } from '../utils/profileDisplay';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList, RootTabParamList } from '../types/navigation';
 import { openServiceCategory } from '../utils/serviceNavigation';
+import {
+  openRoadsideLocation,
+  popularServiceToRoadsideId,
+} from '../utils/roadsideBookingFlow';
 import { colors, shadows, typography } from '../theme';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Path, Stop } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -111,14 +116,9 @@ export default function HomeScreen({ navigation }: Props) {
 
   const [showLocationSheet, setShowLocationSheet] = useState(false);
 
-  const { fetchServices, fetchBrand, brand: apiBrand, servicesReady } = useCatalogStore();
+  const { servicesReady, hasHydrated, isLoading: catalogLoading } = useCatalogStore();
   const profile = useProfileStore(state => state.profile);
   const authUser = useAuthStore(state => state.user);
-
-  useEffect(() => {
-    void fetchServices();
-    void fetchBrand();
-  }, [fetchBrand, fetchServices]);
 
   useEffect(() => {
     if (isLocationHydrated && !hasSelectedLocation) {
@@ -152,7 +152,8 @@ export default function HomeScreen({ navigation }: Props) {
     return displayLocation.split(',')[0].trim() || 'Bhubaneswar';
   }, [displayLocation]);
 
-  const showHomeSkeleton = !isLocationHydrated || !servicesReady;
+  const showHomeSkeleton =
+    !isLocationHydrated || !hasHydrated || (!servicesReady && catalogLoading);
 
   const cardWidth = Math.max(280, width - px(40));
   const cardHeight = px(196);
@@ -185,6 +186,22 @@ export default function HomeScreen({ navigation }: Props) {
 
   const openCategory = (categoryId: string, categoryTitle: string) => {
     openServiceCategory(navigation, categoryId, categoryTitle);
+  };
+
+  const { updateBooking: updateTowingBooking } = useTowingBooking();
+
+  const openPopularService = (item: (typeof POPULAR_SERVICES)[number]) => {
+    if (item.id === 'towing') {
+      updateTowingBooking({ serviceMode: 'instant' });
+      navigation.navigate('TowingChooseVehicle');
+      return;
+    }
+    const roadsideId = popularServiceToRoadsideId(item.id);
+    if (roadsideId) {
+      openRoadsideLocation(navigation, roadsideId);
+      return;
+    }
+    openCategory(item.id, item.categoryTitle);
   };
 
   const openLocationSheet = () => setShowLocationSheet(true);
@@ -622,12 +639,7 @@ export default function HomeScreen({ navigation }: Props) {
             {POPULAR_SERVICES.map(item => (
               <Pressable
                 key={item.id}
-                onPress={() =>
-                  openCategory(
-                    item.id === 'fuel' || item.id === 'battery' ? 'roadside' : item.id,
-                    item.categoryTitle
-                  )
-                }
+                onPress={() => openPopularService(item)}
                 style={({ pressed }) => [
                   {
                     width: '48.5%',

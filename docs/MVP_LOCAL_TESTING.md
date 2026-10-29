@@ -84,7 +84,13 @@ cd "../customer application" && npx tsc --noEmit
 cd "../mobile application" && npx tsc --noEmit
 ```
 
-Optional seed: `cd backend && npm run seed:fresh` (resets local DB).
+Optional smoke after API is up:
+
+```bash
+cd backend && npm run mvp:smoke
+```
+
+Incident steps: `docs/MVP_INCIDENT_RUNBOOK.md`
 
 ## Checklist cross-reference
 

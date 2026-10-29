@@ -43,7 +43,7 @@ const DRIVER_OPTIONS = [
   {
     id: 'full_time' as DriverTypeId,
     title: 'Full-Time Driver',
-    price: 'From ₹999 / day · Enquiry',
+    price: 'From ₹999 / day',
     Icon: Calendar,
   },
   {
@@ -73,12 +73,6 @@ export default function DriverServiceScreen({ navigation }: Props) {
   const handleBook = (driverType: DriverTypeId) => {
     resetBooking();
     updateBooking({ driverType });
-
-    if (driverType === 'full_time') {
-      navigation.navigate('DriverEnquiry');
-      return;
-    }
-
     navigation.navigate('DriverDateTime');
   };
 

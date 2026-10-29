@@ -195,5 +195,5 @@ export function getShortLocation(address: string, displayLabel?: string): string
 }
 
 export function isBookableDriverType(id: DriverTypeId): boolean {
-  return id !== 'full_time';
+  return true;
 }

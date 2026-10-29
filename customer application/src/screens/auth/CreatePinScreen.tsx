@@ -205,7 +205,7 @@ export default function CreatePinScreen({ navigation }: Props) {
               marginBottom: px(compact ? 16 : 24),
               lineHeight: px(18),
             }}>
-            Set a 4-digit PIN for quick & secure login
+            Set a 4-digit PIN for extra app security (login stays OTP)
           </Text>
 
           <Pressable

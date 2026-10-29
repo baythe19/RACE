@@ -22,14 +22,17 @@ const ROADSIDE_SERVICE_LABELS: Record<string, string> = {
   roadside_minor_repair: 'Minor Repairs',
 };
 
-// D-15 (audit 2026-10-28): never echo an unvalidated client string back in a
-// user-facing message — accept only the known slugs, reject everything else.
+/** Flat MVP fares — keep in sync with customer `constants/roadsideBooking.ts`. */
+const ROADSIDE_FLAT_FARES: Record<string, number> = {
+  roadside_flat_tyre: 199,
+  roadside_battery_jump: 299,
+  roadside_fuel_delivery: 149,
+  roadside_minor_repair: 399,
+};
+
 const KNOWN_SERVICE_TYPES = new Set([
   ...TOWING_SERVICE_TYPES,
-  'roadside_flat_tyre',
-  'roadside_battery_jump',
-  'roadside_fuel_delivery',
-  'roadside_minor_repair',
+  ...Object.keys(ROADSIDE_FLAT_FARES),
 ]);
 
 function resolveServiceLabel(serviceType: string): string {
@@ -66,10 +69,28 @@ export class RoadsideBookingService {
       };
     }
 
-    return {
-      available: false,
-      message: `${resolveServiceLabel(normalizedType)} is coming soon`,
+    const flatFare = ROADSIDE_FLAT_FARES[normalizedType];
+    if (!flatFare) {
+      return {
+        available: false,
+        message: `${resolveServiceLabel(normalizedType)} is coming soon`,
+        serviceType: normalizedType,
+      };
+    }
+
+    const booking = await towingBookingService.createRoadsideOnSiteBooking(customerId, {
+      vehicleId: dto.vehicleId,
+      pickup: dto.pickup,
       serviceType: normalizedType,
+      serviceLabel: resolveServiceLabel(normalizedType),
+      flatFare,
+      scheduledAt: dto.scheduledAt,
+    });
+
+    return {
+      available: true,
+      serviceType: normalizedType,
+      booking,
     };
   }
 
@@ -78,21 +99,42 @@ export class RoadsideBookingService {
     const roadsideServices = services.filter((service) => service.category === 'roadside');
     const towingServices = services.filter((service) => service.category === 'towing');
 
-    const items = [
-      ...towingServices.map((service) => ({
-        serviceType: service.slug,
-        label: service.title,
-        available: true,
-      })),
-      ...roadsideServices.map((service) => ({
-        serviceType: service.slug,
-        label: service.title,
-        available: false,
-      })),
-    ];
+    const defaultTowingItems = [...TOWING_SERVICE_TYPES].map((slug) => ({
+      serviceType: slug,
+      label: resolveServiceLabel(slug),
+      available: true,
+    }));
+
+    const defaultRoadsideItems = Object.keys(ROADSIDE_FLAT_FARES).map((slug) => ({
+      serviceType: slug,
+      label: resolveServiceLabel(slug),
+      available: true,
+    }));
+
+    const items =
+      towingServices.length + roadsideServices.length > 0
+        ? [
+            ...towingServices.map((service) => ({
+              serviceType: service.slug,
+              label: service.title,
+              available: true,
+            })),
+            ...roadsideServices.map((service) => ({
+              serviceType: service.slug,
+              label: service.title,
+              available: Object.prototype.hasOwnProperty.call(ROADSIDE_FLAT_FARES, service.slug),
+            })),
+          ]
+        : [...defaultTowingItems, ...defaultRoadsideItems];
+
+    const bookableRoadside = items.filter(
+      (item) => ROADSIDE_FLAT_FARES[item.serviceType] != null,
+    ).length;
+
+    const bookableTowing = items.filter((item) => TOWING_SERVICE_TYPES.has(item.serviceType)).length;
 
     return {
-      bookableCount: towingServices.length,
+      bookableCount: bookableTowing + bookableRoadside,
       items,
     };
   }

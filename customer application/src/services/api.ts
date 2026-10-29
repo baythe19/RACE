@@ -7,6 +7,7 @@ import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
 import { isUiPreviewAuthFlow } from '../config/uiPreviewMode';
 import type { ApiErrorResponse, ApiSuccessResponse } from '../types/auth';
 import { notifyUnauthorized } from './authSession';
+import { persistSessionTokens } from './sessionTokens';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -113,7 +114,7 @@ api.interceptors.response.use(
       >(`${API_BASE_URL}${REFRESH_PATH}`, { refreshToken });
 
       const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-      await saveTokens(accessToken, newRefreshToken);
+      await persistSessionTokens(accessToken, newRefreshToken);
       processQueue(accessToken);
 
       if (!originalRequest.headers) {

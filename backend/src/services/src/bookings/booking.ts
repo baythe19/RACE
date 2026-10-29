@@ -157,6 +157,28 @@ function isNightSurchargeTime(date: Date): boolean {
   return hour >= 22 || hour < 6;
 }
 
+/** Fixed on-site roadside assist (no distance matrix). */
+export function calculateRoadsideFlatFare(totalFare: number): {
+  fare: number;
+  breakdown: TowingFareBreakdown;
+} {
+  const { advanceAmount, remainingAmount } = splitAdvance(totalFare);
+  return {
+    fare: totalFare,
+    breakdown: {
+      baseFare: totalFare,
+      distanceKm: 0,
+      extraKm: 0,
+      extraKmCharge: 0,
+      nightSurcharge: 0,
+      totalFare,
+      advanceAmount,
+      remainingAmount,
+      isFallback: false,
+    },
+  };
+}
+
 export function getVehicleCategory(
   vehicleType: string,
   vehicleSubtype?: string,
