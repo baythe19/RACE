@@ -3,7 +3,15 @@ import { Animated, StyleSheet, View } from 'react-native';
 
 import { colors, spacing } from '../../theme';
 
-export type DataSkeletonVariant = 'list' | 'cards' | 'detail' | 'profile' | 'wallet';
+export type DataSkeletonVariant =
+  | 'list'
+  | 'cards'
+  | 'detail'
+  | 'profile'
+  | 'wallet'
+  | 'home'
+  | 'services'
+  | 'bookings';
 
 function Bone({
   width = '100%',
@@ -124,6 +132,85 @@ export default function DataSkeleton({
         ))}
       </>
     );
+  } else if (variant === 'bookings') {
+    content = (
+      <>
+        {[0, 1].map(index => (
+          <Card key={index} style={styles.spacedSm}>
+            <Row style={styles.spaceBetween}>
+              <Bone width="38%" height={11} />
+              <Bone width={72} height={20} radius={10} />
+            </Row>
+            <Row style={[styles.spacedSm, { alignItems: 'flex-start' }]}>
+              <Bone width={36} height={36} radius={10} />
+              <View style={styles.textGroup}>
+                <Bone width="72%" height={15} />
+                <Bone width="55%" height={10} style={styles.spacedXs} />
+              </View>
+            </Row>
+            <Bone width="92%" height={10} style={styles.spacedSm} />
+            <Bone width="78%" height={10} style={styles.spacedXs} />
+            <Row style={[styles.spacedMd, { marginTop: 14 }]}>
+              <Bone width={40} height={40} radius={20} />
+              <View style={styles.textGroup}>
+                <Bone width="48%" height={12} />
+                <Bone width="36%" height={9} style={styles.spacedXs} />
+              </View>
+            </Row>
+            <Row style={[styles.spacedMd, { gap: 10 }]}>
+              <Bone width="48%" height={40} radius={12} />
+              <Bone width="48%" height={40} radius={12} />
+            </Row>
+          </Card>
+        ))}
+        {[0, 1].map(index => (
+          <Card key={`h-${index}`} style={[styles.listCard, styles.spacedSm]}>
+            <Row style={styles.spaceBetween}>
+              <View style={styles.textGroup}>
+                <Bone width="64%" height={14} />
+                <Bone width="40%" height={10} style={styles.spacedXs} />
+              </View>
+              <Bone width={48} height={18} radius={9} />
+            </Row>
+          </Card>
+        ))}
+      </>
+    );
+  } else if (variant === 'services') {
+    content = (
+      <>
+        {[0, 1, 2, 3].map(index => (
+          <Bone key={index} width="100%" height={148} radius={20} style={styles.spacedSm} />
+        ))}
+      </>
+    );
+  } else if (variant === 'home') {
+    content = (
+      <>
+        <Bone width="55%" height={22} />
+        <Bone width="70%" height={28} style={styles.spacedXs} />
+        <Bone width="48%" height={14} style={styles.spacedSm} />
+        <Bone width="100%" height={196} radius={22} style={styles.spacedLg} />
+        <Bone width="42%" height={18} style={styles.spacedLg} />
+        <Row style={styles.spacedSm}>
+          {[0, 1, 2, 3].map(index => (
+            <View key={index} style={styles.homeServiceTile}>
+              <Bone width="100%" height={46} radius={14} />
+              <Bone width="70%" height={10} style={styles.spacedSm} />
+            </View>
+          ))}
+        </Row>
+        <Row style={[styles.spaceBetween, styles.spacedLg]}>
+          <Bone width="48%" height={18} />
+          <Bone width={56} height={14} />
+        </Row>
+        <View style={styles.homePopularGrid}>
+          {[0, 1, 2, 3].map(index => (
+            <Bone key={index} width="48.5%" height={96} radius={18} />
+          ))}
+        </View>
+      </>
+    );
   } else if (variant === 'cards') {
     content = (
       <>
@@ -212,4 +299,15 @@ const styles = StyleSheet.create({
   spacedSm: { marginTop: 8 },
   spacedMd: { marginTop: 12 },
   spacedLg: { marginTop: 18 },
+  homeServiceTile: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  homePopularGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+    marginTop: 8,
+  },
 });

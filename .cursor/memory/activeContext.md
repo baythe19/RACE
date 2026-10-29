@@ -1,5 +1,14 @@
 ## Current focus
 
+**2026-10-29 (local hire offers):** Offer feed maps legacy Driver Service through selfDriverCategory. QA part-time is Part-Time, independent full-time is Full-Time. Local ensure refreshed the vendor fleet. Local request check 18/18. Test bookings cancelled. Drivers left offline.
+
+**2026-10-29 (customer skeleton loaders):** `DataSkeleton` variants `home`, `services`, `bookings`. Home until location hydrated + catalog `servicesReady`; Services tab until `servicesReady`; Bookings on first fetch (`isPending`). Customer `tsc` 0.
+
+**2026-10-29 (MVP local /goal):** P0 fixes for local MVP testing — payment webhook fail-closed (`paymentWebhook.ts`); vendor `acceptTerms` from checkbox; driver register refreshes session (mock token only with `UI_PREVIEW_MUTATIONS`); customer `.env` QA/preview flags off; `backend/.env` + `.env.example` `ALLOW_STUB_PAYMENTS=true`; docs `MVP_LOCAL_TESTING.md` + `MVP_LAUNCH_CHECKLIST.md`. Backend + both apps `tsc` 0. Open for full prod: CI tests, QR camera, roadside build, Razorpay.
+ Live Render tested, not redeployed. Towing works when fleet driver is online: PENDING → stub advance CONFIRMED → vendor offer → assign DRIVER_ASSIGNED. Customer tracking stays public PENDING until accept. Delhi booking accepted on Render (city gate not deployed) and cancelled. New inbox rows are local-only. QA part-time `driverType` is `Driver Service`, so hire offers miss. Test vehicle OD02RF7800 deleted. Drivers set offline again.
+
+**2026-10-29 (Metro bundle errors):** Customer sim would not load. Disk files were already valid (`tsc --noEmit` 0); Metro :8081 was down and HMR was serving stale modules (Zap/Bike, duplicate MAP_PROVIDER, unterminated JSX, return-outside-function). Aliased `Motorbike as Bike` / `PlugZap as Zap`; stopped `fetchProfile` from rethrowing 401; skip profile/vehicle/wallet/SOS-context fetches when logged out. Metro `--clear` + API :3000 restarted. Transform check: all listed modules + index bundle HTTP 200. Reload Peach/sootsim on 8081.
+
 **2026-10-29 (MVP notifications + real booking flow):** Backend `bookingNotifications.ts` — customer in-app + admin alerts on create/advance/cancel/trip milestones; driver in-app on vendor job assign. Customer app: `useCustomerRealtimeSync` (socket `notification:new`, Android channels, inbox refresh), OS alert on advance confirm. Real path = API create + stub advance verify (preview only when UI QA mock). Backend + customer `tsc` 0.
 
 **2026-10-29 (part-time schedule soften):** DriverDateTimeScreen — short date chips `29/10` (month number); soft amber outline; duration pills 2h/4h/8h/More; More = 12h & 24h with km only. Start time stays on screen: Morning/Afternoon/Evening/Night, half-hour row, hour stepper + :00/:30, AM/PM. `tsc` 0.

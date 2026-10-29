@@ -328,11 +328,23 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
           fontSize: t.caption,
           color: colors.grey,
           textAlign: 'center',
+          marginBottom: t.px(8),
+          lineHeight: t.px(18),
+        }}>
+        MVP pilot: confirming unlocks dispatch with a test payment record — no card or UPI is
+        charged now.
+      </Text>
+
+      <Text
+        style={{
+          fontSize: t.caption,
+          color: colors.grey,
+          textAlign: 'center',
           marginBottom: t.px(16),
           lineHeight: t.px(18),
         }}>
         Our partner collects the remaining payment after the tow is completed.
-        {'\n'}Online payment options will be available soon.
+        {'\n'}In-app online payment options will be available soon.
       </Text>
 
       {/* Single, clear CTA */}

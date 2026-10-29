@@ -22,6 +22,7 @@ type Nav = {
  * (Profile, Bookings, …) instead of the previously focused tab (usually Home).
  */
 export function goBackWithinStack(navigation: Nav): void {
+  // Always stay inside this helper — callers must not duplicate this body.
   const state = navigation.getState();
   if (state && state.index > 0) {
     navigation.goBack();

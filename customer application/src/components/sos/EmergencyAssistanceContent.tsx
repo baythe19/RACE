@@ -13,6 +13,7 @@ import {
 import * as Location from 'expo-location';
 import {
   ChevronRight,
+  Info,
   MapPin,
   Phone,
   Send,

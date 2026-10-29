@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import { SERVICE_CATEGORY_CARDS } from '../constants/serviceCategoryCards';
 import { useCatalogStore } from '../store/catalogStore';
 import type { ServicesStackParamList } from '../types/navigation';
@@ -25,7 +26,7 @@ export default function ServicesScreen({ navigation }: Props) {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
 
-  const { fetchServices } = useCatalogStore();
+  const { fetchServices, servicesReady } = useCatalogStore();
 
   useEffect(() => {
     void fetchServices();
@@ -60,7 +61,10 @@ export default function ServicesScreen({ navigation }: Props) {
           gap: px(12),
         }}
         showsVerticalScrollIndicator={false}>
-        {SERVICE_CATEGORY_CARDS.map(item => (
+        {!servicesReady ? (
+          <DataSkeleton variant="services" testID="servicesSkeleton" />
+        ) : (
+          SERVICE_CATEGORY_CARDS.map(item => (
           <Pressable
             key={item.id}
             onPress={() => openCategory(item.id, item.categoryTitle)}
@@ -73,7 +77,8 @@ export default function ServicesScreen({ navigation }: Props) {
             ]}>
             <ServiceCategoryArtCard card={item} />
           </Pressable>
-        ))}
+        ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );

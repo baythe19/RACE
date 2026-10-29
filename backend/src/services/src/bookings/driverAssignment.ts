@@ -177,11 +177,27 @@ async function releaseDriverReservationIfBookingUnclaimed(
   }
 }
 
+/**
+ * Offer feed matches Part-Time / Full-Time / Tow Driver.
+ * Older QA rows stored the label "Driver Service" and relied on selfDriverCategory.
+ */
+export function resolvedOfferDriverType(driver: IUser): string | undefined {
+  const raw = driver.driverProfile?.driverType?.trim();
+  if (raw === 'Tow Driver' || raw === 'Full-Time' || raw === 'Part-Time') {
+    return raw;
+  }
+  if (!raw || raw === 'Driver Service') {
+    if (driver.selfDriverCategory === 'PART_TIME') return 'Part-Time';
+    if (driver.selfDriverCategory === 'FULL_TIME') return 'Full-Time';
+  }
+  return raw || undefined;
+}
+
 export function isDriverEligibleForBooking(
   driver: IUser,
   bookingType: ActiveBookingType,
 ): boolean {
-  const driverType = driver.driverProfile?.driverType;
+  const driverType = resolvedOfferDriverType(driver);
   if (!driverType) return false;
   return driverTypesForBooking(bookingType).includes(driverType);
 }

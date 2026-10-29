@@ -21,7 +21,7 @@ import { BHUBANESWAR_DEFAULT } from '../../utils/googleMaps';
 import { LOCATION_ACCENT } from '../../utils/googlePlaces';
 import { colors, typography } from '../../theme';
 
-const MAP_PROVIDER =
+const MAP_PROVIDER: typeof PROVIDER_GOOGLE | typeof PROVIDER_DEFAULT =
   Platform.OS === 'android' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY)
     ? PROVIDER_GOOGLE
     : PROVIDER_DEFAULT;

@@ -23,9 +23,10 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { images } from '../assets';
+import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import LocationSelectorSheet from '../components/location/LocationSelectorSheet';
 import NotServiceableScreen from '../components/location/NotServiceableScreen';
-import AppScreenLayout from '../components/ui/AppScreenLayout';
 import { useAuthStore } from '../store/authStore';
 import { useCatalogStore } from '../store/catalogStore';
 import { useLocationStore } from '../store/locationStore';
@@ -110,7 +111,7 @@ export default function HomeScreen({ navigation }: Props) {
 
   const [showLocationSheet, setShowLocationSheet] = useState(false);
 
-  const { fetchServices, fetchBrand, brand: apiBrand } = useCatalogStore();
+  const { fetchServices, fetchBrand, brand: apiBrand, servicesReady } = useCatalogStore();
   const profile = useProfileStore(state => state.profile);
   const authUser = useAuthStore(state => state.user);
 
@@ -150,6 +151,8 @@ export default function HomeScreen({ navigation }: Props) {
     if (!displayLocation || displayLocation === 'Locating...') return 'Bhubaneswar';
     return displayLocation.split(',')[0].trim() || 'Bhubaneswar';
   }, [displayLocation]);
+
+  const showHomeSkeleton = !isLocationHydrated || !servicesReady;
 
   const cardWidth = Math.max(280, width - px(40));
   const cardHeight = px(196);
@@ -309,6 +312,10 @@ export default function HomeScreen({ navigation }: Props) {
             </View>
           </View>
         }>
+        {showHomeSkeleton ? (
+          <DataSkeleton variant="home" testID="homeSkeleton" />
+        ) : (
+          <>
         {/* Hero Section: Road Scenery Background + Highlighted Greeting + Curved 24/7 Card */}
         <View style={{ marginBottom: px(22), position: 'relative' }}>
           {/* Atmospheric Road & Tow Truck Background Visual extending edge-to-edge under greeting */}
@@ -688,6 +695,8 @@ export default function HomeScreen({ navigation }: Props) {
             ))}
           </View>
         </View>
+          </>
+        )}
       </AppScreenLayout>
 
       <LocationSelectorSheet

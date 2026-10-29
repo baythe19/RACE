@@ -224,7 +224,7 @@ export default function DriverPickupScreen({ navigation }: Props) {
         </Pressable>
 
         {savedLocations.length > 0 ? (
-        <View>
+          <View>
           <Text
             style={{
               fontSize: t.caption,
@@ -288,7 +288,7 @@ export default function DriverPickupScreen({ navigation }: Props) {
               );
             })}
           </View>
-        </View>
+          </View>
         ) : null}
 
         {recentPickups.length > 0 ? (

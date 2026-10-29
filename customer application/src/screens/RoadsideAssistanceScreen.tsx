@@ -22,6 +22,7 @@ import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCar
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import { useCatalogStore } from '../store/catalogStore';
+import { useRoadsideAvailabilityQuery } from '../services/bookings/useServiceBookingMutations';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
@@ -34,29 +35,33 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideAssistance'>;
 const ROADSIDE_OPTIONS = [
   {
     id: 'flat_tyre',
+    slug: 'roadside_flat_tyre',
     title: 'Flat Tyre Assistance',
     price: 'From ₹199',
     Icon: Disc,
   },
   {
     id: 'battery_jumpstart',
+    slug: 'roadside_battery_jump',
     title: 'Battery Jumpstart',
     price: 'From ₹199',
     Icon: BatteryCharging,
   },
   {
     id: 'fuel_delivery',
+    slug: 'roadside_fuel_delivery',
     title: 'Fuel Delivery',
     price: 'From ₹299',
     Icon: Fuel,
   },
   {
     id: 'minor_repair',
+    slug: 'roadside_minor_repair',
     title: 'Minor Mechanical Fix',
     price: 'From ₹399',
     Icon: Wrench,
   },
-];
+] as const;
 
 export default function RoadsideAssistanceScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
@@ -66,6 +71,19 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
   const heroCard = getServiceCategoryCard('roadside');
 
   const apiBrand = useCatalogStore(state => state.brand);
+  const { data: availability } = useRoadsideAvailabilityQuery();
+
+  const availabilityBySlug = React.useMemo(() => {
+    const map = new Map<string, boolean>();
+    availability?.items.forEach(item => {
+      map.set(item.serviceType, item.available);
+    });
+    return map;
+  }, [availability]);
+
+  const bookableCount = ROADSIDE_OPTIONS.filter(
+    opt => availabilityBySlug.get(opt.slug) !== false,
+  ).length;
 
   const bookRoadside = () => {
     navigation.navigate('RoadsideSelectService');
@@ -99,12 +117,27 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
             textAlign: 'center',
             fontWeight: typography.weights.medium,
           }}>
-          On-spot help · Fair upfront pricing
+          On-spot help · Prices shown only for services you can book today
         </Text>
+        {bookableCount === 0 ? (
+          <Text
+            style={{
+              fontSize: px(12),
+              lineHeight: px(17),
+              color: colors.grey,
+              textAlign: 'center',
+              fontWeight: typography.weights.medium,
+            }}>
+            Tyre, battery, fuel & repairs are coming soon. Instant towing is available from Home →
+            Towing.
+          </Text>
+        ) : null}
 
         {/* Roadside Options List */}
         <View style={{ gap: px(10) }}>
-          {ROADSIDE_OPTIONS.map(opt => (
+          {ROADSIDE_OPTIONS.map(opt => {
+            const comingSoon = availabilityBySlug.get(opt.slug) === false;
+            return (
             <View
               key={opt.id}
               style={[
@@ -118,6 +151,7 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                   borderWidth: 1,
                   borderColor: '#F0EFEA',
                   gap: px(12),
+                  opacity: comingSoon ? 0.72 : 1,
                 },
               ]}>
               <View
@@ -145,17 +179,20 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                   style={{
                     fontSize: px(12),
                     fontWeight: typography.weights.bold,
-                    color: colors.primary,
+                    color: comingSoon ? colors.grey : colors.primary,
                     marginTop: px(3),
                   }}>
-                  {opt.price}
+                  {comingSoon ? 'Coming soon' : opt.price}
                 </Text>
               </View>
 
               <Pressable
-                onPress={() => bookRoadside()}
+                onPress={() => {
+                  if (!comingSoon) bookRoadside();
+                }}
+                disabled={comingSoon}
                 style={{
-                  backgroundColor: colors.primary,
+                  backgroundColor: comingSoon ? colors.border : colors.primary,
                   paddingHorizontal: px(14),
                   height: px(32),
                   borderRadius: px(8),
@@ -166,13 +203,14 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                   style={{
                     fontSize: px(12),
                     fontWeight: typography.weights.bold,
-                    color: colors.dark,
+                    color: comingSoon ? colors.grey : colors.dark,
                   }}>
-                  Book Now
+                  {comingSoon ? 'Soon' : 'Book Now'}
                 </Text>
               </Pressable>
             </View>
-          ))}
+          );
+          })}
         </View>
       </ScrollView>
 
@@ -219,11 +257,12 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
 
         <Pressable
           onPress={() => bookRoadside()}
+          disabled={bookableCount === 0}
           style={{
             flex: 1.5,
             height: px(46),
             borderRadius: px(14),
-            backgroundColor: colors.primary,
+            backgroundColor: bookableCount === 0 ? colors.border : colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'row',
@@ -233,11 +272,13 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
             style={{
               fontSize: px(14),
               fontWeight: typography.weights.bold,
-              color: colors.dark,
+              color: bookableCount === 0 ? colors.grey : colors.dark,
             }}>
-            Book Service
+            {bookableCount === 0 ? 'Services coming soon' : 'Book Service'}
           </Text>
-          <ArrowRight size={px(16)} color={colors.dark} strokeWidth={2.5} />
+          {bookableCount === 0 ? null : (
+            <ArrowRight size={px(16)} color={colors.dark} strokeWidth={2.5} />
+          )}
         </Pressable>
       </View>
     </SafeAreaView>

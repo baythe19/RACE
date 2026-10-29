@@ -42,7 +42,7 @@ export default function BookingsScreen() {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
   const [activeTab, setActiveTab] = useState<BookingTabId>('all');
-  const { data: bookings = [], isLoading, refetch, isRefetching } = useBookingsQuery();
+  const { data: bookings = [], isPending, isLoading, refetch, isRefetching } = useBookingsQuery();
 
   const typeFiltered = useMemo(() => {
     if (activeTab === 'towing') {
@@ -103,7 +103,8 @@ export default function BookingsScreen() {
   };
 
   const hasVisibleBookings = showOngoingCards || showHistoryCards;
-  const showEmptyScene = !isLoading && !isRefetching && !hasVisibleBookings;
+  const showBookingsSkeleton = isPending || (isLoading && bookings.length === 0);
+  const showEmptyScene = !showBookingsSkeleton && !isRefetching && !hasVisibleBookings;
 
   /** On All: active trips exist but no past jobs — soft hint under the list. */
   const showPastEmptyHint =
@@ -111,6 +112,7 @@ export default function BookingsScreen() {
     showOngoingCards &&
     !showHistoryCards &&
     !isLoading &&
+    !isPending &&
     !isRefetching;
 
   const emptyCopy = (() => {
@@ -162,7 +164,7 @@ export default function BookingsScreen() {
         void refetch();
       }}
       contentStyle={
-        showEmptyScene || (isLoading && bookings.length === 0) ? styles.fillContent : undefined
+        showEmptyScene || showBookingsSkeleton ? styles.fillContent : undefined
       }
       header={
         <TabRootHeader
@@ -209,9 +211,9 @@ export default function BookingsScreen() {
         })}
       </ScrollView>
 
-      {isLoading && bookings.length === 0 ? (
+      {showBookingsSkeleton ? (
         <View style={styles.centeredFill}>
-          <DataSkeleton variant="cards" />
+          <DataSkeleton variant="bookings" testID="bookingsSkeleton" />
         </View>
       ) : null}
 

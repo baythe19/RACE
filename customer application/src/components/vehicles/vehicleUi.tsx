@@ -12,8 +12,8 @@ import {
   Flame,
   Fuel,
   Leaf,
-  Motorbike,
-  PlugZap,
+  Motorbike as Bike,
+  PlugZap as Zap,
   Truck,
   type LucideProps,
 } from 'lucide-react-native';
@@ -66,8 +66,8 @@ export const VEHICLE_TYPE_OPTIONS: Array<{
   Icon: React.ComponentType<LucideProps>;
 }> = [
   { id: 'car', label: 'Car', Icon: Car },
-  { id: 'bike', label: 'Bike', Icon: Motorbike },
-  { id: 'ev', label: 'EV', Icon: PlugZap },
+  { id: 'bike', label: 'Bike', Icon: Bike },
+  { id: 'ev', label: 'EV', Icon: Zap },
   { id: 'truck', label: 'Truck', Icon: Truck },
   { id: 'auto', label: 'Auto', Icon: AutoIcon },
   { id: 'bus', label: 'Bus', Icon: BusFront },
@@ -84,7 +84,7 @@ export const FUEL_TYPE_OPTIONS: Array<{
   { id: 'petrol', label: 'Petrol', Icon: Fuel },
   { id: 'diesel', label: 'Diesel', Icon: Droplet },
   { id: 'cng', label: 'CNG', Icon: Flame },
-  { id: 'electric', label: 'EV', Icon: PlugZap },
+  { id: 'electric', label: 'EV', Icon: Zap },
   { id: 'hybrid', label: 'Hybrid', Icon: Leaf },
   { id: 'other', label: 'Other', Icon: CircleDashed },
 ];

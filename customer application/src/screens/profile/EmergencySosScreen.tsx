@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'EmergencySos'>;
 export default function EmergencySosScreen({}: Props) {
   const user = useAppSelector((state) => state.auth.user);
   const { data: config } = useSosConfigQuery();
-  const { data: context, isLoading } = useSosContextQuery();
+  const { data: context, isLoading } = useSosContextQuery(undefined, Boolean(user));
   const sosAlert = useSosAlertMutation();
 
   const emergencyContact = context?.emergencyContact

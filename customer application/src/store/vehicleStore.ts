@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import * as vehicleService from '../services/vehicleService';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, readAccessToken } from '../services/api';
 import type { Vehicle, VehicleInput } from '../types/vehicle';
 
 interface VehicleState {
@@ -70,6 +70,18 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
     vehiclesFetchInFlight = (async () => {
       set({ isLoading: true, error: null });
       try {
+        const token = await readAccessToken();
+        if (!token) {
+          set(state => ({
+            vehicles:
+              Array.isArray(state.vehicles) && state.vehicles.length > 0
+                ? state.vehicles
+                : DEFAULT_VEHICLES,
+            isLoading: false,
+            error: null,
+          }));
+          return;
+        }
         const vehicles = await vehicleService.getVehicles();
         const list = Array.isArray(vehicles) && vehicles.length > 0 ? vehicles : DEFAULT_VEHICLES;
         set({ vehicles: list, isLoading: false });

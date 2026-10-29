@@ -5,6 +5,17 @@
 
 ---
 
+## Latest session — Local driver-hire offer match (2026-10-29)
+
+- Offer feed treats legacy `Driver Service` via `selfDriverCategory`, and loads that field on the driver. QA part-time type is `Part-Time`, full-time independent type is `Full-Time`. Fleet driver stays `Tow Driver`.
+- Local `ensure:test-accounts` refreshed 9000000001–4 (trucks + fleet membership). Backend `tsc` 0. Live local check 18/18: part-time/full-time offers split, vendor sees paid towing only, online fleet assign → driver active job, customer tracking stays PENDING until accept. Test bookings cancelled. Drivers set offline.
+
+## Latest session — Customer Metro bundle errors (2026-10-29)
+
+- Peach/sootsim parse errors (DriverPickup JSX, goBackWithinStack return, Zap/Bike, MAP_PROVIDER dup, sanitizeFilePart dup, unterminated DateTime JSX, Info undefined) were stale HMR + dead Metro :8081.
+- Real fixes: `Motorbike as Bike` / `PlugZap as Zap`; `fetchProfile` no longer rethrows; skip authed fetches when logged out. Metro `--clear` + API :3000 up. Index bundle HTTP 200. Reload the sim.
+- Customer `tsc --noEmit` 0.
+
 ## Latest session — Customer Bookings/location UI recheck (2026-10-29)
 
 - Honest reaudit of prior Bookings + location + card asks on `v8.0.0---custumer-app`.

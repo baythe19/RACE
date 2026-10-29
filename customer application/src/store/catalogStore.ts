@@ -10,6 +10,8 @@ interface CatalogState {
   services: ServiceCategory[];
   brand: Brand | null;
   isLoading: boolean;
+  /** First `fetchServices` finished (success or fallback). Used for Home/Services skeletons. */
+  servicesReady: boolean;
   error: string | null;
   fetchServices: () => Promise<void>;
   fetchBrand: () => Promise<void>;
@@ -25,6 +27,7 @@ export const useCatalogStore = create<CatalogState>((set) => ({
   services: DEFAULT_SERVICES,
   brand: DEFAULT_BRAND,
   isLoading: false,
+  servicesReady: false,
   error: null,
 
   fetchServices: async () => {
@@ -36,10 +39,12 @@ export const useCatalogStore = create<CatalogState>((set) => ({
         set({
           services: Array.isArray(services) && services.length > 0 ? services : DEFAULT_SERVICES,
           isLoading: false,
+          servicesReady: true,
         });
       } catch (error) {
         set({
           isLoading: false,
+          servicesReady: true,
           error: getApiErrorMessage(error, 'Unable to load services'),
         });
       } finally {

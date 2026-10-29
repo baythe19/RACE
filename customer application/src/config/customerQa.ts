@@ -10,13 +10,11 @@ const allowMockReleaseApk =
 const isReleaseBuild = __DEV__ === false && !allowMockReleaseApk;
 
 /**
- * Floating screen-jump harness.
- * On in __DEV__ always (local UI work), or when env is explicitly true
- * (preview / QA builds). Partner uses env-only; customer needs the FAB
- * reliably while iterating on screens.
+ * Floating screen-jump harness — opt-in only (MVP local uses real navigation).
+ * Set EXPO_PUBLIC_UI_QA_NAVIGATOR=true when you need the FAB.
  */
 export const UI_QA_NAVIGATOR_ENABLED =
-  __DEV__ === true || process.env.EXPO_PUBLIC_UI_QA_NAVIGATOR === 'true';
+  process.env.EXPO_PUBLIC_UI_QA_NAVIGATOR === 'true';
 
 /** Default mock/preview auth from env (Continue can skip real OTP). */
 const envMockDefault =

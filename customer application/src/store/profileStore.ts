@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import * as profileService from '../services/profileService';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, readAccessToken } from '../services/api';
 import { syncOnboardingRequiredFromProfile } from './authState';
 import type { Profile } from '../types/models';
 import type { UpdateProfileRequest } from '../utils/profilePayload';
@@ -32,6 +32,11 @@ export const useProfileStore = create<ProfileState>((set) => ({
     profileFetchInFlight = (async () => {
       set({ isLoading: true, error: null });
       try {
+        const token = await readAccessToken();
+        if (!token) {
+          set({ isLoading: false, error: null });
+          return;
+        }
         const profile = await profileService.getProfile();
         set({ profile, isLoading: false });
       } catch (error) {
@@ -39,7 +44,6 @@ export const useProfileStore = create<ProfileState>((set) => ({
           isLoading: false,
           error: getApiErrorMessage(error, 'Unable to load profile'),
         });
-        throw error;
       } finally {
         profileFetchInFlight = null;
       }

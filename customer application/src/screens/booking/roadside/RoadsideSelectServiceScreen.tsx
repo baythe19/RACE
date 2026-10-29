@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Alert, Image, Pressable, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
@@ -34,6 +34,7 @@ function ServiceCard({
   return (
     <Pressable
       onPress={onPress}
+      disabled={comingSoon}
       style={{
         flex: 1,
         borderRadius: t.cardRadius,
@@ -44,7 +45,7 @@ function ServiceCard({
         justifyContent: 'center',
         paddingVertical: t.px(18),
         paddingHorizontal: t.px(8),
-        gap: t.px(8),
+        opacity: comingSoon ? 0.65 : 1,
       }}>
       <Image
         source={image}
@@ -89,6 +90,9 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
 
   const rows = [ROADSIDE_SERVICES.slice(0, 2), ROADSIDE_SERVICES.slice(2, 4)];
 
+  const isSelectedComingSoon =
+    availabilityBySlug.get(roadsideServiceIdToSlug(selected)) === false;
+
   return (
     <TowingBookingLayout
       title="Select Service"
@@ -96,9 +100,17 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
       accentColor={ROADSIDE_ACCENT}
       onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
+        if (isSelectedComingSoon) {
+          Alert.alert(
+            'Coming soon',
+            'This roadside service is not available yet. Choose another option or use Towing from Home.',
+          );
+          return;
+        }
         updateBooking({ serviceId: selected });
         navigation.navigate('RoadsideLocation');
-      }}>
+      }}
+      continueDisabled={isSelectedComingSoon}>
       <View style={{ flex: 1, gap: t.gridGap }}>
         {rows.map((row, rowIndex) => (
           <View key={rowIndex} style={{ flex: 1, flexDirection: 'row', gap: t.gridGap }}>
@@ -110,7 +122,14 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
                 image={service.image}
                 isSelected={selected === service.id}
                 comingSoon={availabilityBySlug.get(roadsideServiceIdToSlug(service.id)) === false}
-                onPress={() => setSelected(service.id)}
+                onPress={() => {
+                  const slug = roadsideServiceIdToSlug(service.id);
+                  if (availabilityBySlug.get(slug) === false) {
+                    Alert.alert('Coming soon', `${service.label} is not bookable yet.`);
+                    return;
+                  }
+                  setSelected(service.id);
+                }}
                 t={t}
               />
             ))}

@@ -61,7 +61,7 @@ import {
 } from '../../../../services/vendor/vendorDriversApi';
 import { vendorMembershipKeys } from '../../../../services/vendor/useVendorMembershipQueries';
 import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
-import { completeOnboarding } from '../../../../redux/auth/authSlice';
+import { completeOnboarding, updateTokens, updateUser } from '../../../../redux/auth/authSlice';
 import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlice';
 import { API_ENDPOINTS } from '../../../../config/api';
 import {
@@ -71,6 +71,7 @@ import {
 } from '../../../../constants/preview';
 import { api, saveTokens } from '../../../../services/api';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
+import { refreshAuthSession } from '../../../../services/authService';
 import type {
   PartnerRegistrationStackParamList,
   PartnerRootStackParamList,
@@ -917,8 +918,19 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       dispatch(finishPartnerSignup());
 
       if (!authUser) {
+        if (!UI_PREVIEW_MUTATIONS_ENABLED) {
+          throw new Error('Your session expired. Log in with OTP and submit again.');
+        }
         const token = 'mock-driver-token';
         await saveTokens(token, token);
+      } else {
+        try {
+          const session = await refreshAuthSession();
+          dispatch(updateTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken }));
+          dispatch(updateUser(session.user));
+        } catch {
+          // Registration succeeded; verification screen can poll status with existing tokens.
+        }
       }
 
       dispatch(
