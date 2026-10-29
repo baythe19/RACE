@@ -23,6 +23,7 @@ import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
 import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
 import { getApiErrorMessage } from '../../../services/api';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingAdvancePayment'>;
 
@@ -256,8 +257,7 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
       step={3}
       accentColor={TOWING_ACCENT}
       scrollable
-      showStep={false}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       hideFooter>
       {/* Collapsible booking summary */}
       <Pressable

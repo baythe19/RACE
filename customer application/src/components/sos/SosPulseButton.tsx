@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Pressable, Text, View } from 'react-native';
 
 import { SOS_COLORS } from '../../constants/sosTheme';
 import { typography } from '../../theme';
@@ -10,51 +10,68 @@ type Props = {
 };
 
 /**
- * The single red SOS pulse. Kept as the one intentionally loud element of the
- * redesigned light screen — emergency identity is preserved, everything else
- * around it now follows the app's light design language.
+ * Soft SOS pulse — urgency without flashy strobe.
+ * Rings breathe slowly; Reduce Motion keeps a static ring.
  */
 export default function SosPulseButton({ px, onPress }: Props) {
   const pulse = useRef(new Animated.Value(0)).current;
-  const pressScale = useRef(new Animated.Value(1)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then(enabled => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      pulse.setValue(0.45);
+      return;
+    }
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1400, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1400, useNativeDriver: true }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 2200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 0,
+          duration: 2200,
+          useNativeDriver: true,
+        }),
       ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reduceMotion]);
 
-  const onPressIn = () => {
-    Animated.spring(pressScale, { toValue: 0.92, useNativeDriver: true }).start();
-  };
-  const onPressOut = () => {
-    Animated.spring(pressScale, { toValue: 1, useNativeDriver: true }).start();
-  };
-
-  const rings = [4, 3, 2, 1];
+  const rings = reduceMotion ? [2] : [3, 2, 1];
 
   return (
     <View
       style={{
         alignItems: 'center',
         justifyContent: 'center',
-        height: px(148),
-        marginBottom: px(6),
+        height: px(156),
+        marginBottom: px(4),
       }}>
       {rings.map((ring, index) => {
-        const size = px(68 + ring * 20);
+        const size = px(72 + ring * 18);
         const opacity = pulse.interpolate({
           inputRange: [0, 1],
-          outputRange: [0.10 + index * 0.06, 0.38 - index * 0.06],
+          outputRange: [0.1 + index * 0.04, 0.32 - index * 0.06],
         });
         return (
           <Animated.View
             key={ring}
+            pointerEvents="none"
             style={{
               position: 'absolute',
               width: size,
@@ -68,37 +85,38 @@ export default function SosPulseButton({ px, onPress }: Props) {
         );
       })}
       <Pressable
-        onPress={onPress}
-        disabled={!onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={{
-          width: px(78),
-          height: px(78),
-          borderRadius: px(39),
-          backgroundColor: SOS_COLORS.red,
-          alignItems: 'center',
-          justifyContent: 'center',
-          shadowColor: SOS_COLORS.red,
-          shadowOpacity: 0.45,
-          shadowRadius: px(14),
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 8,
-          transform: [{ scale: pressScale }],
-        }}>
-        <Text
-          style={{
-            color: SOS_COLORS.white,
-            fontSize: px(23),
-            fontWeight: typography.weights.extrabold,
-            letterSpacing: 1.2,
-          }}>
-          SOS
-        </Text>
-        <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: px(9), marginTop: px(2) }}>
-          tap to alert
-        </Text>
-      </Pressable>
+          accessibilityRole="button"
+          accessibilityLabel="Send SOS alert"
+          accessibilityHint="Sends an emergency alert with your live location to your contact"
+          onPress={onPress}
+          disabled={!onPress}
+          style={({ pressed }) => ({
+            opacity: pressed ? 0.9 : 1,
+            width: px(82),
+            height: px(82),
+            borderRadius: px(41),
+            backgroundColor: SOS_COLORS.red,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: SOS_COLORS.red,
+            shadowOpacity: 0.32,
+            shadowRadius: px(16),
+            shadowOffset: { width: 0, height: 4 },
+            elevation: 6,
+          })}>
+          <Text
+            style={{
+              color: SOS_COLORS.white,
+              fontSize: px(22),
+              fontWeight: typography.weights.extrabold,
+              letterSpacing: 1.4,
+            }}>
+            SOS
+          </Text>
+          <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: px(9.5), marginTop: px(2) }}>
+            tap to alert
+          </Text>
+        </Pressable>
     </View>
   );
 }

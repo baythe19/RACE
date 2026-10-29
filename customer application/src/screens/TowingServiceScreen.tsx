@@ -29,6 +29,7 @@ import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import type { TowingServiceModeId } from '../types/towingBooking';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -80,7 +81,7 @@ export default function TowingServiceScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="Towing Service" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader title="Towing Service" onBack={() => goBackWithinStack(navigation)} />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}

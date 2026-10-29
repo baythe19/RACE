@@ -21,6 +21,7 @@ import ServiceNavHeader from '../components/services/ServiceNavHeader';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -73,7 +74,7 @@ export default function MoreServicesScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="More Services" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader title="More Services" onBack={() => goBackWithinStack(navigation)} />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}

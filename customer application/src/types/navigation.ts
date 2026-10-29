@@ -197,7 +197,7 @@ export type ProfileStackParamList = {
   ProfileMain: undefined;
   PersonalInformation: undefined;
   MyVehicles: undefined;
-  AddVehicle: undefined;
+  AddVehicle: { returnToDriverWizard?: boolean } | undefined;
   VehicleDetail: { vehicleId: string };
   EditVehicle: { vehicleId: string };
   SosDetails: undefined;

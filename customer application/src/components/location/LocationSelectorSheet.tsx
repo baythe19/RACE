@@ -335,7 +335,7 @@ export default function LocationSelectorSheet({
                     marginTop: 2,
                     textDecorationLine: 'none',
                   }}>
-                  Drag the pin, then confirm
+                  Drag map or long-press to set
                 </Text>
               </View>
             </Pressable>

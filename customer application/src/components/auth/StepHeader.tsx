@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { colors, radius, spacing, typography } from '../../theme';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 interface StepHeaderProps {
   step: number;
@@ -74,7 +75,7 @@ export function AuthBackHeader({ onBack, rightElement }: AuthBackHeaderProps) {
 export function useAuthNavigationBack(
   navigation: NativeStackNavigationProp<AuthStackParamList>,
 ) {
-  return () => navigation.goBack();
+  return () => goBackWithinStack(navigation);
 }
 
 const styles = StyleSheet.create({

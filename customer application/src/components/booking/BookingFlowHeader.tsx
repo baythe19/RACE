@@ -192,7 +192,18 @@ export default function BookingFlowHeader({
           <BookingStepper step={step} labels={stepLabels} theme={t} accentColor={accentColor} />
         </View>
       ) : null}
-      <Text style={[styles.centeredTitle, { fontSize: t.screenTitle }]}>{title}</Text>
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.centeredTitle,
+          {
+            fontSize: t.screenTitle,
+            lineHeight: t.screenTitle + 4,
+            height: t.screenTitle + 6,
+          },
+        ]}>
+        {title}
+      </Text>
     </View>
   );
 }

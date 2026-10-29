@@ -16,6 +16,7 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { shouldShowTripStartOtp } from '../../../utils/bookingDisplay';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverOnWay'>;
 
@@ -57,7 +58,7 @@ export default function DriverOnWayScreen({ navigation, route }: Props) {
       title="Your driver is on the way"
       step={7}
       headerVariant="inline"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel="Done"
       onContinue={() => navigation.popToTop()}>
       <View style={{ flex: 1 }}>

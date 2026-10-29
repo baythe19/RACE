@@ -12,6 +12,7 @@ import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideLocation'>;
 
@@ -47,7 +48,7 @@ export default function RoadsideLocationScreen({ navigation }: Props) {
       step={2}
       accentColor={ROADSIDE_ACCENT}
       scrollable
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       continueDisabled={!hasLocation}
       onContinue={() => {
         if (!hasLocation) {

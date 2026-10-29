@@ -16,6 +16,7 @@ import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingLocation'>;
 
@@ -91,7 +92,7 @@ export default function DriverBookingLocationScreen({ navigation }: Props) {
       title="Pickup Location"
       step={2}
       accentColor={DRIVER_ACCENT}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       continueDisabled={!hasPickup}
       onContinue={() => {
         updateBooking({

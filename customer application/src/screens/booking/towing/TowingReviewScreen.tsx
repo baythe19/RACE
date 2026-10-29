@@ -33,6 +33,7 @@ import {
   isTowingWalkthroughEnabled,
 } from '../../../utils/towingBookingWalkthrough';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingReview'>;
 
@@ -186,8 +187,8 @@ export default function TowingReviewScreen({ navigation }: Props) {
       step={3}
       accentColor={TOWING_ACCENT}
       scrollable
-      onBack={() => navigation.goBack()}
-      buttonLabel="Continue to payment"
+      onBack={() => goBackWithinStack(navigation)}
+      buttonLabel="Confirm booking"
       onContinue={handleContinue}
       continueDisabled={isLoadingFare || !fareBreakdown}>
       <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>

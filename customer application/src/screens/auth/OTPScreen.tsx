@@ -24,6 +24,7 @@ import type { AuthStackParamList } from '../../types/navigation';
 import { getPhoneDigits } from '../../utils/phone';
 import { maskMobile } from '../../utils/mask';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -215,7 +216,7 @@ export default function OTPScreen({ navigation, route }: Props) {
   const isVerifying = isLoading && otpValue.length === 6;
 
   return (
-    <AuthFormLayout onBack={() => navigation.goBack()}>
+    <AuthFormLayout onBack={() => goBackWithinStack(navigation)}>
       <View style={[styles.card, shadows.card, { borderRadius: px(18), padding: px(spacing.xl) }]}>
         <View style={[styles.iconWrap, { width: px(64), height: px(64), borderRadius: px(32) }]}>
           <MessageCircle size={px(28)} color={colors.primary} strokeWidth={2.2} />
@@ -228,7 +229,7 @@ export default function OTPScreen({ navigation, route }: Props) {
 
         <View style={[styles.phoneRow, { marginTop: px(10), marginBottom: px(24), gap: px(6) }]}>
           <Text style={[styles.phoneText, { fontSize: px(14) }]}>{destinationLabel}</Text>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.editBtn}>
+          <Pressable onPress={() => goBackWithinStack(navigation)} hitSlop={8} style={styles.editBtn}>
             <Pencil size={15} color={colors.primary} strokeWidth={2.2} />
           </Pressable>
         </View>

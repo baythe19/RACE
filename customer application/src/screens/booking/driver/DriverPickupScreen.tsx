@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
-import { Building2, ChevronRight, Clock, Home, MapPin, PlusCircle } from 'lucide-react-native';
-import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Pressable, Text, View } from 'react-native';
+import { Building2, ChevronRight, Clock, Home, MapPin } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
+import TileMapSurface from '../../../components/common/TileMapSurface';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
   DRIVER_BOOKING_STEP_LABELS,
@@ -21,13 +22,10 @@ import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverPickup'>;
 
-const MAP_PROVIDER =
-  Platform.OS === 'android' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY)
-    ? PROVIDER_GOOGLE
-    : PROVIDER_DEFAULT;
 const PLACEHOLDER = 'Search or pick on map';
 
 const LOCATION_ICONS = {
@@ -118,8 +116,8 @@ export default function DriverPickupScreen({ navigation }: Props) {
       step={2}
       stepLabels={DRIVER_BOOKING_STEP_LABELS}
       accentColor={DRIVER_ACCENT}
-      scrollable
-      onBack={() => navigation.goBack()}
+      scrollable={recentPickups.length > 2}
+      onBack={() => goBackWithinStack(navigation)}
       continueDisabled={!hasPickup}
       buttonLabel="Continue"
       onContinue={() => {
@@ -131,50 +129,32 @@ export default function DriverPickupScreen({ navigation }: Props) {
         });
         navigation.navigate('DriverChooseVehicleType');
       }}>
-      <View style={{ gap: t.px(16) }}>
-        <Text
-          style={{
-            fontSize: t.caption,
-            color: colors.grey,
-            lineHeight: t.px(18),
-            marginTop: -t.px(4),
-          }}>
-          Driver will come to this spot. No drop location needed for driver hire.
-        </Text>
-
+      <WizardStepFade>
+      <View style={{ gap: t.px(10) }}>
         <View>
-          <Text
-            style={{
-              fontSize: t.sectionTitle,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: t.px(10),
-            }}>
-            Meet here
-          </Text>
           <Pressable
             onPress={() => setShowPicker(true)}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: t.px(12),
+              gap: t.px(10),
               borderRadius: chipRadius,
-              borderWidth: 1.5,
+              borderWidth: 1,
               borderColor: DRIVER_ACCENT,
               backgroundColor: colors.background,
-              paddingHorizontal: t.px(14),
-              paddingVertical: t.px(14),
+              paddingHorizontal: t.px(12),
+              paddingVertical: t.px(8),
             }}>
             <View
               style={{
-                width: t.px(36),
-                height: t.px(36),
-                borderRadius: t.px(10),
+                width: t.px(28),
+                height: t.px(28),
+                borderRadius: t.px(8),
                 backgroundColor: DRIVER_LIGHT_BG,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <MapPin size={t.px(18)} color={DRIVER_ACCENT} strokeWidth={2.4} />
+              <MapPin size={t.px(15)} color={DRIVER_ACCENT} strokeWidth={2.4} />
             </View>
             <Text
               style={{
@@ -194,40 +174,42 @@ export default function DriverPickupScreen({ navigation }: Props) {
         <Pressable onPress={() => setShowPicker(true)}>
           <View
             style={{
-              height: t.px(160),
+              height: t.px(96),
               borderRadius: chipRadius,
               overflow: 'hidden',
               borderWidth: 1,
               borderColor: colors.border,
             }}>
-            {hasPickup ? (
-              <MapView
+            {hasPickup && pickupLat != null && pickupLng != null ? (
+              <TileMapSurface
                 key={`${pickupLat}-${pickupLng}`}
-                provider={MAP_PROVIDER}
-                style={{ width: '100%', height: '100%' }}
-                scrollEnabled={false}
-                zoomEnabled={false}
-                pitchEnabled={false}
-                rotateEnabled={false}
-                pointerEvents="none"
+                interactive={false}
                 initialRegion={{
-                  latitude: pickupLat!,
-                  longitude: pickupLng!,
+                  latitude: pickupLat,
+                  longitude: pickupLng,
                   latitudeDelta: 0.012,
                   longitudeDelta: 0.012,
                 }}
+                markers={[
+                  {
+                    id: 'pickup',
+                    latitude: pickupLat,
+                    longitude: pickupLng,
+                    color: DRIVER_ACCENT,
+                  },
+                ]}
               />
             ) : (
               <View
                 style={{
                   width: '100%',
                   height: '100%',
-                  backgroundColor: '#F3F4F6',
+                  backgroundColor: '#E5E7EB',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: t.px(6),
                 }}>
-                <MapPin size={t.px(28)} color={colors.grey} />
+                <MapPin size={t.px(28)} color={DRIVER_ACCENT} fill={DRIVER_ACCENT} strokeWidth={1.6} />
                 <Text
                   style={{
                     fontSize: t.caption,
@@ -238,35 +220,21 @@ export default function DriverPickupScreen({ navigation }: Props) {
                 </Text>
               </View>
             )}
-            {hasPickup ? (
-              <View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <MapPin size={t.px(32)} color={DRIVER_ACCENT} fill={DRIVER_ACCENT} />
-              </View>
-            ) : null}
           </View>
         </Pressable>
 
+        {savedLocations.length > 0 ? (
         <View>
           <Text
             style={{
-              fontSize: t.sectionTitle,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: t.px(10),
+              fontSize: t.caption,
+              fontWeight: typography.weights.semibold,
+              color: colors.grey,
+              marginBottom: t.px(6),
             }}>
-            Quick picks
+            Saved
           </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(8) }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(6) }}>
             {savedLocations.map(location => {
               const iconKey = location.label.toLowerCase() as keyof typeof LOCATION_ICONS;
               const Icon = LOCATION_ICONS[iconKey] ?? Home;
@@ -292,39 +260,26 @@ export default function DriverPickupScreen({ navigation }: Props) {
                     );
                   }}
                   style={{
-                    width: '31%',
-                    flexGrow: 1,
-                    maxWidth: '48%',
+                    flexDirection: 'row',
                     alignItems: 'center',
                     gap: t.px(6),
-                    borderRadius: chipRadius,
-                    borderWidth: isSelected ? 1.5 : 1,
+                    borderRadius: t.px(8),
+                    borderWidth: 1,
                     borderColor: isSelected ? DRIVER_ACCENT : colors.border,
                     backgroundColor: isSelected ? DRIVER_LIGHT_BG : colors.background,
-                    paddingVertical: t.px(12),
-                    paddingHorizontal: t.px(8),
+                    paddingVertical: t.px(6),
+                    paddingHorizontal: t.px(10),
                   }}>
-                  <View
-                    style={{
-                      width: t.px(34),
-                      height: t.px(34),
-                      borderRadius: t.px(10),
-                      backgroundColor: isSelected ? colors.background : DRIVER_LIGHT_BG,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Icon
-                      size={t.px(16)}
-                      color={isSelected ? DRIVER_ACCENT : colors.dark}
-                      strokeWidth={2.2}
-                    />
-                  </View>
+                  <Icon
+                    size={t.px(14)}
+                    color={isSelected ? DRIVER_ACCENT : colors.dark}
+                    strokeWidth={2.2}
+                  />
                   <Text
                     style={{
                       fontSize: t.caption,
-                      fontWeight: typography.weights.bold,
+                      fontWeight: typography.weights.semibold,
                       color: colors.dark,
-                      textAlign: 'center',
                     }}
                     numberOfLines={1}>
                     {location.label}
@@ -332,52 +287,18 @@ export default function DriverPickupScreen({ navigation }: Props) {
                 </Pressable>
               );
             })}
-            <Pressable
-              onPress={() => setShowPicker(true)}
-              style={{
-                width: '31%',
-                flexGrow: 1,
-                maxWidth: '48%',
-                alignItems: 'center',
-                gap: t.px(6),
-                borderRadius: chipRadius,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.background,
-                paddingVertical: t.px(12),
-                paddingHorizontal: t.px(8),
-              }}>
-              <View
-                style={{
-                  width: t.px(34),
-                  height: t.px(34),
-                  borderRadius: t.px(10),
-                  backgroundColor: DRIVER_LIGHT_BG,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <PlusCircle size={t.px(16)} color={DRIVER_ACCENT} strokeWidth={2.2} />
-              </View>
-              <Text
-                style={{
-                  fontSize: t.caption,
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                }}>
-                New place
-              </Text>
-            </Pressable>
           </View>
         </View>
+        ) : null}
 
         {recentPickups.length > 0 ? (
           <View>
             <Text
               style={{
-                fontSize: t.sectionTitle,
-                fontWeight: typography.weights.bold,
-                color: colors.dark,
-                marginBottom: t.px(10),
+                fontSize: t.caption,
+                fontWeight: typography.weights.semibold,
+                color: colors.grey,
+                marginBottom: t.px(6),
               }}>
               Recent
             </Text>
@@ -396,46 +317,25 @@ export default function DriverPickupScreen({ navigation }: Props) {
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: t.px(12),
-                    borderRadius: chipRadius,
+                    gap: t.px(8),
+                    borderRadius: t.px(10),
                     borderWidth: 1,
                     borderColor: colors.border,
                     backgroundColor: colors.background,
-                    paddingHorizontal: t.px(12),
-                    paddingVertical: t.px(12),
+                    paddingHorizontal: t.px(10),
+                    paddingVertical: t.px(8),
                   }}>
-                  <View
+                  <Clock size={t.px(14)} color={colors.grey} strokeWidth={2} />
+                  <Text
                     style={{
-                      width: t.px(36),
-                      height: t.px(36),
-                      borderRadius: t.px(10),
-                      backgroundColor: '#F3F4F6',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Clock size={t.px(16)} color={colors.grey} strokeWidth={2} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text
-                      style={{
-                        fontSize: t.body,
-                        fontWeight: typography.weights.bold,
-                        color: colors.dark,
-                      }}
-                      numberOfLines={1}>
-                      {location.title}
-                    </Text>
-                    <Text
-                      style={{
-                        marginTop: t.px(2),
-                        fontSize: t.caption,
-                        color: colors.grey,
-                        lineHeight: t.px(16),
-                      }}
-                      numberOfLines={1}>
-                      {formatLocationDisplay(location.address)}
-                    </Text>
-                  </View>
+                      flex: 1,
+                      fontSize: t.caption,
+                      fontWeight: typography.weights.semibold,
+                      color: colors.dark,
+                    }}
+                    numberOfLines={1}>
+                    {location.title}
+                  </Text>
                   <ChevronRight size={t.iconSm} color={colors.grey} />
                 </Pressable>
               ))}
@@ -443,6 +343,7 @@ export default function DriverPickupScreen({ navigation }: Props) {
           </View>
         ) : null}
       </View>
+      </WizardStepFade>
 
       <LocationPickerModal
         visible={showPicker}

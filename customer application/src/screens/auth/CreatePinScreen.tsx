@@ -21,6 +21,7 @@ import { getApiErrorMessage } from '../../services/api';
 import { setPin as setPinApi } from '../../services/profileService';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 const PIN_LENGTH = 4;
@@ -169,7 +170,7 @@ export default function CreatePinScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={[styles.body, { paddingHorizontal: px(24) }]}>
-        <AuthBackHeader onBack={() => navigation.goBack()} />
+        <AuthBackHeader onBack={() => goBackWithinStack(navigation)} />
 
         <View style={[styles.content, compact && styles.contentCompact]}>
           <View

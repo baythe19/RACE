@@ -177,3 +177,38 @@ User: "vehicle page me har input, har form keyboard ke saath properly respond ka
 | Layout | `AppScreenLayout` का स्क्रॉलव्यू `keyboardShouldPersistTaps="handled"` पहले से है ✅; `ProfileSubScreenLayout` डिफ़ॉल्ट `keyboardAvoiding: true` (राउंड 4) से AddVehicle/EditVehicle कवर हैं |
 
 टाइप-चेक क्लीन है (2 पहले से मौजूद बुकिंग-फ़्लो त्रुटियों के अलावा)। मेट्रो बंडल 200.
+
+### Round 6 — My Vehicles list + Add Vehicle form redesign (2026-10-29)
+
+User screenshots: list page cards खिंचे हुए (QR badge title के ऊपर, Add card नीचे बड़ा), Add form
+flat/unorganized list जैसा।
+
+**My Vehicles list:**
+| Change | Detail |
+|--------|--------|
+| Add button → header right | Gold pill "＋ Add Vehicle" अब header में (हमेशा दिखता है, scroll करने पर भी) |
+| Add card → empty-state only | बड़ा dashed "Add your first vehicle" कार्ड सिर्फ तब जब कोई vehicle नहीं — vehicles हों तो duplicate कार्ड नहीं |
+| Card interior | QR chip अब right column में नीचे (Primary badge के नीचे clear gap), title के ऊपर नहीं; image 96→84; action row (View QR | Edit) को top border के साथ footer-style |
+| QR info banner | आखिर में रहता है, spacing normalized |
+
+**Add Vehicle form — organized sections:**
+| Section | Contents |
+|---------|----------|
+| 1. Vehicle identity | Type grid, Subtype chips, Number, Brand, Model |
+| 2. Colour & fuel | Color picker + custom, Fuel chips |
+| 3. Photo | Dashed upload area |
+
+हर section एक bordered card में (`styles.sectionCard` — bg, border, radius 16, padding 14)।
+SectionLabel अब uppercase 13px extrabold headings।
+
+Fixes during restructure: missing `StyleSheet` import (crash would happen at render),
+section card closes balanced. tsc clean, Metro bundle 200.
+
+### Round 6b — visible spec chips (2026-10-29)
+
+User: "UI same hi dikh raha hai" — round 6 के structural changes को visible
+में translate किया:
+
+- Vehicle card specs (fuel / color / type) अब **grey chip badges** हैं
+  (चपटे टेक्स्ट की जगह गोल पट्टियाँ) — कार्ड अब बहुत अधिक structured दिखता है
+- View QR अब गोल्ड + Edit गहरा, बीच में डिवाइडर।

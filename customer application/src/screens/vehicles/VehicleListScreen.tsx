@@ -15,9 +15,9 @@ import {
   formatVehicleTypeWithSubtype,
   FuelTypeIcon,
   getColorHex,
-  MiniQrCode,
   VEHICLE_BANNER_BG,
   VEHICLE_YELLOW,
+  VehicleEmergencyQrThumb,
   VehiclePlaceholderImage,
   VehicleTypeIcon,
 } from '../../components/vehicles/vehicleUi';
@@ -28,6 +28,30 @@ import { formatVehicleNumber } from '../../utils/vehicleFormat';
 import { colors, shadows, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'MyVehicles'>;
+
+function SpecChip({
+  px,
+  children,
+}: {
+  px: (n: number) => number;
+  children: React.ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: px(4),
+        backgroundColor: '#F3F4F6',
+        borderRadius: px(6),
+        paddingHorizontal: px(8),
+        paddingVertical: px(4),
+        maxWidth: '100%',
+      }}>
+      {children}
+    </View>
+  );
+}
 
 function VehicleListCard({
   vehicle,
@@ -46,6 +70,7 @@ function VehicleListCard({
 }) {
   const colorHex = getColorHex(vehicle.color);
   const colorLabel = vehicle.color || '—';
+  const qrSize = px(52);
 
   return (
     <Pressable
@@ -56,136 +81,162 @@ function VehicleListCard({
           borderWidth: isPrimary ? 1.5 : 1,
           borderColor: isPrimary ? VEHICLE_YELLOW : colors.border,
           backgroundColor: colors.background,
-          padding: px(12),
+          padding: px(14),
           marginBottom: px(12),
         },
         shadows.card,
       ]}>
-      {isPrimary ? (
-        <View style={{ position: 'absolute', top: px(10), right: px(10), zIndex: 2 }}>
-          <View
-            style={{
-              paddingHorizontal: px(10),
-              paddingVertical: px(4),
-              borderRadius: px(12),
-              backgroundColor: '#FEF3C7',
-            }}>
-            <Text
-              style={{
-                fontSize: px(10),
-                fontWeight: typography.weights.bold,
-                color: VEHICLE_YELLOW,
-              }}>
-              Primary Vehicle
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      <View style={{ flexDirection: 'row', gap: px(12) }}>
-        <VehiclePlaceholderImage type={vehicle.vehicleType} size={px(84)} />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: px(12) }}>
+        <VehiclePlaceholderImage type={vehicle.vehicleType} size={px(76)} />
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: px(8),
+              flexWrap: 'wrap',
+              gap: px(6),
+              marginBottom: px(4),
             }}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontSize: px(15),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                  marginBottom: px(2),
-                }}>
-                {vehicle.brand} {vehicle.model}
-              </Text>
-              <Text style={{ fontSize: px(12), color: colors.grey, marginBottom: px(8) }}>
-                {formatVehicleNumber(vehicle.vehicleNumber)}
-              </Text>
-
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(10) }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4) }}>
-                  <FuelTypeIcon type={vehicle.fuelType} size={px(12)} />
-                  <Text style={{ fontSize: px(11), color: colors.grey }}>
-                    {formatFuelLabel(vehicle.fuelType)}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4) }}>
-                  <Circle size={px(8)} color={colorHex} fill={colorHex} />
-                  <Text style={{ fontSize: px(11), color: colors.grey }}>{colorLabel}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4) }}>
-                  <VehicleTypeIcon type={vehicle.vehicleType} size={px(12)} color={colors.grey} />
-                  <Text style={{ fontSize: px(11), color: colors.grey }}>
-                    {formatVehicleTypeWithSubtype(vehicle)}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* QR chip sits under the Primary badge, right-aligned column */}
-            <View
+            <Text
+              numberOfLines={2}
               style={{
-                padding: px(5),
-                borderRadius: px(8),
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.background,
-                flexShrink: 0,
-                alignSelf: 'flex-start',
-                marginTop: isPrimary ? px(26) : 0,
+                flex: 1,
+                minWidth: px(120),
+                fontSize: px(15),
+                fontWeight: typography.weights.bold,
+                color: colors.dark,
+                lineHeight: px(20),
               }}>
-              <MiniQrCode size={px(38)} />
-            </View>
+              {vehicle.brand} {vehicle.model}
+            </Text>
+            {isPrimary ? (
+              <View
+                style={{
+                  paddingHorizontal: px(8),
+                  paddingVertical: px(3),
+                  borderRadius: px(6),
+                  backgroundColor: '#FEF3C7',
+                }}>
+                <Text
+                  style={{
+                    fontSize: px(9.5),
+                    fontWeight: typography.weights.bold,
+                    color: VEHICLE_YELLOW,
+                  }}>
+                  Primary
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          <View
+          <Text
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: px(14),
-              marginTop: px(10),
-              paddingTop: px(8),
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
+              fontSize: px(12),
+              color: colors.grey,
+              fontWeight: typography.weights.semibold,
+              marginBottom: px(8),
+              letterSpacing: 0.3,
             }}>
-            <Pressable onPress={onViewQr}>
+            {formatVehicleNumber(vehicle.vehicleNumber)}
+          </Text>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: px(6), alignItems: 'center' }}>
+            <SpecChip px={px}>
+              <FuelTypeIcon type={vehicle.fuelType} size={px(11)} />
               <Text
                 style={{
-                  fontSize: px(12),
-                  fontWeight: typography.weights.bold,
-                  color: VEHICLE_YELLOW,
-                }}>
-                View QR
-              </Text>
-            </Pressable>
-            <Text style={{ color: colors.border }}>|</Text>
-            <Pressable onPress={onEdit}>
-              <Text
-                style={{
-                  fontSize: px(12),
-                  fontWeight: typography.weights.bold,
+                  fontSize: px(10.5),
                   color: colors.grey,
+                  fontWeight: typography.weights.semibold,
                 }}>
-                Edit
+                {formatFuelLabel(vehicle.fuelType)}
               </Text>
-            </Pressable>
+            </SpecChip>
+            <SpecChip px={px}>
+              <Circle size={px(7)} color={colorHex} fill={colorHex} />
+              <Text
+                style={{
+                  fontSize: px(10.5),
+                  color: colors.grey,
+                  fontWeight: typography.weights.semibold,
+                }}>
+                {colorLabel}
+              </Text>
+            </SpecChip>
+            <SpecChip px={px}>
+              <VehicleTypeIcon type={vehicle.vehicleType} size={px(11)} color={colors.grey} />
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: px(10.5),
+                  color: colors.grey,
+                  fontWeight: typography.weights.semibold,
+                  flexShrink: 1,
+                }}>
+                {formatVehicleTypeWithSubtype(vehicle)}
+              </Text>
+            </SpecChip>
           </View>
         </View>
+
+        <Pressable
+          onPress={onViewQr}
+          accessibilityRole="button"
+          accessibilityLabel="View vehicle emergency QR code"
+          style={({ pressed }) => [
+            {
+              alignItems: 'center',
+              flexShrink: 0,
+              padding: px(4),
+              borderRadius: px(10),
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: '#FAFAFA',
+            },
+            pressed && { opacity: 0.7 },
+          ]}>
+          <VehicleEmergencyQrThumb vehicleId={vehicle.id} qrCodeDataUrl={vehicle.qrCode} size={qrSize} />
+        </Pressable>
+      </View>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: px(20),
+          marginTop: px(12),
+          paddingTop: px(10),
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+        }}>
+        <Pressable onPress={onViewQr} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+          <Text
+            style={{
+              fontSize: px(12.5),
+              fontWeight: typography.weights.bold,
+              color: VEHICLE_YELLOW,
+            }}>
+            View QR
+          </Text>
+        </Pressable>
+        <Pressable onPress={onEdit} style={({ pressed }) => [pressed && { opacity: 0.6 }]}>
+          <Text
+            style={{
+              fontSize: px(12.5),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            Edit
+          </Text>
+        </Pressable>
       </View>
     </Pressable>
   );
 }
 
 function AddVehicleCard({ px, onPress }: { px: (n: number) => number; onPress: () => void }) {
-  // Empty-state hero card — only visible when the user has no vehicles yet
-  // (with vehicles present the Add action lives in the header button).
   return (
     <Pressable
       onPress={onPress}
@@ -242,6 +293,7 @@ function QrInfoBanner({ px }: { px: (n: number) => number }) {
         borderRadius: px(12),
         backgroundColor: VEHICLE_BANNER_BG,
         padding: px(14),
+        marginTop: px(4),
       }}>
       <View
         style={{
@@ -262,10 +314,10 @@ function QrInfoBanner({ px }: { px: (n: number) => number }) {
             color: colors.dark,
             marginBottom: px(2),
           }}>
-          Each vehicle gets a unique QR code
+          Emergency QR
         </Text>
-        <Text style={{ fontSize: px(12), color: colors.dark, lineHeight: px(18) }}>
-          Scan to request emergency help instantly
+        <Text style={{ fontSize: px(12), color: colors.dark, lineHeight: px(17) }}>
+          Scan opens help for that vehicle — call, towing, or SOS.
         </Text>
       </View>
     </View>

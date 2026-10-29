@@ -10,6 +10,7 @@ import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { RoadsideServiceId } from '../../../types/roadsideBooking';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideSelectService'>;
 
@@ -93,7 +94,7 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
       title="Select Service"
       step={1}
       accentColor={ROADSIDE_ACCENT}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
         updateBooking({ serviceId: selected });
         navigation.navigate('RoadsideLocation');

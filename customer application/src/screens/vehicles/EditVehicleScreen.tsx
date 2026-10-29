@@ -21,6 +21,7 @@ import { FORM_PLACEHOLDER_COLOR } from '../../constants/profileForm';
 import { FUEL_TYPE_IDS, VEHICLE_TYPE_IDS } from '../../components/vehicles/vehicleUi';
 import type { FuelType, VehicleType } from '../../types/vehicle';
 import { colors, radius, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'EditVehicle'>;
 
@@ -74,7 +75,7 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
         model: model.trim(),
         color: color.trim() || undefined,
       });
-      navigation.goBack();
+      goBackWithinStack(navigation);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update vehicle');
     }

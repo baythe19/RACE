@@ -87,16 +87,25 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
   },
 
   fetchVehicle: async id => {
-    set({ isLoading: true, error: null });
+    const cached = get().vehicles.find(item => item.id === id) ?? null;
+    set({ isLoading: true, error: null, selectedVehicle: cached ?? get().selectedVehicle });
     try {
       const vehicle = await vehicleService.getVehicle(id);
-      set({ selectedVehicle: vehicle, isLoading: false });
+      set(state => ({
+        selectedVehicle: vehicle,
+        vehicles: state.vehicles.map(item => (item.id === id ? vehicle : item)),
+        isLoading: false,
+        error: null,
+      }));
     } catch (error) {
+      if (cached) {
+        set({ selectedVehicle: cached, isLoading: false, error: null });
+        return;
+      }
       set({
         isLoading: false,
         error: getApiErrorMessage(error, 'Unable to load vehicle'),
       });
-      throw error;
     }
   },
 

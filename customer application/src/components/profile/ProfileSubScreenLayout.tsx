@@ -1,8 +1,10 @@
 import React, { type ReactNode } from 'react';
 import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import AppScreenLayout from '../ui/AppScreenLayout';
 import AppStackHeader from '../ui/AppStackHeader';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import { colors } from '../../theme';
 
@@ -31,8 +33,8 @@ export default function ProfileSubScreenLayout({
   onBack,
   keyboardAvoiding = true,
 }: Props) {
-  const navigation = useNavigation();
-  const handleBack = onBack ?? (() => navigation.goBack());
+  const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const handleBack = onBack ?? (() => goBackWithinStack(navigation));
 
   return (
     <AppScreenLayout

@@ -43,6 +43,7 @@ import {
 } from '../../utils/bookingDisplay';
 import { formatLocationDisplay } from '../../utils/readableAddress';
 import { colors, shadows, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -139,7 +140,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
 
   if (!booking) {
     return (
-      <ProfileSubScreenLayout title="Booking details" onBack={() => navigation.goBack()}>
+      <ProfileSubScreenLayout title="Booking details" onBack={() => goBackWithinStack(navigation)}>
         <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
           {bookingQuery.isError ? (
             <>
@@ -219,7 +220,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   return (
     <ProfileSubScreenLayout
       title="Booking details"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       headerRight={
         <View
           style={{

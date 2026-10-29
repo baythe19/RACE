@@ -14,8 +14,23 @@ export function humanizeApiErrorMessage(message: string, fallback = 'Something w
     return 'This code was already used. Tap Resend OTP for a fresh code.';
   }
 
-  if (lower.includes('expired') || lower.includes('verification_expired')) {
+  const looksLikeOtp =
+    lower.includes('otp') ||
+    lower.includes('verify-otp') ||
+    lower.includes('verification code') ||
+    lower.includes('verification_expired') ||
+    lower.includes('hanu');
+
+  if (looksLikeOtp && (lower.includes('expired') || lower.includes('verification_expired'))) {
     return OTP_EXPIRED;
+  }
+
+  if (lower.includes('expired') && (lower.includes('token') || lower.includes('jwt') || lower.includes('session'))) {
+    return 'Your session expired. Please sign in again.';
+  }
+
+  if (lower.includes('expired') && !looksLikeOtp) {
+    return text.length > 120 ? fallback : text;
   }
 
   if (

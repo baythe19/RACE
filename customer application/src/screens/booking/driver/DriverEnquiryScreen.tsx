@@ -11,6 +11,7 @@ import { useProfileStore } from '../../../store/profileStore';
 import { createEnquiry, type EnquiryDto } from '../../../services/enquiryService';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverEnquiry'>;
 
@@ -72,7 +73,7 @@ export default function DriverEnquiryScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 8 }}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ marginBottom: 20 }}>
+        <Pressable onPress={() => goBackWithinStack(navigation)} hitSlop={12} style={{ marginBottom: 20 }}>
           <Ionicons name="arrow-back" size={24} color={colors.dark} />
         </Pressable>
 

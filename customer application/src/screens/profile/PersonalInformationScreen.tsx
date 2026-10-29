@@ -28,6 +28,7 @@ import { useProfileStore } from '../../store/profileStore';
 import { getApiErrorMessage } from '../../services/api';
 import { apiDateToDisplay, buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
 import { colors, shadows, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 function formatRelationship(value?: string): string {
   if (!value) return '';
@@ -143,7 +144,7 @@ export default function PersonalInformationScreen() {
       // push/pop flow instead of leaving the user stuck on the form).
       void fetchProfile();
       Alert.alert('Saved', 'Your profile has been updated.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
       ]);
     } catch (error) {
       Alert.alert('Profile', getApiErrorMessage(error, 'Unable to update profile'));

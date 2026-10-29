@@ -17,6 +17,7 @@ import {
   isOngoingUnifiedStatus,
 } from '../../../utils/bookingDisplay';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList & BookingsStackParamList, 'TowingTrack'>;
 
@@ -97,7 +98,7 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
 
   const handleContinue = () => {
     if (fromBookings) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     if (isCompleted && bookingId) {
@@ -184,7 +185,7 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
         fromBookings ? 'Back to Bookings' : isCompleted ? 'Rate Experience' : 'Continue'
       }
       onPrimary={handleContinue}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       footerExtra={
         bookingId ? (
           <DropoffPaymentModal

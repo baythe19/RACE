@@ -8,6 +8,7 @@ import { useDriverBooking } from '../../../context/DriverBookingContext';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { DriverTypeId } from '../../../types/driverBooking';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverSelectType'>;
 
@@ -79,7 +80,7 @@ export default function DriverSelectTypeScreen({ navigation }: Props) {
     <TowingBookingLayout
       title="Select Driver Type"
       step={1}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
         updateBooking({ driverType: selected });
         navigation.navigate('DriverDateTime');

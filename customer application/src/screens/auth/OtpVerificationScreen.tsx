@@ -32,6 +32,7 @@ import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { CUSTOMER_QA_OTP } from '../../config/customerQa';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'OtpVerification'>;
 
@@ -234,7 +235,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
       <KeyboardFormView style={styles.fill} contentContainerStyle={styles.scrollContent}>
-          <AuthHeader scale={scale} onBack={() => navigation.goBack()} />
+          <AuthHeader scale={scale} onBack={() => goBackWithinStack(navigation)} />
 
           <Text
             style={[
@@ -285,7 +286,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
               {formatPhone(mobileNumber)}
             </Text>
             <Pressable
-              onPress={() => navigation.goBack()}
+              onPress={() => goBackWithinStack(navigation)}
               hitSlop={8}
               style={{ marginLeft: 10 * scale }}
               accessibilityRole="button"

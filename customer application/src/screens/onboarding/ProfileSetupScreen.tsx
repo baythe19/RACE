@@ -39,6 +39,7 @@ import type { AuthStackParamList } from '../../types/navigation';
 import { getApiErrorMessage } from '../../services/api';
 import { apiDateToDisplay, buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
 import { colors, shadows, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -198,7 +199,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
           <StepHeader
             step={1}
             scale={s}
-            onBack={canGoBack ? () => navigation.goBack() : undefined}
+            onBack={canGoBack ? () => goBackWithinStack(navigation) : undefined}
             onSkip={() => {
               void setCustomerOnboardingStep('vehicle').then(() => {
                 useAuthStore.getState().setCustomerOnboardingStep('vehicle');

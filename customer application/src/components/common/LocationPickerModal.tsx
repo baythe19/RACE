@@ -8,16 +8,21 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import {
   GooglePlacesAutocomplete,
   type GooglePlacesAutocompleteRef,
 } from 'react-native-google-places-autocomplete';
-import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
+import MapView, {
+  PROVIDER_DEFAULT,
+  PROVIDER_GOOGLE,
+  type LongPressEvent,
+  type Region,
+} from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Crosshair, MapPin, Search } from 'lucide-react-native';
+import { ArrowLeft, Crosshair, MapPin, Search } from 'lucide-react-native';
 
+import TileMapSurface, { type TileMapHandle } from './TileMapSurface';
 import type { LocationResult } from '../../types/location';
 import { BHUBANESWAR_DEFAULT, getGoogleMapsApiKey } from '../../utils/googleMaps';
 import {
@@ -73,8 +78,11 @@ export default function LocationPickerModal({
   const apiKey = getGoogleMapsApiKey();
   const insets = useSafeAreaInsets();
   const mapRef = useRef<MapView>(null);
+  const tileRef = useRef<TileMapHandle>(null);
+  const [nativeMapReady, setNativeMapReady] = useState(false);
   const searchRef = useRef<GooglePlacesAutocompleteRef>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const geoSeqRef = useRef(0);
   const regionRef = useRef<Region>({
     latitude: initialLocation?.latitude ?? BHUBANESWAR_DEFAULT.latitude,
     longitude: initialLocation?.longitude ?? BHUBANESWAR_DEFAULT.longitude,
@@ -85,6 +93,7 @@ export default function LocationPickerModal({
   const [selected, setSelected] = useState<LocationResult | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isMapMoving, setIsMapMoving] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   /** Soft Places failure — never wipe the whole search screen. */
   const [placesHint, setPlacesHint] = useState<string | null>(
@@ -93,12 +102,14 @@ export default function LocationPickerModal({
   const [sheetHeight, setSheetHeight] = useState(230);
 
   const resolveRegion = useCallback(async (region: Region) => {
+    const seq = ++geoSeqRef.current;
     setIsGeocoding(true);
     try {
       const location = await reverseGeocodeToLocation(region.latitude, region.longitude);
+      if (seq !== geoSeqRef.current) return;
       setSelected(location);
     } finally {
-      setIsGeocoding(false);
+      if (seq === geoSeqRef.current) setIsGeocoding(false);
     }
   }, []);
 
@@ -112,6 +123,7 @@ export default function LocationPickerModal({
       };
       regionRef.current = region;
       mapRef.current?.animateToRegion(region, 400);
+      tileRef.current?.animateToRegion(region, 400);
       void resolveRegion(region);
     },
     [resolveRegion],
@@ -120,6 +132,8 @@ export default function LocationPickerModal({
   useEffect(() => {
     if (!visible) {
       setShowSearch(false);
+      setIsMapMoving(false);
+      setNativeMapReady(false);
       return;
     }
 
@@ -127,13 +141,19 @@ export default function LocationPickerModal({
     setPlacesHint(apiKey ? null : 'Address search needs a Maps key on this build.');
     const lat = initialLocation?.latitude ?? BHUBANESWAR_DEFAULT.latitude;
     const lng = initialLocation?.longitude ?? BHUBANESWAR_DEFAULT.longitude;
-    regionRef.current = {
+    const region: Region = {
       latitude: lat,
       longitude: lng,
       latitudeDelta: BHUBANESWAR_DEFAULT.latitudeDelta,
       longitudeDelta: BHUBANESWAR_DEFAULT.longitudeDelta,
     };
-    void resolveRegion(regionRef.current);
+    regionRef.current = region;
+    const frame = requestAnimationFrame(() => {
+      mapRef.current?.animateToRegion(region, 0);
+      tileRef.current?.animateToRegion(region, 0);
+    });
+    void resolveRegion(region);
+    return () => cancelAnimationFrame(frame);
   }, [
     visible,
     initialMode,
@@ -149,15 +169,29 @@ export default function LocationPickerModal({
     };
   }, []);
 
+  const handleRegionChange = useCallback((_region: Region, details?: { isGesture?: boolean }) => {
+    if (details?.isGesture) setIsMapMoving(true);
+  }, []);
+
   const handleRegionChangeComplete = useCallback(
     (region: Region) => {
       regionRef.current = region;
+      setIsMapMoving(false);
       if (debounceRef.current) clearTimeout(debounceRef.current);
       debounceRef.current = setTimeout(() => {
         void resolveRegion(region);
       }, REVERSE_GEOCODE_DEBOUNCE_MS);
     },
     [resolveRegion],
+  );
+
+  /** Rapido/Uber-style: long-press drops the pin on that exact spot (map recenters). */
+  const handleMapLongPress = useCallback(
+    (event: LongPressEvent) => {
+      const { latitude, longitude } = event.nativeEvent.coordinate;
+      animateTo(latitude, longitude);
+    },
+    [animateTo],
   );
 
   const handlePlaceSelect = useCallback(
@@ -240,27 +274,50 @@ export default function LocationPickerModal({
           provider={MAP_PROVIDER}
           style={StyleSheet.absoluteFill}
           initialRegion={mapRegion}
+          onRegionChange={handleRegionChange}
           onRegionChangeComplete={handleRegionChangeComplete}
+          onLongPress={handleMapLongPress}
+          onMapReady={() => setNativeMapReady(true)}
           showsUserLocation
           showsMyLocationButton={false}
           rotateEnabled={false}
           pitchEnabled={false}
         />
 
-        {/* Center pin — map moves underneath */}
+        {/* Peach / web have no native map tiles. This surface keeps drag + long-press working. */}
+        {!nativeMapReady && !showSearch ? (
+          <TileMapSurface
+            ref={tileRef}
+            initialRegion={mapRegion}
+            onRegionChange={handleRegionChange}
+            onRegionChangeComplete={handleRegionChangeComplete}
+            onLongPress={(latitude, longitude) => animateTo(latitude, longitude)}
+          />
+        ) : null}
+
+        {/* Center pin — Rapido pattern: map pans under a fixed pin; long-press also drops here */}
         {!showSearch ? (
-          <View style={styles.centerPinWrap} pointerEvents="none">
+          <View
+            style={[
+              styles.centerPinWrap,
+              isMapMoving ? styles.centerPinLifted : null,
+            ]}
+            pointerEvents="none">
             <View style={[styles.pinBubble, shadows.cardSoft]}>
               <Text style={styles.pinBubbleText} numberOfLines={1}>
-                {isGeocoding ? 'Finding address...' : addressParts.title || 'Move map to pin'}
+                {isMapMoving
+                  ? 'Release to set'
+                  : isGeocoding
+                    ? 'Finding address...'
+                    : addressParts.title || 'Move map to pin'}
               </Text>
             </View>
             <MapPin size={42} color={accentColor} fill={accentColor} strokeWidth={1.5} />
-            <View style={styles.pinShadow} />
+            <View style={[styles.pinShadow, isMapMoving ? styles.pinShadowLifted : null]} />
           </View>
         ) : null}
 
-        {/* Full-width header (map mode) */}
+        {/* Header matches AppStackHeader: left back + left title + right action */}
         {!showSearch ? (
           <View style={[styles.headerBar, { paddingTop: insets.top + 6 }]}>
             <Pressable
@@ -269,11 +326,16 @@ export default function LocationPickerModal({
               style={styles.headerBtn}
               accessibilityRole="button"
               accessibilityLabel="Go back">
-              <Ionicons name="arrow-back" size={22} color={colors.dark} />
+              <ArrowLeft size={22} color={colors.dark} strokeWidth={2.4} />
             </Pressable>
-            <Text style={styles.headerTitle} numberOfLines={1}>
-              {title}
-            </Text>
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {title}
+              </Text>
+              <Text style={styles.headerSubtitle} numberOfLines={1}>
+                Drag map or long-press to set
+              </Text>
+            </View>
             <Pressable
               onPress={() => {
                 setPlacesHint(apiKey ? null : 'Address search needs a Maps key on this build.');
@@ -312,11 +374,13 @@ export default function LocationPickerModal({
                 style={styles.headerBtn}
                 accessibilityRole="button"
                 accessibilityLabel="Go back">
-                <Ionicons name="arrow-back" size={22} color={colors.dark} />
+                <ArrowLeft size={22} color={colors.dark} strokeWidth={2.4} />
               </Pressable>
-              <Text style={styles.headerTitle} numberOfLines={1}>
-                Search location
-              </Text>
+              <View style={styles.headerTitleWrap}>
+                <Text style={styles.headerTitle} numberOfLines={1}>
+                  Search location
+                </Text>
+              </View>
               <View style={{ width: 44 }} />
             </View>
 
@@ -434,7 +498,9 @@ export default function LocationPickerModal({
             ]}
             onLayout={event => setSheetHeight(event.nativeEvent.layout.height)}>
             <Text style={styles.sheetLabel}>Selected location</Text>
-            <Text style={styles.sheetSubtitle}>Drag the map to fine-tune the pin</Text>
+            <Text style={styles.sheetSubtitle}>
+              Drag the map, or long-press to drop the pin
+            </Text>
 
             <Pressable
               onPress={() => {
@@ -499,6 +565,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 5,
   },
+  centerPinLifted: {
+    marginTop: -64,
+    opacity: 0.92,
+  },
   pinBubble: {
     backgroundColor: colors.dark,
     borderRadius: 8,
@@ -521,6 +591,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.25)',
     marginTop: 2,
   },
+  pinShadowLifted: {
+    width: 16,
+    height: 6,
+    opacity: 0.35,
+  },
   headerBar: {
     position: 'absolute',
     top: 0,
@@ -531,25 +606,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     minHeight: 52,
-    backgroundColor: colors.background,
+    backgroundColor: colors.pageBg ?? colors.background,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
-    paddingHorizontal: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 10,
   },
   headerBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
+  headerTitleWrap: {
     flex: 1,
-    textAlign: 'center',
+    minWidth: 0,
+    marginHorizontal: 6,
+  },
+  headerTitle: {
     fontSize: 18,
     fontWeight: typography.weights.extrabold,
     color: colors.dark,
+    lineHeight: 22,
+    letterSpacing: -0.3,
+    textAlign: 'left',
+    textDecorationLine: 'none',
+  },
+  headerSubtitle: {
+    marginTop: 2,
+    fontSize: 11,
+    color: colors.grey,
+    lineHeight: 15,
+    textAlign: 'left',
     textDecorationLine: 'none',
   },
   gpsBtn: {

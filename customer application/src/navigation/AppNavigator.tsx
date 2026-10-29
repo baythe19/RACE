@@ -113,7 +113,11 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const BookingsStack = createNativeStackNavigator<BookingsStackParamList>();
 const CallStack = createNativeStackNavigator<CallStackParamList>();
 
-const stackScreenOptions = {
+const stackScreenOptions = ({
+  navigation,
+}: {
+  navigation: { getState: () => { index: number } };
+}) => ({
   headerStyle: {
     backgroundColor: colors.background,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -133,15 +137,21 @@ const stackScreenOptions = {
   headerBackButtonDisplayMode: 'minimal' as const,
   headerLeft: (props: Parameters<typeof StackBackButton>[0]) => <StackBackButton {...props} />,
   contentStyle: { backgroundColor: colors.background },
-  // Professional standard push across every stack — card slides from the
-  // right, previous screen eases left. One consistent feel app-wide.
   animation: 'slide_from_right' as const,
   animationDuration: 280,
   gestureDirection: 'horizontal' as const,
   animationTypeForReplace: 'push' as const,
-};
+  gestureEnabled: navigation.getState().index > 0,
+});
 
 const towingBookingScreenOptions = { headerShown: false as const };
+
+/** Driver wizard keeps the stepper and Continue button planted; only the body changes. */
+const driverWizardScreenOptions = {
+  headerShown: false as const,
+  animation: 'none' as const,
+  animationDuration: 0,
+};
 
 const towingBookingScreens = (
   Stack: ReturnType<typeof createNativeStackNavigator<HomeStackParamList>>,
@@ -234,7 +244,7 @@ const driverBookingScreens = (
     <Stack.Screen
       name="DriverBookingPayment"
       component={DriverBookingPaymentScreen}
-      options={towingBookingScreenOptions}
+      options={driverWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverBookingConfirmed"
@@ -254,22 +264,22 @@ const driverBookingScreens = (
     <Stack.Screen
       name="DriverDateTime"
       component={DriverDateTimeScreen}
-      options={towingBookingScreenOptions}
+      options={driverWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverPickup"
       component={DriverPickupScreen}
-      options={towingBookingScreenOptions}
+      options={driverWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverChooseVehicleType"
       component={DriverChooseVehicleTypeScreen}
-      options={towingBookingScreenOptions}
+      options={driverWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverReview"
       component={DriverReviewScreen}
-      options={towingBookingScreenOptions}
+      options={driverWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverAssigned"
@@ -435,12 +445,13 @@ function ServicesStackNavigator() {
 function BookingsStackNavigator() {
   return (
     <BookingsStack.Navigator
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerShown: false,
         animation: 'slide_from_right' as const,
         animationDuration: 280,
         gestureDirection: 'horizontal' as const,
-      }}>
+        gestureEnabled: navigation.getState().index > 0,
+      })}>
       <BookingsStack.Screen name="BookingsMain" component={BookingsScreen} />
       <BookingsStack.Screen name="BookingDetail" component={BookingDetailScreen} />
       <BookingsStack.Screen name="TowingTrack" component={TowingTrackScreen} />
@@ -453,13 +464,14 @@ function BookingsStackNavigator() {
 function CallStackNavigator() {
   return (
     <CallStack.Navigator
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerShown: false,
         contentStyle: { backgroundColor: '#000000' },
         animation: 'slide_from_right' as const,
         animationDuration: 280,
         gestureDirection: 'horizontal' as const,
-      }}>
+        gestureEnabled: navigation.getState().index > 0,
+      })}>
       <CallStack.Screen name="CallMain" component={CallScreen} />
       <CallStack.Screen name="QRScan" component={QRScanScreen} />
       <CallStack.Screen name="SOSEmergency" component={SOSEmergencyScreen} />
@@ -471,18 +483,15 @@ function CallStackNavigator() {
 function ProfileStackNavigator() {
   return (
     <ProfileStack.Navigator
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerShown: false,
-        // Standard professional push: new card slides in from the right while
-        // the previous page eases slightly left — no modal float, no flash.
-        animation: 'slide_from_right',
+        animation: 'slide_from_right' as const,
         animationDuration: 280,
-        gestureDirection: 'horizontal',
-        // Solid page backgrounds so the underlying screen never shows through
-        // mid-slide (the "half page over half page" artifact).
+        gestureDirection: 'horizontal' as const,
         contentStyle: { backgroundColor: colors.background },
-        animationTypeForReplace: 'push',
-      }}>
+        animationTypeForReplace: 'push' as const,
+        gestureEnabled: navigation.getState().index > 0,
+      })}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
       <ProfileStack.Screen name="MyVehicles" component={MyVehiclesScreen} />
@@ -510,6 +519,7 @@ export function MainTabNavigator() {
         <RoadsideBookingProvider>
         <Tab.Navigator
         tabBar={props => <CustomTabBar {...props} />}
+        backBehavior="none"
         screenOptions={{ headerShown: false }}>
         <Tab.Screen name="Home" component={HomeStackNavigator} />
         <Tab.Screen name="Bookings" component={BookingsStackNavigator} />

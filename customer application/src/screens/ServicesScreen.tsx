@@ -14,6 +14,7 @@ import { SERVICE_CATEGORY_CARDS } from '../constants/serviceCategoryCards';
 import { useCatalogStore } from '../store/catalogStore';
 import type { ServicesStackParamList } from '../types/navigation';
 import { openServiceCategory } from '../utils/serviceNavigation';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -36,7 +37,7 @@ export default function ServicesScreen({ navigation }: Props) {
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
     } else {
       const parent = navigation.getParent();
       (parent as any)?.navigate('Home', { screen: 'HomeMain' });

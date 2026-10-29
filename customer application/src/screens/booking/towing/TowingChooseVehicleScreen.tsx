@@ -13,6 +13,7 @@ import type { Vehicle } from '../../../types/vehicle';
 import { isTowingWalkthroughEnabled } from '../../../utils/towingBookingWalkthrough';
 import { getVehicleCategory } from '../../../utils/vehicleCategory';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingChooseVehicle'>;
 
@@ -59,7 +60,7 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
       step={1}
       scrollable
       continueDisabled={!canContinue}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
         const vehicle = safeVehicles.find(item => item.id === selectedId);
         if (!vehicle) return;

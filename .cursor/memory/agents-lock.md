@@ -8,4 +8,5 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
-| 2026-10-29 agent | MyVehicles list redesign + AddVehicle form organize | add-btn header right, form sections | session: vehicle UI |
+| Agent | customer vehicle QR | download, detail UX, expiry fix, browser test | now |
+| Auto | customer maps UI | unify map chrome across picker, live trip, driver pickup | now |

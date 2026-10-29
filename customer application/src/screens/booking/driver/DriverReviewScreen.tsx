@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { DriverFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
   DRIVER_BOOKING_STEP_LABELS,
@@ -23,6 +24,7 @@ import type { DriverFareBreakdown, DriverPackageHours } from '../../../types/far
 import { calculateDriverPricing, formatRupee } from '../../../utils/driverPricing';
 import { parseStoredDate } from '../../../utils/driverCalendar';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverReview'>;
 
@@ -89,6 +91,7 @@ export default function DriverReviewScreen({ navigation }: Props) {
     booking.fareBreakdown ?? null,
   );
   const [isLoadingFare, setIsLoadingFare] = useState(false);
+  const [fareUnavailable, setFareUnavailable] = useState(false);
 
   const packageHours: DriverPackageHours =
     booking.durationId === 'custom'
@@ -108,6 +111,7 @@ export default function DriverReviewScreen({ navigation }: Props) {
 
     async function loadFare() {
       setIsLoadingFare(true);
+      setFareUnavailable(false);
       try {
         const estimate = await estimateDriverFare({
           packageHours,
@@ -119,6 +123,7 @@ export default function DriverReviewScreen({ navigation }: Props) {
       } catch {
         if (!cancelled) {
           setFareBreakdown(null);
+          setFareUnavailable(true);
         }
       } finally {
         if (!cancelled) {
@@ -174,22 +179,11 @@ export default function DriverReviewScreen({ navigation }: Props) {
       stepLabels={DRIVER_BOOKING_STEP_LABELS}
       accentColor={DRIVER_ACCENT}
       scrollable
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel="Continue to pay"
       onContinue={handleContinue}
-      continueDisabled={!canContinue}
-      footerNoteBelow={
-        <Text
-          style={{
-            fontSize: t.caption,
-            color: colors.grey,
-            textAlign: 'center',
-            marginTop: t.px(2),
-            marginBottom: t.px(4),
-          }}>
-          Advance holds your driver. Balance due when service starts.
-        </Text>
-      }>
+      continueDisabled={!canContinue}>
+      <WizardStepFade>
       <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>
         <View
           style={{
@@ -322,7 +316,13 @@ export default function DriverReviewScreen({ navigation }: Props) {
             </View>
           </View>
         )}
+        {fareUnavailable && !isLoadingFare ? (
+          <Text style={{ fontSize: t.caption, color: colors.grey, lineHeight: t.px(18) }}>
+            Live fare is unavailable. You can continue with this estimate.
+          </Text>
+        ) : null}
       </View>
+      </WizardStepFade>
     </TowingBookingLayout>
   );
 }

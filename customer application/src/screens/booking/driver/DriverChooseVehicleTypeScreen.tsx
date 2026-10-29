@@ -1,9 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { Car, Check, Plus } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
   DRIVER_BOOKING_STEP_LABELS,
@@ -15,7 +17,9 @@ import { useVehicleStore } from '../../../store/vehicleStore';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { Vehicle } from '../../../types/vehicle';
 import { getVehicleCategory } from '../../../utils/vehicleCategory';
+import { navigateToAddVehicleFromDriverWizard } from '../../../navigation/driverWizardNavigation';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverChooseVehicleType'>;
 
@@ -23,35 +27,101 @@ function formatVehicleLabel(vehicle: Vehicle): string {
   return `${vehicle.brand} ${vehicle.model} · ${vehicle.vehicleNumber}`;
 }
 
+function VehicleListSkeleton({
+  radius,
+  px,
+}: {
+  radius: number;
+  px: (n: number) => number;
+}) {
+  const opacity = useRef(new Animated.Value(0.45)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, { toValue: 1, duration: 650, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0.45, duration: 650, useNativeDriver: true }),
+      ]),
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [opacity]);
+
+  return (
+    <View style={{ gap: px(10) }}>
+      {[0, 1].map(index => (
+        <Animated.View
+          key={index}
+          style={{
+            opacity,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: px(12),
+            borderRadius: radius,
+            borderWidth: 1,
+            borderColor: colors.border,
+            padding: px(14),
+          }}>
+          <View
+            style={{
+              width: px(44),
+              height: px(44),
+              borderRadius: px(12),
+              backgroundColor: '#F3F4F6',
+            }}
+          />
+          <View style={{ flex: 1, gap: px(8) }}>
+            <View style={{ width: '62%', height: px(12), borderRadius: px(6), backgroundColor: '#F3F4F6' }} />
+            <View style={{ width: '40%', height: px(10), borderRadius: px(6), backgroundColor: '#F3F4F6' }} />
+          </View>
+          <View
+            style={{
+              width: px(22),
+              height: px(22),
+              borderRadius: px(6),
+              backgroundColor: '#F3F4F6',
+            }}
+          />
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
 function goAddVehicle(navigation: Props['navigation']) {
-  const parent = navigation.getParent();
-  if (parent) {
-    (parent as { navigate: (a: string, b?: object) => void }).navigate('Profile', {
-      screen: 'AddVehicle',
-    });
-    return;
-  }
-  (navigation as { navigate: (a: string, b?: object) => void }).navigate('Profile', {
-    screen: 'AddVehicle',
-  });
+  navigateToAddVehicleFromDriverWizard(navigation);
 }
 
 export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
-  const { vehicles, fetchVehicles, isLoading } = useVehicleStore();
+  const { vehicles, fetchVehicles } = useVehicleStore();
   const [selectedId, setSelectedId] = useState(booking.vehicleId ?? '');
   const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (!settled) setHasLoaded(true);
+    }, 8000);
     void fetchVehicles()
       .catch(error => {
         if (__DEV__) {
           console.warn('[DriverChooseVehicleType] fetchVehicles failed', error);
         }
       })
-      .finally(() => setHasLoaded(true));
+      .finally(() => {
+        settled = true;
+        setHasLoaded(true);
+      });
+    return () => clearTimeout(timer);
   }, [fetchVehicles]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchVehicles();
+    }, [fetchVehicles]),
+  );
 
   useEffect(() => {
     if (selectedId) return;
@@ -65,7 +135,7 @@ export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
   }, [booking.vehicleId, selectedId, vehicles]);
 
   const canContinue = selectedId.length > 0 && vehicles.length > 0;
-  const showLoading = !hasLoaded && (isLoading || vehicles.length === 0);
+  const showLoading = !hasLoaded && vehicles.length === 0;
   const chipRadius = t.px(12);
 
   return (
@@ -74,9 +144,9 @@ export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
       step={3}
       stepLabels={DRIVER_BOOKING_STEP_LABELS}
       accentColor={DRIVER_ACCENT}
-      scrollable
+      scrollable={vehicles.length > 3}
       continueDisabled={!canContinue}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
         const vehicle = vehicles.find(item => item.id === selectedId);
         if (!vehicle) return;
@@ -87,22 +157,11 @@ export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
         });
         navigation.navigate('DriverReview');
       }}>
-      <View style={{ gap: t.px(14) }}>
-        <Text
-          style={{
-            fontSize: t.caption,
-            color: colors.grey,
-            lineHeight: t.px(18),
-            marginTop: -t.px(4),
-          }}>
-          Pick the car the hired driver will drive for you.
-        </Text>
+      <WizardStepFade>
+      <View style={{ gap: t.px(10) }}>
 
         {showLoading ? (
-          <View style={{ alignItems: 'center', paddingVertical: t.px(40), gap: t.px(10) }}>
-            <ActivityIndicator color={DRIVER_ACCENT} />
-            <Text style={{ fontSize: t.caption, color: colors.grey }}>Loading your vehicles…</Text>
-          </View>
+          <VehicleListSkeleton radius={chipRadius} px={t.px} />
         ) : vehicles.length === 0 ? (
           <View
             style={{
@@ -259,19 +318,15 @@ export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'center',
                 gap: t.px(6),
-                borderRadius: chipRadius,
-                borderWidth: 1,
-                borderColor: colors.border,
-                borderStyle: 'dashed',
-                paddingVertical: t.px(14),
+                alignSelf: 'flex-start',
+                paddingVertical: t.px(4),
               }}>
-              <Plus size={t.px(16)} color={DRIVER_ACCENT} strokeWidth={2.4} />
+              <Plus size={t.px(14)} color={DRIVER_ACCENT} strokeWidth={2.4} />
               <Text
                 style={{
-                  fontSize: t.body,
-                  fontWeight: typography.weights.bold,
+                  fontSize: t.caption,
+                  fontWeight: typography.weights.semibold,
                   color: colors.dark,
                 }}>
                 Add another vehicle
@@ -280,6 +335,7 @@ export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
           </View>
         )}
       </View>
+      </WizardStepFade>
     </TowingBookingLayout>
   );
 }

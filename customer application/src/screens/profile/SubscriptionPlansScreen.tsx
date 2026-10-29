@@ -16,6 +16,7 @@ import {
 import { getApiErrorMessage } from '../../services/api/apiClient';
 import type { ProfileStackParamList } from '../../types/navigation';
 import { colors, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'SubscriptionPlans'>;
 
@@ -37,7 +38,7 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
     subscribe.mutate(
       { planSlug, billingCycle: billingPeriod },
       {
-        onSuccess: () => navigation.goBack(),
+        onSuccess: () => goBackWithinStack(navigation),
         onError: (error) => {
           Alert.alert('Subscription failed', getApiErrorMessage(error));
         },

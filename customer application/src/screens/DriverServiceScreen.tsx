@@ -27,6 +27,7 @@ import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import type { DriverTypeId } from '../types/driverBooking';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -88,7 +89,7 @@ export default function DriverServiceScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="Driver Service" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader title="Driver Service" onBack={() => goBackWithinStack(navigation)} />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}

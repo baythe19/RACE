@@ -18,6 +18,7 @@ import {
 } from '../../services/subscriptions/useSubscriptionQueries';
 import type { ProfileStackParamList } from '../../types/navigation';
 import { colors, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 export default function ChoosePlanScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
@@ -41,7 +42,7 @@ export default function ChoosePlanScreen() {
       {
         onSuccess: () => {
           Alert.alert('Subscribed', 'Your plan is now active.', [
-            { text: 'OK', onPress: () => navigation.goBack() },
+            { text: 'OK', onPress: () => goBackWithinStack(navigation) },
           ]);
         },
         onError: error => Alert.alert('Subscription failed', getApiErrorMessage(error)),

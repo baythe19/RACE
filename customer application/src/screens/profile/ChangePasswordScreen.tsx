@@ -9,6 +9,7 @@ import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/P
 import { getApiErrorMessage } from '../../services/api';
 import { changePassword } from '../../services/profileService';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -49,7 +50,7 @@ export default function ChangePasswordScreen() {
     try {
       await changePassword(current, next);
       Alert.alert('Updated', 'Your password has been changed successfully.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
       ]);
     } catch (error) {
       Alert.alert('Could not update password', getApiErrorMessage(error));

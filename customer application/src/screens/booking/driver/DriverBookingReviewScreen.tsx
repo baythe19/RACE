@@ -20,6 +20,7 @@ import type { DriverFareBreakdown } from '../../../types/fare';
 import { calculateDriverPricing, formatRupee } from '../../../utils/driverPricing';
 import { getVehicleCategoryLabel } from '../../../utils/vehicleCategory';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingReview'>;
 
@@ -115,7 +116,7 @@ export default function DriverBookingReviewScreen({ navigation }: Props) {
       step={4}
       accentColor={DRIVER_ACCENT}
       scrollable
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel="Continue"
       onContinue={handleContinue}
       continueDisabled={!booking.vehicleId || isLoadingFare || totalPrice <= 0}

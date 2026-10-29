@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import LocationPickerModal from '../../components/common/LocationPickerModal';
 import { useUserLocationStore } from '../../store/userLocationStore';
 import type { HomeStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'SelectLocation'>;
 
@@ -27,10 +28,10 @@ export default function SelectLocationScreen({ navigation }: Props) {
               }
             : undefined
         }
-        onClose={() => navigation.goBack()}
+        onClose={() => goBackWithinStack(navigation)}
         onLocationSelected={location => {
           void setUserLocation(location);
-          navigation.goBack();
+          goBackWithinStack(navigation);
         }}
       />
     </View>

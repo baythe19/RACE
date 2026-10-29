@@ -14,6 +14,7 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { shouldShowTripStartOtp } from '../../../utils/bookingDisplay';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingDriverOnWay'>;
 
@@ -55,7 +56,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
       title="Your driver is on the way"
       step={0}
       headerVariant="inline"
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel="Continue"
       onContinue={() => navigation.navigate('TowingCompleted', trackParams)}>
       <View style={{ flex: 1 }}>

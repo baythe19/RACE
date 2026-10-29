@@ -25,6 +25,7 @@ import { formatFuelLabel } from '../../components/vehicles/vehicleUi';
 import { getLucideIcon } from '../../utils/lucideIcon';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -84,7 +85,7 @@ export default function QRCodeScreen({ navigation, route }: Props) {
         <StepHeader
           step={3}
           scale={s}
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackWithinStack(navigation)}
           showSkip={false}
         />
 

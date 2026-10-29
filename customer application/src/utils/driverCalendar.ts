@@ -153,8 +153,11 @@ export interface UpcomingDateChip {
   isToday: boolean;
 }
 
-/** Compact strip of upcoming bookable days (avoids full-month calendar density). */
-export function buildUpcomingDateStrip(count = 14): UpcomingDateChip[] {
+/** Bookable days ahead in part-time driver schedule (≈2 months). */
+export const DRIVER_BOOKING_DATE_STRIP_DAYS = 60;
+
+/** Compact strip of upcoming bookable days (horizontal scroll). */
+export function buildUpcomingDateStrip(count = DRIVER_BOOKING_DATE_STRIP_DAYS): UpcomingDateChip[] {
   const today = startOfDay(new Date());
   const chips: UpcomingDateChip[] = [];
 

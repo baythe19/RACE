@@ -19,6 +19,7 @@ import { useAppDispatch } from '../../redux/hooks';
 import { clearSignupPath, setSignupPath } from '../../redux/onboarding/onboardingSlice';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, layout, radius, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'AccountType'>;
 
@@ -33,7 +34,7 @@ export default function AccountTypeScreen({ navigation }: Props) {
 
   const handleBack = useCallback(() => {
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     const parent = navigation.getParent();

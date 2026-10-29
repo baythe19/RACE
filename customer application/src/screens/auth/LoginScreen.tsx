@@ -35,6 +35,7 @@ import {
   isValidIndianMobile,
 } from '../../utils/phone';
 import { colors, layout, radius, shadows, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 const SUCCESS_GREEN = '#22C55E';
@@ -111,7 +112,7 @@ export default function LoginScreen({ navigation }: Props) {
 
       <View style={[styles.topBar, { paddingHorizontal: px(layout.screenPadding) }]}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => goBackWithinStack(navigation)}
           hitSlop={12}
           style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
           <ArrowLeft size={22} color={colors.dark} strokeWidth={2.5} />

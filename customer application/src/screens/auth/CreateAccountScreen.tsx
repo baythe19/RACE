@@ -25,6 +25,7 @@ import { useSignupDraftStore } from '../../store/signupDraftStore';
 import type { AuthStackParamList } from '../../types/navigation';
 import { formatPhoneE164, getPhoneDigits } from '../../utils/phone';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -110,7 +111,7 @@ export default function CreateAccountScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}>
           <View style={styles.main}>
             <View style={{ marginBottom: px(4) }}>
-              <AuthBackHeader onBack={() => navigation.goBack()} />
+              <AuthBackHeader onBack={() => goBackWithinStack(navigation)} />
             </View>
 
             <Text

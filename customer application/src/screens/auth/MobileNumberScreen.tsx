@@ -53,6 +53,7 @@ import { ensurePreviewAuthSession, previewAdvanceFromMobileNumber } from '../../
 import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'MobileNumber'>;
 
@@ -143,7 +144,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
       return;
     }
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     const parent = navigation.getParent();

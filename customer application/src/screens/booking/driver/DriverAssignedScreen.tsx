@@ -12,6 +12,7 @@ import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import { brand } from '../../../theme/brand';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverAssigned'>;
 
@@ -69,7 +70,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
       title=" "
       step={5}
       hideFooter
-      onBack={() => navigation.goBack()}>
+      onBack={() => goBackWithinStack(navigation)}>
       <View style={{ flex: 1, justifyContent: 'space-between' }}>
         <View style={{ alignItems: 'center', paddingTop: t.px(4) }}>
           <Animated.View

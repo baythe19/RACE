@@ -12,6 +12,7 @@ import { confirmMobileChange, requestMobileChange } from '../../services/profile
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 export default function ChangeMobileNumberScreen() {
   const px = useProfilePx();
@@ -89,7 +90,7 @@ export default function ChangeMobileNumberScreen() {
         useAuthStore.getState().setUser({ ...updatedAuthUser, mobileNumber: updatedProfile.mobileNumber });
       }
       Alert.alert('Updated', `Your mobile number has been updated to ${newPhone}.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
+        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
       ]);
     } catch (error) {
       Alert.alert('Could not update number', getApiErrorMessage(error));

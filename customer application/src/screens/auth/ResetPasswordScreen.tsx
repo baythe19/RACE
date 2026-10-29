@@ -21,6 +21,7 @@ import { AuthBackHeader } from '../../components/auth/StepHeader';
 import { DEMO_OTP } from '../../constants/auth';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -66,7 +67,7 @@ export default function ResetPasswordScreen({ navigation, route }: Props) {
           contentContainerStyle={{ paddingHorizontal: px(24), paddingBottom: px(24) }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <AuthBackHeader onBack={() => navigation.goBack()} />
+          <AuthBackHeader onBack={() => goBackWithinStack(navigation)} />
 
           <Text
             style={{

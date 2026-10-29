@@ -26,6 +26,7 @@ import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideReview'>;
 
@@ -189,7 +190,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       title="Review & Confirm"
       step={3}
       accentColor={ROADSIDE_ACCENT}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel={isBusy ? 'Confirming...' : 'Confirm & Get Help'}
       continueDisabled={isBusy}
       onContinue={() => void handleConfirm()}

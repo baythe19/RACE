@@ -21,6 +21,7 @@ import {
 import { brand } from '../../../theme/brand';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideHelpOnWay'>;
 
@@ -39,7 +40,7 @@ export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
       step={4}
       accentColor={ROADSIDE_ACCENT}
       hideFooter
-      onBack={() => navigation.goBack()}>
+      onBack={() => goBackWithinStack(navigation)}>
       <View style={{ flex: 1 }}>
         <Text
           style={{
