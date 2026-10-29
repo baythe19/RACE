@@ -102,12 +102,17 @@ export async function listNotifications(): Promise<{
       category: mapNotificationType(n.type),
       read: n.isRead,
       createdAt: n.createdAt,
+      metadata: n.metadata,
     })),
   };
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
   await apiClient.patch(`${API_ENDPOINTS.notifications}/read-all`);
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await apiClient.patch(`${API_ENDPOINTS.notifications}/${id}/read`);
 }
 
 export async function getNotificationPreferences(): Promise<NotificationPreference[]> {
