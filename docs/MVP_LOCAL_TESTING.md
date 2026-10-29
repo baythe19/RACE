@@ -69,12 +69,22 @@ For **UI-only walkthroughs** (no backend), copy `mobile application/.env.testing
 4. **Partner driver** — accept job, trip OTP at pickup, complete dropoff; customer pays via **UPI/cash** flow (no in-app gateway required for MVP).
 5. **Admin** — dashboard KPIs include `towingbookings` + `driverbookings` (legacy `bookings` may be empty).
 
+## MVP dispatch model (no bidding yet)
+
+- **Towing / roadside on-site:** confirmed jobs appear on **vendor** open offers. **First vendor to assign** a connected driver wins; the job leaves other vendors’ lists (socket `vendor:jobs-updated`).
+- **Driver hire:** open offers go to matching **independent** drivers (part-time / full-time / outstation+night rules). No price bidding in MVP.
+- **Payments:** stub advance/final only (`ALLOW_STUB_PAYMENTS=true`). No Razorpay in this demo path.
+- **Cancel:** simple demo rules — full stub refund before partner is en route; no tiered fee matrix in the app yet.
+
 ## What is intentionally stub / out of scope for MVP local
 
-- In-app Razorpay / card rails (settlement = UPI QR + cash to driver).
-- Roadside battery/tyre/fuel/repair (API returns `coming soon`; towing redirect works).
+- In-app Razorpay / card rails (settlement = UPI QR + cash to driver; advance is stub verify).
+- **Bidding / auction** on jobs (assign-first-wins only).
+- Production tiered cancellation fees (MVP uses simplified demo policy).
 - Real camera QR scan (vehicle QR via API URL / share still works).
 - Automated payouts to partner bank (profile bank fields + ledger only).
+
+Roadside battery/tyre/fuel/repair: book via customer app when availability API marks them on; vendor assigns **mechanic only** (no tow truck required for on-site assist).
 
 ## Verify before you call it “MVP ready locally”
 

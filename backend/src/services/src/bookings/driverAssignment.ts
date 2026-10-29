@@ -8,7 +8,7 @@ import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
 import { DriverVendorMembershipModel } from '../../../models/src/driverVendorMembership';
 import { canTransition } from '../bookingStatusConstants';
-import { emitBookingStatusUpdate, emitToDriver } from '../socket';
+import { emitBookingStatusUpdate, emitDriverOffersUpdated, emitToDriver, emitVendorOffersUpdated } from '../socket';
 import { notifyCustomerTripStatus, notifyDriverJobOffer } from '../bookingNotifications';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
 import { encryptTripOtpForStorage, generateTripStartOtp, hashTripOtpForStorage } from './tripOtp';
@@ -890,6 +890,12 @@ export async function claimOpenBookingOffer(
       await releaseFleetVehicleFromBooking(bookingId);
     }
     throw new ConflictError('This job was just taken by another partner');
+  }
+
+  if (bookingType === 'towing') {
+    emitVendorOffersUpdated();
+  } else {
+    emitDriverOffersUpdated();
   }
 
   if (vendorDispatched) {
