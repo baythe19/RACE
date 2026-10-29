@@ -1,7 +1,7 @@
 import { createNotification } from './admin/notificationService';
 import { notificationService } from './notification';
 import { UserModel } from '../../models/src/user';
-import { emitVendorOffersUpdated } from './socket';
+import { emitDriverOffersUpdated, emitVendorOffersUpdated } from './socket';
 import type { UnifiedBookingStatus } from './bookingStatusConstants';
 
 type ServiceBookingKind = 'towing' | 'driver';
@@ -197,7 +197,56 @@ export async function notifyDriverJobOffer(params: {
   );
 }
 
-/** Confirmed towing / on-site roadside jobs land in the vendor (partner) inbox. */
+/** Confirmed hire jobs land with the matching independent drivers. */
+export async function notifyDriversOpenHireJob(params: {
+  bookingNumber: string;
+  bookingId: string;
+  serviceLabel: string;
+  driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
+  pickupAddress?: string;
+}): Promise<void> {
+  emitDriverOffersUpdated();
+
+  const category =
+    params.driverServiceType === 'part_time'
+      ? { selfDriverCategory: 'PART_TIME' as const }
+      : params.driverServiceType === 'full_time'
+        ? { selfDriverCategory: 'FULL_TIME' as const }
+        : { selfDriverCategory: { $in: ['PART_TIME', 'FULL_TIME'] as const } };
+
+  const drivers = await UserModel.find({
+    role: 'driver',
+    driverContext: 'INDEPENDENT',
+    accountStatus: { $nin: ['SUSPENDED', 'INACTIVE'] },
+    ...category,
+  })
+    .select('_id')
+    .limit(40)
+    .lean()
+    .exec();
+
+  const where = params.pickupAddress?.trim() ? ` · ${params.pickupAddress.trim()}` : '';
+  await Promise.all(
+    drivers.map(driver =>
+      notificationService
+        .createForUser(
+          driver._id.toString(),
+          {
+            type: 'BOOKING_CONFIRMED',
+            title: 'New driver job',
+            message: `${params.serviceLabel} ${params.bookingNumber}${where}. Open Jobs to accept.`,
+            metadata: {
+              bookingId: params.bookingId,
+              bookingType: 'driver',
+              bookingNumber: params.bookingNumber,
+            },
+          },
+          { audience: 'driver', category: 'booking' },
+        )
+        .catch(() => undefined),
+    ),
+  );
+}
 export async function notifyVendorsOpenTowingJob(params: {
   bookingNumber: string;
   bookingId: string;

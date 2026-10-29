@@ -9,6 +9,7 @@ import { encryptTripOtpForStorage, generateCompletionOtp, getTripOtpValue, hashT
 import { emitBookingStatusUpdate, emitToDriver } from './socket';
 import { hanuSendOtp, isHanuConfigured } from '../../utils/src/hanuSms';
 import { logger } from '../../utils/src/logger';
+import { bookingServiceLabel } from './bookings/driverAssignment';
 
 function mapTowingItem(
   booking: Awaited<ReturnType<typeof towingBookingService.listBookings>>[number],
@@ -17,7 +18,10 @@ function mapTowingItem(
     id: booking.id,
     bookingNumber: booking.bookingNumber,
     bookingType: 'towing',
-    serviceLabel: 'Towing',
+    serviceLabel: bookingServiceLabel('towing', {
+      assistLabel: booking.assistLabel,
+      towingMode: booking.towingMode,
+    }),
     status: booking.status,
     paymentStatus: booking.paymentStatus,
     vehicleId: booking.vehicleId ?? '',
@@ -53,7 +57,9 @@ function mapDriverItem(
     id: booking.id,
     bookingNumber: booking.bookingNumber,
     bookingType: 'driver',
-    serviceLabel: 'Driver Hire',
+    serviceLabel: bookingServiceLabel('driver', {
+      driverServiceType: booking.driverServiceType,
+    }),
     status: booking.status,
     paymentStatus: booking.paymentStatus,
     vehicleId: booking.vehicleId ?? '',

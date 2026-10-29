@@ -469,7 +469,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                 color: colors.dark,
               }}
               numberOfLines={1}>
-              {booking.driver?.name ?? 'Finding a driver'}
+              {booking.driver?.name ?? 'Finding a partner'}
             </Text>
             <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }} numberOfLines={1}>
               {[booking.driver?.experience, booking.assignedFleetVehicleLabel]

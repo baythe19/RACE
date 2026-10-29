@@ -51,6 +51,7 @@ function mapTowingBooking(
     pickup: booking.pickup,
     dropoff: booking.dropoff,
     towingMode: booking.towingMode,
+    assistLabel: booking.assistLabel,
     distanceKm: booking.distanceKm,
     estimatedFare: booking.estimatedFare,
     fareBreakdown: booking.fareBreakdown,

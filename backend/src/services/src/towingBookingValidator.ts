@@ -78,6 +78,7 @@ export interface TowingBookingResponseDto {
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
   towingMode?: 'instant' | 'scheduled' | 'emergency';
+  assistLabel?: string;
   distanceKm?: number;
   estimatedFare: number;
   fareBreakdown?: TowingFareBreakdown;

@@ -6,6 +6,7 @@ import { useAppSelector } from '../redux/hooks';
 import {
   connectSocket,
   disconnectSocket,
+  onBookingStatus,
   onNotificationNew,
 } from '../services/socketService';
 import { profileKeys } from '../services/profile/useProfileQueries';
@@ -28,14 +29,20 @@ export function useCustomerRealtimeSync(enabled: boolean) {
     void requestCustomerNotificationPermissions();
     connectSocket();
 
+    const refreshBookings = () => {
+      void queryClient.invalidateQueries({ queryKey: ['bookings'], refetchType: 'active' });
+    };
+
     const refreshInbox = () => {
       void queryClient.invalidateQueries({
         queryKey: profileKeys.notifications,
         refetchType: 'active',
       });
+      refreshBookings();
     };
 
     const unsubNotification = onNotificationNew(refreshInbox);
+    const unsubStatus = onBookingStatus(refreshBookings);
 
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active') {
@@ -48,6 +55,7 @@ export function useCustomerRealtimeSync(enabled: boolean) {
 
     return () => {
       unsubNotification();
+      unsubStatus();
       subscription.remove();
       disconnectSocket();
     };

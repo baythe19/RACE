@@ -35,7 +35,9 @@ import {
   notifyAdminCustomerBookingCreated,
   notifyCustomerBookingCreated,
   notifyCustomerBookingCancelled,
+  notifyDriversOpenHireJob,
 } from '../bookingNotifications';
+import { bookingServiceLabel } from './driverAssignment';
 
 function mapDriverBooking(
   booking: IDriverBooking,
@@ -466,6 +468,18 @@ export class DriverBookingService {
         note: entry.note,
       })),
     });
+
+    if (update.status === 'CONFIRMED' && booking.status !== 'CONFIRMED') {
+      void notifyDriversOpenHireJob({
+        bookingNumber: updated.bookingNumber,
+        bookingId: updated.id,
+        serviceLabel: bookingServiceLabel('driver', {
+          driverServiceType: updated.driverServiceType,
+        }),
+        driverServiceType: updated.driverServiceType,
+        pickupAddress: updated.pickup?.address,
+      }).catch(() => undefined);
+    }
 
     return mapDriverBookingWithDriver(updated);
   }

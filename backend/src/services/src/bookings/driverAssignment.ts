@@ -285,10 +285,42 @@ export type OpenBookingOffer = {
   offerExpiresAt?: string;
   /** Server-computed: the decision window has already lapsed. */
   isExpired?: boolean;
+  /** Roadside on-site assist — vendor assigns a mechanic/driver only (no tow truck). */
+  onSiteAssist?: boolean;
 };
 
+export function isOnSiteAssistBooking(booking: {
+  assistLabel?: string | null;
+  distanceKm?: number | null;
+  pickup?: { latitude?: number; longitude?: number };
+  dropoff?: { latitude?: number; longitude?: number } | null;
+}): boolean {
+  if (!booking.assistLabel?.trim()) return false;
+  if (booking.distanceKm === 0) return true;
+  const pickup = booking.pickup;
+  const dropoff = booking.dropoff;
+  if (!pickup || !dropoff) return false;
+  return pickup.latitude === dropoff.latitude && pickup.longitude === dropoff.longitude;
+}
+
+/**
+ * Full-time jobs → full-time drivers only.
+ * Outstation and night → either independent category can accept.
+ */
+export function independentDriverMatchesHire(
+  selfCategory: 'FULL_TIME' | 'PART_TIME' | undefined,
+  driverServiceType?: string,
+): boolean {
+  if (driverServiceType === 'part_time') return selfCategory === 'PART_TIME';
+  if (driverServiceType === 'full_time') return selfCategory === 'FULL_TIME';
+  if (driverServiceType === 'outstation' || driverServiceType === 'night') {
+    return selfCategory === 'PART_TIME' || selfCategory === 'FULL_TIME';
+  }
+  return selfCategory === 'PART_TIME' || selfCategory === 'FULL_TIME';
+}
+
 /** Specific, bookable name for an offer — falls back to the broad category. */
-function offerServiceLabel(
+export function bookingServiceLabel(
   bookingType: 'towing' | 'driver',
   booking: {
     towingMode?: 'instant' | 'scheduled' | 'emergency';
@@ -331,6 +363,8 @@ function mapOffer(
     vendorId?: { toString(): string } | null;
     assignedFleetVehicleLabel?: string | null;
     towingMode?: 'instant' | 'scheduled' | 'emergency';
+    assistLabel?: string;
+    distanceKm?: number;
     driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   },
   distanceKm?: number,
@@ -338,6 +372,14 @@ function mapOffer(
   includeDecisionWindow = false,
 ): OpenBookingOffer {
   const vendorId = booking.vendorId?.toString();
+  const onSiteAssist =
+    bookingType === 'towing' &&
+    isOnSiteAssistBooking({
+      assistLabel: 'assistLabel' in booking ? booking.assistLabel : undefined,
+      distanceKm: 'distanceKm' in booking ? booking.distanceKm : undefined,
+      pickup: booking.pickup,
+      dropoff: booking.dropoff ?? null,
+    });
   return {
     bookingType,
     id: booking.id ?? booking._id?.toString() ?? '',
@@ -348,10 +390,11 @@ function mapOffer(
     estimatedFare: booking.estimatedFare,
     createdAt: booking.createdAt.toISOString(),
     distanceKm,
-    serviceLabel: offerServiceLabel(bookingType, booking),
+    serviceLabel: bookingServiceLabel(bookingType, booking),
     vendorId,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
     vendorApproved: Boolean(vendorId),
+    onSiteAssist: onSiteAssist || undefined,
     ...(includeDecisionWindow
       ? {
           offerExpiresAt: offerExpiresAt(booking.createdAt).toISOString(),
@@ -500,12 +543,12 @@ export async function listOpenBookingOffers(options?: {
       if (options.forDriver.driverContext === 'INDEPENDENT' && bookingType !== 'driver') {
         return;
       }
-      const selfCategory = options.forDriver.selfDriverCategory;
-      const driverServiceType = booking.driverServiceType;
-      if (selfCategory === 'FULL_TIME' && driverServiceType === 'part_time') {
-        return;
-      }
-      if (selfCategory === 'PART_TIME' && driverServiceType === 'full_time') {
+      if (
+        !independentDriverMatchesHire(
+          options.forDriver.selfDriverCategory,
+          booking.driverServiceType,
+        )
+      ) {
         return;
       }
     }

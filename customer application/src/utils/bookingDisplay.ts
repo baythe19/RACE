@@ -92,10 +92,15 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
       ? formatUnifiedStatusLabel(booking.unifiedStatus)
       : formatUnifiedStatusLabel(booking.status),
     pickup: formatLocationDisplay(booking.pickup),
-    drop:
-      formatLocationDisplay(booking.dropoff) === '—'
-        ? 'On-site service'
-        : formatLocationDisplay(booking.dropoff),
+    drop: (() => {
+      const dropLine = formatLocationDisplay(booking.dropoff);
+      const pickupLine = formatLocationDisplay(booking.pickup);
+      if (dropLine === '—') return 'On-site help';
+      if (dropLine === pickupLine && !/towing/i.test(booking.serviceLabel)) {
+        return 'On-site help';
+      }
+      return dropLine;
+    })(),
     eta: booking.etaMinutes != null ? `${booking.etaMinutes} min` : 'Updating',
     driver: booking.driver
       ? {
@@ -105,7 +110,7 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
           phone: booking.driver.phone,
         }
       : {
-          name: 'Finding a driver',
+          name: 'Finding a partner',
           photo: null,
         },
     bookingType: booking.bookingType ?? 'towing',

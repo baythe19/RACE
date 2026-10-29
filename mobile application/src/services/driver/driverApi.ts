@@ -66,6 +66,7 @@ export type DriverJobBooking = {
     mobileNumber?: string;
   };
   serviceLabel?: string;
+  onSiteAssist?: boolean;
   vendorId?: string;
   assignedFleetVehicleLabel?: string;
   vendorApproved?: boolean;

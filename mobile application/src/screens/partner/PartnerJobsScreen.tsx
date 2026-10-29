@@ -556,6 +556,7 @@ export default function PartnerJobsScreen() {
         {isVendor && isOffer && !job.vendorApproved ? (
           <View style={styles.vendorActions}>
             <Pressable
+              disabled={Boolean(job.isExpired)}
               onPress={() =>
                 navigation.navigate('VendorAssignJob', {
                   bookingId: job.id,
@@ -565,9 +566,10 @@ export default function PartnerJobsScreen() {
                   pickupAddress: job.pickup?.address || job.pickup?.label,
                   dropoffAddress: job.dropoff?.address || job.dropoff?.label || undefined,
                   estimatedFare: job.estimatedFare,
+                  onSiteAssist: job.onSiteAssist,
                 })
               }
-              style={styles.assignBtn}>
+              style={[styles.assignBtn, job.isExpired ? styles.assignBtnDisabled : null]}>
               <View style={styles.assignBtnInner}>
                 {job.bookingType === 'towing' ? (
                   <Truck size={17} color={colors.dark} strokeWidth={2.4} />
@@ -575,7 +577,13 @@ export default function PartnerJobsScreen() {
                   <UserPlus size={17} color={colors.dark} strokeWidth={2.4} />
                 )}
                 <PartnerText style={styles.assignLabel}>
-                  {job.bookingType === 'towing' ? 'Assign driver & vehicle' : 'Assign driver'}
+                  {job.isExpired
+                    ? 'Offer expired'
+                    : job.onSiteAssist
+                      ? 'Assign mechanic'
+                      : job.bookingType === 'towing'
+                        ? 'Assign driver & vehicle'
+                        : 'Assign driver'}
                 </PartnerText>
               </View>
             </Pressable>
@@ -1106,6 +1114,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  assignBtnDisabled: {
+    opacity: 0.45,
   },
   assignBtnInner: {
     flexDirection: 'row',
