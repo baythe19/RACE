@@ -9,6 +9,7 @@ import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
 import { DriverVendorMembershipModel } from '../../../models/src/driverVendorMembership';
 import { canTransition } from '../bookingStatusConstants';
 import { emitBookingStatusUpdate, emitToDriver } from '../socket';
+import { notifyCustomerTripStatus, notifyDriverJobOffer } from '../bookingNotifications';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
 import { encryptTripOtpForStorage, generateTripStartOtp, hashTripOtpForStorage } from './tripOtp';
 import type { ActiveBookingType } from '../../../models/src/user';
@@ -837,6 +838,20 @@ export async function claimOpenBookingOffer(
       status: 'DRIVER_ASSIGNED',
       message: 'New job assigned by your vendor',
     });
+    void notifyDriverJobOffer({
+      driverId,
+      bookingNumber: claimed.bookingNumber,
+      bookingType,
+      bookingId,
+      message: `${claimed.bookingNumber} assigned by your vendor — accept to start`,
+    }).catch(() => undefined);
+    void notifyCustomerTripStatus({
+      customerId: claimed.customerId.toString(),
+      bookingNumber: claimed.bookingNumber,
+      bookingType,
+      bookingId: claimed.id,
+      status: 'DRIVER_ASSIGNED',
+    }).catch(() => undefined);
     return {
       id: claimed.id,
       status: claimed.status,
@@ -857,6 +872,13 @@ export async function claimOpenBookingOffer(
     message: 'Partner accepted your booking',
     assignedFleetVehicleLabel: fleetVehicleLabel,
   });
+  void notifyCustomerTripStatus({
+    customerId: claimed.customerId.toString(),
+    bookingNumber: claimed.bookingNumber,
+    bookingType,
+    bookingId: claimed.id,
+    status: 'DRIVER_EN_ROUTE',
+  }).catch(() => undefined);
   emitToDriver(driverId, 'trip:otp', {
     bookingId,
     bookingType,
@@ -983,8 +1005,9 @@ export async function assignDriverToBooking(
   };
 
   await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, bookingVendorId);
+  let assigned;
   try {
-    const assigned =
+    assigned =
       bookingType === 'towing'
         ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: true }).exec()
         : await DriverBookingModel.findOneAndUpdate(filter, update, { new: true }).exec();
@@ -1003,6 +1026,20 @@ export async function assignDriverToBooking(
     driverAccepted: false,
     message: 'Driver allotted - awaiting acceptance',
   });
+  void notifyCustomerTripStatus({
+    customerId: assigned.customerId.toString(),
+    bookingNumber: assigned.bookingNumber,
+    bookingType,
+    bookingId: assigned.id,
+    status: 'DRIVER_ASSIGNED',
+  }).catch(() => undefined);
+  void notifyDriverJobOffer({
+    driverId,
+    bookingNumber: assigned.bookingNumber,
+    bookingType,
+    bookingId: assigned.id,
+    message: `${assigned.bookingNumber} allotted — accept in the app to start`,
+  }).catch(() => undefined);
 }
 
 export async function releaseDriver(driverId: string, bookingId: string): Promise<void> {

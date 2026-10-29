@@ -14,6 +14,7 @@ import type { LocationResult } from '../../../types/location';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { findServiceableCity } from '../../../config/serviceableAreas';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
+import { ensureForegroundLocation } from '../../../utils/locationPermission';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatReadableLocation } from '../../../utils/readableAddress';
 import {
@@ -405,6 +406,8 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
             void (async () => {
               setIsLocatingPickup(true);
               try {
+                const allowed = await ensureForegroundLocation();
+                if (!allowed) return;
                 const fetched = await fetchCurrentLocation();
                 if (!fetched?.latitude || !fetched?.longitude) return;
                 if (!assertServiceableBookingLocation(fetched.latitude, fetched.longitude)) return;

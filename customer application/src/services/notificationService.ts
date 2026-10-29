@@ -87,6 +87,20 @@ export async function presentCustomerAlert(params: {
 }
 
 /**
+ * Outer-app alert when advance payment confirms the booking (real API path).
+ */
+export async function alertBookingConfirmed(bookingNumber?: string): Promise<void> {
+  await presentCustomerAlert({
+    title: 'Booking confirmed',
+    body: bookingNumber
+      ? `${bookingNumber} is confirmed. We are finding a nearby partner.`
+      : 'Advance paid. We are finding a nearby partner.',
+    channelId: 'trip_status',
+    data: { type: 'BOOKING_CONFIRMED' },
+  });
+}
+
+/**
  * High-priority outer-app lockscreen alert when driver/mechanic is assigned.
  */
 export async function alertDriverAssigned(driverName?: string, etaMinutes?: number): Promise<void> {

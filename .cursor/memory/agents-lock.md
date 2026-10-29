@@ -8,5 +8,3 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
-| Agent | customer vehicle QR | download, detail UX, expiry fix, browser test | now |
-| Auto | customer maps UI | unify map chrome across picker, live trip, driver pickup | now |

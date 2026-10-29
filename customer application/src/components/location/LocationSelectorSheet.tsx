@@ -21,6 +21,7 @@ import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
 import { useLocationStore } from '../../store/locationStore';
 import type { LocationResult } from '../../types/location';
 import { reverseGeocode } from '../../utils/googleMaps';
+import { ensureForegroundLocation } from '../../utils/locationPermission';
 import { LOCATION_ACCENT } from '../../utils/googlePlaces';
 import { colors, radius, typography } from '../../theme';
 
@@ -78,14 +79,8 @@ export default function LocationSelectorSheet({
   const handleUseCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission needed',
-          'Allow location access to use your current location, or search / pick on the map.',
-        );
-        return;
-      }
+      const allowed = await ensureForegroundLocation();
+      if (!allowed) return;
 
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,

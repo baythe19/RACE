@@ -31,6 +31,11 @@ import {
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
 import { resolveCustomerTrackingExtras } from './customerTrackingLocation';
 import { ensureBookingServiceable } from './serviceability';
+import {
+  notifyAdminCustomerBookingCreated,
+  notifyCustomerBookingCreated,
+  notifyCustomerBookingCancelled,
+} from '../bookingNotifications';
 
 function mapDriverBooking(
   booking: IDriverBooking,
@@ -136,6 +141,19 @@ export class DriverBookingService {
       scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
       statusHistory: createInitialStatusHistory('PENDING'),
     });
+
+    void notifyAdminCustomerBookingCreated({
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'driver',
+      bookingId: booking.id,
+    }).catch(() => undefined);
+    void notifyCustomerBookingCreated({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'driver',
+      bookingId: booking.id,
+      advanceAmount: breakdown.advanceAmount,
+    }).catch(() => undefined);
 
     return mapDriverBookingWithDriver(booking);
   }
@@ -384,6 +402,14 @@ export class DriverBookingService {
         note: entry.note,
       })),
     });
+
+    void notifyCustomerBookingCancelled({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'driver',
+      bookingId: booking.id,
+      refundAmount: policy.refundAmount,
+    }).catch(() => undefined);
 
     const mapped = await mapDriverBookingWithDriver(booking);
     return {

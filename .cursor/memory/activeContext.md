@@ -1,5 +1,7 @@
 ## Current focus
 
+**2026-10-29 (MVP notifications + real booking flow):** Backend `bookingNotifications.ts` — customer in-app + admin alerts on create/advance/cancel/trip milestones; driver in-app on vendor job assign. Customer app: `useCustomerRealtimeSync` (socket `notification:new`, Android channels, inbox refresh), OS alert on advance confirm. Real path = API create + stub advance verify (preview only when UI QA mock). Backend + customer `tsc` 0.
+
 **2026-10-29 (part-time schedule soften):** DriverDateTimeScreen — short date chips `29/10` (month number); soft amber outline; duration pills 2h/4h/8h/More; More = 12h & 24h with km only. Start time stays on screen: Morning/Afternoon/Evening/Night, half-hour row, hour stepper + :00/:30, AM/PM. `tsc` 0.
 
 **2026-10-29 (vehicle QR E2E):** `VehicleEmergencyQrPanel` — download/share/preview browser + scan URL. List card Download. Detail uses ProfileSubScreenLayout. Fixed false OTP-expired on vehicle fetch (`humanizeApiError` + list cache fallback in `fetchVehicle`/`useVehicleQuery`). Deps: `qrcode`, `expo-file-system`. `tsc` 0.
@@ -14,6 +16,10 @@
 **2026-10-29 (profile wizard phone + dropdown):** Emergency mobile capped at 10 digits (`ProfileMobileField` maxLength + digit strip). Make/relationship menus dismiss the keyboard first, then open; focusing a field or showing the keyboard closes any open menu. `tsc` 0.
 
 **2026-10-29 (SOS UI polish):** Removed duplicate Call Emergency grid tile (big red strip only). Soft pulse (slower breathe + reduce-motion static), entrance fade, press feedback. Emergency contact = Call (not second Alert). Dropped debug "pulse check" footer. Quick actions → 3-up "More help". `tsc` 0.
+
+**2026-10-29 (map small polish):** GPS permission asks once; if already denied, alert offers Open Settings and map/search still work (`locationPermission.ts`) on home sheet, map picker, and towing "Use current location". Pin lifts with a 180ms transform instead of a jump. `tsc` clean on these files (existing SOS errors are outside this change).
+
+**2026-10-29 (map chrome unified):** Customer maps share one canvas. Pick-on-map, live trip, and driver pickup preview all use the same tile map + teardrop pins (green pickup, red drop, amber partner/accent) when native Google tiles aren't ready. Live trip no longer swaps to a grey "route card". Unused `LocationPickerMap` now renders `LocationPickerModal` so it can't grow a second chrome. `tsc` 0.
 
 **2026-10-29 (location options recheck — drag/long-press now real):** Google geocode is `REQUEST_DENIED` (billing off) so addresses were stuck on "Selected location". Added OSM reverse-geocode fallback. Peach has no native map tiles — `TileMapSurface` covers the picker until a native map is ready: drag pans, long-press drops the pin, pin lifts ("Release to set"). Live: Bhubaneswar → drag → Kendrapara, long-press → Basudebpur. Stale geocode race guarded. Pickup auto-fill skips out-of-city GPS. `tsc` 0.
 

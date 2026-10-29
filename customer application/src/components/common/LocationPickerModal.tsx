@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Platform,
   Pressable,
@@ -31,6 +32,7 @@ import {
   reverseGeocodeToLocation,
 } from '../../utils/googlePlaces';
 import { formatLocationDisplay } from '../../utils/readableAddress';
+import { ensureForegroundLocation } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
 const MAP_PROVIDER =
@@ -100,6 +102,15 @@ export default function LocationPickerModal({
     apiKey ? null : 'Address search needs a Maps key on this build.',
   );
   const [sheetHeight, setSheetHeight] = useState(230);
+  const pinLift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(pinLift, {
+      toValue: isMapMoving ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [isMapMoving, pinLift]);
 
   const resolveRegion = useCallback(async (region: Region) => {
     const seq = ++geoSeqRef.current;
@@ -216,14 +227,14 @@ export default function LocationPickerModal({
   const handleCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setPlacesHint('Location permission is off. Enable it, or drag the pin on the map.');
+      const allowed = await ensureForegroundLocation();
+      if (!allowed) {
+        setPlacesHint('Location is off. Drag the pin, or turn on location in Settings.');
         return;
       }
 
       const position = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
       setShowSearch(false);
       setPlacesHint(null);
@@ -297,10 +308,19 @@ export default function LocationPickerModal({
 
         {/* Center pin — Rapido pattern: map pans under a fixed pin; long-press also drops here */}
         {!showSearch ? (
-          <View
+          <Animated.View
             style={[
               styles.centerPinWrap,
-              isMapMoving ? styles.centerPinLifted : null,
+              {
+                transform: [
+                  {
+                    translateY: pinLift.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, -14],
+                    }),
+                  },
+                ],
+              },
             ]}
             pointerEvents="none">
             <View style={[styles.pinBubble, shadows.cardSoft]}>
@@ -313,8 +333,8 @@ export default function LocationPickerModal({
               </Text>
             </View>
             <MapPin size={42} color={accentColor} fill={accentColor} strokeWidth={1.5} />
-            <View style={[styles.pinShadow, isMapMoving ? styles.pinShadowLifted : null]} />
-          </View>
+            <View style={styles.pinShadow} />
+          </Animated.View>
         ) : null}
 
         {/* Header matches AppStackHeader: left back + left title + right action */}
@@ -565,10 +585,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 5,
   },
-  centerPinLifted: {
-    marginTop: -64,
-    opacity: 0.92,
-  },
   pinBubble: {
     backgroundColor: colors.dark,
     borderRadius: 8,
@@ -590,11 +606,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: 'rgba(0,0,0,0.25)',
     marginTop: 2,
-  },
-  pinShadowLifted: {
-    width: 16,
-    height: 6,
-    opacity: 0.35,
   },
   headerBar: {
     position: 'absolute',

@@ -14,6 +14,7 @@ export class NotificationRepository {
     message: string;
     metadata?: Record<string, string>;
     audience?: 'customer' | 'vendor' | 'driver';
+    category?: 'vendor' | 'driver' | 'booking' | 'payment' | 'customer' | 'system' | 'subscription';
   }): Promise<INotification> {
     return NotificationModel.create({
       recipient: {
@@ -24,7 +25,7 @@ export class NotificationRepository {
       title: data.title,
       message: data.message,
       metadata: data.metadata,
-      category: 'system',
+      category: data.category ?? 'system',
       isRead: false,
     });
   }

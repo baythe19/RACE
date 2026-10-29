@@ -84,7 +84,7 @@ export default function VehicleEmergencyQrPanel({
           textAlign: 'center',
           marginBottom: px(14),
         }}>
-        Windshield sticker — scan opens emergency help for this vehicle.
+        Scan this sticker to call the owner, WhatsApp, or 112 in one tap.
       </Text>
 
       <GoldButton

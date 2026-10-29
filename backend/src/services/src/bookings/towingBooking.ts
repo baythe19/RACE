@@ -30,6 +30,11 @@ import {
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
 import { resolveCustomerTrackingExtras } from './customerTrackingLocation';
 import { ensureBookingServiceable } from './serviceability';
+import {
+  notifyAdminCustomerBookingCreated,
+  notifyCustomerBookingCreated,
+  notifyCustomerBookingCancelled,
+} from '../bookingNotifications';
 
 function mapTowingBooking(
   booking: ITowingBooking,
@@ -129,6 +134,19 @@ export class TowingBookingService {
       scheduledAt,
       statusHistory: createInitialStatusHistory('PENDING'),
     });
+
+    void notifyAdminCustomerBookingCreated({
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+    }).catch(() => undefined);
+    void notifyCustomerBookingCreated({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+      advanceAmount: breakdown.advanceAmount,
+    }).catch(() => undefined);
 
     return mapTowingBookingWithDriver(booking);
   }
@@ -380,6 +398,14 @@ export class TowingBookingService {
         note: entry.note,
       })),
     });
+
+    void notifyCustomerBookingCancelled({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+      refundAmount: policy.refundAmount,
+    }).catch(() => undefined);
 
     const mapped = await mapTowingBookingWithDriver(booking);
     return {

@@ -1,5 +1,6 @@
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
 import { emitBookingStatusUpdate, emitDriverLocation, emitToBooking, emitToDriver, emitToUser } from './socket';
+import { notifyCustomerTripStatus } from './bookingNotifications';
 import { userRepository } from './userRepository';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
@@ -467,6 +468,14 @@ export class DriverService {
         timestamp: entry.timestamp.toISOString(),
       })),
     });
+
+    void notifyCustomerTripStatus({
+      customerId: updated.customerId.toString(),
+      bookingNumber: updated.bookingNumber,
+      bookingType: dto.bookingType,
+      bookingId: updated.id,
+      status: dto.status,
+    }).catch(() => undefined);
 
     return updated;
   }

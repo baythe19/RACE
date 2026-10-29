@@ -1,7 +1,6 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Linking,
   Pressable,
   ScrollView,
@@ -14,7 +13,6 @@ import {
 import * as Location from 'expo-location';
 import {
   ChevronRight,
-  Info,
   MapPin,
   Phone,
   Send,
@@ -27,6 +25,8 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import AppScreenLayout from '../ui/AppScreenLayout';
 import TabRootHeader from '../ui/TabRootHeader';
 import SosPulseButton from './SosPulseButton';
+import SosAppDialog, { type SosDialogVariant } from './SosAppDialog';
+import { jumpToAuthScreen } from '../../navigation/customerNavigationRef';
 import { useSosDetails } from '../../context/SosDetailsContext';
 import { useAppSelector } from '../../redux/hooks';
 import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
@@ -42,6 +42,16 @@ import { colors, typography } from '../../theme';
 import type { RootTabParamList } from '../../types/navigation';
 
 const REF_W = 390;
+
+type SosDialogState = {
+  variant: SosDialogVariant;
+  title: string;
+  message: string;
+  primaryLabel?: string;
+  onPrimary?: () => void;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+};
 
 function formatEmergencyPhone(raw: string) {
   const digits = raw.replace(/\D/g, '');
@@ -79,6 +89,10 @@ export default function EmergencyAssistanceContent({
   const { data: config, isError: configError } = useSosConfigQuery();
   const { data: context, isLoading: contextLoading } = useSosContextQuery(undefined, isAuthenticated);
   const sosAlert = useSosAlertMutation();
+  const [dialog, setDialog] = useState<SosDialogState | null>(null);
+
+  const openDialog = useCallback((next: SosDialogState) => setDialog(next), []);
+  const closeDialog = useCallback(() => setDialog(null), []);
 
   const emergencyPhone = (config?.emergencyPhone ?? '112').replace(/\s/g, '');
   const emergencyPhoneLabel = formatEmergencyPhone(emergencyPhone);
@@ -121,10 +135,13 @@ export default function EmergencyAssistanceContent({
   }, [details.location]);
 
   const showSosInfo = () => {
-    Alert.alert(
-      'SOS alert',
-      'One tap sends an alert with your live location to your emergency contact. Use Call Emergency for ambulance, police, or fire.',
-    );
+    openDialog({
+      variant: 'info',
+      title: 'SOS alert',
+      message:
+        'One tap sends an alert with your live location to your emergency contact. For ambulance, police, or fire, use Call Emergency.',
+      primaryLabel: 'Got it',
+    });
   };
 
   const triggerAlert = useCallback(
@@ -133,16 +150,25 @@ export default function EmergencyAssistanceContent({
       successTitle: string,
     ) => {
       if (!isAuthenticated) {
-        Alert.alert('Sign in required', 'Please log in to use emergency alerts.');
+        openDialog({
+          variant: 'signIn',
+          title: 'Sign in required',
+          message: 'Log in to send SOS alerts and notify your emergency contact with live location.',
+          primaryLabel: 'Log in',
+          onPrimary: () => jumpToAuthScreen('MobileNumber'),
+          secondaryLabel: 'Cancel',
+        });
         return;
       }
       if (sosAlert.isPending) return;
 
       if (previewSos) {
-        Alert.alert(
-          successTitle,
-          previewSosAlertMessage(action, { contactName, vehicleLabel }),
-        );
+        openDialog({
+          variant: 'success',
+          title: successTitle,
+          message: previewSosAlertMessage(action, { contactName, vehicleLabel }),
+          primaryLabel: 'Done',
+        });
         return;
       }
 
@@ -150,12 +176,24 @@ export default function EmergencyAssistanceContent({
       sosAlert.mutate(
         { action, vehicleId, ...location },
         {
-          onSuccess: result => Alert.alert(successTitle, result.message),
-          onError: error => Alert.alert('Request failed', getApiErrorMessage(error)),
+          onSuccess: result =>
+            openDialog({
+              variant: 'success',
+              title: successTitle,
+              message: result.message,
+              primaryLabel: 'Done',
+            }),
+          onError: error =>
+            openDialog({
+              variant: 'error',
+              title: 'Request failed',
+              message: getApiErrorMessage(error),
+              primaryLabel: 'OK',
+            }),
         },
       );
     },
-    [contactName, isAuthenticated, previewSos, resolveLocation, sosAlert, vehicleId, vehicleLabel],
+    [contactName, isAuthenticated, openDialog, previewSos, resolveLocation, sosAlert, vehicleId, vehicleLabel],
   );
 
   const handleGridAction = (id: string) => {
@@ -178,7 +216,12 @@ export default function EmergencyAssistanceContent({
         if (isAuthenticated) {
           void triggerAlert('notify_contacts', 'Contact Notified');
         } else {
-          Alert.alert('Emergency Contacts', `${contactName} (${contactRelation})\n${contactPhone}`);
+          openDialog({
+            variant: 'info',
+            title: 'Emergency contact',
+            message: `${contactName} (${contactRelation})\n${contactPhone}`,
+            primaryLabel: 'OK',
+          });
         }
         break;
       default:
@@ -226,6 +269,7 @@ export default function EmergencyAssistanceContent({
         <TabRootHeader
           title="Emergency SOS"
           subtitle="Immediate help, one tap away"
+          onInfoPress={showSosInfo}
           onBellPress={() => tabNav.navigate('Profile')}
           onAvatarPress={() => tabNav.navigate('Profile')}
         />
@@ -240,25 +284,6 @@ export default function EmergencyAssistanceContent({
             {sosAlert.isPending ? (
               <ActivityIndicator color={colors.primary} style={{ marginTop: px(8) }} />
             ) : null}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="How SOS alert works"
-              accessibilityHint="Shows what happens when you tap SOS"
-              onPress={showSosInfo}
-              hitSlop={12}
-              style={({ pressed }) => ({
-                marginTop: px(10),
-                width: px(36),
-                height: px(36),
-                borderRadius: px(18),
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: pressed ? '#F0F0F2' : '#F7F7F8',
-                borderWidth: 1,
-                borderColor: colors.border,
-              })}>
-              <Info size={px(18)} color={colors.grey} strokeWidth={2.2} />
-            </Pressable>
           </View>
 
           <Pressable
@@ -582,6 +607,17 @@ export default function EmergencyAssistanceContent({
             {supportPhone ? `Support ${supportPhone} · ` : ''}Powered by RACE Service
           </Text>
       </ScrollView>
+      <SosAppDialog
+        visible={dialog != null}
+        variant={dialog?.variant}
+        title={dialog?.title ?? ''}
+        message={dialog?.message ?? ''}
+        primaryLabel={dialog?.primaryLabel}
+        onPrimary={dialog?.onPrimary}
+        secondaryLabel={dialog?.secondaryLabel}
+        onSecondary={dialog?.onSecondary}
+        onClose={closeDialog}
+      />
     </AppScreenLayout>
   );
 }
@@ -589,8 +625,8 @@ export default function EmergencyAssistanceContent({
 const styles = StyleSheet.create({
   pulseWrap: {
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 12,
+    marginTop: 0,
+    marginBottom: 8,
   },
   bigCall: {
     backgroundColor: colors.error,

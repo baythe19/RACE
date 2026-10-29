@@ -30,52 +30,80 @@ function isLocalApi(url: string): boolean {
 /** Same layout as the public scan page, built from the vehicle already on this phone. */
 export function buildVehicleEmergencyPreviewHtml(vehicle: Vehicle): string {
   const plate = formatVehicleNumber(vehicle.vehicleNumber);
-  const rows = [
-    ['Registration', plate],
-    ['Vehicle', `${vehicle.brand} ${vehicle.model}`],
-    ['Type', vehicle.vehicleSubtype ? `${vehicle.vehicleType} · ${vehicle.vehicleSubtype}` : vehicle.vehicleType],
-    ['Fuel', vehicle.fuelType],
-    ...(vehicle.color ? [['Colour', vehicle.color] as const] : []),
-  ]
-    .map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(String(value))}</td></tr>`)
+  const vehicleLine = [vehicle.brand, vehicle.model].filter(Boolean).join(' ');
+  const chips = [vehicle.vehicleType, vehicle.fuelType, vehicle.color].filter(Boolean) as string[];
+  const chipHtml = chips
+    .map(chip => `<span class="chip">${escapeHtml(chip)}</span>`)
     .join('');
+  const shareText = JSON.stringify(
+    `Need help with ${plate}${vehicleLine ? ` (${vehicleLine})` : ''}. Opened from a RACE emergency QR.`,
+  );
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RACE Emergency — ${escapeHtml(plate)}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#16161E" />
+  <title>RACE · Help for ${escapeHtml(plate)}</title>
   <style>
+    :root { color-scheme: dark; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; font-family: system-ui, sans-serif; background: #0B0B0B; color: #fff; padding: 20px; }
-    .wrap { max-width: 440px; margin: 0 auto; }
-    .badge { display: inline-block; background: #E53935; font-weight: 800; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 12px; border-radius: 999px; margin-bottom: 14px; }
-    .card { background: #1A1A1A; border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 22px 18px; margin-bottom: 16px; }
-    h1 { margin: 0 0 6px; font-size: 26px; color: #FFC107; }
-    p { margin: 0 0 16px; color: #B0B0B0; line-height: 1.5; }
-    table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 15px; text-align: left; }
-    th { color: #B0B0B0; width: 42%; font-weight: 500; }
-    td { font-weight: 700; text-transform: uppercase; }
-    .btn { display: block; width: 100%; text-align: center; text-decoration: none; font-weight: 800; font-size: 16px; padding: 16px 18px; border-radius: 20px; margin-top: 12px; }
-    .btn-primary { background: #E53935; color: #fff; }
-    .btn-secondary { background: #FFC107; color: #0B0B0B; }
-    .note { margin-top: 16px; font-size: 12px; color: #707070; text-align: center; line-height: 1.45; }
+    body { margin: 0; min-height: 100vh; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #16161E; color: #F9FAFB; padding: 20px 20px 32px; }
+    .wrap { max-width: 420px; margin: 0 auto; }
+    .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 22px; }
+    .logo { font-weight: 800; letter-spacing: 0.18em; font-size: 13px; color: #F5A623; }
+    .brand-sub { font-size: 12px; color: #9CA3AF; }
+    .kicker { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #E23744; }
+    .plate { display: inline-block; background: #F5A623; color: #16161E; font-weight: 800; font-size: 22px; letter-spacing: 0.12em; padding: 10px 16px; border-radius: 8px; margin-bottom: 14px; }
+    .vehicle { margin: 0 0 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .chip { background: #1F2030; border: 1px solid #2A2B3A; color: #D1D5DB; font-size: 12px; font-weight: 700; padding: 6px 10px; border-radius: 999px; text-transform: capitalize; }
+    .lede { margin: 0 0 20px; color: #9CA3AF; line-height: 1.5; font-size: 14px; }
+    .actions { display: grid; gap: 10px; }
+    .btn { display: block; width: 100%; text-align: center; text-decoration: none; font-weight: 800; font-size: 16px; padding: 16px 18px; border-radius: 14px; border: 0; cursor: pointer; font-family: inherit; }
+    .btn-red { background: #E23744; color: #fff; }
+    .btn-gold { background: #F5A623; color: #16161E; }
+    .btn-ghost { background: #1F2030; color: #F9FAFB; border: 1px solid #2A2B3A; }
+    .foot { margin: 22px 0 0; font-size: 11px; color: #6B7280; text-align: center; line-height: 1.5; }
   </style>
 </head>
 <body>
   <main class="wrap">
-    <div class="badge">Emergency QR</div>
-    <section class="card">
-      <h1>${escapeHtml(plate)}</h1>
-      <p>Anyone who scans this sticker sees this vehicle and can call the owner or request towing. Phone numbers stay masked until the live RACE server confirms the vehicle.</p>
-      <table>${rows}</table>
+    <header class="brand">
+      <span class="logo">RACE</span>
+      <span class="brand-sub">Roadside help</span>
+    </header>
+    <p class="kicker">This vehicle needs help</p>
+    <div class="plate">${escapeHtml(plate)}</div>
+    <h1 class="vehicle">${escapeHtml(vehicleLine || 'Registered vehicle')}</h1>
+    ${chipHtml ? `<div class="chips">${chipHtml}</div>` : ''}
+    <p class="lede">One tap to reach the owner. If no one answers, call 112.</p>
+    <section class="actions">
+      <a class="btn btn-red" href="tel:112">Call owner</a>
+      <a class="btn btn-gold" href="tel:112">Call 112</a>
+      <button class="btn btn-ghost" type="button" id="shareBtn">Share this page</button>
     </section>
-    <a class="btn btn-primary" href="tel:112">Contact owner</a>
-    <a class="btn btn-secondary" href="tel:112">Request towing</a>
-    <p class="note">The QR stores only this vehicle’s private id, not the number plate. A scan opens the RACE emergency page for that id.</p>
+    <p class="foot">RACE emergency sticker · numbers stay private until you tap Call</p>
   </main>
+  <script>
+    (function () {
+      var btn = document.getElementById('shareBtn');
+      if (!btn) return;
+      var payload = { title: 'RACE emergency', text: ${shareText}, url: location.href };
+      btn.addEventListener('click', function () {
+        if (navigator.share) { navigator.share(payload).catch(function () {}); return; }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(payload.text + ' ' + payload.url).then(function () {
+            btn.textContent = 'Copied';
+            setTimeout(function () { btn.textContent = 'Share this page'; }, 1600);
+          });
+          return;
+        }
+        window.location.href = 'sms:?body=' + encodeURIComponent(payload.text);
+      });
+    })();
+  </script>
 </body>
 </html>`;
 }

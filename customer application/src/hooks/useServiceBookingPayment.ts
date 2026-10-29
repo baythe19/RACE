@@ -8,6 +8,8 @@ import {
   createDriverBooking,
   createTowingBooking,
 } from '../services/bookings/serviceBookingApi';
+import { alertBookingConfirmed, requestCustomerNotificationPermissions } from '../services/notificationService';
+import { profileKeys } from '../services/profile/useProfileQueries';
 import {
   isPreviewBookingMode,
   previewAdvancePayment,
@@ -60,8 +62,11 @@ export function useServiceBookingPayment() {
         return { booking } satisfies ConfirmResult;
       }
       const booking = await createTowingBooking(payload);
+      await requestCustomerNotificationPermissions();
       await completeAdvancePayment(booking.id, 'towing');
+      await alertBookingConfirmed(booking.bookingNumber);
       await refreshBookings();
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
       return { booking } satisfies ConfirmResult;
     } catch (err) {
       const message = getApiErrorMessage(err, 'Unable to confirm towing booking');
@@ -71,7 +76,7 @@ export function useServiceBookingPayment() {
     } finally {
       endConfirm();
     }
-  }, [refreshBookings]);
+  }, [queryClient, refreshBookings]);
 
   const confirmDriver = useCallback(async (payload: CreateDriverBookingRequest) => {
     if (!beginConfirm()) return undefined;
@@ -83,8 +88,11 @@ export function useServiceBookingPayment() {
         return { booking } satisfies ConfirmResult;
       }
       const booking = await createDriverBooking(payload);
+      await requestCustomerNotificationPermissions();
       await completeAdvancePayment(booking.id, 'driver');
+      await alertBookingConfirmed(booking.bookingNumber);
       await refreshBookings();
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
       return { booking } satisfies ConfirmResult;
     } catch (err) {
       const message = getApiErrorMessage(err, 'Unable to confirm driver booking');
@@ -94,7 +102,7 @@ export function useServiceBookingPayment() {
     } finally {
       endConfirm();
     }
-  }, [refreshBookings]);
+  }, [queryClient, refreshBookings]);
 
   const confirmExistingBooking = useCallback(
     async (bookingId: string, bookingType: ServiceBookingType) => {
@@ -105,8 +113,11 @@ export function useServiceBookingPayment() {
           await refreshBookings();
           return;
         }
+        await requestCustomerNotificationPermissions();
         await completeAdvancePayment(bookingId, bookingType);
+        await alertBookingConfirmed();
         await refreshBookings();
+        void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
       } catch (err) {
         const message = getApiErrorMessage(err, 'Unable to record advance payment');
         setError(message);
@@ -116,7 +127,7 @@ export function useServiceBookingPayment() {
         endConfirm();
       }
     },
-    [refreshBookings],
+    [queryClient, refreshBookings],
   );
 
   return { confirmTowing, confirmDriver, confirmExistingBooking, isConfirming, error };
