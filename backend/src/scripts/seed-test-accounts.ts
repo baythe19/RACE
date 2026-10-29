@@ -139,7 +139,7 @@ async function main(): Promise<void> {
     driverProfile: {
       driverCode: 'QA-DR-FT-001',
       licenseNo: 'QADLFT2026001',
-      driverType: 'Tow Driver',
+      driverType: 'Full-Time',
       city: 'Bhubaneswar',
       state: 'Odisha',
       vehicleRegistration: 'QA01DV0001',
@@ -176,7 +176,7 @@ async function main(): Promise<void> {
     driverProfile: {
       driverCode: 'QA-DR-PT-002',
       licenseNo: 'QADLPT2026002',
-      driverType: 'Driver Service',
+      driverType: 'Part-Time',
       city: 'Bhubaneswar',
       state: 'Odisha',
       availabilityWindow: 'evenings_weekends',

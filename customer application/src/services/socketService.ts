@@ -104,3 +104,11 @@ export function onDriverArrivedDropoff(
   activeSocket.on('booking:driver_arrived_dropoff', callback);
   return () => activeSocket.off('booking:driver_arrived_dropoff', callback);
 }
+
+export function onNotificationNew(
+  callback: (payload: { notificationId?: string; createdAt?: string }) => void,
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('notification:new', callback);
+  return () => activeSocket.off('notification:new', callback);
+}

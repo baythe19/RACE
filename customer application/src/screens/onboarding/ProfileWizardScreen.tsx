@@ -46,10 +46,13 @@ import {
   HERO_VIEWBOX_W,
   VehicleHero,
 } from '../../components/onboarding/ProfileSetupHeroes';
-import { dismissOpenProfileDropdown } from '../../components/onboarding/profileDropdownDismiss';
+import {
+  dismissOpenProfileDropdown,
+  setProfileKeyboardOpen,
+} from '../../components/onboarding/profileDropdownDismiss';
 import { KeyboardFormView } from '../../components/ui/AppKeyboard';
 import { ensurePreviewAuthSession } from '../../config/uiPreviewAuth';
-import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { completeOnboarding } from '../../redux/auth/authSlice';
 import { finishVehicleOnboarding } from '../../redux/onboarding/onboardingSlice';
@@ -57,6 +60,7 @@ import { markCustomerOnboardingComplete } from '../../store/customerOnboarding';
 import { useAuthStore } from '../../store/authStore';
 import { useVehicleStore } from '../../store/vehicleStore';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'ProfileWizard'>;
 type SetupStep = 1 | 2 | 3 | 4;
@@ -73,6 +77,21 @@ const MODELS_BY_MAKE: Record<string, string[]> = {
 };
 const DONE_ROADSIDE_ART = require('../../assets/images/done-roadside-journey.jpg');
 const DONE_ROADSIDE_ASPECT = 825 / 1905;
+
+/** Start fetching the success illustration as soon as this screen loads, not when it appears. */
+function preloadDoneRoadsideArt() {
+  const asset = Asset.fromModule(DONE_ROADSIDE_ART);
+  void asset
+    .downloadAsync()
+    .then(() => {
+      const uri = asset.localUri || asset.uri;
+      if (uri) return Image.prefetch(uri);
+      return undefined;
+    })
+    .catch(() => undefined);
+}
+
+preloadDoneRoadsideArt();
 /** Vertical gap under “RACE is ready…” before chips (and mirrored above hero art). */
 const SUCCESS_CHIP_GAP = 36;
 
@@ -140,6 +159,8 @@ export default function ProfileWizardScreen({ navigation }: Props) {
 
   const handleInputFocus = useCallback(
     (targetScrollY?: number) => {
+      dismissOpenProfileDropdown();
+      setDropdownOpen(false);
       Animated.timing(cardShiftY, {
         toValue: -Math.round(110 * scale),
         duration: Platform.OS === 'ios' ? 250 : 200,
@@ -158,6 +179,9 @@ export default function ProfileWizardScreen({ navigation }: Props) {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
     const showSub = Keyboard.addListener(showEvent, event => {
+      setProfileKeyboardOpen(true);
+      dismissOpenProfileDropdown();
+      setDropdownOpen(false);
       setKeyboardHeight(event.endCoordinates?.height || 280);
       Animated.timing(cardShiftY, {
         toValue: -Math.round(110 * scale),
@@ -166,6 +190,7 @@ export default function ProfileWizardScreen({ navigation }: Props) {
       }).start();
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
+      setProfileKeyboardOpen(false);
       setKeyboardHeight(0);
       Animated.timing(cardShiftY, {
         toValue: 0,
@@ -181,10 +206,8 @@ export default function ProfileWizardScreen({ navigation }: Props) {
   }, [cardShiftY, scale]);
 
   useEffect(() => {
-    if (step >= 3) {
-      void Asset.fromModule(DONE_ROADSIDE_ART).downloadAsync().catch(() => undefined);
-    }
-  }, [step]);
+    preloadDoneRoadsideArt();
+  }, []);
 
   const showStep = useCallback(
     (next: SetupStep) => {
@@ -209,7 +232,7 @@ export default function ProfileWizardScreen({ navigation }: Props) {
       return;
     }
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
     }
   };
 
@@ -221,7 +244,7 @@ export default function ProfileWizardScreen({ navigation }: Props) {
           return true;
         }
         if (navigation.canGoBack()) {
-          navigation.goBack();
+          goBackWithinStack(navigation);
         }
         return true;
       });
@@ -306,7 +329,7 @@ export default function ProfileWizardScreen({ navigation }: Props) {
   const finishToHome = async () => {
     dispatch(finishVehicleOnboarding());
 
-    if (UI_PREVIEW_AUTH_FLOW) {
+    if (isUiPreviewAuthFlow()) {
       ensurePreviewAuthSession(dispatch, true);
     }
 
@@ -484,7 +507,7 @@ export default function ProfileWizardScreen({ navigation }: Props) {
                       error={fieldErrors.emergencyMobile}
                       onFocus={() => handleInputFocus()}
                       onChangeText={value => {
-                        setEmergencyMobile(value.replace(/[^\d\s]/g, ''));
+                        setEmergencyMobile(value.replace(/\D/g, '').slice(0, 10));
                         clearFieldError('emergencyMobile');
                       }}
                     />
@@ -849,7 +872,7 @@ function SuccessView({
   const artHeight = artWidth * DONE_ROADSIDE_ASPECT;
 
   useEffect(() => {
-    void Asset.fromModule(DONE_ROADSIDE_ART).downloadAsync().catch(() => undefined);
+    preloadDoneRoadsideArt();
   }, []);
 
   return (

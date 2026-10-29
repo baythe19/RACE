@@ -137,6 +137,8 @@ const authSlice = createSlice({
 
       if (authenticated && user) {
         syncZustandAuth(user, onboardingRequired);
+      } else if (authenticated) {
+        useAuthStore.getState().setAuthenticated(true);
       } else {
         useAuthStore.getState().clearAuth();
       }

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   Bike,
   Car,
@@ -17,6 +17,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { AUTH_COLORS as COLORS } from '../auth/authDesign';
 import {
+  isProfileKeyboardOpen,
   registerProfileDropdownCloser,
   unregisterProfileDropdownCloser,
 } from './profileDropdownDismiss';
@@ -262,11 +263,12 @@ export function ProfileMobileField({
         <View style={{ width: 1, height: 22 * scale, marginHorizontal: 10 * scale, backgroundColor: '#E7E7E8' }} />
         <TextInput
           value={value}
-          onChangeText={onChangeText}
+          onChangeText={text => onChangeText(text.replace(/\D/g, '').slice(0, 10))}
           onFocus={onFocus}
           placeholder={placeholder}
           placeholderTextColor="#B0B1B8"
-          keyboardType="phone-pad"
+          keyboardType="number-pad"
+          maxLength={10}
           autoCorrect={false}
           style={{
             flex: 1,
@@ -329,15 +331,44 @@ export function ProfileDropdown({
     return undefined;
   }, [close, onOpenChange, open]);
 
+  // A text field and this menu should not be open together. Keyboard show closes the menu.
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(showEvent, () => setOpen(false));
+    return () => sub.remove();
+  }, []);
+
+  const openMenu = () => {
+    fieldRef.current?.measureInWindow((x, y, width, height) => {
+      if (width <= 0) return;
+      setAnchor({ x, y, width, height });
+      setOpen(true);
+    });
+  };
+
   const toggle = () => {
     if (open) {
       setOpen(false);
       return;
     }
-    fieldRef.current?.measureInWindow((x, y, width, height) => {
-      setAnchor({ x, y, width, height });
-      setOpen(true);
-    });
+    const keyboardUp =
+      isProfileKeyboardOpen() || (typeof Keyboard.isVisible === 'function' && Keyboard.isVisible());
+    if (!keyboardUp) {
+      openMenu();
+      return;
+    }
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      hideSub.remove();
+      clearTimeout(fallback);
+      // Wait for the card to slide back after the keyboard hides, then measure.
+      setTimeout(openMenu, 260);
+    };
+    const hideSub = Keyboard.addListener('keyboardDidHide', finish);
+    const fallback = setTimeout(finish, 700);
+    Keyboard.dismiss();
   };
 
   const menuTop = anchor ? anchor.y + anchor.height + 6 : 0;

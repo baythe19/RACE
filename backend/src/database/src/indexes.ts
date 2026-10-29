@@ -14,6 +14,8 @@ import { NotificationModel } from '../../models/src/notification';
 import { VehicleModel } from '../../models/src/vehicle';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
 import { DriverVendorMembershipModel } from '../../models/src/driverVendorMembership';
+import { OtpLogModel } from '../../models/src/otpLog';
+import { EnquiryModel } from '../../models/src/enquiry';
 
 const MODELS = [
   UserModel,
@@ -29,6 +31,10 @@ const MODELS = [
   VehicleModel,
   VendorVehicleModel,
   DriverVendorMembershipModel,
+  // D-05: OtpLog carries the TTL index (14d) and Enquiry has its own compound
+  // indexes — both must be synced on boot like the rest.
+  OtpLogModel,
+  EnquiryModel,
 ];
 
 export async function ensureDatabaseIndexes(): Promise<void> {

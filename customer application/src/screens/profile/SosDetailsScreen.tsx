@@ -9,6 +9,10 @@ import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/P
 import { useSosDetails } from '../../context/SosDetailsContext';
 import { colors, shadows, typography } from '../../theme';
 
+function digitsOnly(value: string, maxLen = 10): string {
+  return value.replace(/\D/g, '').slice(0, maxLen);
+}
+
 function SectionTitle({ label, px }: { label: string; px: (n: number) => number }) {
   return (
     <Text
@@ -125,12 +129,13 @@ export default function SosDetailsScreen() {
         <FormField
           label="Owner Phone"
           value={ownerPhone}
-          onChangeText={setOwnerPhone}
-          placeholder="+91 XXXXX XXXXX"
+          onChangeText={value => setOwnerPhone(digitsOnly(value))}
+          placeholder="10-digit mobile"
           Icon={Phone}
           variant="outlined"
           compact
           keyboardType="phone-pad"
+          maxLength={10}
           required
         />
       </View>
@@ -191,12 +196,13 @@ export default function SosDetailsScreen() {
         <FormField
           label="Contact Phone"
           value={contactPhone}
-          onChangeText={setContactPhone}
-          placeholder="+91 XXXXX XXXXX"
+          onChangeText={value => setContactPhone(digitsOnly(value))}
+          placeholder="10-digit mobile"
           Icon={Phone}
           variant="outlined"
           compact
           keyboardType="phone-pad"
+          maxLength={10}
           iconColor={colors.error}
           required
         />

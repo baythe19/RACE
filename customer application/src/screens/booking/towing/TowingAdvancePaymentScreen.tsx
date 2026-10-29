@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
-import { Check, ChevronDown, ChevronUp, Smartphone, Wallet } from 'lucide-react-native';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { towingServiceTimingLabel } from '../../../components/booking/TowingServiceModeBanner';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import { TowingFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import {
@@ -17,40 +18,17 @@ import { useServiceBookingPayment } from '../../../hooks/useServiceBookingPaymen
 import { useVehicleStore } from '../../../store/vehicleStore';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { estimateTowingFare } from '../../../services/bookings/fareApi';
-import { formatRupee, formatRupeeRange } from '../../../utils/towingPricing';
 import { buildTowingBookingRequest } from '../../../utils/serviceBookingPayload';
 import type { TowingFareBreakdown } from '../../../types/fare';
 import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
-import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
+import { towingFareModeParams } from '../../../utils/towingFareEstimate';
 import { getApiErrorMessage } from '../../../services/api';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingAdvancePayment'>;
 
-type PaymentMethodId = 'upi' | 'cash';
-
 const TOWING_ACCENT = '#F59E0B';
-const SELECTED_BG = '#FEF3C7';
-
-const PAYMENT_METHODS: Array<{
-  id: PaymentMethodId;
-  label: string;
-  description: string;
-  Icon: typeof Smartphone;
-}> = [
-  {
-    id: 'upi',
-    label: 'UPI',
-    description: 'PhonePe / GPay / Paytm',
-    Icon: Smartphone,
-  },
-  {
-    id: 'cash',
-    label: 'Cash on Service',
-    description: 'Pay when the tow truck arrives',
-    Icon: Wallet,
-  },
-];
 
 function formatBookingNumber(bookingNumber: string): string {
   return bookingNumber.startsWith('#') ? bookingNumber : `#${bookingNumber}`;
@@ -62,7 +40,6 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
   const { vehicles, fetchVehicles } = useVehicleStore();
   const { confirmTowing, isConfirming } = useServiceBookingPayment();
   const [summaryExpanded, setSummaryExpanded] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('upi');
   const [showSuccess, setShowSuccess] = useState(false);
   const [fareBreakdown, setFareBreakdown] = useState<TowingFareBreakdown | null>(
     booking.fareBreakdown ?? null,
@@ -95,16 +72,14 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     async function loadFare() {
       setIsLoadingFare(true);
       try {
-        const scheduledAt =
-          booking.serviceMode === 'scheduled'
-            ? towingDateIdToScheduledAt(booking.dateId)
-            : undefined;
+        const { towingMode, scheduledAt } = towingFareModeParams(booking);
         const estimate = await estimateTowingFare({
           pickup_lat: pickupLat,
           pickup_lng: pickupLng,
           dropoff_lat: dropLat,
           dropoff_lng: dropLng,
           scheduledAt,
+          towingMode,
         });
         if (!cancelled) {
           setFareBreakdown(estimate.fareBreakdown);
@@ -150,27 +125,26 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
   const activeBreakdown = fareBreakdown ?? booking.fareBreakdown ?? null;
   const totalMin = activeBreakdown?.totalFare ?? booking.totalPriceMin ?? booking.totalPrice;
   const totalMax = activeBreakdown?.totalFare ?? booking.totalPriceMax ?? booking.totalPrice;
-  const advance =
-    activeBreakdown?.advanceAmount ?? booking.advancePaymentMin ?? booking.advancePayment;
-
-  const totalRange = formatRupeeRange(totalMin, totalMax);
 
   const summaryRows = [
     { label: 'Service', value: 'Towing' },
     { label: 'Vehicle', value: booking.vehicleLabel || getVehicleLabel(booking.vehicleType) },
     { label: 'Pickup', value: getShortLocation(booking.pickup, booking.pickupLabel) },
     { label: 'Drop', value: getShortLocation(booking.drop, booking.dropLabel) },
-    { label: 'Towing Type', value: getTowingTypeLabel(booking.towingType) },
+    { label: 'Tow truck', value: getTowingTypeLabel(booking.towingType) },
     {
       label: 'Date & Time',
-      value: `${getDateLabel(booking.dateId)}, ${getTimeLabel(booking.timeId)}`,
+      value: towingServiceTimingLabel(
+        booking.serviceMode,
+        getDateLabel(booking.dateId),
+        getTimeLabel(booking.timeId),
+      ),
     },
-    { label: 'Est. Total', value: totalRange },
+    { label: 'Est. Total', value: `₹${totalMin}` },
   ];
 
-  const handleConfirm = async (_method: PaymentMethodId) => {
-    if (isConfirming || showSuccess || isLoadingFare || !advance) return;
-    setPaymentMethod(_method);
+  const handleConfirm = async () => {
+    if (isConfirming || showSuccess || isLoadingFare) return;
 
     let payload;
     try {
@@ -183,7 +157,11 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     }
 
     try {
-      const { booking: created } = await confirmTowing(payload);
+      const result = await confirmTowing(payload);
+      const created = result?.booking;
+      if (!created) {
+        throw new Error('Booking response was empty');
+      }
       const breakdown =
         (created.fareBreakdown as TowingFareBreakdown | undefined) ??
         activeBreakdown ??
@@ -210,40 +188,64 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
           fareBreakdown: breakdown ?? undefined,
         });
         resetBooking();
-      }, 900);
+      }, 1100);
     } catch (error) {
       setShowSuccess(false);
       successScale.setValue(0);
-      Alert.alert('Payment Failed', getApiErrorMessage(error, 'Unable to confirm booking. Please try again.'));
+      Alert.alert('Booking Failed', getApiErrorMessage(error, 'Unable to confirm booking. Please try again.'));
     }
   };
 
   if (showSuccess) {
     return (
-      <TowingBookingLayout title="Pay Advance" step={7} showStep={false} hideFooter>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 }}>
+      <TowingBookingLayout title="Booking" step={0} showStep={false} hideFooter>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: t.px(24) }}>
           <Animated.View
             style={{
-              width: t.px(88),
-              height: t.px(88),
-              borderRadius: t.px(44),
-              backgroundColor: colors.success,
+              width: t.px(96),
+              height: t.px(96),
+              borderRadius: t.px(48),
+              backgroundColor: colors.goldLight,
+              borderWidth: 2,
+              borderColor: TOWING_ACCENT,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ scale: successScale }],
             }}>
-            <Check size={t.px(42)} color={colors.background} strokeWidth={3} />
+            <View
+              style={{
+                width: t.px(64),
+                height: t.px(64),
+                borderRadius: t.px(32),
+                backgroundColor: TOWING_ACCENT,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Check size={t.px(34)} color={colors.background} strokeWidth={3.2} />
+            </View>
           </Animated.View>
           <Text
             style={{
-              fontSize: t.px(20),
-              fontWeight: typography.weights.bold,
-              color: colors.success,
+              marginTop: t.px(18),
+              fontSize: t.px(22),
+              fontWeight: typography.weights.extrabold,
+              color: colors.dark,
             }}>
-            Payment successful!
+            Booking Confirmed!
+          </Text>
+          <Text
+            style={{
+              marginTop: t.px(6),
+              fontSize: t.body,
+              color: colors.grey,
+              textAlign: 'center',
+              lineHeight: t.px(20),
+            }}>
+            Your towing request has been placed.
+            {'\n'}Assigning a nearby partner…
           </Text>
           {confirmedFare ? (
-            <View style={{ width: '100%', marginTop: t.px(8) }}>
+            <View style={{ width: '100%', marginTop: t.px(18) }}>
               <TowingFareBreakdownCard breakdown={confirmedFare} accentColor={TOWING_ACCENT} compact />
             </View>
           ) : null}
@@ -254,13 +256,13 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
 
   return (
     <TowingBookingLayout
-      title="Pay Advance"
-      step={7}
+      title="Confirm & book"
+      step={3}
       accentColor={TOWING_ACCENT}
       scrollable
-      showStep={false}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       hideFooter>
+      {/* Collapsible booking summary */}
       <Pressable
         onPress={() => setSummaryExpanded(prev => !prev)}
         style={[
@@ -271,7 +273,7 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
             backgroundColor: colors.background,
             paddingHorizontal: t.px(16),
             paddingVertical: t.px(14),
-            marginBottom: t.px(16),
+            marginBottom: t.px(14),
           },
           shadows.card,
         ]}>
@@ -313,141 +315,75 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
         ) : null}
       </Pressable>
 
-      <View
-        style={{
-          borderRadius: t.cardRadius,
-          backgroundColor: SELECTED_BG,
-          borderWidth: 1,
-          borderColor: TOWING_ACCENT,
-          paddingVertical: t.px(16),
-          paddingHorizontal: t.px(16),
-          marginBottom: t.px(20),
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <Text style={{ fontSize: t.bodyLarge, fontWeight: typography.weights.semibold, color: colors.dark }}>
-          Pay now
-        </Text>
-        <Text
-          style={{
-            fontSize: t.px(22),
-            fontWeight: typography.weights.extrabold,
-            color: TOWING_ACCENT,
-          }}>
-          {isLoadingFare ? '...' : formatRupee(advance)}
-        </Text>
-      </View>
-
+      {/* Fare summary — full picture, pay-later split shown for transparency */}
       {activeBreakdown ? (
-        <View style={{ marginBottom: t.px(20) }}>
+        <View style={{ marginBottom: t.px(14) }}>
           <TowingFareBreakdownCard breakdown={activeBreakdown} accentColor={TOWING_ACCENT} compact />
         </View>
       ) : isLoadingFare ? (
-        <View style={{ alignItems: 'center', marginBottom: t.px(20) }}>
+        <View style={{ alignItems: 'center', marginBottom: t.px(14) }}>
           <ActivityIndicator color={TOWING_ACCENT} />
         </View>
       ) : null}
 
       <Text
         style={{
-          fontSize: t.sectionTitle,
-          fontWeight: typography.weights.bold,
-          color: colors.dark,
-          marginBottom: t.px(10),
+          fontSize: t.caption,
+          color: colors.grey,
+          textAlign: 'center',
+          marginBottom: t.px(8),
+          lineHeight: t.px(18),
         }}>
-        Payment Method
+        MVP pilot: confirming unlocks dispatch with a test payment record — no card or UPI is
+        charged now.
       </Text>
 
-      <View style={{ gap: t.px(10), marginBottom: t.px(24) }}>
-        {PAYMENT_METHODS.map(method => {
-          const selected = paymentMethod === method.id;
-          const Icon = method.Icon;
-          return (
-            <Pressable
-              key={method.id}
-              onPress={() => setPaymentMethod(method.id)}
-              style={[
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: t.px(12),
-                  borderRadius: t.inputRadius,
-                  borderWidth: selected ? 2 : 1,
-                  borderColor: selected ? TOWING_ACCENT : colors.border,
-                  backgroundColor: selected ? SELECTED_BG : colors.background,
-                  paddingHorizontal: t.px(16),
-                  paddingVertical: t.px(14),
-                },
-                shadows.card,
-              ]}>
-              <Icon size={t.iconSm} color={selected ? TOWING_ACCENT : colors.dark} strokeWidth={2} />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: t.labelBold,
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {method.label}
-                </Text>
-                <Text style={{ fontSize: t.caption, color: colors.grey }}>{method.description}</Text>
-              </View>
-              <View
-                style={{
-                  width: t.px(20),
-                  height: t.px(20),
-                  borderRadius: t.px(10),
-                  borderWidth: selected ? 0 : 1.5,
-                  borderColor: colors.border,
-                  backgroundColor: selected ? TOWING_ACCENT : colors.background,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                {selected ? <Check size={t.px(12)} color={colors.background} strokeWidth={3} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Pressable
-        onPress={() => void handleConfirm(paymentMethod)}
-        disabled={isConfirming || isLoadingFare || !advance}
+      <Text
         style={{
+          fontSize: t.caption,
+          color: colors.grey,
+          textAlign: 'center',
+          marginBottom: t.px(16),
+          lineHeight: t.px(18),
+        }}>
+        Our partner collects the remaining payment after the tow is completed.
+        {'\n'}In-app online payment options will be available soon.
+      </Text>
+
+      {/* Single, clear CTA */}
+      <Pressable
+        onPress={() => void handleConfirm()}
+        disabled={isConfirming || isLoadingFare}
+        style={({ pressed }) => ({
           minHeight: t.buttonHeight,
           borderRadius: t.cardRadius,
-          backgroundColor: isConfirming || isLoadingFare || !advance ? colors.grey : TOWING_ACCENT,
+          backgroundColor: isConfirming || isLoadingFare ? colors.border : colors.primary,
+          opacity: pressed ? 0.9 : 1,
           alignItems: 'center',
           justifyContent: 'center',
-          marginBottom: t.px(12),
           flexDirection: 'row',
           gap: t.px(8),
-        }}>
-        {isConfirming ? <ActivityIndicator color={colors.dark} /> : null}
+          marginBottom: t.px(10),
+        })}>
+        {isConfirming || isLoadingFare ? <ActivityIndicator color={colors.dark} size="small" /> : null}
         <Text
           style={{
             fontSize: t.buttonLabel,
             fontWeight: typography.weights.bold,
             color: colors.dark,
           }}>
-          {isConfirming ? 'Processing...' : `Pay ${formatRupee(advance)} & Confirm Booking`}
+          {isConfirming ? 'Confirming…' : 'Confirm Booking'}
         </Text>
       </Pressable>
 
-      <Pressable
-        onPress={() => void handleConfirm('cash')}
-        disabled={isConfirming || isLoadingFare || !advance}
-        style={{ alignItems: 'center', padding: t.px(8), opacity: isConfirming || isLoadingFare || !advance ? 0.5 : 1 }}>
-        <Text
-          style={{
-            fontSize: t.body,
-            fontWeight: typography.weights.semibold,
-            color: colors.grey,
-          }}>
-          Pay Cash on Service
-        </Text>
-      </Pressable>
+      <Text
+        style={{
+          fontSize: t.caption,
+          color: colors.grey,
+          textAlign: 'center',
+        }}>
+        You will not be charged anything right now
+      </Text>
     </TowingBookingLayout>
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 
 import { TOKEN_KEYS } from '../config/env';
-import { UI_PREVIEW_AUTH_FLOW } from '../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../config/uiPreviewMode';
 import { hydrateAuthStore } from '../redux/store';
 import { setUnauthorizedHandler } from '../services/authSession';
 import { getCustomerOnboardingStep } from '../store/customerOnboarding';
@@ -48,7 +48,7 @@ export function useAuth() {
         }
 
         try {
-          if (!UI_PREVIEW_AUTH_FLOW) {
+          if (!isUiPreviewAuthFlow()) {
             await useProfileStore.getState().fetchProfile();
             await useVehicleStore.getState().fetchVehicles();
           }

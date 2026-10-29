@@ -14,6 +14,15 @@ import { SafeAreaView, useSafeAreaInsets, type Edge } from 'react-native-safe-ar
 import { useScreenPx } from '../../hooks/useScreenPx';
 import { colors } from '../../theme';
 
+const KeyboardAware = (() => {
+  try {
+    return require('react-native-keyboard-controller')
+      .KeyboardAwareScrollView as typeof import('react-native-keyboard-controller').KeyboardAwareScrollView;
+  } catch {
+    return null;
+  }
+})();
+
 type Props = {
   header?: ReactNode;
   footer?: ReactNode;
@@ -46,6 +55,23 @@ export default function AppScreenLayout({
   const paddingX = horizontalPadding ?? px(20);
 
   const body = scrollable ? (
+    KeyboardAware && keyboardAvoiding ? (
+      <KeyboardAware
+        style={styles.flex}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        bottomOffset={px(96)}
+        extraKeyboardSpace={px(24)}
+        contentContainerStyle={[
+          {
+            paddingHorizontal: paddingX,
+            paddingBottom: px(24),
+          },
+          contentStyle,
+        ]}>
+        {children}
+      </KeyboardAware>
+    ) : (
     <ScrollView
       style={styles.flex}
       showsVerticalScrollIndicator={false}
@@ -69,6 +95,7 @@ export default function AppScreenLayout({
       ]}>
       {children}
     </ScrollView>
+    )
   ) : (
     <View
       style={[
@@ -91,10 +118,14 @@ export default function AppScreenLayout({
   return (
     <View style={[styles.root, { backgroundColor }]}>
       <SafeAreaView style={styles.flex} edges={edges}>
-        {keyboardAvoiding ? (
+        {keyboardAvoiding && !KeyboardAware ? (
           <KeyboardAvoidingView
             style={styles.flex}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
+            // Android: react-native's automatic "adjustResize" handles it when
+            // the activity is configured; no KAV wrapper needed there.
+          >
             {content}
           </KeyboardAvoidingView>
         ) : (

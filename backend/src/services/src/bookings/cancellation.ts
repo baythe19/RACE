@@ -6,53 +6,16 @@ export type CancellationResult = {
   cancellationFee: number;
 };
 
+/**
+ * MVP demo cancellation — keep rules simple until product signs off on tiered fees.
+ * Stub payments only; refund amounts are bookkeeping, not real bank transfers.
+ */
 export function getCancellationPolicy(
   status: string,
   advancePaid: boolean,
   advanceAmount: number,
   _scheduledAt?: Date,
 ): CancellationResult {
-  if (status === 'PENDING' && !advancePaid) {
-    return {
-      canCancel: true,
-      refundAmount: 0,
-      refundPercent: 0,
-      cancellationFee: 0,
-      reason: 'Free cancellation - no payment made',
-    };
-  }
-
-  if (status === 'CONFIRMED') {
-    return {
-      canCancel: true,
-      refundAmount: advanceAmount,
-      refundPercent: 100,
-      cancellationFee: 0,
-      reason: 'Full refund - driver not yet assigned',
-    };
-  }
-
-  if (status === 'DRIVER_ASSIGNED') {
-    const refundAmount = Math.round(advanceAmount * 0.5);
-    return {
-      canCancel: true,
-      refundAmount,
-      refundPercent: 50,
-      cancellationFee: Math.round(advanceAmount * 0.5),
-      reason: '50% refund - driver was assigned',
-    };
-  }
-
-  if (status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED') {
-    return {
-      canCancel: true,
-      refundAmount: 0,
-      refundPercent: 0,
-      cancellationFee: advanceAmount,
-      reason: 'No refund - driver is already on the way',
-    };
-  }
-
   if (['IN_PROGRESS', 'COMPLETED', 'RATED', 'CANCELLED'].includes(status)) {
     return {
       canCancel: false,
@@ -63,11 +26,32 @@ export function getCancellationPolicy(
     };
   }
 
+  if (status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED') {
+    return {
+      canCancel: false,
+      refundAmount: 0,
+      refundPercent: 0,
+      cancellationFee: 0,
+      reason: 'Partner is already on the way. Use Help & support if you need assistance.',
+    };
+  }
+
+  if (!advancePaid) {
+    return {
+      canCancel: true,
+      refundAmount: 0,
+      refundPercent: 0,
+      cancellationFee: 0,
+      reason: 'Free cancellation — advance not paid yet',
+    };
+  }
+
   return {
-    canCancel: false,
-    refundAmount: 0,
-    refundPercent: 0,
+    canCancel: true,
+    refundAmount: advanceAmount,
+    refundPercent: 100,
     cancellationFee: 0,
-    reason: 'Cannot cancel at this stage',
+    reason:
+      'Demo: full advance marked refunded in the app (stub payment — not a real bank payout)',
   };
 }

@@ -70,6 +70,15 @@ export function isBookingCompleted(booking: Booking): boolean {
   return ['SERVICE_COMPLETED', 'PAYMENT_PENDING', 'PAID'].includes(booking.status);
 }
 
+/**
+ * Trip-start OTP is only for pickup handover: driver has arrived, customer
+ * shares the code so the trip can move to IN_PROGRESS.
+ * Completion OTP (after dropoff payment) is a separate flow in DropoffPaymentModal.
+ */
+export function shouldShowTripStartOtp(status?: string): boolean {
+  return status === 'DRIVER_ARRIVED';
+}
+
 export function formatBookingDisplayId(bookingNumber: string): string {
   return bookingNumber.startsWith('#') ? bookingNumber : `#${bookingNumber}`;
 }
@@ -83,24 +92,31 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
       ? formatUnifiedStatusLabel(booking.unifiedStatus)
       : formatUnifiedStatusLabel(booking.status),
     pickup: formatLocationDisplay(booking.pickup),
-    drop:
-      formatLocationDisplay(booking.dropoff) === '—'
-        ? 'On-site service'
-        : formatLocationDisplay(booking.dropoff),
+    drop: (() => {
+      const dropLine = formatLocationDisplay(booking.dropoff);
+      const pickupLine = formatLocationDisplay(booking.pickup);
+      if (dropLine === '—') return 'On-site help';
+      if (dropLine === pickupLine && !/towing/i.test(booking.serviceLabel)) {
+        return 'On-site help';
+      }
+      return dropLine;
+    })(),
     eta: booking.etaMinutes != null ? `${booking.etaMinutes} min` : 'Updating',
     driver: booking.driver
       ? {
           name: booking.driver.name,
-          rating: booking.driver.rating,
           photo: booking.driver.avatarUrl ?? null,
           experience: booking.driver.experience,
+          phone: booking.driver.phone,
         }
       : {
-          name: 'Finding a driver',
+          name: 'Finding a partner',
           photo: null,
         },
     bookingType: booking.bookingType ?? 'towing',
-    tripStartOtp: booking.tripStartOtp,
+    tripStartOtp: shouldShowTripStartOtp(booking.unifiedStatus)
+      ? booking.tripStartOtp
+      : undefined,
   };
 }
 

@@ -39,6 +39,32 @@ export class DriverBookingRepository {
     return DriverBookingModel.find(filter).sort({ createdAt: -1 });
   }
 
+  async findByIdWithOtp(id: string): Promise<IDriverBooking | null> {
+    return DriverBookingModel.findById(id).select('+tripStartOtpEncrypted +completionOtpEncrypted');
+  }
+
+  async findByCustomerWithOtp(
+    customerId: string,
+    options?: { status?: UnifiedBookingStatus },
+  ): Promise<IDriverBooking[]> {
+    const filter: Record<string, unknown> = { customerId };
+    if (options?.status) filter.status = options.status;
+    return DriverBookingModel.find(filter)
+      .select('+tripStartOtpEncrypted +completionOtpEncrypted')
+      .sort({ createdAt: -1 });
+  }
+
+  async findByDriverWithOtp(
+    driverId: string,
+    options?: { status?: UnifiedBookingStatus },
+  ): Promise<IDriverBooking[]> {
+    const filter: Record<string, unknown> = { driverId };
+    if (options?.status) filter.status = options.status;
+    return DriverBookingModel.find(filter)
+      .select('+tripStartOtpEncrypted +completionOtpEncrypted')
+      .sort({ createdAt: -1 });
+  }
+
   async updateById(
     id: string,
     update: Partial<IDriverBooking>,
@@ -69,3 +95,4 @@ export class DriverBookingRepository {
 }
 
 export const driverBookingRepository = new DriverBookingRepository();
+

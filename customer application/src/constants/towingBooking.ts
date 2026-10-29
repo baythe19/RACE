@@ -8,8 +8,13 @@ import type {
   TowingVehicleTypeId,
 } from '../types/towingBooking';
 import { formatLocationDisplay } from '../utils/readableAddress';
+import { getDateReviewLabel, parseStoredDate } from '../utils/driverCalendar';
 
-export const TOWING_BOOKING_STEPS = 10;
+/** Canonical 4-phase booking flow. Steps 1–3 are wizard screens; step 4 is the confirmation screen. */
+export const TOWING_BOOKING_STEPS = 4;
+
+/** Labels shown in the horizontal stepper on wizard screens (steps 1–3). */
+export const TOWING_BOOKING_STEP_LABELS = ['Vehicle & Tow', 'Pickup & Drop', 'Review'] as const;
 
 export const TOWING_SERVICE_LIST: Array<{
   id: TowingServiceModeId;
@@ -61,25 +66,37 @@ export const TOWING_VEHICLE_TYPES: Array<{
   { id: 'bike', label: 'Bike', image: images.booking.vehicleBike },
 ];
 
+/** Same four fleet categories as partner `VendorVehicleRegistrationScreen` VEHICLE_TYPES. */
 export const TOWING_TYPES: Array<{
   id: TowingTypeId;
   label: string;
-  description: string;
-  descriptionLines?: [string, string];
+  /** Two-word card title on customer booking step 1. */
+  shortLabel: string;
   image: number;
 }> = [
   {
     id: 'flatbed',
-    label: 'Flatbed Towing',
-    description: 'Best for all vehicles. Safe & secure.',
-    descriptionLines: ['Best for all vehicles.', 'Safe & secure.'],
+    label: 'Flatbed Tow Truck',
+    shortLabel: 'Flatbed tow',
     image: images.booking.towingFlatbed,
   },
   {
     id: 'wheel_lift',
-    label: 'Wheel Lift Towing',
-    description: 'Suitable for small vehicles.',
+    label: 'Wheel-lift Tow Truck',
+    shortLabel: 'Wheel lift',
     image: images.booking.towingWheelLift,
+  },
+  {
+    id: 'heavy_tow',
+    label: 'Heavy Tow Truck',
+    shortLabel: 'Heavy tow',
+    image: images.booking.towingHeavy,
+  },
+  {
+    id: 'other',
+    label: 'Other',
+    shortLabel: 'Other',
+    image: images.booking.towingOther,
   },
 ];
 
@@ -117,13 +134,11 @@ export function getVehicleLabel(id: TowingVehicleTypeId): string {
 }
 
 export function getTowingTypeLabel(id: TowingTypeId): string {
-  const type = TOWING_TYPES.find(t => t.id === id);
-  if (!type) return id;
-  return type.id === 'flatbed' ? 'Flatbed' : 'Wheel Lift';
+  return TOWING_TYPES.find(t => t.id === id)?.label ?? id;
 }
 
 export function getDateLabel(dateId: string): string {
-  return TOWING_DATE_OPTIONS.find(d => d.id === dateId)?.day ?? 'Today';
+  return getDateReviewLabel(parseStoredDate(dateId));
 }
 
 export function getTimeLabel(timeId: TowingTimeId): string {

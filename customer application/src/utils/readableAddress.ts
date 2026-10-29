@@ -38,6 +38,7 @@ function isPlotOrBlockPart(part: string): boolean {
 
 function isReadableAreaPart(part: string): boolean {
   if (isNoisePart(part) || isPlotOrBlockPart(part)) return false;
+  if (/^selected location$/i.test(part.trim())) return false;
   if (/^\d+$/.test(part)) return false;
   return part.length >= 2;
 }
@@ -70,6 +71,10 @@ export function formatReadableAddress(
     result = cleaned.slice(-2).join(', ');
   } else {
     result = cleaned[0] ?? parts[0] ?? address.trim();
+  }
+
+  if (/^selected location$/i.test(result.trim())) {
+    return 'Pinned on map';
   }
 
   if (result.length > maxLen) {
@@ -142,10 +147,15 @@ export function formatReadableLocation(
 ): string {
   const label = displayLabel?.trim();
   if (label) {
-    if (label.length > maxLen) {
-      return `${label.slice(0, maxLen - 1).trim()}…`;
+    const cleaned = label
+      .replace(/^Selected location,?\s*/i, '')
+      .replace(/^Selected address,?\s*/i, '')
+      .trim();
+    const use = cleaned || label;
+    if (use.length > maxLen) {
+      return `${use.slice(0, maxLen - 1).trim()}…`;
     }
-    return label;
+    return use;
   }
   return formatReadableAddress(address, maxLen);
 }

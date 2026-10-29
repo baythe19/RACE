@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AuthToast from '../../components/auth/AuthToast';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import Screen, { ScreenContent } from '../../components/ui/Screen';
 import { useVehicleStore } from '../../store/vehicleStore';
@@ -21,6 +21,7 @@ import { FORM_PLACEHOLDER_COLOR } from '../../constants/profileForm';
 import { FUEL_TYPE_IDS, VEHICLE_TYPE_IDS } from '../../components/vehicles/vehicleUi';
 import type { FuelType, VehicleType } from '../../types/vehicle';
 import { colors, radius, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'EditVehicle'>;
 
@@ -35,6 +36,10 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
   const [fuelType, setFuelType] = useState<FuelType>('petrol');
   const [vehicleNumber, setVehicleNumber] = useState('');
+  const numberRef = React.useRef<TextInput | null>(null);
+  const brandRef = React.useRef<TextInput | null>(null);
+  const modelRef = React.useRef<TextInput | null>(null);
+  const colorRef = React.useRef<TextInput | null>(null);
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [color, setColor] = useState('');
@@ -70,7 +75,7 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
         model: model.trim(),
         color: color.trim() || undefined,
       });
-      navigation.goBack();
+      goBackWithinStack(navigation);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to update vehicle');
     }
@@ -80,7 +85,7 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
     return (
       <Screen>
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <DataSkeleton variant="detail" />
         </View>
       </Screen>
     );
@@ -99,10 +104,10 @@ export default function EditVehicleScreen({ navigation, route }: Props) {
               <ChipRow label="Vehicle Type" options={VEHICLE_TYPES} value={vehicleType} onChange={setVehicleType} />
               <ChipRow label="Fuel Type" options={FUEL_TYPES} value={fuelType} onChange={setFuelType} />
 
-              <Field label="Vehicle Number" value={vehicleNumber} onChangeText={setVehicleNumber} placeholder="e.g. OD02AB1234" autoCapitalize="characters" />
-              <Field label="Brand" value={brand} onChangeText={setBrand} placeholder="e.g. Hyundai" />
-              <Field label="Model" value={model} onChangeText={setModel} placeholder="e.g. i20" />
-              <Field label="Color (optional)" value={color} onChangeText={setColor} placeholder="e.g. White" />
+              <Field label="Vehicle Number" value={vehicleNumber} onChangeText={setVehicleNumber} placeholder="e.g. OD02AB1234" autoCapitalize="characters" returnKeyType="next" inputRef={numberRef} onSubmitEditing={() => brandRef.current?.focus()} />
+              <Field label="Brand" value={brand} onChangeText={setBrand} placeholder="e.g. Hyundai" returnKeyType="next" inputRef={brandRef} onSubmitEditing={() => modelRef.current?.focus()} />
+              <Field label="Model" value={model} onChangeText={setModel} placeholder="e.g. i20" returnKeyType="next" inputRef={modelRef} onSubmitEditing={() => colorRef.current?.focus()} />
+              <Field label="Color (optional)" value={color} onChangeText={setColor} placeholder="e.g. White" returnKeyType="done" inputRef={colorRef} onSubmitEditing={() => void handleSubmit()} />
 
               <AuthToast message={error || storeError || ''} />
 
@@ -125,23 +130,37 @@ function Field({
   onChangeText,
   placeholder,
   autoCapitalize = 'sentences',
+  keyboardType = 'default',
+  returnKeyType = 'next',
+  inputRef,
+  onSubmitEditing,
 }: {
   label: string;
   value: string;
   onChangeText: (v: string) => void;
   placeholder?: string;
   autoCapitalize?: 'none' | 'sentences' | 'characters';
+  keyboardType?: 'default' | 'number-pad';
+  returnKeyType?: 'next' | 'done';
+  inputRef?: React.RefObject<TextInput | null>;
+  onSubmitEditing?: () => void;
 }) {
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={FORM_PLACEHOLDER_COLOR}
         autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+        keyboardType={keyboardType}
+        returnKeyType={returnKeyType}
+        submitBehavior="blurAndSubmit"
+        onSubmitEditing={onSubmitEditing}
       />
     </View>
   );

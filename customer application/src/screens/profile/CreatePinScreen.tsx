@@ -4,7 +4,8 @@ import { Delete, Shield } from 'lucide-react-native';
 
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
-import { DEMO_PIN } from '../../constants/auth';
+import { getApiErrorMessage } from '../../services/api';
+import { setPin as setPinApi } from '../../services/profileService';
 import { colors, typography } from '../../theme';
 
 const PIN_LENGTH = 4;
@@ -41,6 +42,7 @@ export default function CreatePinScreen() {
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const stepConfig: Record<
     PinStep,
@@ -69,11 +71,6 @@ export default function CreatePinScreen() {
     if (next.length !== PIN_LENGTH) return;
 
     if (step === 'current') {
-      if (next !== DEMO_PIN) {
-        Alert.alert('Wrong PIN', 'Current PIN is incorrect.');
-        setCurrentPin('');
-        return;
-      }
       setTimeout(() => setStep('new'), 200);
       return;
     }
@@ -83,7 +80,7 @@ export default function CreatePinScreen() {
     }
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (currentPin.length < PIN_LENGTH) {
       Alert.alert('Required', 'Enter your current PIN.');
       setStep('current');
@@ -112,7 +109,16 @@ export default function CreatePinScreen() {
       setStep('new');
       return;
     }
-    Alert.alert('PIN Updated', 'Your PIN has been changed successfully.');
+    if (saving) return;
+    setSaving(true);
+    try {
+      await setPinApi(currentPin, newPin);
+      Alert.alert('PIN Updated', 'Your PIN has been changed successfully.');
+    } catch (error) {
+      Alert.alert('Could not update PIN', getApiErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -204,7 +210,8 @@ export default function CreatePinScreen() {
       </View>
 
       <GoldButton
-        label="Update PIN"
+        label={saving ? 'Updating…' : 'Update PIN'}
+        disabled={saving}
         onPress={handleUpdate}
         style={{ width: '100%' }}
         height={px(52)}

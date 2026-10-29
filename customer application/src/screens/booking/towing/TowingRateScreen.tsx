@@ -8,6 +8,7 @@ import TowingBookingLayout, { useBookingTheme } from '../../../components/bookin
 import { useBookingQuery, useSubmitRatingMutation } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList & BookingsStackParamList, 'TowingRate'>;
 
@@ -42,7 +43,7 @@ export default function TowingRateScreen({ navigation, route }: Props) {
 
   if (bookingId && !booking) {
     return (
-      <TowingBookingLayout title="Rate Your Experience" step={10} hideFooter>
+      <TowingBookingLayout title="Rate Your Experience" step={0} hideFooter>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -53,8 +54,8 @@ export default function TowingRateScreen({ navigation, route }: Props) {
   return (
     <TowingBookingLayout
       title="Rate Your Experience"
-      step={10}
-      onBack={() => navigation.goBack()}
+      step={0}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel={isSubmitting ? 'Submitting...' : 'Submit Review'}
       continueDisabled={!canSubmit}
       onContinue={() => void handleSubmit()}

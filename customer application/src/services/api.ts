@@ -4,9 +4,10 @@ import { humanizeApiErrorMessage } from '../utils/humanizeApiError';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
-import { UI_PREVIEW_AUTH_FLOW } from '../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../config/uiPreviewMode';
 import type { ApiErrorResponse, ApiSuccessResponse } from '../types/auth';
 import { notifyUnauthorized } from './authSession';
+import { persistSessionTokens } from './sessionTokens';
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -76,7 +77,7 @@ api.interceptors.response.use(
     const refreshToken = await getRefreshToken();
     const accessToken = await getAccessToken();
     const previewSession =
-      UI_PREVIEW_AUTH_FLOW ||
+      isUiPreviewAuthFlow() ||
       accessToken === 'ui-preview-access' ||
       refreshToken === 'ui-preview-refresh';
     if (previewSession) {
@@ -113,7 +114,7 @@ api.interceptors.response.use(
       >(`${API_BASE_URL}${REFRESH_PATH}`, { refreshToken });
 
       const { accessToken, refreshToken: newRefreshToken } = response.data.data;
-      await saveTokens(accessToken, newRefreshToken);
+      await persistSessionTokens(accessToken, newRefreshToken);
       processQueue(accessToken);
 
       if (!originalRequest.headers) {
@@ -138,7 +139,11 @@ export function getApiErrorMessage(error: unknown, fallback = 'Something went wr
       return `Server is slow to wake up (${API_BASE_URL}). Wait a few seconds and try again.`;
     }
     if (error.message === 'Network Error' || !error.response) {
-      return `Network error — cannot reach ${API_BASE_URL}. Check internet and try again.`;
+      const base = API_BASE_URL.toLowerCase();
+      if (base.includes('localhost') || base.includes('127.0.0.1')) {
+        return 'Cannot reach your computer’s API. On a real phone, set EXPO_PUBLIC_API_URL to your PC’s LAN IP (not localhost) and restart Metro.';
+      }
+      return 'Network error — check your connection and try again.';
     }
     if (error.response?.status === 429) {
       return 'OTP limit reached. Try again in 1 hour.';

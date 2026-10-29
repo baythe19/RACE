@@ -104,6 +104,8 @@ export interface BookingDriver {
   rating?: number;
   photo: string | null;
   experience?: string;
+  /** Driver mobile for Call on active cards; falls back to support if missing. */
+  phone?: string;
 }
 
 export interface ActiveBooking {

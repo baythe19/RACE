@@ -142,6 +142,8 @@ export interface ServiceBookingTracking {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement deep-link. */
+  driverUpiId?: string;
   pickup: BookingLocation;
   dropoff?: BookingLocation;
   assignedFleetVehicleLabel?: string;

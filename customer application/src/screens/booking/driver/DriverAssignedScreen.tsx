@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { ActivityIndicator, Animated, Linking, Pressable, Text, View } from 'react-native';
-import { ArrowRight, Check, MessageCircle, Phone, Star } from 'lucide-react-native';
+import { ArrowRight, Check, MessageCircle, Phone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
@@ -12,6 +12,7 @@ import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import { brand } from '../../../theme/brand';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverAssigned'>;
 
@@ -20,14 +21,13 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
   const { booking: draftBooking } = useDriverBooking();
   const bookingId = route.params?.bookingId;
   const booking = useBookingQuery(bookingId ?? '', 'driver');
-  const { etaMinutes, driverName, driverPhone, driverRating, status } = useBookingTracking(
+  const { etaMinutes, driverName, driverPhone, status } = useBookingTracking(
     bookingId,
     'driver',
   );
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
   const name = driverName ?? booking?.driver?.name ?? 'Assigning driver';
-  const rating = booking?.driver?.rating ?? driverRating;
   const phone = driverPhone ?? booking?.driver?.phone ?? brand.phoneRaw;
   const hasDriver = Boolean(driverName ?? booking?.driver?.name);
 
@@ -70,7 +70,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
       title=" "
       step={5}
       hideFooter
-      onBack={() => navigation.goBack()}>
+      onBack={() => goBackWithinStack(navigation)}>
       <View style={{ flex: 1, justifyContent: 'space-between' }}>
         <View style={{ alignItems: 'center', paddingTop: t.px(4) }}>
           <Animated.View
@@ -128,19 +128,6 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
                     }}>
                     {name}
                   </Text>
-                  {hasDriver && rating != null ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
-                      <Star size={t.px(14)} color={colors.primary} fill={colors.primary} />
-                      <Text
-                        style={{
-                          fontSize: t.body,
-                          fontWeight: typography.weights.semibold,
-                          color: colors.grey,
-                        }}>
-                        {rating.toFixed(1)}
-                      </Text>
-                    </View>
-                  ) : null}
                 </View>
 
                 <View

@@ -1,18 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Phone, Smartphone } from 'lucide-react-native';
 
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import OtpInput from '../../components/auth/OtpInput';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
-import { DEMO_OTP } from '../../constants/auth';
+import { getApiErrorMessage } from '../../services/api';
+import { confirmMobileChange, requestMobileChange } from '../../services/profileService';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 export default function ChangeMobileNumberScreen() {
   const px = useProfilePx();
+  const navigation = useNavigation();
   const authUser = useAuthStore(state => state.user);
   const profile = useProfileStore(state => state.profile);
   const fetchProfile = useProfileStore(state => state.fetchProfile);
@@ -21,6 +25,9 @@ export default function ChangeMobileNumberScreen() {
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
   const [timer, setTimer] = useState(0);
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const currentPhone = profile?.mobileNumber ?? authUser?.mobileNumber ?? '';
 
@@ -34,31 +41,62 @@ export default function ChangeMobileNumberScreen() {
     return () => clearInterval(interval);
   }, [timer]);
 
-  const handleSendOtp = () => {
-    if (!newPhone.trim() || newPhone.length < 10) {
+  const handleSendOtp = async () => {
+    if (!newPhone.trim() || newPhone.replace(/\D/g, '').length < 10) {
       Alert.alert('Invalid Number', 'Please enter a valid mobile number.');
       return;
     }
-    if (newPhone.replace(/\s/g, '') === currentPhone.replace(/\s/g, '')) {
+    if (newPhone.replace(/\D/g, '').slice(-10) === currentPhone.replace(/\D/g, '').slice(-10)) {
       Alert.alert('Same Number', 'New number must be different from current number.');
       return;
     }
-    setOtpSent(true);
-    setTimer(30);
-    setDigits(['', '', '', '', '', '']);
-    Alert.alert('OTP Sent', `Verification code sent to ${newPhone}`);
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const result = await requestMobileChange(newPhone.replace(/\D/g, '').slice(-10));
+      setPendingToken(result.pendingToken);
+      setDevOtp(result.devOtp ?? null);
+      setOtpSent(true);
+      setTimer(result.expiresIn ? Math.max(1, Math.round(result.expiresIn)) : 300);
+      setDigits(['', '', '', '', '', '']);
+      setActiveIndex(0);
+      Alert.alert('OTP Sent', `Verification code sent to ${result.newMobile}`);
+    } catch (error) {
+      Alert.alert('Could not send OTP', getApiErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleUpdate = () => {
-    if (!otpSent) {
-      handleSendOtp();
+  const handleUpdate = async () => {
+    const pending = pendingToken;
+    if (!otpSent || !pending) {
+      void handleSendOtp();
       return;
     }
-    if (digits.join('') !== DEMO_OTP) {
-      Alert.alert('Invalid OTP', 'Please enter the correct verification code.');
+    const code = digits.join('');
+    if (code.length !== 6) {
+      Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
       return;
     }
-    Alert.alert('Updated', `Your mobile number has been updated to ${newPhone}.`);
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await confirmMobileChange(pending, code);
+      await fetchProfile();
+      const updatedProfile = useProfileStore.getState().profile;
+      const updatedAuthUser = useAuthStore.getState().user;
+      if (updatedAuthUser && updatedProfile) {
+        useAuthStore.getState().setUser({ ...updatedAuthUser, mobileNumber: updatedProfile.mobileNumber });
+      }
+      Alert.alert('Updated', `Your mobile number has been updated to ${newPhone}.`, [
+        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
+      ]);
+    } catch (error) {
+      Alert.alert('Could not update number', getApiErrorMessage(error));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -98,6 +136,12 @@ export default function ChangeMobileNumberScreen() {
         We'll send a 6-digit OTP to your new number to confirm the change.
       </Text>
 
+      {otpSent && devOtp ? (
+        <Text style={{ fontSize: px(11), color: colors.grey, marginBottom: px(12) }}>
+          Dev OTP for testing: {devOtp}
+        </Text>
+      ) : null}
+
       {otpSent ? (
         <View style={{ marginBottom: px(16) }}>
           <Text
@@ -132,7 +176,8 @@ export default function ChangeMobileNumberScreen() {
       ) : null}
 
       <GoldButton
-        label={otpSent ? 'Update Mobile Number' : 'Send OTP'}
+        label={submitting ? 'Please wait…' : otpSent ? 'Update Mobile Number' : 'Send OTP'}
+        disabled={submitting}
         onPress={handleUpdate}
         style={{ width: '100%' }}
         height={px(52)}

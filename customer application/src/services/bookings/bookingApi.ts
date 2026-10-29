@@ -112,6 +112,12 @@ function mapCombinedItem(item: CombinedBookingListItem): Booking {
 }
 
 export async function listBookings(): Promise<Booking[]> {
+  const { isCustomerMockDataEnabled } = await import('../../config/customerQa');
+  if (isCustomerMockDataEnabled()) {
+    const { getPreviewCustomerBookings } = await import('../../data/previewCustomerBookings');
+    return getPreviewCustomerBookings();
+  }
+
   const { data } = await apiClient.get<ApiSuccessResponse<CombinedBookingListItem[]>>(
     API_ENDPOINTS.bookings,
   );
@@ -122,6 +128,15 @@ export async function getBooking(
   id: string,
   bookingType?: ServiceBookingType,
 ): Promise<Booking | null> {
+  const { isCustomerMockDataEnabled } = await import('../../config/customerQa');
+  if (isCustomerMockDataEnabled()) {
+    const { getPreviewCustomerBookings } = await import('../../data/previewCustomerBookings');
+    const matches = getPreviewCustomerBookings().filter(
+      booking => booking.id === id && (!bookingType || booking.bookingType === bookingType),
+    );
+    return matches[0] ?? null;
+  }
+
   if (bookingType === 'towing') {
     const towing = await getTowingBooking(id);
     return mapServiceBookingToBooking(towing, 'towing', 'Towing');

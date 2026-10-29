@@ -26,6 +26,8 @@ export interface ITowingBooking extends Document {
   bookingNumber: string;
   vehicleId: Types.ObjectId;
   towingMode?: 'instant' | 'scheduled' | 'emergency';
+  /** On-site roadside label (flat tyre, battery, …). Absent for vehicle towing. */
+  assistLabel?: string;
   pickup: ITowingBookingLocation;
   dropoff?: ITowingBookingLocation;
   distanceKm?: number;
@@ -51,14 +53,18 @@ export interface ITowingBooking extends Document {
   /** Vendor fleet vehicle assigned to fulfill this job */
   assignedFleetVehicleId?: Types.ObjectId;
   assignedFleetVehicleLabel?: string;
-  /** 4-digit code customer shares with partner to start trip */
+  /** One-way SHA-256 verifier; raw OTP is never persisted here. */
   tripStartOtp?: string;
+  /** AES-GCM encrypted trip OTP for server-side delivery/authorized customer response. */
+  tripStartOtpEncrypted?: string;
   tripStartOtpVerified?: boolean;
   tripStartOtpAttempts?: number;
   /** Timestamp when partner marks arrival at dropoff */
   arrivedAtDropoffAt?: Date;
-  /** 4-digit code customer shares with partner to complete trip after payment confirmation */
+  /** One-way SHA-256 verifier; raw OTP is never persisted here. */
   completionOtp?: string;
+  /** AES-GCM encrypted completion OTP for server-side delivery/authorized customer response. */
+  completionOtpEncrypted?: string;
   completionOtpVerified?: boolean;
   completionOtpAttempts?: number;
   /** Mode selected by customer: CASH, UPI, or ONLINE */
@@ -137,11 +143,13 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
     driverId: { type: Schema.Types.ObjectId, ref: 'Driver', index: true },
     assignedFleetVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
     assignedFleetVehicleLabel: { type: String, trim: true },
-    tripStartOtp: { type: String, trim: true },
+    tripStartOtp: { type: String, trim: true, select: false },
+    tripStartOtpEncrypted: { type: String, select: false },
     tripStartOtpVerified: { type: Boolean, default: false },
     tripStartOtpAttempts: { type: Number, default: 0 },
     arrivedAtDropoffAt: { type: Date },
-    completionOtp: { type: String, trim: true },
+    completionOtp: { type: String, trim: true, select: false },
+    completionOtpEncrypted: { type: String, select: false },
     completionOtpVerified: { type: Boolean, default: false },
     completionOtpAttempts: { type: Number, default: 0 },
     paymentCollectionMode: { type: String, enum: ['CASH', 'UPI', 'ONLINE'] },
@@ -153,6 +161,7 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
       default: 'instant',
       index: true,
     },
+    assistLabel: { type: String, trim: true },
     scheduledAt: { type: Date },
     statusHistory: { type: [StatusHistorySchema], default: [] },
     cancelledAt: { type: Date },

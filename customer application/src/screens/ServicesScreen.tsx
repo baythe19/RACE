@@ -1,19 +1,20 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   Pressable,
   ScrollView,
   useWindowDimensions,
-  View,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import { SERVICE_CATEGORY_CARDS } from '../constants/serviceCategoryCards';
 import { useCatalogStore } from '../store/catalogStore';
 import type { ServicesStackParamList } from '../types/navigation';
 import { openServiceCategory } from '../utils/serviceNavigation';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -24,11 +25,10 @@ export default function ServicesScreen({ navigation }: Props) {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
 
-  const { fetchServices } = useCatalogStore();
+  const { servicesReady, hasHydrated, isLoading: catalogLoading } = useCatalogStore();
 
-  useEffect(() => {
-    void fetchServices();
-  }, [fetchServices]);
+  const showServicesSkeleton =
+    !hasHydrated || (!servicesReady && catalogLoading);
 
   const openCategory = (categoryId: string, categoryTitle: string) => {
     openServiceCategory(navigation, categoryId, categoryTitle);
@@ -36,7 +36,7 @@ export default function ServicesScreen({ navigation }: Props) {
 
   const handleBack = () => {
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
     } else {
       const parent = navigation.getParent();
       (parent as any)?.navigate('Home', { screen: 'HomeMain' });
@@ -59,7 +59,10 @@ export default function ServicesScreen({ navigation }: Props) {
           gap: px(12),
         }}
         showsVerticalScrollIndicator={false}>
-        {SERVICE_CATEGORY_CARDS.map(item => (
+        {showServicesSkeleton ? (
+          <DataSkeleton variant="services" testID="servicesSkeleton" />
+        ) : (
+          SERVICE_CATEGORY_CARDS.map(item => (
           <Pressable
             key={item.id}
             onPress={() => openCategory(item.id, item.categoryTitle)}
@@ -72,7 +75,8 @@ export default function ServicesScreen({ navigation }: Props) {
             ]}>
             <ServiceCategoryArtCard card={item} />
           </Pressable>
-        ))}
+        ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );

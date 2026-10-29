@@ -11,6 +11,8 @@ interface EmptyStateProps {
   subtitle?: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Fill leftover screen height and center icon+copy in the middle. */
+  fill?: boolean;
 }
 
 export default function EmptyState({
@@ -19,9 +21,10 @@ export default function EmptyState({
   subtitle,
   actionLabel,
   onAction,
+  fill = false,
 }: EmptyStateProps) {
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, fill && styles.fill]}>
       <View style={styles.iconWrap}>
         <Ionicons name={icon} size={40} color={colors.primary} />
       </View>
@@ -41,6 +44,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xxl,
+  },
+  fill: {
+    flexGrow: 1,
+    alignSelf: 'stretch',
+    minHeight: 320,
   },
   iconWrap: {
     width: 72,

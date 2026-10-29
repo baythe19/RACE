@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   Share,
@@ -13,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Check, Download, Hospital, Share2 } from 'lucide-react-native';
+import { Check, Hospital, Share2 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import QRCodePlaceholder from '../../components/auth/QRCodePlaceholder';
@@ -24,6 +25,7 @@ import { formatFuelLabel } from '../../components/vehicles/vehicleUi';
 import { getLucideIcon } from '../../utils/lucideIcon';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -83,7 +85,7 @@ export default function QRCodeScreen({ navigation, route }: Props) {
         <StepHeader
           step={3}
           scale={s}
-          onBack={() => navigation.goBack()}
+          onBack={() => goBackWithinStack(navigation)}
           showSkip={false}
         />
 
@@ -197,8 +199,9 @@ export default function QRCodeScreen({ navigation, route }: Props) {
             const Icon = getLucideIcon(action.icon);
             const iconColor = ACTION_ICON_COLORS[action.icon] ?? colors.primary;
             return (
-              <Pressable
+              <View
                 key={action.label}
+                accessibilityRole="text"
                 style={{
                   width: '48%',
                   flexDirection: 'row',
@@ -206,12 +209,11 @@ export default function QRCodeScreen({ navigation, route }: Props) {
                   gap: px(8),
                   backgroundColor: colors.background,
                   borderWidth: 1,
-                  borderColor: colors.primary,
+                  borderColor: colors.border,
                   borderRadius: px(20),
                   paddingHorizontal: px(12),
                   paddingVertical: px(10),
-                }}
-                onPress={() => Alert.alert(action.label, 'Feature coming soon')}>
+                }}>
                 <Icon size={px(16)} color={iconColor} />
                 <Text
                   style={{
@@ -222,7 +224,7 @@ export default function QRCodeScreen({ navigation, route }: Props) {
                   }}>
                   {action.label}
                 </Text>
-              </Pressable>
+              </View>
             );
           })}
         </View>
@@ -242,7 +244,9 @@ export default function QRCodeScreen({ navigation, route }: Props) {
             paddingVertical: px(12),
             marginBottom: px(22),
           }}
-          onPress={() => Alert.alert('Emergency Help', 'Feature coming soon')}>
+          onPress={() => void Linking.openURL('tel:112')}
+          accessibilityRole="button"
+          accessibilityLabel="Call emergency 112">
           <Hospital size={px(18)} color={colors.primary} strokeWidth={2} />
           <Text
             style={{
@@ -250,7 +254,7 @@ export default function QRCodeScreen({ navigation, route }: Props) {
               fontWeight: typography.weights.semibold,
               color: colors.dark,
             }}>
-            Emergency Help
+            Emergency Help · Call 112
           </Text>
         </Pressable>
 
@@ -264,34 +268,8 @@ export default function QRCodeScreen({ navigation, route }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             gap: px(10),
-            marginBottom: px(12),
-            ...shadows.card,
-          }}
-          onPress={() => Alert.alert('Download', 'QR saved to your device gallery.')}>
-          <Download size={px(20)} color={colors.dark} />
-          <Text
-            style={{
-              fontSize: px(17),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            Download QR Code
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={{
-            width: '100%',
-            minHeight: px(54),
-            borderRadius: px(14),
-            borderWidth: 1.5,
-            borderColor: colors.primary,
-            backgroundColor: colors.background,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: px(10),
             marginBottom: px(24),
+            ...shadows.card,
           }}
           onPress={handleShare}>
           <Share2 size={px(20)} color={colors.dark} />

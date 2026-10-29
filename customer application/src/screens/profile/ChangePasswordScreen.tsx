@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { Eye, EyeOff, Lock } from 'lucide-react-native';
 
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import { getApiErrorMessage } from '../../services/api';
+import { changePassword } from '../../services/profileService';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -20,26 +24,39 @@ export default function ChangePasswordScreen() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNext, setShowNext] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const navigation = useNavigation();
 
   const inputStyle = {
     color: colors.dark,
     fontSize: px(14),
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!current.trim()) {
       Alert.alert('Required', 'Enter your current password.');
       return;
     }
-    if (next.length < 6) {
-      Alert.alert('Weak Password', 'New password must be at least 6 characters.');
+    if (next.length < 8) {
+      Alert.alert('Weak Password', 'New password must be at least 8 characters.');
       return;
     }
     if (next !== confirm) {
       Alert.alert('Mismatch', 'New passwords do not match.');
       return;
     }
-    Alert.alert('Updated', 'Your password has been changed successfully.');
+    if (saving) return;
+    setSaving(true);
+    try {
+      await changePassword(current, next);
+      Alert.alert('Updated', 'Your password has been changed successfully.', [
+        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
+      ]);
+    } catch (error) {
+      Alert.alert('Could not update password', getApiErrorMessage(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -99,11 +116,12 @@ export default function ChangePasswordScreen() {
       </View>
 
       <Text style={{ fontSize: px(11), color: colors.grey, marginBottom: px(16), lineHeight: px(16) }}>
-        Password must be at least 6 characters. Tap the eye icon to show what you type.
+        Password must be at least 8 characters. Tap the eye icon to show what you type.
       </Text>
 
       <GoldButton
-        label="Update Password"
+        label={saving ? 'Updating…' : 'Update Password'}
+        disabled={saving}
         onPress={handleSave}
         style={{ width: '100%' }}
         height={px(52)}

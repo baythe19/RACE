@@ -1,10 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
-import { CalendarClock, Car, MapPin, Truck, Wrench } from 'lucide-react-native';
+import {
+  CalendarClock,
+  Car,
+  MapPin,
+  Navigation,
+  Truck,
+  Wrench,
+} from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { TowingFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import TowingServiceModeBanner, {
+  towingServiceTimingLabel,
+} from '../../../components/booking/TowingServiceModeBanner';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   getDateLabel,
   getShortLocation,
@@ -17,13 +28,13 @@ import { estimateTowingFare } from '../../../services/bookings/fareApi';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { TowingFareBreakdown } from '../../../types/fare';
 import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
-import { formatRupee } from '../../../utils/towingPricing';
-import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
+import { towingFareModeParams } from '../../../utils/towingFareEstimate';
 import {
   getTowingWalkthroughFare,
-  TOWING_WALKTHROUGH_ENABLED,
+  isTowingWalkthroughEnabled,
 } from '../../../utils/towingBookingWalkthrough';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingReview'>;
 
@@ -45,11 +56,21 @@ function SummaryRow({
       style={{
         flexDirection: 'row',
         alignItems: 'flex-start',
-        paddingVertical: t.px(10),
+        paddingVertical: t.px(11),
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
       }}>
-      <Icon size={t.px(18)} color={colors.grey} strokeWidth={2} style={{ marginTop: t.px(2) }} />
+      <View
+        style={{
+          width: t.px(32),
+          height: t.px(32),
+          borderRadius: t.px(16),
+          backgroundColor: colors.goldLight,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon size={t.px(15)} color={TOWING_ACCENT} strokeWidth={2.2} />
+      </View>
       <View style={{ flex: 1, marginLeft: t.px(12), minWidth: 0 }}>
         <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>{label}</Text>
         <Text
@@ -86,23 +107,21 @@ export default function TowingReviewScreen({ navigation }: Props) {
     async function loadFare() {
       setIsLoadingFare(true);
       try {
-        const scheduledAt =
-          booking.serviceMode === 'scheduled'
-            ? towingDateIdToScheduledAt(booking.dateId)
-            : undefined;
+        const { towingMode, scheduledAt } = towingFareModeParams(booking);
         const estimate = await estimateTowingFare({
           pickup_lat: pickupLat,
           pickup_lng: pickupLng,
           dropoff_lat: dropLat,
           dropoff_lng: dropLng,
           scheduledAt,
+          towingMode,
         });
         if (!cancelled) {
           setFareBreakdown(estimate.fareBreakdown);
         }
       } catch {
         if (!cancelled) {
-          setFareBreakdown(TOWING_WALKTHROUGH_ENABLED ? getTowingWalkthroughFare() : null);
+          setFareBreakdown(isTowingWalkthroughEnabled() ? getTowingWalkthroughFare() : null);
         }
       } finally {
         if (!cancelled) {
@@ -153,7 +172,6 @@ export default function TowingReviewScreen({ navigation }: Props) {
   };
 
   const totalPrice = fareBreakdown?.totalFare ?? booking.totalPrice;
-  const advancePayment = fareBreakdown?.advanceAmount ?? booking.advancePayment;
 
   return (
     <TowingBookingLayout
@@ -161,23 +179,14 @@ export default function TowingReviewScreen({ navigation }: Props) {
       step={3}
       accentColor={TOWING_ACCENT}
       scrollable
-      onBack={() => navigation.goBack()}
-      buttonLabel="Pay advance"
+      onBack={() => goBackWithinStack(navigation)}
+      buttonLabel="Confirm booking"
       onContinue={handleContinue}
-      continueDisabled={isLoadingFare || !fareBreakdown}
-      footerNoteBelow={
-        <Text
-          style={{
-            fontSize: t.caption,
-            color: colors.grey,
-            textAlign: 'center',
-            marginTop: t.px(2),
-            marginBottom: t.px(4),
-          }}>
-          You won't be charged until service begins
-        </Text>
-      }>
+      continueDisabled={isLoadingFare || !fareBreakdown}>
+      <WizardStepFade>
+      <TowingServiceModeBanner mode={booking.serviceMode} t={t} />
       <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>
+        {/* Booking summary */}
         <View
           style={[
             {
@@ -186,21 +195,11 @@ export default function TowingReviewScreen({ navigation }: Props) {
               borderColor: colors.border,
               backgroundColor: colors.background,
               paddingHorizontal: t.px(16),
-              paddingTop: t.px(4),
+              paddingTop: t.px(14),
               paddingBottom: t.px(4),
             },
             shadows.card,
           ]}>
-          <Text
-            style={{
-              fontSize: t.labelBold,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              paddingVertical: t.px(10),
-            }}>
-            Booking Details
-          </Text>
-          <SummaryRow Icon={Wrench} label="Service Type" value="Towing" t={t} />
           <SummaryRow
             Icon={Car}
             label="Vehicle"
@@ -208,7 +207,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
             t={t}
           />
           <SummaryRow
-            Icon={MapPin}
+            Icon={Navigation}
             label="Pickup"
             value={getShortLocation(booking.pickup, booking.pickupLabel)}
             t={t}
@@ -221,18 +220,23 @@ export default function TowingReviewScreen({ navigation }: Props) {
           />
           <SummaryRow
             Icon={Truck}
-            label="Towing Type"
+            label="Tow truck"
             value={getTowingTypeLabel(booking.towingType)}
             t={t}
           />
-          <View style={{ paddingVertical: t.px(10) }}>
+          <View style={{ paddingVertical: t.px(11) }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-              <CalendarClock
-                size={t.px(18)}
-                color={colors.grey}
-                strokeWidth={2}
-                style={{ marginTop: t.px(2) }}
-              />
+              <View
+                style={{
+                  width: t.px(32),
+                  height: t.px(32),
+                  borderRadius: t.px(16),
+                  backgroundColor: colors.goldLight,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <CalendarClock size={t.px(15)} color={TOWING_ACCENT} strokeWidth={2.2} />
+              </View>
               <View style={{ flex: 1, marginLeft: t.px(12) }}>
                 <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>
                   Date & Time
@@ -243,24 +247,54 @@ export default function TowingReviewScreen({ navigation }: Props) {
                     fontWeight: typography.weights.semibold,
                     color: colors.dark,
                   }}>
-                  {booking.serviceMode === 'instant'
-                    ? 'Now · dispatched immediately'
-                    : `${getDateLabel(booking.dateId)}, ${getTimeLabel(booking.timeId)}`}
+                  {towingServiceTimingLabel(
+                    booking.serviceMode,
+                    getDateLabel(booking.dateId),
+                    getTimeLabel(booking.timeId),
+                  )}
                 </Text>
               </View>
             </View>
           </View>
         </View>
 
+        {/* Fare */}
         {isLoadingFare ? (
-          <View style={{ alignItems: 'center', paddingVertical: t.px(20) }}>
+          <View
+            style={[
+              {
+                alignItems: 'center',
+                paddingVertical: t.px(24),
+                borderRadius: t.cardRadius,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+              },
+              shadows.card,
+            ]}>
             <ActivityIndicator color={TOWING_ACCENT} />
             <Text style={{ marginTop: t.px(8), fontSize: t.caption, color: colors.grey }}>
               Calculating fare from route distance...
             </Text>
           </View>
         ) : fareBreakdown ? (
-          <TowingFareBreakdownCard breakdown={fareBreakdown} accentColor={TOWING_ACCENT} />
+          <View>
+            <TowingFareBreakdownCard
+              breakdown={fareBreakdown}
+              accentColor={TOWING_ACCENT}
+              compact
+            />
+            <Text
+              style={{
+                marginTop: t.px(10),
+                fontSize: t.caption,
+                color: colors.grey,
+                textAlign: 'center',
+                lineHeight: t.px(18),
+              }}>
+              Advance is adjusted in the final bill. Pay the rest after service is done.
+            </Text>
+          </View>
         ) : (
           <View
             style={{
@@ -285,11 +319,12 @@ export default function TowingReviewScreen({ navigation }: Props) {
                 fontWeight: typography.weights.extrabold,
                 color: TOWING_ACCENT,
               }}>
-              {totalPrice > 0 ? formatRupee(totalPrice) : '—'}
+              {totalPrice > 0 ? `₹${totalPrice}` : '—'}
             </Text>
           </View>
         )}
       </View>
+      </WizardStepFade>
     </TowingBookingLayout>
   );
 }

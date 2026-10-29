@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Bell, UserRound } from 'lucide-react-native';
+import { Bell, Info, UserRound } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { useScreenPx } from '../../hooks/useScreenPx';
@@ -18,6 +18,8 @@ type Props = {
   showNotificationBadge?: boolean;
   onBellPress?: () => void;
   onAvatarPress?: () => void;
+  /** SOS / help screens: info icon in the header action row (not in page body). */
+  onInfoPress?: () => void;
   actions?: ReactNode;
 };
 
@@ -30,6 +32,7 @@ export default function TabRootHeader({
   showNotificationBadge = false,
   onBellPress,
   onAvatarPress,
+  onInfoPress,
   actions,
 }: Props) {
   const px = useScreenPx();
@@ -71,21 +74,24 @@ export default function TabRootHeader({
             <>
               <Text
                 style={{
-                  fontSize: px(26),
+                  // Partner list screens (Fleet Vehicles) use ~18 extrabold heading.
+                  fontSize: px(18),
                   fontWeight: typography.weights.extrabold,
                   color: colors.dark,
-                  lineHeight: px(32),
+                  lineHeight: px(22),
+                  textAlign: 'left',
                 }}
-                numberOfLines={2}>
+                numberOfLines={1}>
                 {title}
               </Text>
               {subtitle ? (
                 <Text
                   style={{
-                    marginTop: px(4),
-                    fontSize: px(13),
+                    marginTop: px(2),
+                    fontSize: px(11),
                     color: colors.grey,
-                    lineHeight: px(18),
+                    lineHeight: px(16),
+                    textAlign: 'left',
                   }}
                   numberOfLines={2}>
                   {subtitle}
@@ -97,6 +103,16 @@ export default function TabRootHeader({
         {actions ??
           (showActions ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(10) }}>
+              {onInfoPress ? (
+                <Pressable
+                  hitSlop={8}
+                  onPress={onInfoPress}
+                  style={styles.bellWrap}
+                  accessibilityRole="button"
+                  accessibilityLabel="How SOS alert works">
+                  <Info size={px(20)} color={colors.dark} strokeWidth={2.2} />
+                </Pressable>
+              ) : null}
               <Pressable
                 hitSlop={8}
                 onPress={handleBell}
@@ -142,8 +158,9 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    minHeight: 44,
   },
   bellWrap: {
     position: 'relative',

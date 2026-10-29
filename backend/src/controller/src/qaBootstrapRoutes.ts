@@ -157,7 +157,7 @@ router.post('/qa-bootstrap/test-accounts', async (req, res) => {
       reviewStatus: 'VERIFIED', operationalStatus: 'ENABLED', isAvailable: false,
       selfDriverCategory: 'FULL_TIME', driverContext: 'INDEPENDENT',
       driverProfile: {
-        driverCode: 'QA-DR-FT-001', licenseNo: 'QADLFT2026001', driverType: 'Tow Driver',
+        driverCode: 'QA-DR-FT-001', licenseNo: 'QADLFT2026001', driverType: 'Full-Time',
         city: 'Bhubaneswar', state: 'Odisha', vehicleRegistration: 'QA01DV0001', status: 'APPROVED',
         rating: 4.8, reviewCount: 24, experienceYears: 5, languages: ['Hindi', 'English', 'Odia'],
         policeVerificationStatus: 'VERIFIED',
@@ -171,7 +171,7 @@ router.post('/qa-bootstrap/test-accounts', async (req, res) => {
       reviewStatus: 'VERIFIED', operationalStatus: 'ENABLED', isAvailable: false,
       selfDriverCategory: 'PART_TIME', driverContext: 'INDEPENDENT',
       driverProfile: {
-        driverCode: 'QA-DR-PT-002', licenseNo: 'QADLPT2026002', driverType: 'Driver Service',
+        driverCode: 'QA-DR-PT-002', licenseNo: 'QADLPT2026002', driverType: 'Part-Time',
         city: 'Bhubaneswar', state: 'Odisha', availabilityWindow: 'evenings_weekends', status: 'APPROVED',
         rating: 4.5, reviewCount: 11, experienceYears: 2, languages: ['Hindi', 'Odia'],
         policeVerificationStatus: 'VERIFIED',

@@ -62,9 +62,9 @@ export function buildTowingBookingRequest(
   };
 
   if (booking.serviceMode === 'scheduled') {
-    payload.scheduledAt = towingDateIdToScheduledAt(booking.dateId);
+    payload.scheduledAt = towingDateIdToScheduledAt(booking.dateId, booking.timeId);
     payload.towingMode = 'scheduled';
-  } else if (booking.towingType?.toLowerCase().includes('emergency')) {
+  } else if (booking.serviceMode === 'emergency') {
     payload.towingMode = 'emergency';
   } else {
     payload.towingMode = 'instant';
@@ -92,9 +92,18 @@ export function buildDriverBookingRequest(
     driverServiceType: booking.driverType,
   };
 
-  const scheduledAt = driverDateIdToScheduledAt(booking.dateId);
+  const scheduledAt = driverDateIdToScheduledAt(booking.dateId, booking.startTime);
   if (scheduledAt) {
     payload.scheduledAt = scheduledAt;
+  }
+
+  if (booking.driverType === 'outstation' && booking.dropoff.trim()) {
+    payload.dropoff = requireBookingLocation(
+      booking.dropoff.trim(),
+      booking.dropoffLat,
+      booking.dropoffLng,
+      'dropoff',
+    );
   }
 
   validateDriverBookingRequest(payload);

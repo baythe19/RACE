@@ -1,11 +1,19 @@
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../utils/src/errors';
 import { emitBookingStatusUpdate, emitDriverLocation, emitToBooking, emitToDriver, emitToUser } from './socket';
+import { notifyCustomerTripStatus } from './bookingNotifications';
 import { userRepository } from './userRepository';
 import { towingBookingRepository } from './towingBookingRepository';
 import { driverBookingRepository } from './driverBookingRepository';
 import { assertValidStatusTransition } from './bookings/booking';
 import { releaseDriver, unassignDriverFromBooking, claimOpenBookingOffer, listOpenBookingOffers } from './bookings/driverAssignment';
-import { assertTripStartOtp, generateTripStartOtp, assertCompletionOtp } from './bookings/tripOtp';
+import {
+  assertTripStartOtp,
+  assertCompletionOtp,
+  encryptTripOtpForStorage,
+  generateTripStartOtp,
+  getTripOtpValue,
+  hashTripOtpForStorage,
+} from './bookings/tripOtp';
 import { processBookingCompletionEscrowSettlement } from './payments/escrowSettlement';
 import { logger } from '../../utils/src/logger';
 import { UserModel } from '../../models/src/user';
@@ -184,7 +192,9 @@ export class DriverService {
     assertDriverRole(role);
     await assertDriverApproved(driverId);
 
-    const driver = await UserModel.findById(driverId).select('driverProfile currentLocation role driverContext').exec();
+    const driver = await UserModel.findById(driverId)
+      .select('driverProfile currentLocation role driverContext selfDriverCategory')
+      .exec();
     if (!driver) throw new NotFoundError('Driver not found');
 
     return listOpenBookingOffers({ forDriver: driver });
@@ -296,14 +306,14 @@ export class DriverService {
     });
 
     if (bookingType === 'towing') {
-      const booking = await towingBookingRepository.findById(bookingId);
+      const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
       if (!booking) {
         return { active: false as const };
       }
       return { active: true as const, booking: mapBooking('towing', booking) };
     }
 
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       return { active: false as const };
     }
@@ -328,7 +338,7 @@ export class DriverService {
         ? towingBookingRepository
         : driverBookingRepository;
 
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Booking not found');
     }
@@ -417,10 +427,13 @@ export class DriverService {
     // the driver accepts. Accepting (→ DRIVER_EN_ROUTE) is the trip-start gate,
     // so the driver-only trip OTP is delivered exactly here.
     if (dto.status === 'DRIVER_EN_ROUTE' && booking.status === 'DRIVER_ASSIGNED') {
-      const tripStartOtp = booking.tripStartOtp ?? generateTripStartOtp();
-      if (!booking.tripStartOtp) {
-        await Model.updateStatus(bookingId, 'DRIVER_EN_ROUTE', 'DRIVER_EN_ROUTE', {
-          tripStartOtp,
+      const tripStartOtp = booking.tripStartOtp
+        ? getTripOtpValue(booking.tripStartOtp, booking.tripStartOtpEncrypted) ?? generateTripStartOtp()
+        : generateTripStartOtp();
+      if (!booking.tripStartOtp || !booking.tripStartOtpEncrypted) {
+        await Model.updateById(bookingId, {
+          tripStartOtp: hashTripOtpForStorage(tripStartOtp),
+          tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
         });
       }
       emitToDriver(driverId, 'trip:otp', {
@@ -458,6 +471,14 @@ export class DriverService {
       })),
     });
 
+    void notifyCustomerTripStatus({
+      customerId: updated.customerId.toString(),
+      bookingNumber: updated.bookingNumber,
+      bookingType: dto.bookingType,
+      bookingId: updated.id,
+      status: dto.status,
+    }).catch(() => undefined);
+
     return updated;
   }
 
@@ -472,7 +493,7 @@ export class DriverService {
     }
 
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
 
     if (booking.status === 'CONFIRMED' && !booking.driverId) {
@@ -494,7 +515,7 @@ export class DriverService {
     await assertDriverApproved(driverId);
 
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
     if (!booking.driverId || booking.driverId.toString() !== driverId) {
       throw new ForbiddenError('This booking is not assigned to you');
@@ -517,7 +538,7 @@ export class DriverService {
     await assertDriverApproved(driverId);
 
     const Model = bookingType === 'towing' ? towingBookingRepository : driverBookingRepository;
-    const booking = await Model.findById(bookingId);
+    const booking = await Model.findByIdWithOtp(bookingId);
     if (!booking) throw new NotFoundError('Booking not found');
     if (!booking.driverId || booking.driverId.toString() !== driverId) {
       throw new ForbiddenError('This booking is not assigned to you');

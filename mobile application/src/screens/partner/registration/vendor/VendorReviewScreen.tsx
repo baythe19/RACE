@@ -203,7 +203,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         email: vendorBusiness.email || undefined,
         address: address || undefined,
         bankDetails,
-        acceptTerms: true as const,
+        acceptTerms: termsAccepted,
       });
 
       try {

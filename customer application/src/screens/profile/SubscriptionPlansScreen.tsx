@@ -16,6 +16,7 @@ import {
 import { getApiErrorMessage } from '../../services/api/apiClient';
 import type { ProfileStackParamList } from '../../types/navigation';
 import { colors, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'SubscriptionPlans'>;
 
@@ -28,6 +29,7 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
   const subscribe = useSubscribeMutation();
 
   const handleSelect = (planSlug: string, actionType?: string) => {
+    if (subscribe.isPending) return;
     if (actionType === 'contact') {
       Alert.alert('Corporate Plan', 'Please contact RACE support to activate corporate billing.');
       return;
@@ -36,7 +38,7 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
     subscribe.mutate(
       { planSlug, billingCycle: billingPeriod },
       {
-        onSuccess: () => navigation.goBack(),
+        onSuccess: () => goBackWithinStack(navigation),
         onError: (error) => {
           Alert.alert('Subscription failed', getApiErrorMessage(error));
         },
@@ -58,7 +60,9 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={styles.scroll}>
           <ScreenContent>
             <Text style={styles.title}>Choose Your Plan</Text>
-            <Text style={styles.subtitle}>Get more with RACE Premium</Text>
+            <Text style={styles.subtitle}>
+              MVP pilot: plans activate with test billing only — no recurring card charge yet.
+            </Text>
 
             <View style={styles.toggle}>
               <Pressable

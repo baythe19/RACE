@@ -644,7 +644,7 @@ export default function PartnerHomeScreen() {
                 <Pressable
                   style={styles.reviewLeadCta}
                   onPress={() => {
-                    if (activeVehicleCount === 0) {
+                    if (activeVehicleCount === 0 && !lead.onSiteAssist) {
                       goAccountScreen('VendorVehicles');
                       return;
                     }
@@ -657,11 +657,12 @@ export default function PartnerHomeScreen() {
                         serviceLabel: lead.serviceLabel,
                         pickupAddress: lead.pickup?.address || lead.pickup?.label,
                         estimatedFare: lead.estimatedFare,
+                        onSiteAssist: lead.onSiteAssist,
                       },
                     } as never);
                   }}>
                   <PartnerText style={styles.reviewLeadText}>
-                    {activeVehicleCount === 0 ? 'Add vehicle' : 'Review lead'}
+                    {activeVehicleCount === 0 && !lead.onSiteAssist ? 'Add vehicle' : 'Review lead'}
                   </PartnerText>
                 </Pressable>
               </View>

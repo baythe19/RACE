@@ -17,10 +17,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import { showServiceHeaderInfo } from '../components/services/ServiceOptionInfoIcon';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import { MORE_SERVICES_HEADER_INFO } from '../constants/serviceLandingInfo';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -73,7 +76,13 @@ export default function MoreServicesScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="More Services" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader
+        title="More Services"
+        onBack={() => goBackWithinStack(navigation)}
+        onInfoPress={() =>
+          showServiceHeaderInfo('More services', MORE_SERVICES_HEADER_INFO)
+        }
+      />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}

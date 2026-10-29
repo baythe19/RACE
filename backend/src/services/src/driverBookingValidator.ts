@@ -25,7 +25,8 @@ export const createDriverBookingSchema = z
     packageHours: packageHoursSchema.optional(),
     estimatedDurationHours: z.number().positive().optional(),
     driverServiceType: z.enum(['part_time', 'full_time', 'outstation', 'night']).optional(),
-    scheduledAt: z.string().datetime().optional(),
+    // D-12: accept UTC offsets ("+05:30") as well as "Z" (client sends Z).
+    scheduledAt: z.string().datetime({ offset: true }).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.scheduledAt && new Date(data.scheduledAt) <= new Date()) {
@@ -129,6 +130,8 @@ export interface DriverTrackingResponseDto {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement deep-link. */
+  driverUpiId?: string;
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
   assignedFleetVehicleLabel?: string;

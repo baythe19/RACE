@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAppDispatch } from '../../redux/hooks';
+import { useAuthStore } from '../../store/authStore';
 import {
   setNotifications,
   setNotificationPreferences,
@@ -39,6 +40,7 @@ export const profileKeys = {
 
 export function useSavedLocationsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.locations,
     queryFn: async () => {
@@ -46,6 +48,7 @@ export function useSavedLocationsQuery() {
       dispatch(setSavedLocations(locations));
       return locations;
     },
+    enabled: isAuthenticated,
   });
 }
 
@@ -82,6 +85,7 @@ export function useDeleteLocationMutation() {
 
 export function usePaymentMethodsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.payments,
     queryFn: async () => {
@@ -89,11 +93,13 @@ export function usePaymentMethodsQuery() {
       dispatch(setPaymentMethods(methods));
       return methods;
     },
+    enabled: isAuthenticated,
   });
 }
 
 export function useWalletQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.wallet,
     queryFn: async () => {
@@ -101,6 +107,7 @@ export function useWalletQuery() {
       dispatch(setWalletBalance(wallet));
       return wallet;
     },
+    enabled: isAuthenticated,
   });
 }
 
@@ -131,6 +138,7 @@ export function useDeletePaymentMethodMutation() {
 
 export function useNotificationsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.notifications,
     queryFn: async () => {
@@ -138,6 +146,7 @@ export function useNotificationsQuery() {
       dispatch(setNotifications(result.notifications));
       return result;
     },
+    enabled: isAuthenticated,
   });
 }
 
@@ -153,6 +162,7 @@ export function useMarkAllNotificationsReadMutation() {
 
 export function useNotificationPrefsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.notificationPrefs,
     queryFn: async () => {
@@ -160,6 +170,7 @@ export function useNotificationPrefsQuery() {
       dispatch(setNotificationPreferences(prefs));
       return prefs;
     },
+    enabled: isAuthenticated,
   });
 }
 

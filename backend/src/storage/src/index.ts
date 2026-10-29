@@ -196,6 +196,26 @@ export class StorageService {
     );
   }
 
+  async uploadCustomerVehiclePhoto(
+    input: UploadFileInput & { customerId: string; vehicleId: string },
+  ): Promise<UploadResult> {
+    this.validateFile(input.buffer, input.mimeType);
+    if (!input.mimeType.toLowerCase().startsWith('image/')) {
+      throw new AppError('Vehicle photo must be a JPG or PNG image', 400);
+    }
+    const storagePath = `customers/${input.customerId}/vehicles/${input.vehicleId}/photos`;
+    const fileName = buildFileName(input.originalName);
+
+    if (gcsConfig.isConfigured) {
+      try {
+        return await uploadToGcs(input, storagePath, fileName);
+      } catch (error) {
+        logger.warn('GCS customer vehicle photo upload failed, falling back to local storage', { error });
+      }
+    }
+    return uploadToLocal(input, storagePath, fileName);
+  }
+
   async uploadVendorVehicleDocument(
     input: UploadFileInput & { vendorId: string; vehicleId: string },
   ): Promise<UploadResult> {

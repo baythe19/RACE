@@ -17,6 +17,7 @@ import { useRegisterVendorMutation } from '../../services/vendor/useVendorMutati
 import type { VendorFlowParamList } from '../../types/navigation';
 import type { UploadedDocument } from '../../types/vendor';
 import { colors, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<VendorFlowParamList, 'VendorReview'>;
 
@@ -64,7 +65,7 @@ export default function ReviewSubmissionScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <Text style={styles.title}>No application data</Text>
-        <PrimaryButton label="Go Back" onPress={() => navigation.goBack()} />
+        <PrimaryButton label="Go Back" onPress={() => goBackWithinStack(navigation)} />
       </SafeAreaView>
     );
   }
@@ -121,7 +122,7 @@ export default function ReviewSubmissionScreen({ navigation }: Props) {
           onPress={() => void handleSubmit()}
           disabled={registerMutation.isPending}
         />
-        <PrimaryButton label="Edit Application" variant="outline" onPress={() => navigation.goBack()} />
+        <PrimaryButton label="Edit Application" variant="outline" onPress={() => goBackWithinStack(navigation)} />
       </ScrollView>
     </SafeAreaView>
   );

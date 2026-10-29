@@ -1,12 +1,9 @@
 import type { LucideIcon } from 'lucide-react-native';
 import {
   Bell,
-  CreditCard,
   FileText,
-  Globe,
   KeyRound,
   Mail,
-  MapPin,
   MessageCircle,
   Shield,
   Smartphone,
@@ -32,11 +29,31 @@ export const PROFILE_MENU_ROUTES = {
 } as const;
 
 export const HELP_FAQ_ITEMS = [
-  'How do I book a towing service?',
-  'What areas do you cover?',
-  'How is the price calculated?',
-  'Can I cancel my booking?',
-  'How do I track my driver?',
+  {
+    question: 'How do I book a towing service?',
+    answer:
+      'From Home, tap Towing, set pickup and drop, review the fare, then pay the advance to confirm. A nearby partner gets your offer.',
+  },
+  {
+    question: 'What areas do you cover?',
+    answer:
+      'We currently serve Bhubaneswar and nearby Odisha cities. Bookings outside the service area are blocked so we can fulfill them reliably.',
+  },
+  {
+    question: 'How is the price calculated?',
+    answer:
+      'Fare uses distance, vehicle type, and service package. You see the breakdown before paying. Advance is collected first; the balance is due at drop-off.',
+  },
+  {
+    question: 'Can I cancel my booking?',
+    answer:
+      'Yes from Booking details while the trip is still cancellable. Refund amount depends on status (pending / confirmed / driver assigned). Policy shows before you confirm.',
+  },
+  {
+    question: 'How do I track my driver?',
+    answer:
+      'Open the booking and tap Track. Live map, ETA, and trip-start OTP appear when the driver is assigned and on the way.',
+  },
 ] as const;
 
 export type SettingsToggleId = 'push' | 'email' | 'sms' | 'emergency';
@@ -77,7 +94,6 @@ export const SETTINGS_SECTIONS: Array<{
         Icon: Smartphone,
         kind: 'nav',
       },
-      { id: 'language', title: 'Language', Icon: Globe, kind: 'nav', value: 'English' },
     ],
   },
   {
@@ -119,28 +135,12 @@ export const SETTINGS_SECTIONS: Array<{
     ],
   },
   {
-    title: 'PRIVACY SETTINGS',
+    title: 'ACCOUNT ACTIONS',
     items: [
-      {
-        id: 'location',
-        title: 'Location Access',
-        subtitle: 'For pickup & tracking',
-        Icon: MapPin,
-        kind: 'nav',
-        value: 'Always',
-      },
-      {
-        id: 'profileVisibility',
-        title: 'Profile Visibility',
-        subtitle: 'Who can see your profile',
-        Icon: Shield,
-        kind: 'nav',
-        value: 'Public',
-      },
       {
         id: 'delete',
         title: 'Delete Account',
-        subtitle: 'Permanently remove your account',
+        subtitle: 'Request removal via support',
         Icon: Trash2,
         kind: 'nav',
         danger: true,
@@ -153,7 +153,6 @@ export const SETTINGS_SECTIONS: Array<{
       { id: 'version', title: 'Version', Icon: FileText, kind: 'nav', value: '1.0.0', muted: true },
       { id: 'terms', title: 'Terms & Conditions', Icon: FileText, kind: 'nav', muted: true },
       { id: 'privacy', title: 'Privacy Policy', Icon: Shield, kind: 'nav', muted: true },
-      { id: 'licences', title: 'Licences', Icon: CreditCard, kind: 'nav', muted: true },
     ],
   },
 ];

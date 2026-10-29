@@ -19,12 +19,29 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceOptionInfoIcon, {
+  showServiceHeaderInfo,
+} from '../components/services/ServiceOptionInfoIcon';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import {
+  ROADSIDE_SERVICE_HEADER_INFO,
+  ROADSIDE_TIER_INFO,
+} from '../constants/serviceLandingInfo';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import { useCatalogStore } from '../store/catalogStore';
+import { useRoadsideAvailabilityQuery } from '../services/bookings/useServiceBookingMutations';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
+import {
+  getRoadsideServiceLabel,
+  getRoadsideServicePrice,
+} from '../constants/roadsideBooking';
+import {
+  openRoadsideLocation,
+  roadsideCatalogIdToServiceId,
+} from '../utils/roadsideBookingFlow';
 
 const REF_W = 390;
 
@@ -32,27 +49,31 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideAssistance'>;
 
 const ROADSIDE_OPTIONS = [
   {
-    id: 'flat_tyre',
-    title: 'Flat Tyre Assistance',
-    price: 'From ₹199',
+    id: 'flat_tyre' as const,
+    slug: 'roadside_flat_tyre',
+    title: getRoadsideServiceLabel('flat_tyre'),
+    price: getRoadsideServicePrice('flat_tyre'),
     Icon: Disc,
   },
   {
-    id: 'battery_jumpstart',
-    title: 'Battery Jumpstart',
-    price: 'From ₹199',
+    id: 'battery_jumpstart' as const,
+    slug: 'roadside_battery_jump',
+    title: getRoadsideServiceLabel('battery'),
+    price: getRoadsideServicePrice('battery'),
     Icon: BatteryCharging,
   },
   {
-    id: 'fuel_delivery',
-    title: 'Fuel Delivery',
-    price: 'From ₹299',
+    id: 'fuel_delivery' as const,
+    slug: 'roadside_fuel_delivery',
+    title: getRoadsideServiceLabel('fuel'),
+    price: getRoadsideServicePrice('fuel'),
     Icon: Fuel,
   },
   {
-    id: 'minor_repair',
-    title: 'Minor Mechanical Fix',
-    price: 'From ₹399',
+    id: 'minor_repair' as const,
+    slug: 'roadside_minor_repair',
+    title: getRoadsideServiceLabel('minor_repairs'),
+    price: getRoadsideServicePrice('minor_repairs'),
     Icon: Wrench,
   },
 ];
@@ -65,9 +86,33 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
   const heroCard = getServiceCategoryCard('roadside');
 
   const apiBrand = useCatalogStore(state => state.brand);
+  const { data: availability } = useRoadsideAvailabilityQuery();
 
-  const bookRoadside = () => {
-    navigation.navigate('RoadsideSelectService');
+  const availabilityBySlug = React.useMemo(() => {
+    const map = new Map<string, boolean>();
+    availability?.items.forEach(item => {
+      map.set(item.serviceType, item.available);
+    });
+    return map;
+  }, [availability]);
+
+  const bookableCount = ROADSIDE_OPTIONS.filter(
+    opt => availabilityBySlug.get(opt.slug) !== false,
+  ).length;
+
+  const startRoadside = (catalogId: (typeof ROADSIDE_OPTIONS)[number]['id']) => {
+    const serviceId = roadsideCatalogIdToServiceId(catalogId);
+    if (!serviceId) return;
+    const slug = ROADSIDE_OPTIONS.find(o => o.id === catalogId)?.slug;
+    if (slug && availabilityBySlug.get(slug) === false) return;
+    openRoadsideLocation(navigation, serviceId);
+  };
+
+  const bookFirstAvailable = () => {
+    const first = ROADSIDE_OPTIONS.find(opt => availabilityBySlug.get(opt.slug) !== false);
+    if (first) {
+      startRoadside(first.id);
+    }
   };
 
   const callSupport = () => {
@@ -77,7 +122,13 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="Roadside Assistance" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader
+        title="Roadside Assistance"
+        onBack={() => goBackWithinStack(navigation)}
+        onInfoPress={() =>
+          showServiceHeaderInfo('How roadside works', ROADSIDE_SERVICE_HEADER_INFO)
+        }
+      />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}
@@ -98,12 +149,27 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
             textAlign: 'center',
             fontWeight: typography.weights.medium,
           }}>
-          On-spot help · Fair upfront pricing
+          On-spot help · Prices shown only for services you can book today
         </Text>
+        {bookableCount === 0 ? (
+          <Text
+            style={{
+              fontSize: px(12),
+              lineHeight: px(17),
+              color: colors.grey,
+              textAlign: 'center',
+              fontWeight: typography.weights.medium,
+            }}>
+            Tyre, battery, fuel & repairs are coming soon. Instant towing is available from Home →
+            Towing.
+          </Text>
+        ) : null}
 
         {/* Roadside Options List */}
         <View style={{ gap: px(10) }}>
-          {ROADSIDE_OPTIONS.map(opt => (
+          {ROADSIDE_OPTIONS.map(opt => {
+            const comingSoon = availabilityBySlug.get(opt.slug) === false;
+            return (
             <View
               key={opt.id}
               style={[
@@ -117,6 +183,7 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                   borderWidth: 1,
                   borderColor: '#F0EFEA',
                   gap: px(12),
+                  opacity: comingSoon ? 0.72 : 1,
                 },
               ]}>
               <View
@@ -131,30 +198,41 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                 <opt.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: px(14),
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {opt.title}
-                </Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text
+                    style={{
+                      flexShrink: 1,
+                      fontSize: px(14),
+                      lineHeight: px(18),
+                      fontWeight: typography.weights.bold,
+                      color: colors.dark,
+                    }}>
+                    {opt.title}
+                  </Text>
+                  <ServiceOptionInfoIcon
+                    alertTitle={opt.title}
+                    alertBody={ROADSIDE_TIER_INFO[opt.id]}
+                  />
+                </View>
                 <Text
                   style={{
                     fontSize: px(12),
                     fontWeight: typography.weights.bold,
-                    color: colors.primary,
+                    color: comingSoon ? colors.grey : colors.primary,
                     marginTop: px(3),
                   }}>
-                  {opt.price}
+                  {comingSoon ? 'Coming soon' : `From ₹${opt.price}`}
                 </Text>
               </View>
 
               <Pressable
-                onPress={() => bookRoadside()}
+                onPress={() => {
+                  if (!comingSoon) startRoadside(opt.id);
+                }}
+                disabled={comingSoon}
                 style={{
-                  backgroundColor: colors.primary,
+                  backgroundColor: comingSoon ? colors.border : colors.primary,
                   paddingHorizontal: px(14),
                   height: px(32),
                   borderRadius: px(8),
@@ -165,13 +243,14 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                   style={{
                     fontSize: px(12),
                     fontWeight: typography.weights.bold,
-                    color: colors.dark,
+                    color: comingSoon ? colors.grey : colors.dark,
                   }}>
-                  Book Now
+                  {comingSoon ? 'Soon' : 'Book Now'}
                 </Text>
               </Pressable>
             </View>
-          ))}
+          );
+          })}
         </View>
       </ScrollView>
 
@@ -217,12 +296,13 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
         </Pressable>
 
         <Pressable
-          onPress={() => bookRoadside()}
+          onPress={() => bookFirstAvailable()}
+          disabled={bookableCount === 0}
           style={{
             flex: 1.5,
             height: px(46),
             borderRadius: px(14),
-            backgroundColor: colors.primary,
+            backgroundColor: bookableCount === 0 ? colors.border : colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
             flexDirection: 'row',
@@ -232,11 +312,13 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
             style={{
               fontSize: px(14),
               fontWeight: typography.weights.bold,
-              color: colors.dark,
+              color: bookableCount === 0 ? colors.grey : colors.dark,
             }}>
-            Book Service
+            {bookableCount === 0 ? 'Services coming soon' : 'Book Service'}
           </Text>
-          <ArrowRight size={px(16)} color={colors.dark} strokeWidth={2.5} />
+          {bookableCount === 0 ? null : (
+            <ArrowRight size={px(16)} color={colors.dark} strokeWidth={2.5} />
+          )}
         </Pressable>
       </View>
     </SafeAreaView>

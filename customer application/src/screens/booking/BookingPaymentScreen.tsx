@@ -16,6 +16,7 @@ import type { HomeStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
 import { initiateAdvancePayment, verifyAdvancePayment } from '../../services/bookings/serviceBookingApi';
 import { getApiErrorMessage } from '../../services/api';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'BookingPayment'>;
 
@@ -59,10 +60,18 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
     navigation.navigate(next as 'RoadsideHelpOnWay');
   };
 
+  // MVP: UPI+Cash are the real rails. GPay option is a coming-soon showcase —
+  // paying always runs the (stub) advance flow regardless of selection, so if a
+  // coming-soon method is picked, fall back to UPI and tell the user.
   const handlePay = async () => {
+    if (payMutation.isPending) return;
     if (!bookingId || !bookingType) {
       Alert.alert('Payment unavailable', 'Booking details are missing. Please retry from booking review.');
       return;
+    }
+    if (selected === 'gpay') {
+      setSelected('upi');
+      Alert.alert('Coming soon', 'Google Pay in-app is launching after MVP. UPI is selected instead.');
     }
 
     try {
@@ -89,7 +98,7 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       title="Confirm Payment"
       step={flow === 'towing' ? 6 : flow === 'driver' ? 5 : 4}
       accentColor={accent}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel={
         payMutation.isPending
           ? 'Processing...'
@@ -142,6 +151,7 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
         <View style={{ gap: t.px(10) }}>
           {BOOKING_PAYMENT_METHODS.map(method => {
             const isSelected = selected === method.id;
+            const isComingSoon = method.subtitle.startsWith('Coming soon');
             return (
               <Pressable
                 key={method.id}

@@ -36,6 +36,9 @@ export function getPackagePrice(
 
 export const DRIVER_BOOKING_STEPS = 6;
 
+/** Wizard labels for Book Now path: Schedule → Pickup → Vehicle → Review */
+export const DRIVER_BOOKING_STEP_LABELS = ['Schedule', 'Pickup', 'Vehicle', 'Review'] as const;
+
 export const DRIVER_SERVICE_LIST: Array<{
   id: DriverTypeId;
   label: string;
@@ -164,7 +167,10 @@ export function getDurationLabel(id: DriverDurationId): string {
   return DRIVER_DURATION_OPTIONS.find(d => d.id === id)?.label ?? id;
 }
 
-export function getDurationReviewLabel(id: DriverDurationId): string {
+export function getDurationReviewLabel(id: DriverDurationId, hours?: number): string {
+  if (id === 'custom' && hours) {
+    return `${hours} hours`;
+  }
   const labels: Record<DriverDurationId, string> = {
     '2': '2 hours',
     '4': '4 hours',
@@ -189,5 +195,5 @@ export function getShortLocation(address: string, displayLabel?: string): string
 }
 
 export function isBookableDriverType(id: DriverTypeId): boolean {
-  return id !== 'full_time';
+  return true;
 }

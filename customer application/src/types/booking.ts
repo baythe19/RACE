@@ -81,6 +81,8 @@ export interface Booking {
   completionOtp?: string;
   paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE' | null;
   paymentConfirmedByCustomer?: boolean;
+  /** P-UPI-01: driver's saved UPI VPA surfaced on tracking/list payloads. */
+  driverUpiId?: string | null;
   estimatedFare?: number;
   fareBreakdown?: {
     totalFare?: number;

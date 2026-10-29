@@ -24,6 +24,7 @@ import SoftScreenFade from '../../components/auth/SoftScreenFade';
 import { images } from '../../assets';
 import { useAppDispatch } from '../../redux/hooks';
 import { setSignupPath } from '../../redux/onboarding/onboardingSlice';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'Onboarding'>;
 
@@ -184,7 +185,7 @@ export default function OnboardingScreen({ navigation }: Props) {
 
   const leaveOnboarding = useCallback(() => {
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     const parent = navigation.getParent();

@@ -50,9 +50,10 @@ import {
   useVerifyOtpMutation,
 } from '../../services/auth/useAuthMutations';
 import { ensurePreviewAuthSession, previewAdvanceFromMobileNumber } from '../../config/uiPreviewAuth';
-import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'MobileNumber'>;
 
@@ -143,7 +144,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
       return;
     }
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     const parent = navigation.getParent();
@@ -198,7 +199,9 @@ export default function MobileNumberScreen({ navigation }: Props) {
   }, [chromeOpacity, heroFactor]);
 
   const handleContinue = async () => {
-    if (UI_PREVIEW_AUTH_FLOW) {
+    if (loading || sendOtpMutation.isPending) return;
+
+    if (isUiPreviewAuthFlow()) {
       Keyboard.dismiss();
       setError('');
       previewAdvanceFromMobileNumber(navigation, dispatch, isSignup);
@@ -243,7 +246,10 @@ export default function MobileNumberScreen({ navigation }: Props) {
           setError('Could not sign you in automatically. Try Continue again.');
           return;
         }
-        const verifyResult = await verifyOtpMutation.mutateAsync({ mobileNumber: digits, otp });
+        const verifyResult = await verifyOtpMutation.mutateAsync({
+          mobileNumber: digits,
+          otp,
+        });
         if (isExistingUser || verifyResult.user.isProfileCompleted) {
           dispatch(clearSignupPath());
         }
@@ -274,7 +280,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
         );
         return;
       }
-      if (__DEV__ || UI_PREVIEW_AUTH_FLOW) {
+      if (__DEV__ || isUiPreviewAuthFlow()) {
         navigation.navigate('OtpVerification', {
           mobileNumber: digits,
           isExistingUser: !isSignup,
@@ -369,7 +375,8 @@ export default function MobileNumberScreen({ navigation }: Props) {
               inputRef={inputRef}
               menuOpen={countryMenuOpen}
               onPhoneChange={value => {
-                setPhone(value.replace(/[^\d\s]/g, ''));
+                // Indian mobile: digits only, hard-capped at 10.
+                setPhone(value.replace(/\D/g, '').slice(0, 10));
                 if (error) setError('');
               }}
               onToggleCountryMenu={() => {
@@ -405,7 +412,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
             isSignup={isSignup}
             marginTop={keyboardOpen ? 12 : 22}
             onPress={() => void handleContinue()}
-            disabled={loading}
+            disabled={loading || sendOtpMutation.isPending}
           />
 
           <Animated.View
@@ -453,8 +460,8 @@ export default function MobileNumberScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
-          {/* Preview builds only — never show in APK when UI_PREVIEW_AUTH_FLOW=false */}
-          {UI_PREVIEW_AUTH_FLOW ? (
+          {/* Preview builds only — never show in APK when isUiPreviewAuthFlow()=false */}
+          {isUiPreviewAuthFlow() ? (
             <View
               style={{
                 marginTop: 14 * scale,

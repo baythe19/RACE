@@ -3,7 +3,7 @@ export type TowingServiceModeId = 'instant' | 'scheduled' | 'emergency';
 import type { TowingFareBreakdown } from './fare';
 
 export type TowingVehicleTypeId = 'hatchback' | 'sedan' | 'suv' | 'bike';
-export type TowingTypeId = 'flatbed' | 'wheel_lift';
+export type TowingTypeId = 'flatbed' | 'wheel_lift' | 'heavy_tow' | 'other';
 export type TowingTimeId = '30-60' | '60-90' | 'custom';
 
 export type ServiceLocationType = 'current' | 'registered' | 'different';

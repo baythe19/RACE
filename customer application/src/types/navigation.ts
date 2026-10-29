@@ -25,8 +25,6 @@ export type TowingBookingParamList = {
   TowingService: undefined;
   TowingChooseVehicle: undefined;
   TowingPickupDrop: undefined;
-  TowingSelectType: undefined;
-  TowingDateTime: undefined;
   TowingReview: undefined;
   TowingAdvancePayment: undefined;
   BookingPayment: BookingPaymentParams;
@@ -72,7 +70,7 @@ export type DriverBookingParamList = {
 export type RoadsideBookingParamList = {
   RoadsideAssistance: undefined;
   RoadsideSelectService: undefined;
-  RoadsideLocation: undefined;
+  RoadsideLocation: { serviceId?: import('./roadsideBooking').RoadsideServiceId } | undefined;
   RoadsideReview: undefined;
   BookingPayment: BookingPaymentParams;
   RoadsideHelpOnWay: undefined;
@@ -151,7 +149,7 @@ export type CallStackParamList = {
 export type RootStackParamList = {
   Splash: undefined;
   Auth: NavigatorScreenParams<AuthStackParamList> | undefined;
-  Main: undefined;
+  Main: NavigatorScreenParams<RootTabParamList> | undefined;
   WrongApp: undefined;
 };
 
@@ -199,7 +197,7 @@ export type ProfileStackParamList = {
   ProfileMain: undefined;
   PersonalInformation: undefined;
   MyVehicles: undefined;
-  AddVehicle: undefined;
+  AddVehicle: { returnToDriverWizard?: boolean } | undefined;
   VehicleDetail: { vehicleId: string };
   EditVehicle: { vehicleId: string };
   SosDetails: undefined;

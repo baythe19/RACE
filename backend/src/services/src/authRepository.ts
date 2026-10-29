@@ -28,6 +28,7 @@ export class AuthRepository {
     return OtpLogModel.create(data);
   }
 
+  /** Latest unexpired OTP log for the exact normalized number. */
   async findLatestValidOtpLog(mobileNumber: string): Promise<IOtpLog | null> {
     const now = new Date();
     return OtpLogModel.findOne({
@@ -42,6 +43,7 @@ export class AuthRepository {
   async findRecentlyVerifiedOtpLog(
     mobileNumber: string,
     otp: string,
+    otpHash: string,
     withinMs: number,
   ): Promise<IOtpLog | null> {
     const since = new Date(Date.now() - withinMs);
@@ -53,7 +55,7 @@ export class AuthRepository {
       mobileNumber,
       mobileVerified: true,
       createdAt: { $gte: since },
-      mobileOtp: otp,
+      $or: [{ mobileOtp: otp }, { otpHash }],
     })
       .sort({ createdAt: -1 })
       .exec();

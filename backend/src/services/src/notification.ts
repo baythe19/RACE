@@ -6,7 +6,7 @@ import type {
   NotificationResponseDto,
   UpdateNotificationPrefsDto,
 } from './notificationValidator';
-import type { NotificationType } from '../../models/src/notification';
+import type { NotificationCategory, NotificationType } from '../../models/src/notification';
 import { emitToUser } from './socket';
 
 function mapNotification(n: INotification): NotificationResponseDto {
@@ -50,6 +50,10 @@ export class NotificationService {
       message: string;
       metadata?: Record<string, string>;
     },
+    options?: {
+      audience?: 'customer' | 'vendor' | 'driver';
+      category?: NotificationCategory;
+    },
   ): Promise<NotificationResponseDto> {
     const notification = await notificationRepository.create({
       userId,
@@ -57,6 +61,8 @@ export class NotificationService {
       title: data.title,
       message: data.message,
       metadata: data.metadata,
+      audience: options?.audience ?? 'customer',
+      category: options?.category ?? 'booking',
     });
     emitToUser(userId, 'notification:new', {
       notificationId: notification.id,

@@ -3,6 +3,8 @@ import type { TowingTypeId } from '../types/towingBooking';
 const TOWING_RATES: Record<TowingTypeId, { basePrice: number; ratePerKm: number }> = {
   flatbed: { basePrice: 500, ratePerKm: 25 },
   wheel_lift: { basePrice: 400, ratePerKm: 20 },
+  heavy_tow: { basePrice: 750, ratePerKm: 32 },
+  other: { basePrice: 550, ratePerKm: 26 },
 };
 
 const EARTH_RADIUS_KM = 6371;

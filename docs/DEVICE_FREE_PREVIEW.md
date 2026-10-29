@@ -1,5 +1,7 @@
 # Preview RACE mobile apps without a phone (Peach browser simulator)
 
+> **Ready-to-use runbook (proven 2026-10-28):** customer app ke liye final copy-paste steps + "repeat-mat-karo" list → **`docs/CUSTOMER_APP_PEACH_RUNBOOK.md`** — wahi use karo, ye file background/gotchas ke liye.
+>
 > Use this whenever no physical device / emulator is available (e.g. Codespace, remote box).
 > Installed and **proven on 2026-10-16**: customer app onboarding rendered pixel-perfect, taps worked, API fetches live.
 

@@ -17,8 +17,11 @@ import { useAppDispatch } from '../../redux/hooks';
 import { completeOnboarding } from '../../redux/auth/authSlice';
 import { markCustomerOnboardingComplete } from '../../store/customerOnboarding';
 import { useAuthStore } from '../../store/authStore';
+import { getApiErrorMessage } from '../../services/api';
+import { setPin as setPinApi } from '../../services/profileService';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 const PIN_LENGTH = 4;
@@ -143,7 +146,15 @@ export default function CreatePinScreen({ navigation }: Props) {
       setStep('confirm');
       return;
     }
-    setPinSet(true);
+    // Persist the PIN (server-side bcrypt hash) so it is real, not decoration.
+    void (async () => {
+      try {
+        await setPinApi(undefined, pin);
+        setPinSet(true);
+      } catch (error) {
+        Alert.alert('Could not save PIN', getApiErrorMessage(error));
+      }
+    })();
   };
 
   const handleGoHome = async () => {
@@ -159,7 +170,7 @@ export default function CreatePinScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={[styles.body, { paddingHorizontal: px(24) }]}>
-        <AuthBackHeader onBack={() => navigation.goBack()} />
+        <AuthBackHeader onBack={() => goBackWithinStack(navigation)} />
 
         <View style={[styles.content, compact && styles.contentCompact]}>
           <View
@@ -194,7 +205,7 @@ export default function CreatePinScreen({ navigation }: Props) {
               marginBottom: px(compact ? 16 : 24),
               lineHeight: px(18),
             }}>
-            Set a 4-digit PIN for quick & secure login
+            Set a 4-digit PIN for extra app security (login stays OTP)
           </Text>
 
           <Pressable

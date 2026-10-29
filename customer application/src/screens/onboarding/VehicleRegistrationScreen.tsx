@@ -43,6 +43,7 @@ import { setCustomerOnboardingStep } from '../../store/customerOnboarding';
 import type { AuthStackParamList } from '../../types/navigation';
 import type { VehicleType } from '../../types/vehicle';
 import { colors, shadows, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -165,7 +166,7 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
           <StepHeader
             step={2}
             scale={s}
-            onBack={() => navigation.goBack()}
+            onBack={() => goBackWithinStack(navigation)}
             onSkip={handleSkip}
           />
 

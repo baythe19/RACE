@@ -22,7 +22,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'EmergencySos'>;
 export default function EmergencySosScreen({}: Props) {
   const user = useAppSelector((state) => state.auth.user);
   const { data: config } = useSosConfigQuery();
-  const { data: context, isLoading } = useSosContextQuery();
+  const { data: context, isLoading } = useSosContextQuery(undefined, Boolean(user));
   const sosAlert = useSosAlertMutation();
 
   const emergencyContact = context?.emergencyContact
@@ -38,6 +38,7 @@ export default function EmergencySosScreen({}: Props) {
     action: 'sos' | 'towing' | 'ambulance' | 'share_location' | 'notify_contacts',
     successTitle: string,
   ) => {
+    if (sosAlert.isPending) return;
     sosAlert.mutate(
       { action, vehicleId, address: 'Current location' },
       {

@@ -24,6 +24,7 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
   >();
   const [paymentConfirmedByCustomer, setPaymentConfirmedByCustomer] = useState<boolean>(false);
   const [fare, setFare] = useState<number | undefined>();
+  const [driverUpiId, setDriverUpiId] = useState<string | undefined>();
 
   useEffect(() => {
     setStatus('PENDING');
@@ -36,6 +37,7 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
     setPaymentCollectionMode(undefined);
     setPaymentConfirmedByCustomer(false);
     setFare(undefined);
+    setDriverUpiId(undefined);
     if (!bookingId) return undefined;
 
     const unsubscribe = trackingService.subscribe(bookingId, (update) => {
@@ -58,6 +60,9 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
       }
       if (update.fare != null) {
         setFare(update.fare);
+      }
+      if (update.driverUpiId) {
+        setDriverUpiId(update.driverUpiId);
       }
       if (update.driver) {
         setDriver(update.driver);
@@ -87,6 +92,7 @@ export function useBookingTracking(bookingId?: string, bookingType?: 'towing' | 
     driverPhone: driver?.phone ?? driverLocation?.driverPhone,
     driverRating: driver?.rating,
     driverLocation,
+    driverUpiId: driverUpiId ?? (undefined as string | undefined),
     tripStartOtp,
     arrivedAtDropoffAt,
     completionOtp,

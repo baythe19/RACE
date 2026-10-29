@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -12,18 +13,19 @@ import {
   Banknote,
   CheckCircle2,
   CreditCard,
+  ExternalLink,
   MapPin,
   QrCode,
   ShieldCheck,
   Smartphone,
 } from 'lucide-react-native';
-
 import {
   confirmCustomerPaymentMode,
   type ConfirmPaymentModeResult,
 } from '../../services/bookings/serviceBookingApi';
 import type { ServiceBookingType } from '../../types/serviceBooking';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
+import InlineQrCode from '../qr/InlineQrCode';
 
 type Props = {
   visible: boolean;
@@ -33,12 +35,31 @@ type Props = {
   completionOtp?: string;
   paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE' | null;
   paymentConfirmedByCustomer?: boolean;
+  /** P-UPI-01: assigned driver's saved UPI VPA (from tracking endpoint). */
+  driverUpiId?: string | null;
+  driverName?: string | null;
   onSuccess?: (result: ConfirmPaymentModeResult) => void;
   onClose?: () => void;
 };
 
 type PaymentOption = 'CASH' | 'UPI' | 'ONLINE';
 
+/** P-UPI-01: build a standard UPI deep-link (works in GPay / PhonePe / Paytm / BHIM). */
+function buildUpiDeepLink(params: {
+  payeeVpa: string;
+  payeeName?: string;
+  amount?: number;
+  note?: string;
+}): string {
+  const query = new URLSearchParams({
+    pa: params.payeeVpa,
+    cu: 'INR',
+  });
+  if (params.payeeName) query.set('pn', params.payeeName);
+  if (params.amount && params.amount > 0) query.set('am', params.amount.toFixed(2));
+  if (params.note) query.set('tn', params.note);
+  return `upi://pay?${query.toString()}`;
+}
 export default function DropoffPaymentModal({
   visible,
   bookingId,
@@ -47,6 +68,8 @@ export default function DropoffPaymentModal({
   completionOtp: serverOtp,
   paymentCollectionMode: serverMode,
   paymentConfirmedByCustomer: serverConfirmed,
+  driverUpiId,
+  driverName,
   onSuccess,
   onClose,
 }: Props) {
@@ -61,7 +84,7 @@ export default function DropoffPaymentModal({
   const activeMode = localConfirmedMode || serverMode || selectedMode;
 
   const handleConfirmPayment = async () => {
-    if (!bookingId) return;
+    if (!bookingId || isSubmitting) return;
     setIsSubmitting(true);
     setErrorMessage(null);
 
@@ -94,6 +117,29 @@ export default function DropoffPaymentModal({
         return 'In-App Payment';
       default:
         return mode;
+    }
+  };
+
+  // P-UPI-01: UPI deep-link + QR payload for the selected driver's VPA.
+  const upiLink = useMemo(
+    () =>
+      driverUpiId
+        ? buildUpiDeepLink({
+            payeeVpa: driverUpiId,
+            payeeName: driverName ?? 'RACE Driver',
+            amount: fare,
+            note: 'RACE trip payment',
+          })
+        : null,
+    [driverUpiId, driverName, fare],
+  );
+
+  const handleOpenUpiApp = async () => {
+    if (!upiLink) return;
+    try {
+      await Linking.openURL(upiLink);
+    } catch {
+      setErrorMessage('Could not open a UPI app. Please scan the QR code instead.');
     }
   };
 
@@ -217,6 +263,30 @@ export default function DropoffPaymentModal({
                     {selectedMode === 'CASH' && <View style={styles.radioInner} />}
                   </View>
                 </TouchableOpacity>
+
+                {/* P-UPI-01: driver QR + deep-link when UPI selected and VPA known */}
+                {selectedMode === 'UPI' && upiLink ? (
+                  <View style={styles.upiPayeeCard}>
+                    <Text style={styles.upiPayeeTitle}>Pay {driverName ?? 'your driver'}</Text>
+                    <Text style={styles.upiPayeeVpa} numberOfLines={1}>
+                      {driverUpiId}
+                    </Text>
+                    <View style={styles.upiQrWrap}>
+                      <InlineQrCode value={upiLink} size={160} />
+                    </View>
+                    <Text style={styles.upiQrHint}>
+                      Scan with any UPI app, or open GPay / PhonePe / Paytm directly.
+                    </Text>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      style={styles.upiOpenButton}
+                      onPress={handleOpenUpiApp}
+                    >
+                      <ExternalLink size={16} color="#FFFFFF" />
+                      <Text style={styles.upiOpenButtonText}>Open UPI App — Pay ₹{Math.round(fare)}</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
 
                 {errorMessage ? (
                   <Text style={styles.errorText}>{errorMessage}</Text>
@@ -437,6 +507,55 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: typography.weights.bold,
+  },
+  // P-UPI-01: driver payee card (QR + VPA + deep-link)
+  upiPayeeCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  upiPayeeTitle: {
+    fontSize: 15,
+    fontWeight: typography.weights.bold,
+    color: colors.dark,
+  },
+  upiPayeeVpa: {
+    fontSize: 12,
+    color: colors.grey,
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  upiQrWrap: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 10,
+  },
+  upiQrHint: {
+    fontSize: 11,
+    color: colors.grey,
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  upiOpenButton: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.md,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  upiOpenButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: typography.weights.bold,
   },
   otpSection: {

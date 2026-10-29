@@ -38,6 +38,8 @@ export interface TrackingUpdate {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement. */
+  driverUpiId?: string;
   arrivedAtDropoffAt?: string;
   completionOtp?: string;
   paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
@@ -134,77 +136,79 @@ class TrackingService {
     this.bindSocket(bookingId, bookingType);
 
     if (!this.intervals.has(bookingId)) {
+      let pollInFlight = false;
+      const applyTyped = (result: {
+        status: string;
+        driver?: TrackingUpdate['driver'];
+        driverLocation?: TrackingUpdate['driverLocation'];
+        driverUpiId?: string;
+        tripStartOtp?: string;
+        assignedFleetVehicleLabel?: string;
+        arrivedAtDropoffAt?: string;
+        completionOtp?: string;
+        paymentCollectionMode?: TrackingUpdate['paymentCollectionMode'];
+        paymentConfirmedByCustomer?: boolean;
+        fare?: number;
+      }) => {
+        this.pushUpdate(bookingId, {
+          bookingId,
+          status: result.status,
+          driver: result.driver,
+          driverLocation: result.driverLocation,
+          driverUpiId: result.driverUpiId,
+          tripStartOtp: result.tripStartOtp,
+          assignedFleetVehicleLabel: result.assignedFleetVehicleLabel,
+          arrivedAtDropoffAt: result.arrivedAtDropoffAt,
+          completionOtp: result.completionOtp,
+          paymentCollectionMode: result.paymentCollectionMode,
+          paymentConfirmedByCustomer: result.paymentConfirmedByCustomer,
+          fare: result.fare,
+        });
+      };
+
       const poll = async () => {
-        const legacy = await getBookingTracking(bookingId, bookingType);
-        if (legacy) {
-          const update: TrackingUpdate = {
+        // Skip overlapping ticks — prevents stacked HTTP when a poll is slow.
+        if (pollInFlight) return;
+        pollInFlight = true;
+        try {
+          if (bookingType === 'towing') {
+            applyTyped(await getTowingBookingTracking(bookingId));
+            return;
+          }
+          if (bookingType === 'driver') {
+            applyTyped(await getDriverBookingTracking(bookingId));
+            return;
+          }
+
+          // Unknown type: one typed resolve path (no towing+driver double probe).
+          const legacy = await getBookingTracking(bookingId);
+          if (!legacy) return;
+          this.pushUpdate(bookingId, {
             bookingId,
             ...(legacy.etaMinutes != null ? { etaMinutes: legacy.etaMinutes } : {}),
             status: legacy.status,
             driverLocation: legacy.driverLocation,
             tripStartOtp: legacy.tripStartOtp,
             assignedFleetVehicleLabel: legacy.assignedFleetVehicleLabel,
-            arrivedAtDropoffAt: (legacy as any).arrivedAtDropoffAt,
-            completionOtp: (legacy as any).completionOtp,
-            paymentCollectionMode: (legacy as any).paymentCollectionMode,
-            paymentConfirmedByCustomer: (legacy as any).paymentConfirmedByCustomer,
-            fare: (legacy as any).fare,
-          };
-          this.pushUpdate(bookingId, update);
-          return;
-        }
-
-        try {
-          const towing =
-            bookingType === 'driver' ? null : await getTowingBookingTracking(bookingId);
-          if (!towing) {
-            throw new Error('Skip towing tracking lookup');
-          }
-          const update: TrackingUpdate = {
-            bookingId,
-            status: towing.status,
-            driver: towing.driver,
-            driverLocation: towing.driverLocation,
-            tripStartOtp: towing.tripStartOtp,
-            assignedFleetVehicleLabel: towing.assignedFleetVehicleLabel,
-            arrivedAtDropoffAt: towing.arrivedAtDropoffAt,
-            completionOtp: towing.completionOtp,
-            paymentCollectionMode: towing.paymentCollectionMode,
-            paymentConfirmedByCustomer: towing.paymentConfirmedByCustomer,
-            fare: towing.fare,
-          };
-          this.pushUpdate(bookingId, update);
-          return;
+            arrivedAtDropoffAt: (legacy as { arrivedAtDropoffAt?: string }).arrivedAtDropoffAt,
+            completionOtp: (legacy as { completionOtp?: string }).completionOtp,
+            paymentCollectionMode: (legacy as { paymentCollectionMode?: TrackingUpdate['paymentCollectionMode'] })
+              .paymentCollectionMode,
+            paymentConfirmedByCustomer: (legacy as { paymentConfirmedByCustomer?: boolean })
+              .paymentConfirmedByCustomer,
+            fare: (legacy as { fare?: number }).fare,
+          });
         } catch {
-          // try driver booking tracking next
-        }
-
-        try {
-          const driver = await getDriverBookingTracking(bookingId);
-          const update: TrackingUpdate = {
-            bookingId,
-            status: driver.status,
-            driver: driver.driver,
-            driverLocation: driver.driverLocation,
-            tripStartOtp: driver.tripStartOtp,
-            assignedFleetVehicleLabel: driver.assignedFleetVehicleLabel,
-            arrivedAtDropoffAt: driver.arrivedAtDropoffAt,
-            completionOtp: driver.completionOtp,
-            paymentCollectionMode: driver.paymentCollectionMode,
-            paymentConfirmedByCustomer: driver.paymentConfirmedByCustomer,
-            fare: driver.fare,
-          };
-          this.pushUpdate(bookingId, update);
-          return;
-        } catch {
-          // no-op: keep previous known state and wait for next poll/socket event
+          // Keep last known state; next tick / socket may recover.
+        } finally {
+          pollInFlight = false;
         }
       };
 
       void poll();
       const interval = setInterval(() => {
         void poll();
-      }, 5000);
+      }, 8_000);
       this.intervals.set(bookingId, interval);
     }
 

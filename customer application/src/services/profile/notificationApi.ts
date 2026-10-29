@@ -29,6 +29,7 @@ interface NotificationsListResponse {
 
 function mapNotificationType(type: string): AppNotification['category'] {
   if (type.includes('BOOKING')) return 'booking';
+  if (type.includes('PAYMENT')) return 'payment';
   if (type.includes('PROMOTION') || type.includes('OFFER')) return 'offers';
   if (type.includes('SUBSCRIPTION')) return 'subscription';
   return 'general';

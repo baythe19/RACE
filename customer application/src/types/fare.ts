@@ -7,6 +7,8 @@ export interface TowingFareBreakdown {
   extraKm: number;
   extraKmCharge: number;
   nightSurcharge: number;
+  prioritySurcharge?: number;
+  scheduledDiscount?: number;
   totalFare: number;
   advanceAmount: number;
   remainingAmount: number;

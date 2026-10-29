@@ -1,8 +1,10 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Bell, CheckCircle, IndianRupee, Star, Tag, Truck, type LucideIcon } from 'lucide-react-native';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
+import { useAuthActions } from '../../hooks/useAuth';
 import { getApiErrorMessage } from '../../services/api';
 import {
   useMarkAllNotificationsReadMutation,
@@ -13,6 +15,7 @@ import { colors, typography } from '../../theme';
 
 const ICONS: Record<string, LucideIcon> = {
   booking: Truck,
+  payment: IndianRupee,
   offers: Tag,
   subscription: Star,
   general: Bell,
@@ -104,13 +107,17 @@ function NotificationCard({ item, px }: { item: AppNotification; px: (n: number)
 
 export default function NotificationsScreen() {
   const px = useProfilePx();
+  const { logout } = useAuthActions();
   const { data, isLoading, isError, error, refetch } = useNotificationsQuery();
   const markAllRead = useMarkAllNotificationsReadMutation();
 
   const items = data?.notifications ?? [];
   const groups = useMemo(() => groupByDay(items), [items]);
+  const errorMessage = isError ? getApiErrorMessage(error, 'Unable to load notifications') : '';
+  const sessionExpired = /session expired|sign in again/i.test(errorMessage);
 
   const handleMarkAllRead = () => {
+    if (markAllRead.isPending) return;
     markAllRead.mutate(undefined, {
       onError: err => {
         Alert.alert('Error', getApiErrorMessage(err, 'Unable to mark notifications as read'));
@@ -121,8 +128,9 @@ export default function NotificationsScreen() {
   return (
     <ProfileSubScreenLayout
       title="Notifications"
+      subtitle="Booking updates and trip alerts"
       headerRight={
-        items.length > 0 ? (
+        !isError && items.length > 0 ? (
           <Pressable onPress={handleMarkAllRead} hitSlop={8} disabled={markAllRead.isPending}>
             <Text
               style={{
@@ -136,27 +144,99 @@ export default function NotificationsScreen() {
         ) : null
       }>
       {isLoading ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
+        <DataSkeleton variant="list" />
       ) : isError ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(24), gap: px(10) }}>
-          <Text style={{ fontSize: px(13), color: colors.grey, textAlign: 'center' }}>
-            {getApiErrorMessage(error, 'Unable to load notifications')}
+        <View style={{ alignItems: 'center', paddingVertical: px(36), gap: px(12) }}>
+          <View
+            style={{
+              width: px(56),
+              height: px(56),
+              borderRadius: px(28),
+              backgroundColor: colors.goldLight,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Bell size={px(26)} color={colors.primary} strokeWidth={2} />
+          </View>
+          <Text
+            style={{
+              fontSize: px(16),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            {sessionExpired ? 'Session expired' : 'Couldn’t load notifications'}
           </Text>
-          <Pressable onPress={() => void refetch()}>
-            <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.primary }}>
-              Try again
-            </Text>
-          </Pressable>
+          <Text
+            style={{
+              fontSize: px(13),
+              color: colors.grey,
+              textAlign: 'center',
+              lineHeight: px(19),
+              paddingHorizontal: px(12),
+            }}>
+            {errorMessage}
+          </Text>
+          {sessionExpired ? (
+            <Pressable
+              onPress={() => {
+                void logout().catch(() => {
+                  Alert.alert('Sign in', 'Please close and reopen the app, then log in again.');
+                });
+              }}
+              style={{
+                marginTop: px(4),
+                paddingHorizontal: px(20),
+                paddingVertical: px(12),
+                borderRadius: px(12),
+                backgroundColor: colors.primary,
+              }}>
+              <Text style={{ fontSize: px(14), fontWeight: typography.weights.bold, color: colors.dark }}>
+                Sign in again
+              </Text>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => void refetch()}>
+              <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.primary }}>
+                Try again
+              </Text>
+            </Pressable>
+          )}
         </View>
       ) : items.length === 0 ? (
         <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          <Bell size={px(36)} color={colors.primary} strokeWidth={1.8} />
-          <Text style={{ marginTop: px(10), fontSize: px(14), color: colors.grey }}>No notifications yet</Text>
+          <View
+            style={{
+              width: px(56),
+              height: px(56),
+              borderRadius: px(28),
+              backgroundColor: colors.goldLight,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: px(4),
+            }}>
+            <Bell size={px(26)} color={colors.primary} strokeWidth={2} />
+          </View>
+          <Text style={{ marginTop: px(10), fontSize: px(15), fontWeight: typography.weights.bold, color: colors.dark }}>
+            No notifications yet
+          </Text>
+          <Text style={{ marginTop: px(6), fontSize: px(12), color: colors.grey, textAlign: 'center' }}>
+            Booking and payment updates will show up here.
+          </Text>
         </View>
       ) : (
         <>
+          {data?.unreadCount && data.unreadCount > 0 ? (
+            <Text
+              style={{
+                fontSize: px(11),
+                fontWeight: typography.weights.bold,
+                color: colors.grey,
+                letterSpacing: 0.6,
+                marginBottom: px(10),
+              }}>
+              {data.unreadCount} UNREAD
+            </Text>
+          ) : null}
           {groups.today.length > 0 ? (
             <>
               <Text

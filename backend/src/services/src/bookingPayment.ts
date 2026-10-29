@@ -20,6 +20,10 @@ import type {
   InitiateBookingPaymentDto,
   VerifyBookingPaymentDto,
 } from './bookingPaymentValidator';
+import {
+  notifyAdminAdvancePaid,
+  notifyCustomerAdvancePaid,
+} from './bookingNotifications';
 
 interface BookingPaymentSnapshot {
   id: string;
@@ -285,6 +289,28 @@ export class BookingPaymentService {
     logger.info(
       `${transaction.bookingType === 'towing' ? 'Towing' : 'Driver'} booking ${transaction.bookingId} confirmed; open for nearby partner accept`,
     );
+
+    const bookingNumber =
+      transaction.bookingType === 'towing'
+        ? (await towingBookingRepository.findById(transaction.bookingId.toString()))?.bookingNumber
+        : (await driverBookingRepository.findById(transaction.bookingId.toString()))?.bookingNumber;
+
+    if (bookingNumber) {
+      void notifyCustomerAdvancePaid({
+        customerId,
+        bookingNumber,
+        bookingType: transaction.bookingType,
+        bookingId: transaction.bookingId.toString(),
+        amount: transaction.amount,
+      }).catch(() => undefined);
+      void notifyAdminAdvancePaid({
+        bookingNumber,
+        bookingType: transaction.bookingType,
+        bookingId: transaction.bookingId.toString(),
+        amount: transaction.amount,
+      }).catch(() => undefined);
+    }
+
     return mapTransaction(successfulTransaction);
   }
 

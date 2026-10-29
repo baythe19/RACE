@@ -1,6 +1,5 @@
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from '../../../utils/src/errors';
 import { emitBookingStatusUpdate } from '../socket';
-import { UserModel } from '../../../models/src/user';
 import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { vehicleRepository } from '../vehicleRepository';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
@@ -30,6 +29,15 @@ import {
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
+import { resolveCustomerTrackingExtras } from './customerTrackingLocation';
+import { ensureBookingServiceable } from './serviceability';
+import {
+  notifyAdminCustomerBookingCreated,
+  notifyCustomerBookingCreated,
+  notifyCustomerBookingCancelled,
+  notifyDriversOpenHireJob,
+} from '../bookingNotifications';
+import { bookingServiceLabel } from './driverAssignment';
 
 function mapDriverBooking(
   booking: IDriverBooking,
@@ -106,6 +114,8 @@ export class DriverBookingService {
       throw new NotFoundError('Vehicle not found');
     }
 
+    ensureBookingServiceable(dto.pickup);
+
     const vehicleCategory = getVehicleCategory(vehicle.vehicleType, vehicle.vehicleSubtype);
     const packageHours = resolvePackageHours(dto.packageHours, dto.estimatedDurationHours);
     const { fare, breakdown } = calculateDriverFare(packageHours, vehicleCategory);
@@ -134,6 +144,19 @@ export class DriverBookingService {
       statusHistory: createInitialStatusHistory('PENDING'),
     });
 
+    void notifyAdminCustomerBookingCreated({
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'driver',
+      bookingId: booking.id,
+    }).catch(() => undefined);
+    void notifyCustomerBookingCreated({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'driver',
+      bookingId: booking.id,
+      advanceAmount: breakdown.advanceAmount,
+    }).catch(() => undefined);
+
     return mapDriverBookingWithDriver(booking);
   }
 
@@ -141,7 +164,7 @@ export class DriverBookingService {
     customerId: string,
     status?: UnifiedBookingStatus,
   ): Promise<DriverBookingResponseDto[]> {
-    const bookings = await driverBookingRepository.findByCustomer(customerId, { status });
+    const bookings = await driverBookingRepository.findByCustomerWithOtp(customerId, { status });
     return Promise.all(
       bookings.map(async (booking) => {
         const mapped = await mapDriverBookingWithDriver(booking);
@@ -155,7 +178,7 @@ export class DriverBookingService {
     bookingId: string,
     requestingUser: { id: string; role: string },
   ): Promise<DriverBookingResponseDto> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -167,6 +190,10 @@ export class DriverBookingService {
     const mapped = await mapDriverBookingWithDriver(booking);
     if (requestingUser.role === 'customer') {
       mapped.tripStartOtp = customerTripOtp(booking);
+      mapped.completionOtp = customerCompletionOtp(booking);
+    } else {
+      mapped.tripStartOtp = undefined;
+      mapped.completionOtp = undefined;
     }
     return mapped;
   }
@@ -176,7 +203,7 @@ export class DriverBookingService {
     newStatus: UnifiedBookingStatus,
     actor: { id: string; role: string },
   ): Promise<DriverBookingResponseDto> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -227,7 +254,7 @@ export class DriverBookingService {
     bookingId: string,
     requestingUser: { id: string; role: string },
   ): Promise<DriverTrackingResponseDto> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -241,24 +268,10 @@ export class DriverBookingService {
       ? await resolveAssignedDriver(booking.driverId?.toString())
       : undefined;
 
-    let driverLocation: DriverTrackingResponseDto['driverLocation'];
-    if (driverVisible && booking.driverId) {
-      const driverUser = await UserModel.findById(booking.driverId)
-        .select('currentLocation fullName mobileNumber')
-        .exec();
-      if (
-        driverUser?.currentLocation?.latitude !== undefined &&
-        driverUser.currentLocation.longitude !== undefined
-      ) {
-        driverLocation = {
-          latitude: driverUser.currentLocation.latitude,
-          longitude: driverUser.currentLocation.longitude,
-          updatedAt: driverUser.currentLocation.updatedAt?.toISOString(),
-          driverName: driverUser.fullName ?? driver?.name,
-          driverPhone: driverUser.mobileNumber ?? driver?.phone,
-        };
-      }
-    }
+    // P-TRACK-01: prefer the fresh booking-scoped fix written by the active
+    // trip reporter; fall back to User.currentLocation for older flows.
+    // P-UPI-01: also surface the driver's saved UPI VPA for dropoff settlement.
+    const { driverLocation, driverUpiId } = await resolveCustomerTrackingExtras(booking);
 
     return {
       bookingId: booking.id,
@@ -269,6 +282,7 @@ export class DriverBookingService {
       })),
       driver,
       driverLocation,
+      driverUpiId,
       pickup: booking.pickup,
       dropoff: booking.dropoff,
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
@@ -287,7 +301,7 @@ export class DriverBookingService {
     bookingId: string,
     customerId: string,
   ): Promise<CancellationResult> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -312,7 +326,7 @@ export class DriverBookingService {
     refundStatus: string;
     policy: CancellationResult;
   }> {
-    let booking = await driverBookingRepository.findById(bookingId);
+    let booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -391,6 +405,14 @@ export class DriverBookingService {
       })),
     });
 
+    void notifyCustomerBookingCancelled({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'driver',
+      bookingId: booking.id,
+      refundAmount: policy.refundAmount,
+    }).catch(() => undefined);
+
     const mapped = await mapDriverBookingWithDriver(booking);
     return {
       booking: mapped,
@@ -404,7 +426,7 @@ export class DriverBookingService {
     bookingId: string,
     update: Partial<IDriverBooking>,
   ): Promise<DriverBookingResponseDto> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }
@@ -447,6 +469,18 @@ export class DriverBookingService {
       })),
     });
 
+    if (update.status === 'CONFIRMED' && booking.status !== 'CONFIRMED') {
+      void notifyDriversOpenHireJob({
+        bookingNumber: updated.bookingNumber,
+        bookingId: updated.id,
+        serviceLabel: bookingServiceLabel('driver', {
+          driverServiceType: updated.driverServiceType,
+        }),
+        driverServiceType: updated.driverServiceType,
+        pickupAddress: updated.pickup?.address,
+      }).catch(() => undefined);
+    }
+
     return mapDriverBookingWithDriver(updated);
   }
 
@@ -455,7 +489,7 @@ export class DriverBookingService {
     requestingUser: { id: string; role: string },
     dto: SubmitServiceBookingRatingDto,
   ): Promise<DriverBookingResponseDto> {
-    const booking = await driverBookingRepository.findById(bookingId);
+    const booking = await driverBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Driver booking not found');
     }

@@ -51,6 +51,8 @@ export type VendorAssignJobRouteParams = {
   dropoffAddress?: string;
   estimatedFare?: number;
   preferredDriverId?: string;
+  /** Roadside on-site — assign driver/mechanic only (no fleet truck). */
+  onSiteAssist?: boolean;
 };
 
 export type PartnerDriversStackParamList = {

@@ -49,6 +49,18 @@ export function validateTowingBookingRequest(payload: CreateTowingBookingRequest
   assertValidBookingLocation(payload.pickup, 'pickup');
   assertValidBookingLocation(payload.dropoff, 'dropoff');
   assertFutureScheduledAt(payload.scheduledAt);
+
+  const mode = payload.towingMode ?? (payload.scheduledAt ? 'scheduled' : 'instant');
+
+  if (mode === 'scheduled' && !payload.scheduledAt) {
+    throw new Error('Pick a date and time for scheduled towing');
+  }
+  if (mode === 'emergency' && payload.scheduledAt) {
+    throw new Error('Emergency towing is dispatched now — remove the scheduled time');
+  }
+  if (mode === 'instant' && payload.scheduledAt) {
+    throw new Error('Instant towing cannot include a scheduled time');
+  }
 }
 
 /** Mirrors backend createDriverBookingSchema */
@@ -57,6 +69,9 @@ export function validateDriverBookingRequest(payload: CreateDriverBookingRequest
   assertValidBookingLocation(payload.pickup, 'pickup');
   if (payload.dropoff) {
     assertValidBookingLocation(payload.dropoff, 'dropoff');
+  }
+  if (payload.driverServiceType === 'outstation' && !payload.dropoff) {
+    throw new Error('Select a destination for outstation driver bookings');
   }
   const hasPackage =
     payload.packageHours != null && PACKAGE_HOURS.has(Number(payload.packageHours));

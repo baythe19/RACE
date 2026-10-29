@@ -11,6 +11,7 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import type { Vehicle } from '../../../types/vehicle';
 import { getVehicleCategory } from '../../../utils/vehicleCategory';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingVehicle'>;
 
@@ -43,7 +44,7 @@ export default function DriverBookingVehicleScreen({ navigation, route }: Props)
       step={step}
       accentColor={DRIVER_ACCENT}
       continueDisabled={!canContinue}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
         const vehicle = safeVehicles.find(item => item.id === selectedId);
         if (!vehicle) return;
