@@ -83,7 +83,18 @@ export function TowingFareBreakdownCard({
       {breakdown.extraKmCharge > 0 ? (
         <FareLine label="Extra km charge" value={formatRupee(breakdown.extraKmCharge)} />
       ) : null}
-      <FareLine label="Night surcharge" value={formatRupee(breakdown.nightSurcharge)} />
+      {breakdown.nightSurcharge > 0 ? (
+        <FareLine label="Night surcharge" value={formatRupee(breakdown.nightSurcharge)} />
+      ) : null}
+      {breakdown.prioritySurcharge ? (
+        <FareLine label="Emergency priority" value={formatRupee(breakdown.prioritySurcharge)} />
+      ) : null}
+      {breakdown.scheduledDiscount ? (
+        <FareLine
+          label="Scheduled booking"
+          value={`−${formatRupee(breakdown.scheduledDiscount)}`}
+        />
+      ) : null}
 
       <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(245, 158, 11, 0.35)', paddingTop: 10, gap: 8 }}>
         <FareLine label="Total" value={formatRupee(breakdown.totalFare)} bold />

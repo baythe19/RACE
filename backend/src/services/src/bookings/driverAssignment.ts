@@ -292,10 +292,12 @@ function offerServiceLabel(
   bookingType: 'towing' | 'driver',
   booking: {
     towingMode?: 'instant' | 'scheduled' | 'emergency';
+    assistLabel?: string;
     driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   },
 ): string {
   if (bookingType === 'towing') {
+    if (booking.assistLabel?.trim()) return booking.assistLabel.trim();
     if (booking.towingMode === 'emergency') return 'Emergency Towing';
     if (booking.towingMode === 'scheduled') return 'Scheduled Towing';
     if (booking.towingMode === 'instant') return 'Instant Towing';
@@ -466,6 +468,14 @@ export async function listOpenBookingOffers(options?: {
       : Promise.resolve([]),
   ]);
 
+  const towingModeRank = (mode?: string) =>
+    mode === 'emergency' ? 0 : mode === 'instant' ? 1 : 2;
+  towing.sort((a, b) => {
+    const byMode = towingModeRank(a.towingMode) - towingModeRank(b.towingMode);
+    if (byMode !== 0) return byMode;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+
   const offers: OpenBookingOffer[] = [];
 
   const consider = (
@@ -477,6 +487,7 @@ export async function listOpenBookingOffers(options?: {
       status: string;
       driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
       towingMode?: 'instant' | 'scheduled' | 'emergency';
+      assistLabel?: string;
       pickup?: { address?: string; latitude?: number; longitude?: number };
       dropoff?: { address?: string; latitude?: number; longitude?: number } | null;
       estimatedFare?: number;

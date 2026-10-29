@@ -26,6 +26,8 @@ export interface ITowingBooking extends Document {
   bookingNumber: string;
   vehicleId: Types.ObjectId;
   towingMode?: 'instant' | 'scheduled' | 'emergency';
+  /** On-site roadside label (flat tyre, battery, …). Absent for vehicle towing. */
+  assistLabel?: string;
   pickup: ITowingBookingLocation;
   dropoff?: ITowingBookingLocation;
   distanceKm?: number;
@@ -159,6 +161,7 @@ const TowingBookingSchema = new Schema<ITowingBooking>(
       default: 'instant',
       index: true,
     },
+    assistLabel: { type: String, trim: true },
     scheduledAt: { type: Date },
     statusHistory: { type: [StatusHistorySchema], default: [] },
     cancelledAt: { type: Date },

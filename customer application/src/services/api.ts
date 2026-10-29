@@ -139,7 +139,11 @@ export function getApiErrorMessage(error: unknown, fallback = 'Something went wr
       return `Server is slow to wake up (${API_BASE_URL}). Wait a few seconds and try again.`;
     }
     if (error.message === 'Network Error' || !error.response) {
-      return `Network error — cannot reach ${API_BASE_URL}. Check internet and try again.`;
+      const base = API_BASE_URL.toLowerCase();
+      if (base.includes('localhost') || base.includes('127.0.0.1')) {
+        return 'Cannot reach your computer’s API. On a real phone, set EXPO_PUBLIC_API_URL to your PC’s LAN IP (not localhost) and restart Metro.';
+      }
+      return 'Network error — check your connection and try again.';
     }
     if (error.response?.status === 429) {
       return 'OTP limit reached. Try again in 1 hour.';

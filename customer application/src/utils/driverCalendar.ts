@@ -48,6 +48,24 @@ export function parseStoredDate(value: string): string {
     return value;
   }
 
+  if (value === 'today') {
+    return toISODate(startOfDay(new Date()));
+  }
+
+  const legacyOffsets: Record<string, number> = {
+    tue: 1,
+    wed: 2,
+    thu: 3,
+    fri: 4,
+    sat: 5,
+    sun: 6,
+  };
+  if (legacyOffsets[value] != null) {
+    const date = startOfDay(new Date());
+    date.setDate(date.getDate() + legacyOffsets[value]!);
+    return toISODate(date);
+  }
+
   if (value === '12') {
     return '2025-05-12';
   }
@@ -155,6 +173,13 @@ export interface UpcomingDateChip {
 
 /** Bookable days ahead in part-time driver schedule (≈2 months). */
 export const DRIVER_BOOKING_DATE_STRIP_DAYS = 60;
+
+/** Compact strip for scheduled towing (one week ahead). */
+export const TOWING_SCHEDULE_DATE_STRIP_DAYS = 7;
+
+export function buildTowingScheduleDateStrip(): UpcomingDateChip[] {
+  return buildUpcomingDateStrip(TOWING_SCHEDULE_DATE_STRIP_DAYS);
+}
 
 /** Compact strip of upcoming bookable days (horizontal scroll). */
 export function buildUpcomingDateStrip(count = DRIVER_BOOKING_DATE_STRIP_DAYS): UpcomingDateChip[] {

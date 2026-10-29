@@ -4,7 +4,7 @@ import type { RoadsideServiceId } from '../types/roadsideBooking';
 export const ROADSIDE_ACCENT = '#F4A115';
 export const ROADSIDE_ACCENT_LIGHT = '#FFF4E5';
 
-export const ROADSIDE_BOOKING_STEP_LABELS = ['Your location', 'Review'] as const;
+export const ROADSIDE_BOOKING_STEP_LABELS = ['Where to help', 'Confirm'] as const;
 
 export const ROADSIDE_SERVICES: Array<{
   id: RoadsideServiceId;

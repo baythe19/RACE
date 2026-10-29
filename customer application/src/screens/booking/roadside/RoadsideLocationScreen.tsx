@@ -29,7 +29,7 @@ import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideLocation'>;
 
-const PLACEHOLDER = 'Enter pickup location';
+const PLACEHOLDER = 'Search where you need help';
 
 export default function RoadsideLocationScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
@@ -121,7 +121,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
 
   return (
     <TowingBookingLayout
-      title="Your location"
+      title="Where you need help"
       step={1}
       stepLabels={ROADSIDE_BOOKING_STEP_LABELS}
       accentColor={ROADSIDE_ACCENT}
@@ -130,7 +130,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
       continueDisabled={!hasLocation}
       onContinue={() => {
         if (!hasLocation) {
-          Alert.alert('Location required', 'Pick your location before continuing.');
+          Alert.alert('Location required', 'Choose where you need help before continuing.');
           return;
         }
         updateBooking({
@@ -156,9 +156,14 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
           {getRoadsideServiceLabel(serviceId)}
         </Text>
 
-        <FormSectionLabel title="Your spot" hint="Pick location" t={t} />
+        <FormSectionLabel
+          title="Help location"
+          hint="Where should we send the professional?"
+          t={t}
+        />
 
         <SinglePickupLocationCard
+          label="You are here"
           value={displayValue}
           placeholder={PLACEHOLDER}
           onPress={() => {
@@ -217,7 +222,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Choose on map"
+            accessibilityLabel="Pick location on map"
             onPress={() => {
               setPickerMode('map');
               setShowPicker(true);
@@ -240,16 +245,21 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
                 fontWeight: typography.weights.semibold,
                 color: colors.dark,
               }}>
-              Choose on map
+              Pick on map
             </Text>
           </Pressable>
         </View>
 
-        <FormSectionLabel title="Landmark" hint="Optional note" t={t} topGap={6} />
+        <FormSectionLabel
+          title="Landmark (optional)"
+          hint="Gate, shop, or landmark so we find you faster"
+          t={t}
+          topGap={8}
+        />
         <TextInput
           value={landmark}
           onChangeText={setLandmark}
-          placeholder="Near mall, signal…"
+          placeholder="e.g. Near KIIT main gate, petrol pump…"
           placeholderTextColor={colors.grey}
           style={{
             borderRadius: t.inputRadius,
@@ -273,8 +283,8 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
           applyLocation(selected);
           setShowPicker(false);
         }}
-        title="Your location"
-        confirmLabel="Use this location"
+        title="Help location"
+        confirmLabel="Use this spot"
         accentColor={ROADSIDE_ACCENT}
         initialMode={pickerMode}
         initialLocation={

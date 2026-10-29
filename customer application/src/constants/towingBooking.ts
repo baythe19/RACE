@@ -8,6 +8,7 @@ import type {
   TowingVehicleTypeId,
 } from '../types/towingBooking';
 import { formatLocationDisplay } from '../utils/readableAddress';
+import { getDateReviewLabel, parseStoredDate } from '../utils/driverCalendar';
 
 /** Canonical 4-phase booking flow. Steps 1–3 are wizard screens; step 4 is the confirmation screen. */
 export const TOWING_BOOKING_STEPS = 4;
@@ -137,7 +138,7 @@ export function getTowingTypeLabel(id: TowingTypeId): string {
 }
 
 export function getDateLabel(dateId: string): string {
-  return TOWING_DATE_OPTIONS.find(d => d.id === dateId)?.day ?? 'Today';
+  return getDateReviewLabel(parseStoredDate(dateId));
 }
 
 export function getTimeLabel(timeId: TowingTimeId): string {

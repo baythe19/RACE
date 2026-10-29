@@ -27,6 +27,32 @@ export const createTowingBookingSchema = z
         path: ['scheduledAt'],
       });
     }
+
+    const mode = data.towingMode ?? (data.scheduledAt ? 'scheduled' : 'instant');
+
+    if (mode === 'scheduled' && !data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'scheduledAt is required for scheduled towing',
+        path: ['scheduledAt'],
+      });
+    }
+
+    if (mode === 'emergency' && data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Emergency towing cannot include a future schedule',
+        path: ['scheduledAt'],
+      });
+    }
+
+    if (mode === 'instant' && data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Instant towing cannot include scheduledAt',
+        path: ['scheduledAt'],
+      });
+    }
   });
 
 export const updateTowingBookingStatusSchema = z.object({

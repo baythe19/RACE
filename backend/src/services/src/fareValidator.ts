@@ -5,7 +5,8 @@ export const towingFareQuerySchema = z.object({
   pickup_lng: z.coerce.number(),
   dropoff_lat: z.coerce.number(),
   dropoff_lng: z.coerce.number(),
-  scheduledAt: z.string().datetime().optional(),
+  scheduledAt: z.string().datetime({ offset: true }).optional(),
+  towingMode: z.enum(['instant', 'scheduled', 'emergency']).optional(),
 });
 
 export const driverFareQuerySchema = z.object({

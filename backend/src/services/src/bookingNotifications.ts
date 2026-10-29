@@ -1,5 +1,7 @@
 import { createNotification } from './admin/notificationService';
 import { notificationService } from './notification';
+import { UserModel } from '../../models/src/user';
+import { emitVendorOffersUpdated } from './socket';
 import type { UnifiedBookingStatus } from './bookingStatusConstants';
 
 type ServiceBookingKind = 'towing' | 'driver';
@@ -192,5 +194,46 @@ export async function notifyDriverJobOffer(params: {
       },
     },
     { audience: 'driver', category: 'booking' },
+  );
+}
+
+/** Confirmed towing / on-site roadside jobs land in the vendor (partner) inbox. */
+export async function notifyVendorsOpenTowingJob(params: {
+  bookingNumber: string;
+  bookingId: string;
+  serviceLabel: string;
+  pickupAddress?: string;
+}): Promise<void> {
+  emitVendorOffersUpdated();
+
+  const vendors = await UserModel.find({
+    $or: [{ role: 'vendor' }, { capabilities: 'vendor' }],
+    accountStatus: { $nin: ['SUSPENDED', 'INACTIVE'] },
+  })
+    .select('_id')
+    .limit(40)
+    .lean()
+    .exec();
+
+  const where = params.pickupAddress?.trim() ? ` · ${params.pickupAddress.trim()}` : '';
+  await Promise.all(
+    vendors.map(vendor =>
+      notificationService
+        .createForUser(
+          vendor._id.toString(),
+          {
+            type: 'BOOKING_CONFIRMED',
+            title: 'New job',
+            message: `${params.serviceLabel} ${params.bookingNumber}${where}. Open Jobs to accept.`,
+            metadata: {
+              bookingId: params.bookingId,
+              bookingType: 'towing',
+              bookingNumber: params.bookingNumber,
+            },
+          },
+          { audience: 'vendor', category: 'booking' },
+        )
+        .catch(() => undefined),
+    ),
   );
 }

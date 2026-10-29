@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, Info } from 'lucide-react-native';
 
 import { typography } from '../../theme';
 
@@ -10,10 +10,12 @@ type Props = {
   title: string;
   onBack: () => void;
   subtitle?: string;
+  /** Top-right info — e.g. how this service books end-to-end. */
+  onInfoPress?: () => void;
 };
 
 /** Shared top bar for Services and each service detail screen. */
-export default function ServiceNavHeader({ title, onBack, subtitle }: Props) {
+export default function ServiceNavHeader({ title, onBack, subtitle, onInfoPress }: Props) {
   const { width } = useWindowDimensions();
   const px = (n: number) => Math.round(n * (width / REF_W));
 
@@ -48,7 +50,7 @@ export default function ServiceNavHeader({ title, onBack, subtitle }: Props) {
           style={{
             flex: 1,
             alignItems: 'center',
-            paddingRight: px(36),
+            paddingHorizontal: px(4),
           }}>
           <Text
             numberOfLines={1}
@@ -75,6 +77,23 @@ export default function ServiceNavHeader({ title, onBack, subtitle }: Props) {
             </Text>
           ) : null}
         </View>
+        {onInfoPress ? (
+          <Pressable
+            onPress={onInfoPress}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Service information"
+            style={{
+              width: px(36),
+              height: px(36),
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Info size={px(16)} color="#9CA3AF" strokeWidth={2} />
+          </Pressable>
+        ) : (
+          <View style={{ width: px(36) }} />
+        )}
       </View>
     </View>
   );

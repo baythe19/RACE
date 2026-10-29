@@ -19,7 +19,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceOptionInfoIcon, {
+  showServiceHeaderInfo,
+} from '../components/services/ServiceOptionInfoIcon';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import {
+  ROADSIDE_SERVICE_HEADER_INFO,
+  ROADSIDE_TIER_INFO,
+} from '../constants/serviceLandingInfo';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import { useCatalogStore } from '../store/catalogStore';
 import { useRoadsideAvailabilityQuery } from '../services/bookings/useServiceBookingMutations';
@@ -111,7 +118,13 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="Roadside Assistance" onBack={() => goBackWithinStack(navigation)} />
+      <ServiceNavHeader
+        title="Roadside Assistance"
+        onBack={() => goBackWithinStack(navigation)}
+        onInfoPress={() =>
+          showServiceHeaderInfo('How roadside works', ROADSIDE_SERVICE_HEADER_INFO)
+        }
+      />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}
@@ -181,15 +194,23 @@ export default function RoadsideAssistanceScreen({ navigation }: Props) {
                 <opt.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: px(14),
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {opt.title}
-                </Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text
+                    style={{
+                      flexShrink: 1,
+                      fontSize: px(14),
+                      lineHeight: px(18),
+                      fontWeight: typography.weights.bold,
+                      color: colors.dark,
+                    }}>
+                    {opt.title}
+                  </Text>
+                  <ServiceOptionInfoIcon
+                    alertTitle={opt.title}
+                    alertBody={ROADSIDE_TIER_INFO[opt.id]}
+                  />
+                </View>
                 <Text
                   style={{
                     fontSize: px(12),

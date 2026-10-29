@@ -8,7 +8,6 @@ import WizardStepFade from '../../../components/booking/WizardStepFade';
 import { DriverFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import {
   DRIVER_ACCENT,
-  DRIVER_BOOKING_STEP_LABELS,
   DRIVER_LIGHT_BG,
   getDateReviewLabel,
   getDriverTypeLabel,
@@ -21,6 +20,7 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { formatRupee } from '../../../utils/driverPricing';
 import { parseStoredDate } from '../../../utils/driverCalendar';
 import { buildDriverBookingRequest } from '../../../utils/serviceBookingPayload';
+import { getDriverServiceFlow } from '../../../utils/driverServiceFlow';
 import type { DriverFareBreakdown } from '../../../types/fare';
 import { colors, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
@@ -46,6 +46,7 @@ const PAYMENT_METHODS: Array<{
 export default function DriverBookingPaymentScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, resetBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
   const { vehicles, fetchVehicles } = useVehicleStore();
   const { confirmDriver, isConfirming } = useServiceBookingPayment();
   const [summaryExpanded, setSummaryExpanded] = useState(true);
@@ -120,7 +121,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
       <TowingBookingLayout
         title="Booking confirmed"
         step={4}
-        stepLabels={DRIVER_BOOKING_STEP_LABELS}
+        stepLabels={flow.wizardStepLabels}
         accentColor={DRIVER_ACCENT}
         hideFooter
         showStep={false}>
@@ -173,7 +174,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
     <TowingBookingLayout
       title="Pay advance"
       step={4}
-      stepLabels={DRIVER_BOOKING_STEP_LABELS}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
       scrollable
       onBack={() => goBackWithinStack(navigation)}

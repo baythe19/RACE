@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react
 import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import { towingServiceTimingLabel } from '../../../components/booking/TowingServiceModeBanner';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import { TowingFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import {
@@ -20,7 +21,7 @@ import { estimateTowingFare } from '../../../services/bookings/fareApi';
 import { buildTowingBookingRequest } from '../../../utils/serviceBookingPayload';
 import type { TowingFareBreakdown } from '../../../types/fare';
 import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
-import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
+import { towingFareModeParams } from '../../../utils/towingFareEstimate';
 import { getApiErrorMessage } from '../../../services/api';
 import { colors, shadows, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
@@ -71,16 +72,14 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     async function loadFare() {
       setIsLoadingFare(true);
       try {
-        const scheduledAt =
-          booking.serviceMode === 'scheduled'
-            ? towingDateIdToScheduledAt(booking.dateId)
-            : undefined;
+        const { towingMode, scheduledAt } = towingFareModeParams(booking);
         const estimate = await estimateTowingFare({
           pickup_lat: pickupLat,
           pickup_lng: pickupLng,
           dropoff_lat: dropLat,
           dropoff_lng: dropLng,
           scheduledAt,
+          towingMode,
         });
         if (!cancelled) {
           setFareBreakdown(estimate.fareBreakdown);
@@ -132,10 +131,14 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     { label: 'Vehicle', value: booking.vehicleLabel || getVehicleLabel(booking.vehicleType) },
     { label: 'Pickup', value: getShortLocation(booking.pickup, booking.pickupLabel) },
     { label: 'Drop', value: getShortLocation(booking.drop, booking.dropLabel) },
-    { label: 'Towing Type', value: getTowingTypeLabel(booking.towingType) },
+    { label: 'Tow truck', value: getTowingTypeLabel(booking.towingType) },
     {
       label: 'Date & Time',
-      value: `${getDateLabel(booking.dateId)}, ${getTimeLabel(booking.timeId)}`,
+      value: towingServiceTimingLabel(
+        booking.serviceMode,
+        getDateLabel(booking.dateId),
+        getTimeLabel(booking.timeId),
+      ),
     },
     { label: 'Est. Total', value: `₹${totalMin}` },
   ];

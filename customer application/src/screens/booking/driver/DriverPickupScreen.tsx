@@ -9,10 +9,10 @@ import TowingBookingLayout, { useBookingTheme } from '../../../components/bookin
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
-  DRIVER_BOOKING_STEP_LABELS,
   DRIVER_LIGHT_BG,
 } from '../../../constants/driverBooking';
 import { useDriverBooking } from '../../../context/DriverBookingContext';
+import { getDriverServiceFlow } from '../../../utils/driverServiceFlow';
 import { useBookingsQuery } from '../../../services/bookings/useBookingQueries';
 import { useSavedLocationsQuery } from '../../../services/profile/useProfileQueries';
 import { useLocationStore } from '../../../store/locationStore';
@@ -27,6 +27,9 @@ import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverPickup'>;
 
 const PLACEHOLDER = 'Search or pick on map';
+const DROP_PLACEHOLDER = 'Destination on map';
+
+type PickerTarget = 'pickup' | 'dropoff' | null;
 
 const LOCATION_ICONS = {
   home: Home,
@@ -36,12 +39,18 @@ const LOCATION_ICONS = {
 export default function DriverPickupScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
   const selectedLocation = useLocationStore(state => state.selectedLocation);
   const [pickup, setPickup] = useState(booking.pickup || PLACEHOLDER);
   const [pickupLabel, setPickupLabel] = useState(booking.pickupLabel ?? '');
   const [pickupLat, setPickupLat] = useState(booking.pickupLat);
   const [pickupLng, setPickupLng] = useState(booking.pickupLng);
-  const [showPicker, setShowPicker] = useState(false);
+  const [dropoff, setDropoff] = useState(booking.dropoff || DROP_PLACEHOLDER);
+  const [dropoffLabel, setDropoffLabel] = useState(booking.dropoffLabel ?? '');
+  const [dropoffLat, setDropoffLat] = useState(booking.dropoffLat);
+  const [dropoffLng, setDropoffLng] = useState(booking.dropoffLng);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
+  const showPicker = pickerTarget !== null;
   const { data: savedLocations = [] } = useSavedLocationsQuery();
   const { data: bookings = [] } = useBookingsQuery();
 
@@ -102,23 +111,46 @@ export default function DriverPickupScreen({ navigation }: Props) {
     });
   };
 
+  const applyDropoff = (address: string, latitude: number, longitude: number, label?: string) => {
+    if (!assertServiceableBookingLocation(latitude, longitude)) return;
+    const displayLabel = label || formatLocationDisplay(address);
+    setDropoff(address);
+    setDropoffLabel(displayLabel);
+    setDropoffLat(latitude);
+    setDropoffLng(longitude);
+    updateBooking({
+      dropoff: address,
+      dropoffLabel: displayLabel,
+      dropoffLat: latitude,
+      dropoffLng: longitude,
+    });
+  };
+
   const hasPickup =
     pickup.trim().length > 0 &&
     pickup !== PLACEHOLDER &&
     pickupLat != null &&
     pickupLng != null;
 
+  const hasDropoff =
+    dropoff.trim().length > 0 &&
+    dropoff !== DROP_PLACEHOLDER &&
+    dropoffLat != null &&
+    dropoffLng != null;
+
+  const canContinue = hasPickup && (!flow.requiresDropoff || hasDropoff);
+
   const chipRadius = t.px(12);
 
   return (
     <TowingBookingLayout
-      title="Pickup location"
+      title={flow.pickupTitle}
       step={2}
-      stepLabels={DRIVER_BOOKING_STEP_LABELS}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
       scrollable={recentPickups.length > 2}
       onBack={() => goBackWithinStack(navigation)}
-      continueDisabled={!hasPickup}
+      continueDisabled={!canContinue}
       buttonLabel="Continue"
       onContinue={() => {
         updateBooking({
@@ -126,14 +158,31 @@ export default function DriverPickupScreen({ navigation }: Props) {
           pickupLabel: pickupLabel || formatLocationDisplay(pickup),
           pickupLat,
           pickupLng,
+          ...(flow.requiresDropoff
+            ? {
+                dropoff,
+                dropoffLabel: dropoffLabel || formatLocationDisplay(dropoff),
+                dropoffLat,
+                dropoffLng,
+              }
+            : {}),
         });
         navigation.navigate('DriverChooseVehicleType');
       }}>
       <WizardStepFade>
       <View style={{ gap: t.px(10) }}>
+        <Text
+          style={{
+            fontSize: t.caption,
+            fontWeight: typography.weights.semibold,
+            color: colors.grey,
+            marginBottom: t.px(2),
+          }}>
+          {flow.pickupFieldLabel}
+        </Text>
         <View>
           <Pressable
-            onPress={() => setShowPicker(true)}
+            onPress={() => setPickerTarget('pickup')}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -171,7 +220,7 @@ export default function DriverPickupScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        <Pressable onPress={() => setShowPicker(true)}>
+        <Pressable onPress={() => setPickerTarget('pickup')}>
           <View
             style={{
               height: t.px(96),
@@ -223,6 +272,57 @@ export default function DriverPickupScreen({ navigation }: Props) {
           </View>
         </Pressable>
 
+        {flow.requiresDropoff ? (
+          <>
+            <Text
+              style={{
+                fontSize: t.caption,
+                fontWeight: typography.weights.semibold,
+                color: colors.grey,
+                marginTop: t.px(4),
+              }}>
+              {flow.dropFieldLabel}
+            </Text>
+            <Pressable
+              onPress={() => setPickerTarget('dropoff')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: t.px(10),
+                borderRadius: chipRadius,
+                borderWidth: 1,
+                borderColor: hasDropoff ? DRIVER_ACCENT : colors.border,
+                backgroundColor: colors.background,
+                paddingHorizontal: t.px(12),
+                paddingVertical: t.px(8),
+              }}>
+              <View
+                style={{
+                  width: t.px(28),
+                  height: t.px(28),
+                  borderRadius: t.px(8),
+                  backgroundColor: DRIVER_LIGHT_BG,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                <MapPin size={t.px(15)} color="#DC2626" strokeWidth={2.4} />
+              </View>
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: t.bodyLarge,
+                  fontWeight: hasDropoff ? typography.weights.semibold : typography.weights.regular,
+                  color: hasDropoff ? colors.dark : colors.grey,
+                  lineHeight: t.px(22),
+                }}
+                numberOfLines={2}>
+                {hasDropoff ? dropoffLabel || formatLocationDisplay(dropoff) : DROP_PLACEHOLDER}
+              </Text>
+              <ChevronRight size={t.iconSm} color={colors.grey} />
+            </Pressable>
+          </>
+        ) : null}
+
         {savedLocations.length > 0 ? (
           <View>
           <Text
@@ -249,7 +349,7 @@ export default function DriverPickupScreen({ navigation }: Props) {
                   key={location.id}
                   onPress={() => {
                     if (location.latitude == null || location.longitude == null) {
-                      setShowPicker(true);
+                      setPickerTarget('pickup');
                       return;
                     }
                     applyPickup(
@@ -347,23 +447,37 @@ export default function DriverPickupScreen({ navigation }: Props) {
 
       <LocationPickerModal
         visible={showPicker}
-        title="Confirm pickup spot"
-        confirmLabel="Confirm pickup"
+        title={pickerTarget === 'dropoff' ? 'Confirm destination' : 'Confirm pickup spot'}
+        confirmLabel={pickerTarget === 'dropoff' ? 'Confirm destination' : 'Confirm pickup'}
         accentColor={DRIVER_ACCENT}
         initialLocation={
-          pickupLat && pickupLng
-            ? { latitude: pickupLat, longitude: pickupLng, address: pickup }
-            : undefined
+          pickerTarget === 'dropoff'
+            ? dropoffLat && dropoffLng
+              ? { latitude: dropoffLat, longitude: dropoffLng, address: dropoff }
+              : undefined
+            : pickupLat && pickupLng
+              ? { latitude: pickupLat, longitude: pickupLng, address: pickup }
+              : undefined
         }
-        onClose={() => setShowPicker(false)}
+        onClose={() => setPickerTarget(null)}
         onLocationSelected={location => {
           const resolved = resolveLocationSelection(location);
-          applyPickup(
-            resolved.address,
-            location.latitude,
-            location.longitude,
-            resolved.displayLabel,
-          );
+          if (pickerTarget === 'dropoff') {
+            applyDropoff(
+              resolved.address,
+              location.latitude,
+              location.longitude,
+              resolved.displayLabel,
+            );
+          } else {
+            applyPickup(
+              resolved.address,
+              location.latitude,
+              location.longitude,
+              resolved.displayLabel,
+            );
+          }
+          setPickerTarget(null);
         }}
       />
     </TowingBookingLayout>

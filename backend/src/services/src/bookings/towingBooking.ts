@@ -10,6 +10,7 @@ import {
   calculateRoadsideFlatFare,
   createInitialStatusHistory,
   generatePrefixedBookingNumber,
+  type TowingPricingMode,
 } from './booking';
 import { assertActorMayTransition, canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
 import { towingBookingRepository } from '../towingBookingRepository';
@@ -35,6 +36,7 @@ import {
   notifyAdminCustomerBookingCreated,
   notifyCustomerBookingCreated,
   notifyCustomerBookingCancelled,
+  notifyVendorsOpenTowingJob,
 } from '../bookingNotifications';
 
 function mapTowingBooking(
@@ -97,6 +99,19 @@ async function mapTowingBookingWithDriver(booking: ITowingBooking): Promise<Towi
   return mapTowingBooking(booking, driver);
 }
 
+function resolveTowingMode(
+  dto: CreateTowingBookingDto,
+  scheduledAt?: Date,
+): TowingPricingMode {
+  if (dto.towingMode === 'emergency' || dto.towingMode === 'scheduled' || dto.towingMode === 'instant') {
+    return dto.towingMode;
+  }
+  if (scheduledAt) {
+    return 'scheduled';
+  }
+  return 'instant';
+}
+
 export class TowingBookingService {
   async createBooking(
     customerId: string,
@@ -110,9 +125,14 @@ export class TowingBookingService {
     ensureBookingServiceable(dto.pickup);
 
     const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : undefined;
+    const towingMode = resolveTowingMode(dto, scheduledAt);
     const matrix = await getDistanceAndDuration(dto.pickup, dto.dropoff);
     const distanceKm = matrix?.distanceKm;
-    const fareResult = calculateTowingFare(matrix?.distanceKm ?? 0, scheduledAt);
+    const fareResult = calculateTowingFare(
+      matrix?.distanceKm ?? 0,
+      scheduledAt,
+      towingMode,
+    );
     const { fare, breakdown } = fareResult;
     const bookingNumber = await generatePrefixedBookingNumber('TOW', () =>
       towingBookingRepository.countAll(),
@@ -124,7 +144,7 @@ export class TowingBookingService {
       vehicleId: vehicle.id as unknown as ITowingBooking['vehicleId'],
       pickup: dto.pickup,
       dropoff: dto.dropoff,
-      towingMode: dto.towingMode ?? (scheduledAt ? 'scheduled' : 'instant'),
+      towingMode,
       distanceKm,
       estimatedFare: fare,
       fareBreakdown: breakdown,
@@ -186,6 +206,7 @@ export class TowingBookingService {
       pickup: onSiteLocation,
       dropoff: onSiteLocation,
       towingMode: 'instant',
+      assistLabel: input.serviceLabel,
       distanceKm: 0,
       estimatedFare: fare,
       fareBreakdown: breakdown,
@@ -529,6 +550,15 @@ export class TowingBookingService {
         note: entry.note,
       })),
     });
+
+    if (update.status === 'CONFIRMED' && booking.status !== 'CONFIRMED') {
+      void notifyVendorsOpenTowingJob({
+        bookingNumber: updated.bookingNumber,
+        bookingId: updated.id,
+        serviceLabel: updated.assistLabel?.trim() || 'Towing',
+        pickupAddress: updated.pickup?.address,
+      }).catch(() => undefined);
+    }
 
     return mapTowingBookingWithDriver(updated);
   }

@@ -5,16 +5,16 @@ import {
   Car,
   MapPin,
   Navigation,
-  Siren,
   Truck,
   Wrench,
-  Zap,
-  type LucideIcon,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { TowingFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import TowingServiceModeBanner, {
+  towingServiceTimingLabel,
+} from '../../../components/booking/TowingServiceModeBanner';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   getDateLabel,
@@ -28,7 +28,7 @@ import { estimateTowingFare } from '../../../services/bookings/fareApi';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { TowingFareBreakdown } from '../../../types/fare';
 import { BHUBANESWAR_DEFAULT } from '../../../utils/googleMaps';
-import { towingDateIdToScheduledAt } from '../../../utils/bookingLocation';
+import { towingFareModeParams } from '../../../utils/towingFareEstimate';
 import {
   getTowingWalkthroughFare,
   isTowingWalkthroughEnabled,
@@ -39,12 +39,6 @@ import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingReview'>;
 
 const TOWING_ACCENT = '#F59E0B';
-
-const MODE_BADGES: Record<string, { label: string; Icon: LucideIcon }> = {
-  instant: { label: 'Instant', Icon: Zap },
-  scheduled: { label: 'Scheduled', Icon: CalendarClock },
-  emergency: { label: 'Emergency', Icon: Siren },
-};
 
 function SummaryRow({
   Icon,
@@ -113,16 +107,14 @@ export default function TowingReviewScreen({ navigation }: Props) {
     async function loadFare() {
       setIsLoadingFare(true);
       try {
-        const scheduledAt =
-          booking.serviceMode === 'scheduled'
-            ? towingDateIdToScheduledAt(booking.dateId)
-            : undefined;
+        const { towingMode, scheduledAt } = towingFareModeParams(booking);
         const estimate = await estimateTowingFare({
           pickup_lat: pickupLat,
           pickup_lng: pickupLng,
           dropoff_lat: dropLat,
           dropoff_lng: dropLng,
           scheduledAt,
+          towingMode,
         });
         if (!cancelled) {
           setFareBreakdown(estimate.fareBreakdown);
@@ -180,7 +172,6 @@ export default function TowingReviewScreen({ navigation }: Props) {
   };
 
   const totalPrice = fareBreakdown?.totalFare ?? booking.totalPrice;
-  const modeBadge = MODE_BADGES[booking.serviceMode] ?? MODE_BADGES.instant;
 
   return (
     <TowingBookingLayout
@@ -193,33 +184,8 @@ export default function TowingReviewScreen({ navigation }: Props) {
       onContinue={handleContinue}
       continueDisabled={isLoadingFare || !fareBreakdown}>
       <WizardStepFade>
+      <TowingServiceModeBanner mode={booking.serviceMode} t={t} />
       <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>
-        {/* Service mode badge */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(8) }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: t.px(5),
-              paddingHorizontal: t.px(10),
-              paddingVertical: t.px(5),
-              borderRadius: t.px(999),
-              backgroundColor: colors.goldLight,
-              borderWidth: 1,
-              borderColor: TOWING_ACCENT,
-            }}>
-            <modeBadge.Icon size={t.px(13)} color={TOWING_ACCENT} strokeWidth={2.4} />
-            <Text
-              style={{
-                fontSize: t.caption,
-                fontWeight: typography.weights.bold,
-                color: TOWING_ACCENT,
-              }}>
-              {modeBadge.label} towing
-            </Text>
-          </View>
-        </View>
-
         {/* Booking summary */}
         <View
           style={[
@@ -254,7 +220,7 @@ export default function TowingReviewScreen({ navigation }: Props) {
           />
           <SummaryRow
             Icon={Truck}
-            label="Towing Type"
+            label="Tow truck"
             value={getTowingTypeLabel(booking.towingType)}
             t={t}
           />
@@ -281,9 +247,11 @@ export default function TowingReviewScreen({ navigation }: Props) {
                     fontWeight: typography.weights.semibold,
                     color: colors.dark,
                   }}>
-                  {booking.serviceMode === 'instant'
-                    ? 'Now · dispatched immediately'
-                    : `${getDateLabel(booking.dateId)}, ${getTimeLabel(booking.timeId)}`}
+                  {towingServiceTimingLabel(
+                    booking.serviceMode,
+                    getDateLabel(booking.dateId),
+                    getTimeLabel(booking.timeId),
+                  )}
                 </Text>
               </View>
             </View>

@@ -8,7 +8,6 @@ import TowingBookingLayout, { useBookingTheme } from '../../../components/bookin
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
-  DRIVER_BOOKING_STEP_LABELS,
   DRIVER_LIGHT_BG,
   DRIVER_PACKAGES,
   getDateReviewLabel,
@@ -23,6 +22,7 @@ import type { DriverDurationId } from '../../../types/driverBooking';
 import type { DriverFareBreakdown, DriverPackageHours } from '../../../types/fare';
 import { calculateDriverPricing, formatRupee } from '../../../utils/driverPricing';
 import { parseStoredDate } from '../../../utils/driverCalendar';
+import { getDriverServiceFlow } from '../../../utils/driverServiceFlow';
 import { colors, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
@@ -87,6 +87,7 @@ function SummaryRow({
 export default function DriverReviewScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
   const [fareBreakdown, setFareBreakdown] = useState<DriverFareBreakdown | null>(
     booking.fareBreakdown ?? null,
   );
@@ -176,7 +177,7 @@ export default function DriverReviewScreen({ navigation }: Props) {
     <TowingBookingLayout
       title="Review booking"
       step={4}
-      stepLabels={DRIVER_BOOKING_STEP_LABELS}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
       scrollable
       onBack={() => goBackWithinStack(navigation)}
@@ -229,23 +230,32 @@ export default function DriverReviewScreen({ navigation }: Props) {
           />
           <SummaryRow
             Icon={Clock}
-            label="Duration"
+            label={flow.reviewDurationLabel}
             value={getDurationReviewLabel(booking.durationId, packageHours)}
             t={t}
           />
           <SummaryRow
             Icon={AlarmClock}
-            label="Start time"
+            label={booking.driverType === 'outstation' ? 'Departure' : 'Start time'}
             value={booking.startTime}
             t={t}
           />
           <SummaryRow
             Icon={MapPin}
-            label="Pickup"
+            label={booking.driverType === 'outstation' ? 'Pickup' : 'Pickup'}
             value={getShortLocation(booking.pickup, booking.pickupLabel)}
             t={t}
-            isLast
+            isLast={!flow.requiresDropoff || !booking.dropoff.trim()}
           />
+          {flow.requiresDropoff && booking.dropoff.trim() ? (
+            <SummaryRow
+              Icon={MapPin}
+              label="Destination"
+              value={getShortLocation(booking.dropoff, booking.dropoffLabel)}
+              t={t}
+              isLast
+            />
+          ) : null}
         </View>
 
         {isLoadingFare ? (

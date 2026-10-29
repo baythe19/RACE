@@ -5,9 +5,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import TowingServiceModeBanner from '../../../components/booking/TowingServiceModeBanner';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import { useTowingBooking } from '../../../context/TowingBookingContext';
 import { estimateTowingFare } from '../../../services/bookings/fareApi';
+import { towingFareModeParams } from '../../../utils/towingFareEstimate';
 import { useSavedLocationsQuery } from '../../../services/profile/useProfileQueries';
 import { useLocationStore } from '../../../store/locationStore';
 import { useUserLocationStore } from '../../../store/userLocationStore';
@@ -328,11 +330,14 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
 
       setIsLoadingFare(true);
       try {
+        const { towingMode, scheduledAt } = towingFareModeParams(booking);
         const estimate = await estimateTowingFare({
           pickup_lat: pickupLat,
           pickup_lng: pickupLng,
           dropoff_lat: dropLat,
           dropoff_lng: dropLng,
+          scheduledAt,
+          towingMode,
         });
         if (!cancelled) {
           setDistanceKm(estimate.fareBreakdown.distanceKm);
@@ -354,7 +359,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [dropLat, dropLng, pickupLat, pickupLng]);
+  }, [booking.dateId, booking.serviceMode, booking.timeId, dropLat, dropLng, pickupLat, pickupLng]);
 
   return (
     <TowingBookingLayout
@@ -378,6 +383,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         navigation.navigate('TowingReview');
       }}>
       <WizardStepFade>
+      <TowingServiceModeBanner mode={booking.serviceMode} t={t} />
       <LocationSearchCard
         pickupValue={pickup !== PLACEHOLDER ? pickupLabel || formatReadableLocation(pickup) : pickup}
         dropValue={drop !== PLACEHOLDER ? dropLabel || formatReadableLocation(drop) : drop}

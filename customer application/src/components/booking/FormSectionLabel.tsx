@@ -17,19 +17,19 @@ export default function FormSectionLabel({ title, hint, t, topGap = 0 }: Props) 
     <View style={{ marginTop: t.px(topGap), marginBottom: t.px(6) }}>
       <Text
         style={{
-          fontSize: t.px(12),
-          fontWeight: typography.weights.bold,
+          fontSize: t.px(13),
+          fontWeight: typography.weights.extrabold,
           color: colors.dark,
-          lineHeight: t.px(15),
+          lineHeight: t.px(17),
         }}>
         {title}
       </Text>
       <Text
         style={{
-          fontSize: t.px(11),
+          fontSize: t.px(12),
           color: colors.grey,
-          marginTop: t.px(1),
-          lineHeight: t.px(14),
+          marginTop: t.px(3),
+          lineHeight: t.px(16),
         }}>
         {hint}
       </Text>

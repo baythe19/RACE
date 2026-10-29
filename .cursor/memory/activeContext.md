@@ -1,6 +1,9 @@
 ## Current focus
 
-**2026-10-29 (local hire offers):** Offer feed maps legacy Driver Service through selfDriverCategory. QA part-time is Part-Time, independent full-time is Full-Time. Local ensure refreshed the vendor fleet. Local request check 18/18. Test bookings cancelled. Drivers left offline.
+**2026-10-29 (driver service per-type UX):** `utils/driverServiceFlow.ts` — differentiated wizard (step labels, schedule/duration/pickup copy); part-time hourly chips; full-time 8h “Full day”; outstation pickup+destination + trip length; night Evening/Night only default 21:00. Landing tier ℹ + header ℹ. `driverDateIdToScheduledAt(dateId, startTime)`. Customer `tsc` 0.
+
+**2026-10-29 (towing tiers aligned):** Instant / scheduled / emergency — customer `serviceMode` → API `towingMode` (fixed payload bug); fare API + `calculateTowingFare` mode surcharges (emergency +₹200, scheduled −₹100, fallbacks ₹499/₹399/₹699); validator mode↔scheduledAt rules; marketplace offers sort emergency first; UI banners + fare breakdown lines. Backend + customer `tsc` 0. Schema `towingMode` enum already correct on `TowingBooking` model.
+ Offer feed maps legacy Driver Service through selfDriverCategory. QA part-time is Part-Time, independent full-time is Full-Time. Local ensure refreshed the vendor fleet. Local request check 18/18. Test bookings cancelled. Drivers left offline.
 
 **2026-10-29 (customer static catalog cache):** `catalogStore` persisted (`race-catalog` AsyncStorage): services + brand + ready flags + fetchedAt. Repeat tab visits skip fetch/skeleton; background refresh only if cache >24h. Bookings query keeps previous list (`placeholderData`) + 30m gcTime; skeleton only when no cached rows. Customer `tsc` 0.
 

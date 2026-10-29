@@ -121,20 +121,34 @@ export default function SavedLocationsScreen() {
     <ProfileSubScreenLayout title="Saved Locations" subtitle="Your frequently used locations">
       {isLoading ? (
         <DataSkeleton variant="list" />
-      ) : isError ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(24), gap: px(10) }}>
-          <Text style={{ fontSize: px(13), color: colors.grey, textAlign: 'center' }}>
-            {getApiErrorMessage(error, 'Unable to load saved locations')}
-          </Text>
-          <Pressable onPress={() => void refetch()}>
-            <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.primary }}>
-              Try again
-            </Text>
-          </Pressable>
-        </View>
       ) : (
         <>
-          {locations.map(location => {
+          {isError ? (
+            <View
+              style={{
+                borderRadius: px(14),
+                borderWidth: 1,
+                borderColor: 'rgba(245,166,35,0.35)',
+                backgroundColor: colors.goldLight,
+                padding: px(14),
+                marginBottom: px(14),
+                gap: px(8),
+              }}>
+              <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.dark }}>
+                Couldn&apos;t sync saved places
+              </Text>
+              <Text style={{ fontSize: px(12), color: colors.grey, lineHeight: px(17) }}>
+                {getApiErrorMessage(error, 'Unable to load saved locations')}
+              </Text>
+              <Pressable onPress={() => void refetch()} style={{ alignSelf: 'flex-start' }}>
+                <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.primary }}>
+                  Try again
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              {locations.map(location => {
             const Icon = ICONS[location.type] ?? MapPin;
             return (
               <View
@@ -197,8 +211,8 @@ export default function SavedLocationsScreen() {
               No saved locations yet
             </Text>
           ) : null}
-        </>
-      )}
+            </>
+          )}
 
       {showForm ? (
         <View

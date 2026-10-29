@@ -18,9 +18,16 @@ export class FareService {
     const pickup = { latitude: query.pickup_lat, longitude: query.pickup_lng };
     const dropoff = { latitude: query.dropoff_lat, longitude: query.dropoff_lng };
     const scheduledAt = query.scheduledAt ? new Date(query.scheduledAt) : undefined;
+    const towingMode =
+      query.towingMode ??
+      (scheduledAt ? ('scheduled' as const) : ('instant' as const));
 
     const matrix = await getDistanceAndDuration(pickup, dropoff);
-    const { fare, breakdown } = calculateTowingFare(matrix?.distanceKm ?? 0, scheduledAt);
+    const { fare, breakdown } = calculateTowingFare(
+      matrix?.distanceKm ?? 0,
+      scheduledAt,
+      towingMode,
+    );
 
     return {
       estimatedFare: fare,

@@ -8,11 +8,11 @@ import TowingBookingLayout, { useBookingTheme } from '../../../components/bookin
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
-  DRIVER_BOOKING_STEP_LABELS,
   DRIVER_LIGHT_BG,
   getDriverVehicleTypeLabel,
 } from '../../../constants/driverBooking';
 import { useDriverBooking } from '../../../context/DriverBookingContext';
+import { getDriverServiceFlow } from '../../../utils/driverServiceFlow';
 import { useVehicleStore } from '../../../store/vehicleStore';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { Vehicle } from '../../../types/vehicle';
@@ -95,6 +95,7 @@ function goAddVehicle(navigation: Props['navigation']) {
 export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
   const { vehicles, fetchVehicles } = useVehicleStore();
   const [selectedId, setSelectedId] = useState(booking.vehicleId ?? '');
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -142,7 +143,7 @@ export default function DriverChooseVehicleTypeScreen({ navigation }: Props) {
     <TowingBookingLayout
       title="Your vehicle"
       step={3}
-      stepLabels={DRIVER_BOOKING_STEP_LABELS}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
       scrollable={vehicles.length > 3}
       continueDisabled={!canContinue}

@@ -7,7 +7,6 @@ import TowingBookingLayout, { useBookingTheme } from '../../../components/bookin
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
   DRIVER_ACCENT,
-  DRIVER_BOOKING_STEP_LABELS,
   DRIVER_DURATION_OPTIONS,
   DRIVER_LIGHT_BG,
   DRIVER_PACKAGES,
@@ -18,7 +17,6 @@ import type { DriverDurationId } from '../../../types/driverBooking';
 import type { DriverPackageHours } from '../../../types/fare';
 import { buildUpcomingDateStrip, parseStoredDate } from '../../../utils/driverCalendar';
 import {
-  DAY_PARTS,
   type DayPart,
   dayPartForTime,
   formatTime12,
@@ -28,6 +26,10 @@ import {
   slotsForDayPart,
   toggleHalfHour,
 } from '../../../utils/driverTime';
+import {
+  dayPartsForDriverType,
+  getDriverServiceFlow,
+} from '../../../utils/driverServiceFlow';
 import { colors, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
@@ -57,6 +59,11 @@ function durationToPackageHours(
 export default function DriverDateTimeScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
+  const dayParts = dayPartsForDriverType(booking.driverType);
+  const durationOptions = DRIVER_DURATION_OPTIONS.filter(opt =>
+    flow.durationChipIds.includes(opt.id),
+  );
   const dateScrollRef = useRef<ScrollView>(null);
   const timeScrollRef = useRef<ScrollView>(null);
 
@@ -74,14 +81,26 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
       : (CUSTOM_PACKAGES[0]?.hours ?? 12),
   );
   const [startTime, setStartTime] = useState(parseStoredTime(booking.startTime));
-  const [dayPart, setDayPart] = useState<DayPart>(dayPartForTime(parseStoredTime(booking.startTime)));
+  const [dayPart, setDayPart] = useState<DayPart>(() => {
+    const part = dayPartForTime(parseStoredTime(booking.startTime));
+    if (dayParts.includes(part)) return part;
+    return flow.defaultDayPart;
+  });
+
+  useEffect(() => {
+    const part = dayPartForTime(parseStoredTime(booking.startTime));
+    if (!dayParts.includes(part)) {
+      setDayPart(flow.defaultDayPart);
+      setStartTime(flow.defaultStartTime);
+    }
+  }, [booking.driverType, booking.startTime, dayParts, flow.defaultDayPart, flow.defaultStartTime]);
 
   const partSlots = useMemo(() => slotsForDayPart(dayPart), [dayPart]);
   const visibleSlots = partSlots.filter(slot => !isTimeSlotPast(selectedDate, slot));
 
   useEffect(() => {
     if (!isTimeSlotPast(selectedDate, startTime)) return;
-    for (const part of DAY_PARTS) {
+    for (const part of dayParts) {
       const next = slotsForDayPart(part).find(slot => !isTimeSlotPast(selectedDate, slot));
       if (!next) continue;
       setStartTime(next);
@@ -142,9 +161,9 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
 
   return (
     <TowingBookingLayout
-      title="Schedule"
+      title={flow.scheduleTitle}
       step={1}
-      stepLabels={DRIVER_BOOKING_STEP_LABELS}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
       scrollable={durationId === 'custom'}
       continueDisabled={isTimeSlotPast(selectedDate, startTime)}
@@ -178,7 +197,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
             </Text>
           </View>
           <Text style={{ fontSize: t.px(11), color: colors.grey, marginBottom: t.px(6) }}>
-            Swipe for dates up to 2 months ahead
+            {flow.scheduleDateHint}
           </Text>
           <ScrollView
             ref={dateScrollRef}
@@ -224,6 +243,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
           </ScrollView>
         </View>
 
+        {durationOptions.length > 0 ? (
         <View>
           <Text
             style={{
@@ -232,11 +252,19 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
               color: colors.dark,
               marginBottom: t.px(8),
             }}>
-            How long
+            {flow.durationLabel}
           </Text>
           <View style={{ flexDirection: 'row', gap: t.px(6) }}>
-            {DRIVER_DURATION_OPTIONS.map(option => {
+            {durationOptions.map(option => {
               const selected = durationId === option.id;
+              const chipLabel =
+                booking.driverType === 'full_time' && option.id === '8'
+                  ? 'Full day'
+                  : booking.driverType === 'outstation' && option.id === '8'
+                    ? '1 day'
+                    : option.id === 'custom'
+                      ? 'More'
+                      : option.label.replace(' hrs', 'h');
               return (
                 <Pressable
                   key={option.id}
@@ -260,7 +288,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
                       fontWeight: typography.weights.semibold,
                       color: colors.dark,
                     }}>
-                    {option.id === 'custom' ? 'More' : option.label.replace(' hrs', 'h')}
+                    {chipLabel}
                   </Text>
                 </Pressable>
               );
@@ -309,6 +337,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
             </View>
           ) : null}
         </View>
+        ) : null}
 
         <View
           style={{
@@ -326,7 +355,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
               justifyContent: 'space-between',
             }}>
             <Text style={{ fontSize: t.body, fontWeight: typography.weights.semibold, color: colors.dark }}>
-              Start time
+              {booking.driverType === 'outstation' ? 'Departure time' : 'Start time'}
             </Text>
             <Text style={{ fontSize: t.caption, fontWeight: typography.weights.semibold, color: colors.dark }}>
               {formatTime12(startTime)} · {dayPartForTime(startTime)}
@@ -334,7 +363,7 @@ export default function DriverDateTimeScreen({ navigation }: Props) {
           </View>
 
           <View style={{ flexDirection: 'row', gap: t.px(6) }}>
-            {DAY_PARTS.map(part => {
+            {dayParts.map(part => {
               const selected = dayPart === part;
               return (
                 <Pressable
