@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { AlertTriangle, Clock, MapPin, Wrench } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -24,6 +25,10 @@ import {
 } from '../../../services/bookings/previewBooking';
 import { useVehicleStore } from '../../../store/vehicleStore';
 import { buildRoadsideBookingRequest } from '../../../utils/serviceBookingPayload';
+import {
+  isRoadsidePickupReady,
+  roadsidePickupKey,
+} from '../../../utils/roadsideBookingFlow';
 import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import type { HomeStackParamList } from '../../../types/navigation';
@@ -71,32 +76,55 @@ function ReviewSection({
 export default function RoadsideReviewScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, resetBooking } = useRoadsideBooking();
-  const { vehicles, fetchVehicles } = useVehicleStore();
+  const { vehicles } = useVehicleStore();
   const { confirmExistingBooking, isConfirming } = useServiceBookingPayment();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
+  const pendingCreateRef = useRef<{ bookingId: string; pickupKey: string } | null>(null);
 
-  useEffect(() => {
-    void fetchVehicles().catch((error) => {
-      if (__DEV__) {
-        console.warn('[RoadsideReview] fetchVehicles failed', error);
-      }
-    });
-  }, [fetchVehicles]);
+  const pickupReady = isRoadsidePickupReady(booking);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (pickupReady) return;
+      navigation.replace('RoadsideLocation', { serviceId: booking.serviceId });
+    }, [booking.serviceId, navigation, pickupReady]),
+  );
 
   const handleConfirm = async () => {
-    if (isSubmitting || isConfirming) return;
+    if (submitLockRef.current || isSubmitting || isConfirming) return;
+    if (!pickupReady) {
+      Alert.alert(
+        'Location required',
+        'Choose where you need help before confirming.',
+        [
+          { text: 'OK' },
+          {
+            text: 'Add location',
+            onPress: () =>
+              navigation.replace('RoadsideLocation', { serviceId: booking.serviceId }),
+          },
+        ],
+      );
+      return;
+    }
+
+    submitLockRef.current = true;
     setIsSubmitting(true);
 
     try {
       await useVehicleStore.getState().fetchVehicles().catch(() => undefined);
       const latestVehicles = useVehicleStore.getState().vehicles;
       const serviceType = roadsideServiceIdToSlug(booking.serviceId);
+      const locationForPayload = booking.landmark?.trim()
+        ? `${booking.location} (${booking.landmark.trim()})`
+        : booking.location;
+      const pickupKey = roadsidePickupKey(booking);
+
       const payload = buildRoadsideBookingRequest(
         {
           ...booking,
-          location: booking.landmark?.trim()
-            ? `${booking.location} (${booking.landmark.trim()})`
-            : booking.location,
+          location: locationForPayload,
         },
         latestVehicles.length ? latestVehicles : vehicles,
         serviceType,
@@ -111,10 +139,24 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
         });
         previewAdvancePayment(previewBooking.id, 'towing');
         resetBooking();
-        navigation.navigate('RoadsideHelpOnWay');
+        navigation.replace('RoadsideHelpOnWay');
         return;
       }
 
+      const pending = pendingCreateRef.current;
+      if (pending && pending.pickupKey === pickupKey) {
+        try {
+          await confirmExistingBooking(pending.bookingId, 'towing');
+        } catch {
+          return;
+        }
+        pendingCreateRef.current = null;
+        resetBooking();
+        navigation.replace('RoadsideHelpOnWay');
+        return;
+      }
+
+      pendingCreateRef.current = null;
       const response = await createRoadsideBooking(payload);
 
       if (!response.available) {
@@ -123,14 +165,15 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       }
 
       if (response.booking) {
+        pendingCreateRef.current = { bookingId: response.booking.id, pickupKey };
         try {
           await confirmExistingBooking(response.booking.id, 'towing');
         } catch {
-          // confirmExistingBooking already shows the payment error.
           return;
         }
+        pendingCreateRef.current = null;
         resetBooking();
-        navigation.navigate('RoadsideHelpOnWay');
+        navigation.replace('RoadsideHelpOnWay');
         return;
       }
 
@@ -157,6 +200,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       }
       Alert.alert('Booking failed', message);
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -178,7 +222,8 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       accentColor={ROADSIDE_ACCENT}
       onBack={() => goBackWithinStack(navigation)}
       buttonLabel={isBusy ? 'Confirming…' : 'Confirm & get help'}
-      continueDisabled={isBusy}
+      continueDisabled={isBusy || !pickupReady}
+      continueLoading={isBusy}
       onContinue={() => void handleConfirm()}
       footerNote={
         <View

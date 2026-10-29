@@ -35,6 +35,7 @@ interface TowingBookingLayoutProps {
   scrollable?: boolean;
   hideFooter?: boolean;
   continueDisabled?: boolean;
+  continueLoading?: boolean;
   showStep?: boolean;
   headerVariant?: 'centered' | 'inline';
   accentColor?: string;
@@ -58,6 +59,7 @@ export default function TowingBookingLayout({
   scrollable = false,
   hideFooter = false,
   continueDisabled = false,
+  continueLoading = false,
   showStep = true,
   headerVariant = 'centered',
   accentColor = colors.primary,
@@ -82,6 +84,7 @@ export default function TowingBookingLayout({
           borderRadius={t.cardRadius}
           labelSize={t.buttonLabel}
           disabled={continueDisabled}
+          loading={continueLoading}
         />
       ) : null}
       {secondaryLabel && onSecondary ? (

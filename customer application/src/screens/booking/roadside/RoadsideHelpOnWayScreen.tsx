@@ -1,17 +1,10 @@
 import React from 'react';
-import { Image, Linking, Pressable, Share, Text, View } from 'react-native';
-import {
-  Check,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Truck,
-} from 'lucide-react-native';
+import { Linking, Pressable, Share, Text, View } from 'react-native';
+import { Check, MapPin, Phone, ShieldCheck, Star, Wrench } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import DriverAvatar from '../../../components/bookings/DriverAvatar';
-import { images } from '../../../assets';
 import {
   ROADSIDE_ACCENT,
   ROADSIDE_ACCENT_LIGHT,
@@ -26,52 +19,125 @@ import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideHelpOnWay'>;
 
 const TRACK_STEPS = [
-  { id: 'dispatched', label: 'Dispatched', state: 'done' as const },
-  { id: 'on_route', label: 'On Route', state: 'active' as const },
-  { id: 'arrived', label: 'Arrived', state: 'pending' as const },
-];
+  { id: 'dispatched', label: 'Dispatched', done: true, active: false },
+  { id: 'on_route', label: 'On the way', done: false, active: true },
+  { id: 'arrived', label: 'Arrived', done: false, active: false },
+] as const;
 
 export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
 
+  const goBookings = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Bookings' as never);
+    } else {
+      navigation.navigate('HomeMain' as never);
+    }
+  };
+
+  const callSupport = () => {
+    void Linking.openURL(`tel:${brand.phoneRaw}`);
+  };
+
+  const shareLocation = async () => {
+    try {
+      await Share.share({
+        message: `RACE roadside help: ${ROADSIDE_MECHANIC.name} is on the way. ETA ~${ROADSIDE_TRACK_ETA_MINUTES} min. Helpline: ${brand.phone}`,
+        title: 'RACE roadside help',
+      });
+    } catch {
+      // dismissed
+    }
+  };
+
   return (
     <TowingBookingLayout
-      title="Help is on the way!"
-      step={4}
+      title="Help is on the way"
+      step={0}
+      showStep={false}
       accentColor={ROADSIDE_ACCENT}
-      hideFooter
-      onBack={() => goBackWithinStack(navigation)}>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontSize: t.body,
-            fontWeight: typography.weights.semibold,
-            color: colors.grey,
-            textAlign: 'center',
-            marginBottom: t.px(16),
-          }}>
-          Mechanic dispatched to your location
-        </Text>
-
-        <View style={{ alignItems: 'center', marginBottom: t.px(18) }}>
+      scrollable
+      onBack={() => goBackWithinStack(navigation)}
+      buttonLabel="View in Bookings"
+      onContinue={goBookings}
+      secondaryLabel="Call support"
+      onSecondary={callSupport}
+      secondaryVariant="outline">
+      <View style={{ gap: t.px(14), paddingBottom: t.px(8) }}>
+        {/* Success hero — matches towing confirmed rhythm */}
+        <View
+          style={[
+            {
+              borderRadius: t.cardRadius,
+              backgroundColor: ROADSIDE_ACCENT_LIGHT,
+              borderWidth: 1,
+              borderColor: '#FDE8C4',
+              alignItems: 'center',
+              paddingHorizontal: t.px(18),
+              paddingTop: t.px(20),
+              paddingBottom: t.px(18),
+            },
+            shadows.cardSoft,
+          ]}>
           <View
             style={{
-              width: t.px(150),
-              height: t.px(150),
-              borderRadius: t.px(75),
-              borderWidth: 3,
-              borderColor: ROADSIDE_ACCENT,
+              width: t.px(64),
+              height: t.px(64),
+              borderRadius: t.px(32),
+              backgroundColor: ROADSIDE_ACCENT,
               alignItems: 'center',
               justifyContent: 'center',
             }}>
-            <Image
-              source={images.booking.roadsideHelpTruck}
-              style={{ width: t.px(110), height: t.px(80) }}
-              resizeMode="contain"
-            />
+            <Wrench size={t.px(30)} color={colors.background} strokeWidth={2.2} />
+          </View>
+          <Text
+            style={{
+              marginTop: t.px(12),
+              fontSize: t.px(19),
+              fontWeight: typography.weights.extrabold,
+              color: colors.dark,
+              textAlign: 'center',
+            }}>
+            Partner assigned
+          </Text>
+          <Text
+            style={{
+              marginTop: t.px(4),
+              fontSize: t.body,
+              color: colors.grey,
+              textAlign: 'center',
+              lineHeight: t.px(20),
+              paddingHorizontal: t.px(8),
+            }}>
+            A verified mechanic is heading to your breakdown spot.
+          </Text>
+          <View
+            style={{
+              marginTop: t.px(14),
+              paddingHorizontal: t.px(14),
+              paddingVertical: t.px(8),
+              borderRadius: t.px(999),
+              backgroundColor: colors.background,
+              borderWidth: 1,
+              borderColor: ROADSIDE_ACCENT,
+            }}>
+            <Text
+              style={{
+                fontSize: t.body,
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
+                textAlign: 'center',
+              }}>
+              ETA{' '}
+              <Text style={{ color: ROADSIDE_ACCENT, fontWeight: typography.weights.extrabold }}>
+                ~{ROADSIDE_TRACK_ETA_MINUTES} min
+              </Text>
+            </Text>
           </View>
         </View>
 
+        {/* Partner card */}
         <View
           style={[
             {
@@ -79,249 +145,249 @@ export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
               borderWidth: 1,
               borderColor: colors.border,
               backgroundColor: colors.background,
-              padding: t.cardPadding,
-              marginBottom: t.px(16),
+              padding: t.px(14),
             },
-            shadows.card,
+            shadows.cardSoft,
           ]}>
+          <Text
+            style={{
+              fontSize: t.caption,
+              fontWeight: typography.weights.semibold,
+              color: colors.grey,
+              marginBottom: t.px(10),
+            }}>
+            Your mechanic
+          </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(12) }}>
             <DriverAvatar
-              size={t.px(64)}
+              size={t.px(52)}
               accentColor={ROADSIDE_ACCENT}
               borderColor={ROADSIDE_ACCENT}
               role="mechanic"
             />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(6) }}>
-                <Text
-                  style={{
-                    fontSize: t.labelBold,
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {ROADSIDE_MECHANIC.name}
-                </Text>
-              </View>
-              <View
-                style={{
-                  alignSelf: 'flex-start',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: t.px(4),
-                  marginTop: t.px(6),
-                  paddingHorizontal: t.px(10),
-                  paddingVertical: t.px(4),
-                  borderRadius: t.px(14),
-                  backgroundColor: ROADSIDE_ACCENT_LIGHT,
-                }}>
-                <ShieldCheck size={t.px(12)} color={ROADSIDE_ACCENT} />
-                <Text
-                  style={{
-                    fontSize: t.caption,
-                    fontWeight: typography.weights.bold,
-                    color: ROADSIDE_ACCENT,
-                  }}>
-                  Verified Mechanic
-                </Text>
-              </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text
                 style={{
-                  marginTop: t.px(8),
-                  fontSize: t.caption,
+                  fontSize: t.bodyLarge,
                   fontWeight: typography.weights.semibold,
-                  color: colors.grey,
+                  color: colors.dark,
                 }}>
-                ETA: {ROADSIDE_TRACK_ETA_MINUTES} min
+                {ROADSIDE_MECHANIC.name}
               </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: t.px(8),
+                  marginTop: t.px(6),
+                }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: t.px(4),
+                    paddingHorizontal: t.px(8),
+                    paddingVertical: t.px(3),
+                    borderRadius: t.px(12),
+                    backgroundColor: ROADSIDE_ACCENT_LIGHT,
+                  }}>
+                  <ShieldCheck size={t.px(12)} color={ROADSIDE_ACCENT} strokeWidth={2.2} />
+                  <Text
+                    style={{
+                      fontSize: t.px(11),
+                      fontWeight: typography.weights.semibold,
+                      color: ROADSIDE_ACCENT,
+                    }}>
+                    Verified
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(3) }}>
+                  <Star size={t.px(12)} color="#F59E0B" fill="#F59E0B" />
+                  <Text
+                    style={{
+                      fontSize: t.px(12),
+                      fontWeight: typography.weights.semibold,
+                      color: colors.grey,
+                    }}>
+                    {ROADSIDE_MECHANIC.rating}
+                  </Text>
+                </View>
+              </View>
             </View>
           </View>
         </View>
 
-        <View style={{ alignItems: 'center', marginBottom: t.px(20) }}>
-          <Text
-            style={{
-              fontSize: t.bodyLarge,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-            }}>
-            Arriving in
-          </Text>
-          <Text
-            style={{
-              fontSize: t.px(32),
-              fontWeight: typography.weights.extrabold,
-              color: ROADSIDE_ACCENT,
-            }}>
-            {ROADSIDE_TRACK_ETA_MINUTES} min
-          </Text>
-        </View>
-
-        <View style={{ marginBottom: t.px(20) }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: t.px(4),
-            }}>
-            {TRACK_STEPS.map((step, index) => {
-              const isDone = step.state === 'done';
-              const isActive = step.state === 'active';
-              const Icon =
-                step.id === 'dispatched' ? Check : step.id === 'on_route' ? Truck : MapPin;
-
-              return (
-                <React.Fragment key={step.id}>
-                  {index > 0 ? (
-                    <View
-                      style={{
-                        flex: 1,
-                        height: 2,
-                        backgroundColor: index === 1 ? colors.success : colors.border,
-                      }}
-                    />
-                  ) : null}
-                  <View
-                    style={{
-                      width: t.px(36),
-                      height: t.px(36),
-                      borderRadius: t.px(18),
-                      backgroundColor: isDone
-                        ? colors.success
-                        : isActive
-                          ? ROADSIDE_ACCENT
-                          : colors.lightGrey,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Icon
-                      size={t.px(16)}
-                      color={isDone || isActive ? colors.background : colors.grey}
-                      strokeWidth={2.5}
-                    />
-                  </View>
-                </React.Fragment>
-              );
-            })}
-          </View>
-
-          <View
-            style={{
-              flexDirection: 'row',
-              marginTop: t.px(8),
-            }}>
-            {TRACK_STEPS.map(step => {
-              const isActive = step.state === 'active';
-              return (
-                <Text
-                  key={step.id}
-                  numberOfLines={1}
-                  style={{
-                    flex: 1,
-                    fontSize: t.px(11),
-                    fontWeight: typography.weights.bold,
-                    color: isActive ? ROADSIDE_ACCENT : colors.dark,
-                    textAlign: 'center',
-                  }}>
-                  {step.label}
-                </Text>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: t.px(10), marginTop: 'auto' }}>
-          <Pressable
-            onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-            style={{
-              flex: 1,
-              minHeight: t.px(52),
-              borderRadius: t.inputRadius,
-              borderWidth: 1.5,
-              borderColor: ROADSIDE_ACCENT,
-              backgroundColor: colors.background,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: t.px(8),
-              paddingVertical: t.px(10),
-              gap: t.px(4),
-            }}>
-            <Phone size={t.px(18)} color={ROADSIDE_ACCENT} />
-            <Text
-              style={{
-                fontSize: t.px(12),
-                fontWeight: typography.weights.bold,
-                color: ROADSIDE_ACCENT,
-                textAlign: 'center',
-              }}>
-              Call Mechanic
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={async () => {
-              try {
-                await Share.share({
-                  message: `RACE Roadside Assistance: A mechanic (${ROADSIDE_MECHANIC.name}) is on the way to my breakdown location. ETA: ~${ROADSIDE_TRACK_ETA_MINUTES} mins. Emergency Helpline: ${brand.phone}`,
-                  title: 'RACE Live Roadside Help',
-                });
-              } catch {
-                // share sheet closed
-              }
-            }}
-            style={{
-              flex: 1,
-              minHeight: t.px(52),
-              borderRadius: t.inputRadius,
-              borderWidth: 1.5,
-              borderColor: ROADSIDE_ACCENT,
-              backgroundColor: colors.background,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: t.px(8),
-              paddingVertical: t.px(10),
-              gap: t.px(4),
-            }}>
-            <MapPin size={t.px(18)} color={ROADSIDE_ACCENT} />
-            <Text
-              numberOfLines={2}
-              style={{
-                fontSize: t.px(11),
-                fontWeight: typography.weights.bold,
-                color: ROADSIDE_ACCENT,
-                textAlign: 'center',
-                lineHeight: t.px(14),
-              }}>
-              Share Live Location
-            </Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => {
-            const parent = navigation.getParent();
-            if (parent) {
-              parent.navigate('Bookings' as any);
-            } else {
-              navigation.navigate('HomeMain' as any);
-            }
-          }}
+        {/* Live status */}
+        <View
           style={{
-            marginTop: t.px(12),
-            width: '100%',
-            height: t.px(48),
-            borderRadius: t.inputRadius,
-            backgroundColor: ROADSIDE_ACCENT,
-            alignItems: 'center',
-            justifyContent: 'center',
+            borderRadius: t.cardRadius,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.background,
+            paddingHorizontal: t.px(12),
+            paddingVertical: t.px(14),
           }}>
           <Text
             style={{
-              fontSize: t.body,
-              fontWeight: typography.weights.bold,
-              color: colors.background,
+              fontSize: t.caption,
+              fontWeight: typography.weights.semibold,
+              color: colors.grey,
+              marginBottom: t.px(14),
             }}>
-            Done · Go to Bookings
+            Live status
           </Text>
-        </Pressable>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            {TRACK_STEPS.map((step, index) => {
+              const dotColor = step.done
+                ? colors.success
+                : step.active
+                  ? ROADSIDE_ACCENT
+                  : colors.border;
+              const lineDone = index > 0 && (step.done || step.active || TRACK_STEPS[index - 1]?.done);
+
+              return (
+                <View key={step.id} style={{ flex: 1, alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', width: '100%' }}>
+                    {index > 0 ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          backgroundColor: lineDone ? colors.success : colors.border,
+                          marginRight: t.px(4),
+                        }}
+                      />
+                    ) : (
+                      <View style={{ flex: 1 }} />
+                    )}
+                    <View
+                      style={{
+                        width: t.px(28),
+                        height: t.px(28),
+                        borderRadius: t.px(14),
+                        backgroundColor: step.done || step.active ? dotColor : colors.pageBg,
+                        borderWidth: step.done || step.active ? 0 : 1.5,
+                        borderColor: colors.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      {step.done ? (
+                        <Check size={t.px(14)} color={colors.background} strokeWidth={2.8} />
+                      ) : step.active ? (
+                        <View
+                          style={{
+                            width: t.px(8),
+                            height: t.px(8),
+                            borderRadius: t.px(4),
+                            backgroundColor: colors.background,
+                          }}
+                        />
+                      ) : null}
+                    </View>
+                    {index < TRACK_STEPS.length - 1 ? (
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 2,
+                          backgroundColor:
+                            step.done || step.active ? colors.success : colors.border,
+                          marginLeft: t.px(4),
+                        }}
+                      />
+                    ) : (
+                      <View style={{ flex: 1 }} />
+                    )}
+                  </View>
+                  <Text
+                    numberOfLines={2}
+                    style={{
+                      marginTop: t.px(8),
+                      fontSize: t.px(10),
+                      fontWeight: step.active ? typography.weights.semibold : typography.weights.medium,
+                      color: step.active ? ROADSIDE_ACCENT : colors.grey,
+                      textAlign: 'center',
+                      lineHeight: t.px(13),
+                      paddingHorizontal: t.px(2),
+                    }}>
+                    {step.label}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Quick actions */}
+        <View style={{ flexDirection: 'row', gap: t.px(10) }}>
+          <Pressable
+            onPress={callSupport}
+            style={({ pressed }) => [
+              shadows.subtle,
+              {
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: t.px(8),
+                minHeight: t.px(48),
+                borderRadius: t.px(14),
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+                opacity: pressed ? 0.9 : 1,
+              },
+            ]}>
+            <Phone size={t.px(18)} color={colors.dark} strokeWidth={2} />
+            <Text
+              style={{
+                fontSize: t.px(13),
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
+              }}>
+              Call
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => void shareLocation()}
+            style={({ pressed }) => [
+              shadows.subtle,
+              {
+                flex: 1,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: t.px(8),
+                minHeight: t.px(48),
+                borderRadius: t.px(14),
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+                opacity: pressed ? 0.9 : 1,
+              },
+            ]}>
+            <MapPin size={t.px(18)} color={colors.dark} strokeWidth={2} />
+            <Text
+              style={{
+                fontSize: t.px(13),
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
+              }}>
+              Share
+            </Text>
+          </Pressable>
+        </View>
+
+        <Text
+          style={{
+            fontSize: t.caption,
+            color: colors.grey,
+            textAlign: 'center',
+            lineHeight: t.px(17),
+            paddingHorizontal: t.px(4),
+          }}>
+          Track updates and chat with your partner from the Bookings tab once the trip starts.
+        </Text>
       </View>
     </TowingBookingLayout>
   );

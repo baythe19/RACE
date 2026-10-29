@@ -1,6 +1,7 @@
 ## Current focus
 
-**2026-10-29 (driver service per-type UX):** `utils/driverServiceFlow.ts` — differentiated wizard (step labels, schedule/duration/pickup copy); part-time hourly chips; full-time 8h “Full day”; outstation pickup+destination + trip length; night Evening/Night only default 21:00. Landing tier ℹ + header ℹ. `driverDateIdToScheduledAt(dateId, startTime)`. Customer `tsc` 0.
+**2026-10-29 (roadside confirm guard):** Review screen — `isRoadsidePickupReady` + auto-`replace` to location if pickup missing; sync `submitLockRef` + button loading; after create, retry payment only (`pendingCreateRef` + pickup key); success uses `replace('RoadsideHelpOnWay')` so back doesn't hit cleared context / duplicate POST. Customer `tsc` 0.
+ `utils/driverServiceFlow.ts` — differentiated wizard (step labels, schedule/duration/pickup copy); part-time hourly chips; full-time 8h “Full day”; outstation pickup+destination + trip length; night Evening/Night only default 21:00. Landing tier ℹ + header ℹ. `driverDateIdToScheduledAt(dateId, startTime)`. Customer `tsc` 0.
 
 **2026-10-29 (towing tiers aligned):** Instant / scheduled / emergency — customer `serviceMode` → API `towingMode` (fixed payload bug); fare API + `calculateTowingFare` mode surcharges (emergency +₹200, scheduled −₹100, fallbacks ₹499/₹399/₹699); validator mode↔scheduledAt rules; marketplace offers sort emergency first; UI banners + fare breakdown lines. Backend + customer `tsc` 0. Schema `towingMode` enum already correct on `TowingBooking` model.
  Offer feed maps legacy Driver Service through selfDriverCategory. QA part-time is Part-Time, independent full-time is Full-Time. Local ensure refreshed the vendor fleet. Local request check 18/18. Test bookings cancelled. Drivers left offline.

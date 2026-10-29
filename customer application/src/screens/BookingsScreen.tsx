@@ -176,10 +176,11 @@ export default function BookingsScreen() {
           showNotificationBadge={unreadCount > 0}
           onBellPress={() => {
             const tabNav = navigation.getParent();
-            (tabNav as { navigate?: (name: string, params?: object) => void } | undefined)?.navigate(
-              'Profile',
-              { screen: 'Notifications' },
-            );
+            if (tabNav) {
+              (tabNav as { navigate: (name: string, params?: object) => void }).navigate('Profile', {
+                screen: 'Notifications',
+              });
+            }
           }}
           onAvatarPress={() => {
             const tabNav = navigation.getParent();
