@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -30,6 +29,7 @@ import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import { FUEL_TYPES, VEHICLE_COLORS, VEHICLE_TYPES } from '../../constants/auth';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import type { ProfileStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
@@ -54,6 +54,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
+  const { dialog, showDialog } = useAppDialog();
 
   const [selectedType, setSelectedType] = useState('car');
   const [number, setNumber] = useState('');
@@ -82,9 +83,13 @@ export default function AddVehicleScreen({ navigation }: Props) {
     if (!model.trim()) nextErrors.model = 'Please enter model';
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length === 0) {
-      Alert.alert('Vehicle Saved', 'Your vehicle has been added successfully.', [
-        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
-      ]);
+      showDialog({
+        tone: 'success',
+        title: 'Vehicle Saved',
+        message: 'Your vehicle has been added successfully.',
+        primaryLabel: 'OK',
+        onPrimary: () => goBackWithinStack(navigation),
+      });
     }
   };
 
@@ -315,7 +320,14 @@ export default function AddVehicleScreen({ navigation }: Props) {
               alignItems: 'center',
               marginBottom: px(8),
             }}
-            onPress={() => Alert.alert('Photo', 'Camera coming soon')}>
+            onPress={() =>
+              showDialog({
+                tone: 'info',
+                title: 'Photo',
+                message: 'Camera coming soon',
+                primaryLabel: 'Got it',
+              })
+            }>
             <Camera size={px(28)} color={colors.primary} />
             <Text
               style={{
@@ -327,7 +339,7 @@ export default function AddVehicleScreen({ navigation }: Props) {
               Add Vehicle Photo (Optional)
             </Text>
           </Pressable>
-
+      {dialog}
     </ProfileSubScreenLayout>
   );
 }

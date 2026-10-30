@@ -39,7 +39,7 @@ export default function DriverOnWayScreen({ navigation, route }: Props) {
     tripOtp && shouldShowTripStartOtp(booking?.unifiedStatus ?? status),
   );
 
-  const name = driverName ?? booking?.driver?.name ?? 'Assigning driver';
+  const name = driverName ?? booking?.driver?.name ?? 'Your partner';
   const phone = driverPhone ?? booking?.driver?.phone ?? brand.phoneRaw;
   const hasDriver = Boolean(driverName ?? booking?.driver?.name);
 

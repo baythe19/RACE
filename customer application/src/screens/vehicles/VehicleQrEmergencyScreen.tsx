@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import GlassCard from '../../components/ui/GlassCard';
 import PrimaryButton from '../../components/ui/PrimaryButton';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { getApiErrorMessage } from '../../services/api';
 import { verifyVehicle } from '../../services/vehicleService';
 import type { HomeStackParamList } from '../../types/navigation';
@@ -24,6 +25,7 @@ function formatTelUrl(number: string): string {
 
 export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
   const vehicleId = (route.params as { vehicleId?: string } | undefined)?.vehicleId ?? 'demo_veh_101';
+  const { dialog, showDialog } = useAppDialog();
   const [verified, setVerified] = useState<VehicleVerifyValidResponse | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
@@ -86,7 +88,12 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
 
   const callNumber = (number?: string) => {
     if (!number?.trim()) {
-      Alert.alert('Unavailable', 'No phone number on file for this contact.');
+      showDialog({
+        tone: 'error',
+        title: 'Unavailable',
+        message: 'No phone number on file for this contact.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     void Linking.openURL(formatTelUrl(number));
@@ -111,6 +118,7 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {dialog}
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.badge}>
           <Ionicons name="warning" size={16} color={colors.textLight} />

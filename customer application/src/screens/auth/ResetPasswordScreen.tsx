@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -18,6 +17,7 @@ import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import OtpInput from '../../components/auth/OtpInput';
 import { AuthBackHeader } from '../../components/auth/StepHeader';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { DEMO_OTP } from '../../constants/auth';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, typography } from '../../theme';
@@ -32,6 +32,7 @@ export default function ResetPasswordScreen({ navigation, route }: Props) {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
   const { phone } = route.params;
+  const { dialog, showDialog } = useAppDialog();
 
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -42,24 +43,44 @@ export default function ResetPasswordScreen({ navigation, route }: Props) {
 
   const handleReset = () => {
     if (digits.join('') !== DEMO_OTP) {
-      Alert.alert('Invalid OTP', 'Please enter the correct OTP.');
+      showDialog({
+        tone: 'error',
+        title: 'Invalid OTP',
+        message: 'Please enter the correct OTP.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (!password.trim() || password.length < 6) {
-      Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+      showDialog({
+        tone: 'warning',
+        title: 'Weak Password',
+        message: 'Password must be at least 6 characters.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (password !== confirm) {
-      Alert.alert('Mismatch', 'Passwords do not match.');
+      showDialog({
+        tone: 'warning',
+        title: 'Mismatch',
+        message: 'Passwords do not match.',
+        primaryLabel: 'OK',
+      });
       return;
     }
-    Alert.alert('Success', 'Your password has been reset.', [
-      { text: 'Login', onPress: () => navigation.navigate('Login') },
-    ]);
+    showDialog({
+      tone: 'success',
+      title: 'Success',
+      message: 'Your password has been reset.',
+      primaryLabel: 'Login',
+      onPrimary: () => navigation.navigate('Login'),
+    });
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {dialog}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

@@ -1,10 +1,11 @@
 import React, { type ReactNode } from 'react';
-import { Alert, Linking, Pressable, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { ChevronRight, Mail, Phone, Siren } from 'lucide-react-native';
 
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import { HELP_FAQ_ITEMS } from '../../constants/profileSubScreens';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { brand } from '../../theme/brand';
 import { colors, shadows, typography } from '../../theme';
 
@@ -69,9 +70,11 @@ function QuickHelpCard({
 
 export default function HelpSupportScreen() {
   const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
 
   return (
     <ProfileSubScreenLayout title="Help & Support">
+      {dialog}
       <View
         style={{
           borderRadius: px(14),
@@ -203,7 +206,14 @@ export default function HelpSupportScreen() {
         {HELP_FAQ_ITEMS.map((item, index) => (
           <Pressable
             key={item.question}
-            onPress={() => Alert.alert(item.question, item.answer)}
+            onPress={() =>
+              showDialog({
+                tone: 'info',
+                title: item.question,
+                message: item.answer,
+                primaryLabel: 'Got it',
+              })
+            }
             style={{
               flexDirection: 'row',
               alignItems: 'center',

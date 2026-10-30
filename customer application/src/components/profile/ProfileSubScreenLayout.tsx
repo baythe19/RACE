@@ -11,6 +11,7 @@ import { colors } from '../../theme';
 type Props = {
   title: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number;
   headerRight?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
@@ -27,6 +28,7 @@ export function useProfilePx() {
 export default function ProfileSubScreenLayout({
   title,
   subtitle,
+  subtitleNumberOfLines,
   headerRight,
   footer,
   children,
@@ -45,6 +47,7 @@ export default function ProfileSubScreenLayout({
         <AppStackHeader
           title={title}
           subtitle={subtitle}
+          subtitleNumberOfLines={subtitleNumberOfLines}
           onBack={handleBack}
           headerRight={headerRight}
         />

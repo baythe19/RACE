@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Pressable, Text, View } from 'react-native';
 import { Check, ChevronDown, ChevronUp } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -14,6 +14,7 @@ import {
   getVehicleLabel,
 } from '../../../constants/towingBooking';
 import { useTowingBooking } from '../../../context/TowingBookingContext';
+import { useAppDialog } from '../../../hooks/useAppDialog';
 import { useServiceBookingPayment } from '../../../hooks/useServiceBookingPayment';
 import { useVehicleStore } from '../../../store/vehicleStore';
 import type { HomeStackParamList } from '../../../types/navigation';
@@ -36,6 +37,7 @@ function formatBookingNumber(bookingNumber: string): string {
 
 export default function TowingAdvancePaymentScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
+  const { dialog, showDialog } = useAppDialog();
   const { booking, updateBooking, resetBooking } = useTowingBooking();
   const { vehicles, fetchVehicles } = useVehicleStore();
   const { confirmTowing, isConfirming } = useServiceBookingPayment();
@@ -52,12 +54,17 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
 
   useEffect(() => {
     void fetchVehicles().catch((error) => {
-      Alert.alert('Unable to load vehicles', 'Please try again.');
+      showDialog({
+        tone: 'error',
+        title: 'Unable to load vehicles',
+        message: 'Please try again.',
+        primaryLabel: 'OK',
+      });
       if (__DEV__) {
         console.warn('[TowingAdvancePayment] fetchVehicles failed', error);
       }
     });
-  }, [fetchVehicles]);
+  }, [fetchVehicles, showDialog]);
 
   useEffect(() => {
     if (fareBreakdown?.totalFare) return;
@@ -152,7 +159,12 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Unable to prepare booking. Please try again.';
-      Alert.alert('Cannot confirm booking', message);
+      showDialog({
+        tone: 'warning',
+        title: 'Cannot confirm booking',
+        message,
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -192,7 +204,12 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
     } catch (error) {
       setShowSuccess(false);
       successScale.setValue(0);
-      Alert.alert('Booking Failed', getApiErrorMessage(error, 'Unable to confirm booking. Please try again.'));
+      showDialog({
+        tone: 'error',
+        title: 'Booking Failed',
+        message: getApiErrorMessage(error, 'Unable to confirm booking. Please try again.'),
+        primaryLabel: 'OK',
+      });
     }
   };
 
@@ -262,6 +279,7 @@ export default function TowingAdvancePaymentScreen({ navigation }: Props) {
       scrollable
       onBack={() => goBackWithinStack(navigation)}
       hideFooter>
+      {dialog}
       {/* Collapsible booking summary */}
       <Pressable
         onPress={() => setSummaryExpanded(prev => !prev)}

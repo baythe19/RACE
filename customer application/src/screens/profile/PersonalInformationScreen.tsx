@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
   Camera,
@@ -24,6 +24,7 @@ import ProfileEmergencyContactFields, {
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import DataSkeleton from '../../components/ui/DataSkeleton';
 import { EMERGENCY_RELATIONSHIP_OPTIONS } from '../../constants/profileForm';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useProfileStore } from '../../store/profileStore';
 import { getApiErrorMessage } from '../../services/api';
 import { apiDateToDisplay, buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
@@ -41,6 +42,7 @@ function formatRelationship(value?: string): string {
 export default function PersonalInformationScreen() {
   const px = useProfilePx();
   const navigation = useNavigation();
+  const { dialog, showDialog } = useAppDialog();
   const { profile, fetchProfile, updateProfile, isLoading } = useProfileStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -143,11 +145,20 @@ export default function PersonalInformationScreen() {
       // Saved → refresh upstream pages, then return to Profile (standard
       // push/pop flow instead of leaving the user stuck on the form).
       void fetchProfile();
-      Alert.alert('Saved', 'Your profile has been updated.', [
-        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
-      ]);
+      showDialog({
+        tone: 'success',
+        title: 'Saved',
+        message: 'Your profile has been updated.',
+        primaryLabel: 'OK',
+        onPrimary: () => goBackWithinStack(navigation),
+      });
     } catch (error) {
-      Alert.alert('Profile', getApiErrorMessage(error, 'Unable to update profile'));
+      showDialog({
+        tone: 'error',
+        title: 'Profile',
+        message: getApiErrorMessage(error, 'Unable to update profile'),
+        primaryLabel: 'OK',
+      });
     }
   };
 
@@ -168,7 +179,16 @@ export default function PersonalInformationScreen() {
       title="Personal Information"
       subtitle="Update your details"
       keyboardAvoiding>
+      {dialog}
       <Pressable
+        onPress={() =>
+          showDialog({
+            tone: 'info',
+            title: 'Profile photo',
+            message: 'Photo upload is coming soon. Your name and contact details are saved on the server.',
+            primaryLabel: 'Got it',
+          })
+        }
         style={{
           alignSelf: 'center',
           alignItems: 'center',

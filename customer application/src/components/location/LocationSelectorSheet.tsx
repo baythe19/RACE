@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -13,6 +12,8 @@ import {
 import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Crosshair, Map as MapIcon, MapPin, Search } from 'lucide-react-native';
+
+import { getAppDialog } from '../../utils/alertBus';
 
 import LocationPickerModal, {
   type LocationPickerInitialMode,
@@ -89,7 +90,12 @@ export default function LocationSelectorSheet({
       const address = await reverseGeocode(latitude, longitude);
       applyLocation({ address, latitude, longitude });
     } catch {
-      Alert.alert('Location error', 'Unable to get your current location. Try search or the map.');
+      getAppDialog().showDialog({
+        tone: 'error',
+        title: 'Location error',
+        message: 'Unable to get your current location. Try search or the map.',
+        primaryLabel: 'OK',
+      });
     } finally {
       setIsLocating(false);
     }
@@ -101,10 +107,12 @@ export default function LocationSelectorSheet({
       if (!city) return;
 
       if (city.comingSoon) {
-        Alert.alert(
-          'Coming soon',
-          `${city.displayName} is coming soon! We'll notify you when we launch there.`,
-        );
+        getAppDialog().showDialog({
+          tone: 'info',
+          title: 'Coming soon',
+          message: `${city.displayName} is coming soon! We'll notify you when we launch there.`,
+          primaryLabel: 'Got it',
+        });
         return;
       }
 

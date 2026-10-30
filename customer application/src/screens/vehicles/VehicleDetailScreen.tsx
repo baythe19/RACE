@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GoldButton from '../../components/auth/GoldButton';
@@ -7,6 +7,7 @@ import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/P
 import DataSkeleton from '../../components/ui/DataSkeleton';
 import VehicleEmergencyQrPanel from '../../components/vehicles/VehicleEmergencyQrPanel';
 import { useVehicleStore } from '../../store/vehicleStore';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import type { ProfileStackParamList } from '../../types/navigation';
 import { formatVehicleNumber } from '../../utils/vehicleFormat';
 import { colors, typography } from '../../theme';
@@ -16,6 +17,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'VehicleDetail'>;
 export default function VehicleDetailScreen({ navigation, route }: Props) {
   const { vehicleId } = route.params;
   const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
   const { vehicles, selectedVehicle, isLoading, error, fetchVehicle, deleteVehicle } =
     useVehicleStore();
 
@@ -32,21 +34,27 @@ export default function VehicleDetailScreen({ navigation, route }: Props) {
   }, [fetchVehicle, vehicleId]);
 
   const handleDelete = () => {
-    Alert.alert('Delete vehicle', 'Remove this vehicle from your account?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteVehicle(vehicleId);
-            navigation.navigate('MyVehicles');
-          } catch (err) {
-            Alert.alert('Vehicle', err instanceof Error ? err.message : 'Unable to delete vehicle');
-          }
-        },
+    showDialog({
+      tone: 'danger',
+      title: 'Delete vehicle',
+      message: 'Remove this vehicle from your account?',
+      secondaryLabel: 'Cancel',
+      primaryLabel: 'Delete',
+      destructive: true,
+      onPrimary: async () => {
+        try {
+          await deleteVehicle(vehicleId);
+          navigation.navigate('MyVehicles');
+        } catch (err) {
+          showDialog({
+            tone: 'error',
+            title: 'Vehicle',
+            message: err instanceof Error ? err.message : 'Unable to delete vehicle',
+            primaryLabel: 'OK',
+          });
+        }
       },
-    ]);
+    });
   };
 
   if (isLoading && !vehicle) {
@@ -71,6 +79,7 @@ export default function VehicleDetailScreen({ navigation, route }: Props) {
       subtitle={formatVehicleNumber(vehicle.vehicleNumber)}
       footer={
         <View style={[styles.footer, { paddingHorizontal: px(20), paddingBottom: px(16) }]}>
+          {dialog}
           <GoldButton
             label="Edit vehicle"
             onPress={() => navigation.navigate('EditVehicle', { vehicleId })}

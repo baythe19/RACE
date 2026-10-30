@@ -46,12 +46,14 @@ import { partnerAccountParams, partnerJobsParams } from '../../../navigation/par
 import AppScreenLayout from '../../../components/ui/AppScreenLayout';
 import DriverDataSkeleton from '../../../components/partner/DriverDataSkeleton';
 import PartnerHeaderLogo from '../../../components/partner/PartnerHeaderLogo';
+import LocationPickerModal from '../../../components/common/LocationPickerModal';
 import { images } from '../../../assets';
 import { useScreenPx } from '../../../hooks/useScreenPx';
 import { usePartnerDialog } from '../../../hooks/usePartnerDialog';
 import { useAppSelector } from '../../../redux/hooks';
 import {
   openLocationSettings,
+  reportDriverManualLocationNow,
   retryDriverLocationReport,
   useDriverLocationReporting,
 } from '../../../hooks/useDriverLocationReporting';
@@ -65,6 +67,7 @@ import {
   useDriverJobOffersQuery,
   useDriverJobsQuery,
   useDriverProfileQuery,
+  useAcceptDriverJobMutation,
   useRefreshDriverDataOnFocus,
 } from '../../../services/driver/useDriverQueries';
 import {
@@ -83,7 +86,9 @@ import {
   isCompletedBookingStatus,
   jobEarnings,
 } from '../../../utils/driverBookingStatus';
-import { buildDriverVerification } from '../../../utils/driverVerification';
+import { buildDriverVerification, assertDriverCanAcceptJobs } from '../../../utils/driverVerification';
+import { getDriverAcceptLocationGate, pickupCoordsFromJob } from '../../../utils/driverLocationGuide';
+import { UI_PREVIEW_MODE } from '../../../constants/preview';
 import {
   driverColors as C,
   driverMetrics as M,
@@ -934,6 +939,7 @@ export default function DriverDashboardScreen() {
   const respondInvitationMutation = useRespondToVendorInvitationMutation();
 
   const availabilityMutation = useDriverAvailabilityMutation();
+  const acceptMutation = useAcceptDriverJobMutation();
   useRefreshDriverDataOnFocus(true);
 
   const [isOnline, setIsOnline] = useState(false);
@@ -941,6 +947,9 @@ export default function DriverDashboardScreen() {
   const [periodOpen, setPeriodOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const locationHealth = useDriverPresenceStore(state => state.locationHealth);
+  const manualLocation = useDriverPresenceStore(state => state.manualLocation);
+  const setManualLocation = useDriverPresenceStore(state => state.setManualLocation);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   /* Availability is read from the backend — never mutated on mount. */
   useEffect(() => {
@@ -1018,16 +1027,69 @@ export default function DriverDashboardScreen() {
     );
   }, [navigation]);
 
-  const openActiveJob = useCallback(() => {
+  const openActiveJob = useCallback(async () => {
     if (!activeJob) {
       openJobs();
       return;
     }
+    if (activeJob.status === 'DRIVER_ASSIGNED' && !UI_PREVIEW_MODE) {
+      const profileVerdict = assertDriverCanAcceptJobs(profile ?? undefined);
+      if (!profileVerdict.ok) {
+        showAlert({
+          tone: 'warning',
+          title: profileVerdict.title ?? 'Profile check failed',
+          message: profileVerdict.message ?? 'You cannot accept jobs right now.',
+        });
+        return;
+      }
+      const gate = getDriverAcceptLocationGate({
+        manualLocation,
+        gpsLocation: useDriverPresenceStore.getState().driverLocation,
+        pickup: pickupCoordsFromJob(activeJob),
+        mobileNumber: user?.mobileNumber,
+        previewMode: UI_PREVIEW_MODE,
+      });
+      if (!gate.ok) {
+        showAlert({
+          tone: 'warning',
+          title: gate.title,
+          message: gate.message,
+        });
+        return;
+      }
+      try {
+        await acceptMutation.mutateAsync({
+          bookingId: activeJob.id,
+          bookingType: activeJob.bookingType,
+        });
+        await refetchActive();
+      } catch (error) {
+        showAlert({
+          tone: 'error',
+          title: 'Accept failed',
+          message: getApiErrorMessage(error, 'Could not accept this assignment'),
+        });
+        return;
+      }
+    }
     navigation.navigate(
       'PartnerJobs',
-      partnerJobsParams('PartnerActiveJob', { bookingId: activeJob.id, bookingType: activeJob.bookingType }),
+      partnerJobsParams('PartnerActiveJob', {
+        bookingId: activeJob.id,
+        bookingType: activeJob.bookingType,
+      }),
     );
-  }, [activeJob, navigation, openJobs]);
+  }, [
+    acceptMutation,
+    activeJob,
+    manualLocation,
+    navigation,
+    openJobs,
+    profile,
+    refetchActive,
+    showAlert,
+    user?.mobileNumber,
+  ]);
 
   const toggleAvailability = useCallback(async () => {
     const next = !isOnline;
@@ -1596,6 +1658,26 @@ export default function DriverDashboardScreen() {
               {locationIssue.message}
             </PartnerText>
           </View>
+          <Pressable
+            onPress={() => setPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Set my location manually"
+            style={({ pressed }) => ({
+              height: px(28),
+              paddingHorizontal: px(10),
+              borderRadius: px(R.pill),
+              borderWidth: 1,
+              borderColor: C.amber,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: px(6),
+              opacity: pressed ? 0.85 : 1,
+            })}>
+            <PartnerText style={[T.small, { fontSize: px(11), fontWeight: '700', color: C.ink }]}>
+              Set location
+            </PartnerText>
+          </Pressable>
           {locationIssue.action ? (
             <Pressable
               onPress={() => {
@@ -1611,6 +1693,7 @@ export default function DriverDashboardScreen() {
                 paddingHorizontal: px(10),
                 borderRadius: px(R.pill),
                 backgroundColor: C.amber,
+                marginLeft: px(6),
                 alignItems: 'center',
                 justifyContent: 'center',
                 opacity: pressed ? 0.85 : 1,
@@ -1621,6 +1704,50 @@ export default function DriverDashboardScreen() {
             </Pressable>
           ) : null}
         </View>
+      ) : null}
+
+      {isOnline && manualLocation ? (
+        <Pressable
+          onPress={() => setPickerOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Change my chosen location"
+          style={({ pressed }) => ({
+            marginTop: px(8),
+            borderRadius: px(R.innerCard),
+            borderWidth: 1,
+            borderColor: '#BBF7D0',
+            backgroundColor: '#F0FDF4',
+            paddingVertical: px(8),
+            paddingHorizontal: px(12),
+            flexDirection: 'row',
+            alignItems: 'center',
+            opacity: pressed ? 0.9 : 1,
+          })}>
+          <View
+            style={{
+              width: px(28),
+              height: px(28),
+              borderRadius: px(7),
+              backgroundColor: '#DCFCE7',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <MapPin size={px(15)} color="#16A34A" strokeWidth={2.4} />
+          </View>
+          <View style={{ flex: 1, marginHorizontal: px(10) }}>
+            <PartnerText
+              numberOfLines={1}
+              style={[T.cardTitle, { fontSize: px(13), lineHeight: px(17), color: C.ink, fontWeight: '700' }]}>
+              Location set manually
+            </PartnerText>
+            <PartnerText
+              numberOfLines={1}
+              style={[T.cardSubtitle, { fontSize: px(11), lineHeight: px(15), color: C.grey, marginTop: px(1) }]}>
+              Jobs match near your chosen point — tap to change
+            </PartnerText>
+          </View>
+          <ChevronRight size={px(16)} color={C.grey} strokeWidth={2.2} />
+        </Pressable>
       ) : null}
 
       {isOperational && dataIssue ? (
@@ -1772,12 +1899,14 @@ export default function DriverDashboardScreen() {
               paddingBottom: px(10),
               borderBottomWidth: 1,
               borderBottomColor: '#F1F5F9',
+              gap: px(8),
             }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' }}>
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
+                  flexShrink: 1,
                   backgroundColor: activeJob.status === 'DRIVER_ASSIGNED' ? '#FEF3C7' : '#ECFDF5',
                   paddingHorizontal: px(8),
                   paddingVertical: px(3),
@@ -1795,6 +1924,7 @@ export default function DriverDashboardScreen() {
                   }}
                 />
                 <PartnerText
+                  numberOfLines={1}
                   style={{
                     fontSize: px(9.5),
                     fontWeight: '800',
@@ -1808,7 +1938,10 @@ export default function DriverDashboardScreen() {
               </View>
 
               <PartnerText
+                numberOfLines={1}
+                ellipsizeMode="middle"
                 style={{
+                  flexShrink: 1,
                   fontSize: px(12),
                   fontWeight: '700',
                   color: '#475569',
@@ -1819,7 +1952,7 @@ export default function DriverDashboardScreen() {
             </View>
 
             {jobEarnings(activeJob) != null ? (
-              <View style={{ alignItems: 'flex-end' }}>
+              <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
                 <PartnerText
                   style={{
                     fontSize: px(15),
@@ -2315,6 +2448,26 @@ export default function DriverDashboardScreen() {
         </>
       )}
     </AppScreenLayout>
+    <LocationPickerModal
+      visible={pickerOpen}
+      onClose={() => setPickerOpen(false)}
+      title="Set your location"
+      confirmLabel="Use this location"
+      initialLocation={
+        manualLocation
+          ? { latitude: manualLocation.latitude, longitude: manualLocation.longitude, address: '' }
+          : undefined
+      }
+      onLocationSelected={location => {
+        setManualLocation({
+          latitude: location.latitude,
+          longitude: location.longitude,
+          updatedAt: Date.now(),
+        });
+        setPickerOpen(false);
+        reportDriverManualLocationNow();
+      }}
+    />
     {partnerDialog}
     </View>
   );

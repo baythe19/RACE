@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native';
 import SubscriptionCard from '../../components/subscription/SubscriptionCard';
 import LoadingState from '../../components/ui/LoadingState';
 import Screen, { ScreenContent } from '../../components/ui/Screen';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { setBillingPeriod } from '../../redux/subscriptions/subscriptionsSlice';
 import { getApiErrorMessage } from '../../services/api';
@@ -23,6 +24,7 @@ import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 export default function ChoosePlanScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const dispatch = useAppDispatch();
+  const { dialog, showDialog } = useAppDialog();
   const plans = useAppSelector(state => state.subscriptions.plans);
   const billingPeriod = useAppSelector(state => state.subscriptions.billingPeriod);
   const { isLoading } = useSubscriptionPlansQuery(billingPeriod);
@@ -33,7 +35,12 @@ export default function ChoosePlanScreen() {
   const handleSelect = (planSlug: string, actionType?: string) => {
     if (subscribe.isPending) return;
     if (actionType === 'contact') {
-      Alert.alert('Corporate Plan', 'Please contact RACE support to activate corporate billing.');
+      showDialog({
+        tone: 'info',
+        title: 'Corporate Plan',
+        message: 'Please contact RACE support to activate corporate billing.',
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -41,31 +48,54 @@ export default function ChoosePlanScreen() {
       { planSlug, billingCycle: billingPeriod },
       {
         onSuccess: () => {
-          Alert.alert('Subscribed', 'Your plan is now active.', [
-            { text: 'OK', onPress: () => goBackWithinStack(navigation) },
-          ]);
+          showDialog({
+            tone: 'success',
+            title: 'Subscribed',
+            message: 'Your plan is now active.',
+            primaryLabel: 'OK',
+            onPrimary: () => goBackWithinStack(navigation),
+          });
         },
-        onError: error => Alert.alert('Subscription failed', getApiErrorMessage(error)),
+        onError: error =>
+          showDialog({
+            tone: 'error',
+            title: 'Subscription failed',
+            message: getApiErrorMessage(error),
+            primaryLabel: 'OK',
+          }),
       },
     );
   };
 
   const handleCancel = () => {
     if (cancelSub.isPending) return;
-    Alert.alert('Cancel subscription', 'Are you sure you want to cancel your current plan?', [
-      { text: 'Keep plan', style: 'cancel' },
-      {
-        text: 'Cancel plan',
-        style: 'destructive',
-        onPress: () => {
-          if (cancelSub.isPending) return;
-          cancelSub.mutate(undefined, {
-            onSuccess: () => Alert.alert('Cancelled', 'Your subscription has been cancelled.'),
-            onError: error => Alert.alert('Cancel failed', getApiErrorMessage(error)),
-          });
-        },
+    showDialog({
+      tone: 'confirm',
+      title: 'Cancel subscription',
+      message: 'Are you sure you want to cancel your current plan?',
+      secondaryLabel: 'Keep plan',
+      primaryLabel: 'Cancel plan',
+      destructive: true,
+      onPrimary: () => {
+        if (cancelSub.isPending) return;
+        cancelSub.mutate(undefined, {
+          onSuccess: () =>
+            showDialog({
+              tone: 'success',
+              title: 'Cancelled',
+              message: 'Your subscription has been cancelled.',
+              primaryLabel: 'OK',
+            }),
+          onError: error =>
+            showDialog({
+              tone: 'error',
+              title: 'Cancel failed',
+              message: getApiErrorMessage(error),
+              primaryLabel: 'OK',
+            }),
+        });
       },
-    ]);
+    });
   };
 
   if (isLoading && plans.length === 0) {
@@ -79,6 +109,7 @@ export default function ChoosePlanScreen() {
   return (
     <Screen>
       <SafeAreaView style={styles.safe}>
+        {dialog}
         <ScrollView contentContainerStyle={styles.scroll}>
           <ScreenContent>
             <Text style={styles.title}>Choose Your Plan</Text>

@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -37,6 +36,7 @@ import {
 import { getVehicleSubtypes, hasVehicleSubtypes } from '../../constants/vehicleSubtypes';
 import { useCreateVehicleMutation } from '../../services/vehicles/useVehicleQueries';
 import { getApiErrorMessage } from '../../services/api';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { buildCreateVehiclePayload } from '../../utils/vehicleFormPayload';
 import { useAuthStore } from '../../store/authStore';
 import { setCustomerOnboardingStep } from '../../store/customerOnboarding';
@@ -61,6 +61,7 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
+  const { dialog, showDialog } = useAppDialog();
   const createVehicleMutation = useCreateVehicleMutation();
 
   const [selectedType, setSelectedType] = useState<VehicleType>('car');
@@ -127,7 +128,12 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
         vehicleNumber: vehicle.vehicleNumber,
       });
     } catch (error) {
-      Alert.alert('Vehicle', getApiErrorMessage(error, 'Unable to save vehicle'));
+      showDialog({
+        tone: 'error',
+        title: 'Vehicle',
+        message: getApiErrorMessage(error, 'Unable to save vehicle'),
+        primaryLabel: 'OK',
+      });
     }
   };
 
@@ -449,7 +455,14 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
               paddingVertical: px(28),
               alignItems: 'center',
             }}
-            onPress={() => Alert.alert('Photo', 'Camera coming soon')}>
+            onPress={() =>
+              showDialog({
+                tone: 'info',
+                title: 'Photo',
+                message: 'Camera coming soon',
+                primaryLabel: 'Got it',
+              })
+            }>
             <Camera size={px(28)} color={colors.primary} />
             <Text
               style={{
@@ -486,6 +499,7 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
           />
         </View>
       </KeyboardAvoidingView>
+      {dialog}
     </SafeAreaView>
   );
 }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { Crosshair, Map as MapIcon } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -14,6 +14,7 @@ import {
   ROADSIDE_BOOKING_STEP_LABELS,
 } from '../../../constants/roadsideBooking';
 import { useRoadsideBooking } from '../../../context/RoadsideBookingContext';
+import { useAppDialog } from '../../../hooks/useAppDialog';
 import { useLocationStore } from '../../../store/locationStore';
 import { useUserLocationStore } from '../../../store/userLocationStore';
 import type { LocationResult } from '../../../types/location';
@@ -33,6 +34,7 @@ const PLACEHOLDER = 'Search where you need help';
 
 export default function RoadsideLocationScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
+  const { dialog, showDialog } = useAppDialog();
   const { booking, updateBooking } = useRoadsideBooking();
   const selectedLocation = useLocationStore(state => state.selectedLocation);
   const userLocation = useUserLocationStore(state => state.location);
@@ -130,7 +132,12 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
       continueDisabled={!hasLocation}
       onContinue={() => {
         if (!hasLocation) {
-          Alert.alert('Location required', 'Choose where you need help before continuing.');
+          showDialog({
+            tone: 'warning',
+            title: 'Location required',
+            message: 'Choose where you need help before continuing.',
+            primaryLabel: 'OK',
+          });
           return;
         }
         updateBooking({
@@ -144,6 +151,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
         navigation.navigate('RoadsideReview');
       }}>
       <WizardStepFade>
+      {dialog}
       <View style={{ gap: t.px(8) }}>
         <Text
           style={{

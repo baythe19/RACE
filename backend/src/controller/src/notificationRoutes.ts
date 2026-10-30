@@ -13,6 +13,7 @@ router.get('/', notificationController.list);
 router.patch('/read-all', notificationController.markAllRead);
 router.patch('/:id/read', notificationController.markRead);
 router.delete('/', notificationController.deleteAll);
+router.delete('/:id', notificationController.deleteOne);
 router.get('/preferences', notificationController.getPrefs);
 router.patch('/preferences', validate(updateNotificationPrefsSchema), notificationController.updatePrefs);
 

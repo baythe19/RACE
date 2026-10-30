@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Clipboard, Linking, Pressable, Text, View } from 'react-native';
+import { Clipboard, Linking, Pressable, Text, View } from 'react-native';
 import { Copy, MapPin, Phone } from 'lucide-react-native';
 
 import DriverAvatar from './DriverAvatar';
@@ -7,6 +7,7 @@ import TripOtpCard from '../booking/TripOtpCard';
 import { getBookingServiceIcon } from '../../constants/bookingsScreen';
 import { brand } from '../../theme/brand';
 import type { ActiveBooking } from '../../types/models';
+import { getAppDialog } from '../../utils/alertBus';
 import { formatLocationDisplay } from '../../utils/readableAddress';
 import { colors, shadows, typography } from '../../theme';
 
@@ -24,7 +25,12 @@ export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Pro
   const copyBookingId = () => {
     const raw = booking.displayId.replace(/^#/, '');
     Clipboard.setString(raw);
-    Alert.alert('Copied', raw);
+    getAppDialog().showDialog({
+      tone: 'success',
+      title: 'Copied',
+      message: raw,
+      primaryLabel: 'OK',
+    });
   };
 
   return (

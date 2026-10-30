@@ -27,7 +27,7 @@ export default function DriverAssignedScreen({ navigation, route }: Props) {
   );
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  const name = driverName ?? booking?.driver?.name ?? 'Assigning driver';
+  const name = driverName ?? booking?.driver?.name ?? 'Your partner';
   const phone = driverPhone ?? booking?.driver?.phone ?? brand.phoneRaw;
   const hasDriver = Boolean(driverName ?? booking?.driver?.name);
 

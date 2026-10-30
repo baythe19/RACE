@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Delete, Shield } from 'lucide-react-native';
 
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { getApiErrorMessage } from '../../services/api';
 import { setPin as setPinApi } from '../../services/profileService';
 import { colors, typography } from '../../theme';
@@ -38,6 +39,7 @@ function PinDots({ value, px, active }: { value: string; px: (n: number) => numb
 
 export default function CreatePinScreen() {
   const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
   const [step, setStep] = useState<PinStep>('current');
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
@@ -82,28 +84,33 @@ export default function CreatePinScreen() {
 
   const handleUpdate = async () => {
     if (currentPin.length < PIN_LENGTH) {
-      Alert.alert('Required', 'Enter your current PIN.');
+      showDialog({ tone: 'warning', title: 'Required', message: 'Enter your current PIN.', primaryLabel: 'OK' });
       setStep('current');
       return;
     }
     if (newPin.length < PIN_LENGTH) {
-      Alert.alert('Required', 'Enter a new 4-digit PIN.');
+      showDialog({ tone: 'warning', title: 'Required', message: 'Enter a new 4-digit PIN.', primaryLabel: 'OK' });
       setStep('new');
       return;
     }
     if (confirmPin.length < PIN_LENGTH) {
-      Alert.alert('Required', 'Confirm your new PIN.');
+      showDialog({ tone: 'warning', title: 'Required', message: 'Confirm your new PIN.', primaryLabel: 'OK' });
       setStep('confirm');
       return;
     }
     if (newPin !== confirmPin) {
-      Alert.alert('Mismatch', 'New PINs do not match. Try again.');
+      showDialog({ tone: 'warning', title: 'Mismatch', message: 'New PINs do not match. Try again.', primaryLabel: 'OK' });
       setConfirmPin('');
       setStep('confirm');
       return;
     }
     if (newPin === currentPin) {
-      Alert.alert('Same PIN', 'New PIN must be different from current PIN.');
+      showDialog({
+        tone: 'warning',
+        title: 'Same PIN',
+        message: 'New PIN must be different from current PIN.',
+        primaryLabel: 'OK',
+      });
       setNewPin('');
       setConfirmPin('');
       setStep('new');
@@ -113,9 +120,19 @@ export default function CreatePinScreen() {
     setSaving(true);
     try {
       await setPinApi(currentPin, newPin);
-      Alert.alert('PIN Updated', 'Your PIN has been changed successfully.');
+      showDialog({
+        tone: 'success',
+        title: 'PIN Updated',
+        message: 'Your PIN has been changed successfully.',
+        primaryLabel: 'OK',
+      });
     } catch (error) {
-      Alert.alert('Could not update PIN', getApiErrorMessage(error));
+      showDialog({
+        tone: 'error',
+        title: 'Could not update PIN',
+        message: getApiErrorMessage(error),
+        primaryLabel: 'OK',
+      });
     } finally {
       setSaving(false);
     }
@@ -123,6 +140,7 @@ export default function CreatePinScreen() {
 
   return (
     <ProfileSubScreenLayout title="Change PIN" subtitle="Verify current PIN, then set a new one">
+      {dialog}
       <View
         style={{
           alignSelf: 'center',

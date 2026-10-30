@@ -91,6 +91,11 @@ export class NotificationService {
     return { deleted };
   }
 
+  async deleteOneForUser(userId: string, notificationId: string): Promise<{ deleted: boolean }> {
+    const deleted = await notificationRepository.deleteOneForUser(userId, notificationId);
+    return { deleted: Boolean(deleted) };
+  }
+
   async getUnreadCount(userId: string): Promise<number> {
     return notificationRepository.countUnread(userId);
   }

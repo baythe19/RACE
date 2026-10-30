@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { AlertTriangle, Clock, MapPin, Wrench } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -15,6 +15,7 @@ import {
   getRoadsideServicePrice,
 } from '../../../constants/roadsideBooking';
 import { useRoadsideBooking } from '../../../context/RoadsideBookingContext';
+import { useAppDialog } from '../../../hooks/useAppDialog';
 import { useServiceBookingPayment } from '../../../hooks/useServiceBookingPayment';
 import { createRoadsideBooking } from '../../../services/bookings/serviceBookingApi';
 import { getApiErrorMessage } from '../../../services/api';
@@ -75,6 +76,7 @@ function ReviewSection({
 
 export default function RoadsideReviewScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
+  const { dialog, showDialog } = useAppDialog();
   const { booking, resetBooking } = useRoadsideBooking();
   const { vehicles } = useVehicleStore();
   const { confirmExistingBooking, isConfirming } = useServiceBookingPayment();
@@ -94,18 +96,14 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
   const handleConfirm = async () => {
     if (submitLockRef.current || isSubmitting || isConfirming) return;
     if (!pickupReady) {
-      Alert.alert(
-        'Location required',
-        'Choose where you need help before confirming.',
-        [
-          { text: 'OK' },
-          {
-            text: 'Add location',
-            onPress: () =>
-              navigation.replace('RoadsideLocation', { serviceId: booking.serviceId }),
-          },
-        ],
-      );
+      showDialog({
+        tone: 'warning',
+        title: 'Location required',
+        message: 'Choose where you need help before confirming.',
+        secondaryLabel: 'OK',
+        primaryLabel: 'Add location',
+        onPrimary: () => navigation.replace('RoadsideLocation', { serviceId: booking.serviceId }),
+      });
       return;
     }
 
@@ -160,7 +158,12 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       const response = await createRoadsideBooking(payload);
 
       if (!response.available) {
-        Alert.alert('Coming soon', response.message ?? 'This service is not available yet.');
+        showDialog({
+          tone: 'info',
+          title: 'Coming soon',
+          message: response.message ?? 'This service is not available yet.',
+          primaryLabel: 'Got it',
+        });
         return;
       }
 
@@ -177,28 +180,39 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
         return;
       }
 
-      Alert.alert('Booking failed', 'Unable to create roadside booking. Please try again.');
+      showDialog({
+        tone: 'error',
+        title: 'Booking failed',
+        message: 'Unable to create roadside booking. Please try again.',
+        primaryLabel: 'OK',
+      });
     } catch (error) {
       const message = getApiErrorMessage(error, 'Something went wrong, please try again.');
       if (message.toLowerCase().includes('vehicle')) {
-        Alert.alert('Vehicle required', message, [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Add Vehicle',
-            onPress: () => {
-              const parent = navigation.getParent();
-              if (parent) {
-                (parent as { navigate: (name: string, params: object) => void }).navigate(
-                  'Profile',
-                  { screen: 'AddVehicle' },
-                );
-              }
-            },
+        showDialog({
+          tone: 'warning',
+          title: 'Vehicle required',
+          message,
+          secondaryLabel: 'Cancel',
+          primaryLabel: 'Add Vehicle',
+          onPrimary: () => {
+            const parent = navigation.getParent();
+            if (parent) {
+              (parent as { navigate: (name: string, params: object) => void }).navigate(
+                'Profile',
+                { screen: 'AddVehicle' },
+              );
+            }
           },
-        ]);
+        });
         return;
       }
-      Alert.alert('Booking failed', message);
+      showDialog({
+        tone: 'error',
+        title: 'Booking failed',
+        message,
+        primaryLabel: 'OK',
+      });
     } finally {
       submitLockRef.current = false;
       setIsSubmitting(false);
@@ -281,6 +295,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
           No charge if we can't help on arrival
         </Text>
       }>
+      {dialog}
       <WizardStepFade>
         {isBusy ? (
           <View style={{ alignItems: 'center', paddingVertical: t.px(12) }}>

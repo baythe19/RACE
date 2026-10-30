@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Phone, Smartphone } from 'lucide-react-native';
 
@@ -7,6 +7,7 @@ import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import OtpInput from '../../components/auth/OtpInput';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { getApiErrorMessage } from '../../services/api';
 import { confirmMobileChange, requestMobileChange } from '../../services/profileService';
 import { useAuthStore } from '../../store/authStore';
@@ -17,6 +18,7 @@ import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 export default function ChangeMobileNumberScreen() {
   const px = useProfilePx();
   const navigation = useNavigation();
+  const { dialog, showDialog } = useAppDialog();
   const authUser = useAuthStore(state => state.user);
   const profile = useProfileStore(state => state.profile);
   const fetchProfile = useProfileStore(state => state.fetchProfile);
@@ -43,11 +45,21 @@ export default function ChangeMobileNumberScreen() {
 
   const handleSendOtp = async () => {
     if (!newPhone.trim() || newPhone.replace(/\D/g, '').length < 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid mobile number.');
+      showDialog({
+        tone: 'warning',
+        title: 'Invalid Number',
+        message: 'Please enter a valid mobile number.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (newPhone.replace(/\D/g, '').slice(-10) === currentPhone.replace(/\D/g, '').slice(-10)) {
-      Alert.alert('Same Number', 'New number must be different from current number.');
+      showDialog({
+        tone: 'warning',
+        title: 'Same Number',
+        message: 'New number must be different from current number.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (submitting) return;
@@ -60,9 +72,19 @@ export default function ChangeMobileNumberScreen() {
       setTimer(result.expiresIn ? Math.max(1, Math.round(result.expiresIn)) : 300);
       setDigits(['', '', '', '', '', '']);
       setActiveIndex(0);
-      Alert.alert('OTP Sent', `Verification code sent to ${result.newMobile}`);
+      showDialog({
+        tone: 'success',
+        title: 'OTP Sent',
+        message: `Verification code sent to ${result.newMobile}`,
+        primaryLabel: 'OK',
+      });
     } catch (error) {
-      Alert.alert('Could not send OTP', getApiErrorMessage(error));
+      showDialog({
+        tone: 'error',
+        title: 'Could not send OTP',
+        message: getApiErrorMessage(error),
+        primaryLabel: 'OK',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -76,7 +98,12 @@ export default function ChangeMobileNumberScreen() {
     }
     const code = digits.join('');
     if (code.length !== 6) {
-      Alert.alert('Invalid OTP', 'Please enter the complete 6-digit code.');
+      showDialog({
+        tone: 'warning',
+        title: 'Invalid OTP',
+        message: 'Please enter the complete 6-digit code.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (submitting) return;
@@ -89,11 +116,20 @@ export default function ChangeMobileNumberScreen() {
       if (updatedAuthUser && updatedProfile) {
         useAuthStore.getState().setUser({ ...updatedAuthUser, mobileNumber: updatedProfile.mobileNumber });
       }
-      Alert.alert('Updated', `Your mobile number has been updated to ${newPhone}.`, [
-        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
-      ]);
+      showDialog({
+        tone: 'success',
+        title: 'Updated',
+        message: `Your mobile number has been updated to ${newPhone}.`,
+        primaryLabel: 'OK',
+        onPrimary: () => goBackWithinStack(navigation),
+      });
     } catch (error) {
-      Alert.alert('Could not update number', getApiErrorMessage(error));
+      showDialog({
+        tone: 'error',
+        title: 'Could not update number',
+        message: getApiErrorMessage(error),
+        primaryLabel: 'OK',
+      });
     } finally {
       setSubmitting(false);
     }
@@ -103,6 +139,7 @@ export default function ChangeMobileNumberScreen() {
     <ProfileSubScreenLayout
       title="Change Mobile Number"
       subtitle="Verify your new number with OTP">
+      {dialog}
       <View
         style={{
           borderRadius: px(14),

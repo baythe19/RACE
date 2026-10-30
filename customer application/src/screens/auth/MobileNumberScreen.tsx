@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   BackHandler,
   Easing,
@@ -19,6 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { TextInput } from 'react-native';
 
 import { KeyboardScreen } from '../../components/ui/AppKeyboard';
+import { useAppDialog } from '../../hooks/useAppDialog';
 
 import {
   AUTH_COLORS as COLORS,
@@ -91,6 +91,7 @@ function extractOtpFromMessage(message?: string): string | null {
 export default function MobileNumberScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
   const loading = useAppSelector(state => state.auth.loading);
+  const { dialog, showDialog } = useAppDialog();
   const signupAccountType = useAppSelector(state => state.onboarding.signupAccountType);
   const signupVendorType = useAppSelector(state => state.onboarding.signupVendorType);
   const partnerSignupRequired = useAppSelector(state => state.onboarding.partnerSignupRequired);
@@ -298,7 +299,12 @@ export default function MobileNumberScreen({ navigation }: Props) {
   };
 
   const handleHelp = () => {
-    Alert.alert('24/7 roadside support', "We're here whenever you need us.");
+    showDialog({
+      tone: 'info',
+      title: '24/7 roadside support',
+      message: "We're here whenever you need us.",
+      primaryLabel: 'Got it',
+    });
   };
 
   const handleTerms = () => {
@@ -307,6 +313,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      {dialog}
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
 
       <KeyboardScreen>

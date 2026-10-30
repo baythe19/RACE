@@ -25,10 +25,15 @@ import { usePartnerDialog } from '../../hooks/usePartnerDialog';
 import PartnerHeaderLogo from '../../components/partner/PartnerHeaderLogo';
 import DriverDataSkeleton from '../../components/partner/DriverDataSkeleton';
 import { useAppSelector } from '../../redux/hooks';
+import { getDriverAcceptLocationGate, pickupCoordsFromJob } from '../../utils/driverLocationGuide';
+import { assertDriverCanAcceptJobs } from '../../utils/driverVerification';
+import { useDriverPresenceStore } from '../../store/driverPresenceStore';
+import { UI_PREVIEW_MODE } from '../../constants/preview';
 import {
   useAcceptDriverJobMutation,
   useDriverJobOffersQuery,
   useDriverJobsQuery,
+  useDriverProfileQuery,
   useRejectDriverJobMutation,
 } from '../../services/driver/useDriverQueries';
 import type { DriverJobBooking } from '../../services/driver/driverApi';
@@ -152,6 +157,7 @@ function vendorBookingToCard(item: VendorBookingItem): DriverJobBooking {
     createdAt: item.createdAt,
     serviceLabel: item.serviceLabel,
     assignedFleetVehicleLabel: item.assignedFleetVehicleLabel,
+    onSiteAssist: item.onSiteAssist,
     driver: item.driver,
     // Vendor-routed rows awaiting a driver claim come from /vendor/bookings.
     vendorApproved: Boolean(item.driver) || item.status === 'CONFIRMED',
@@ -179,6 +185,8 @@ export default function PartnerJobsScreen() {
 
   const driverJobsQuery = useDriverJobsQuery(isDriver);
   const driverOffersQuery = useDriverJobOffersQuery(isDriver);
+  // Driver accept paths check the live profile before claiming a booking.
+  const { data: driverProfile } = useDriverProfileQuery(isDriver);
   const vendorOffersQuery = useVendorBookingOffersQuery(isVendor);
   const vendorBookingsQuery = useVendorBookingsQuery(isVendor);
 
@@ -249,7 +257,9 @@ export default function PartnerJobsScreen() {
     }
   };
 
-  // Vendor fleet bookings after assignment (awaiting claim / claimed / done).
+  // Vendor fleet bookings after assignment (awaiting claim / claimed / done)
+  // PLUS open marketplace leads (no vendor assigned yet) — new jobs must be
+  // visible immediately, newest first.
   const allVendorCards = useMemo(() => {
     const rows = vendorBookingsQuery.data ?? [];
     const awaiting = rows
@@ -258,8 +268,12 @@ export default function PartnerJobsScreen() {
     const claimed = rows
       .filter(item => !EXCLUDED_VENDOR_STATUSES.has(item.status) && item.driver)
       .map(item => ({ job: vendorBookingToCard(item), isOffer: false as const }));
-    return [...awaiting, ...claimed];
-  }, [vendorBookingsQuery.data]);
+    const openLeadIds = new Set(awaiting.map(card => card.job.id));
+    const openLeads = offerCards.filter(({ job }) => !openLeadIds.has(job.id));
+    return [...openLeads, ...awaiting, ...claimed].sort(
+      (a, b) => +new Date(b.job.createdAt) - +new Date(a.job.createdAt),
+    );
+  }, [vendorBookingsQuery.data, offerCards]);
 
   const allDriverCards = useMemo(() => {
     const offerCards = offers.map(job => ({ job, isOffer: true as const }));
@@ -268,6 +282,13 @@ export default function PartnerJobsScreen() {
   }, [offers, myJobs]);
 
   const cards = isVendor ? allVendorCards : allDriverCards;
+
+  /** Newest first — new jobs must be at the top so partners see them immediately. */
+  const sortedCards = useMemo(
+    () =>
+      [...cards].sort((a, b) => +new Date(b.job.createdAt) - +new Date(a.job.createdAt)),
+    [cards],
+  );
 
   const tabs = isDriver ? DRIVER_TABS : VENDOR_TABS;
 
@@ -305,9 +326,10 @@ export default function PartnerJobsScreen() {
   }, [isDriver, offerCards, mineCards, cards, isVendor]);
 
   const filteredCards = useMemo(() => {
-    if (filter === 'all') return cards;
-    return cards.filter(({ job, isOffer }) => tabFor(job, isOffer, isVendor) === filter);
-  }, [cards, filter, isVendor]);
+    const base = sortedCards;
+    if (filter === 'all') return base;
+    return base.filter(({ job, isOffer }) => tabFor(job, isOffer, isVendor) === filter);
+  }, [sortedCards, filter, isVendor]);
 
   const summary = useMemo(() => {
     return {
@@ -324,6 +346,34 @@ export default function PartnerJobsScreen() {
         message: 'You already have an active trip in progress. Please complete or cancel your current trip before accepting a new job.',
       });
       return;
+    }
+    // Pickup-radius gate (driver-side accepts only; vendor staff see assignments).
+    if (!isVendor && !UI_PREVIEW_MODE) {
+      // Profile gate first: rejected/suspended/unsubmitted drivers never accept.
+      const profileVerdict = assertDriverCanAcceptJobs(driverProfile ?? undefined);
+      if (!profileVerdict.ok) {
+        showAlert({
+          tone: 'warning',
+          title: profileVerdict.title ?? 'Profile check failed',
+          message: profileVerdict.message ?? 'You cannot accept jobs right now.',
+        });
+        return;
+      }
+      const gate = getDriverAcceptLocationGate({
+        manualLocation: useDriverPresenceStore.getState().manualLocation,
+        gpsLocation: useDriverPresenceStore.getState().driverLocation,
+        pickup: pickupCoordsFromJob(job),
+        mobileNumber: user?.mobileNumber,
+        previewMode: UI_PREVIEW_MODE,
+      });
+      if (!gate.ok) {
+        showAlert({
+          tone: 'warning',
+          title: gate.title,
+          message: gate.message,
+        });
+        return;
+      }
     }
     setActingId(job.id);
     try {
@@ -897,6 +947,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   summaryTileCopy: {
     flex: 1,
@@ -933,6 +984,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#DBEAFE',
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   summaryTitle: {
     color: colors.dark,

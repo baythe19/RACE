@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import GoldButton from '../../components/auth/GoldButton';
 import { AuthBackHeader } from '../../components/auth/StepHeader';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useAppDispatch } from '../../redux/hooks';
 import { completeOnboarding } from '../../redux/auth/authSlice';
 import { markCustomerOnboardingComplete } from '../../store/customerOnboarding';
@@ -67,6 +67,7 @@ export default function CreatePinScreen({ navigation }: Props) {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
   const compact = height < 700;
+  const { dialog, showDialog } = useAppDialog();
 
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -131,17 +132,32 @@ export default function CreatePinScreen({ navigation }: Props) {
 
   const handleSetPin = () => {
     if (pin.length < PIN_LENGTH) {
-      Alert.alert('Incomplete PIN', 'Please enter a 4-digit PIN.');
+      showDialog({
+        tone: 'warning',
+        title: 'Incomplete PIN',
+        message: 'Please enter a 4-digit PIN.',
+        primaryLabel: 'OK',
+      });
       goToPinStep(true);
       return;
     }
     if (confirmPin.length < PIN_LENGTH) {
-      Alert.alert('Confirm PIN', 'Please re-enter your PIN to confirm.');
+      showDialog({
+        tone: 'warning',
+        title: 'Confirm PIN',
+        message: 'Please re-enter your PIN to confirm.',
+        primaryLabel: 'OK',
+      });
       setStep('confirm');
       return;
     }
     if (pin !== confirmPin) {
-      Alert.alert('Mismatch', 'PINs do not match. Please try again.');
+      showDialog({
+        tone: 'warning',
+        title: 'Mismatch',
+        message: 'PINs do not match. Please try again.',
+        primaryLabel: 'OK',
+      });
       setConfirmPin('');
       setStep('confirm');
       return;
@@ -152,14 +168,24 @@ export default function CreatePinScreen({ navigation }: Props) {
         await setPinApi(undefined, pin);
         setPinSet(true);
       } catch (error) {
-        Alert.alert('Could not save PIN', getApiErrorMessage(error));
+        showDialog({
+          tone: 'error',
+          title: 'Could not save PIN',
+          message: getApiErrorMessage(error),
+          primaryLabel: 'OK',
+        });
       }
     })();
   };
 
   const handleGoHome = async () => {
     if (!pinSet) {
-      Alert.alert('Set PIN first', 'Please set your PIN before continuing to Home.');
+      showDialog({
+        tone: 'warning',
+        title: 'Set PIN first',
+        message: 'Please set your PIN before continuing to Home.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     await markCustomerOnboardingComplete();
@@ -169,6 +195,7 @@ export default function CreatePinScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {dialog}
       <View style={[styles.body, { paddingHorizontal: px(24) }]}>
         <AuthBackHeader onBack={() => goBackWithinStack(navigation)} />
 

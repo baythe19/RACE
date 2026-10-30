@@ -64,7 +64,13 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
 
   const status = mergeLiveStatus(trackedStatus, booking?.unifiedStatus);
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
-  const displayDriverName = driverName ?? booking?.driver?.name ?? 'Assigning driver';
+  /** Pre-accept honesty — see same logic in TowingTrackScreen. */
+  const partnerPending = !driverName && !booking?.driver;
+  const displayDriverName = partnerPending
+    ? status === 'DRIVER_ASSIGNED'
+      ? 'Assigned partner — accepting…'
+      : 'Waiting for a partner to accept'
+    : (driverName ?? booking?.driver?.name ?? 'Partner');
   const phone = driverPhone ?? booking?.driver?.phone;
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
@@ -78,13 +84,30 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
         ? `${booking.etaMinutes} min`
         : etaLabel;
 
+  /**
+   * Honest ETA states (screenshot bug: screen stuck on "Calculating… / Confirmed"):
+   * before a partner is en route there IS no arrival estimate — say so instead
+   * of a spinner; the tracker (ETA endpoint) only has data once the trip starts.
+   */
+  const etaForStage =
+    status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED' || status === 'IN_PROGRESS'
+      ? etaMinutes != null
+        ? `${etaMinutes} min`
+        : 'Updating…'
+      : status === 'DRIVER_ASSIGNED' || status === 'CONFIRMED'
+        ? 'Partner approval pending'
+        : status === 'PENDING'
+          ? 'Available once a partner accepts'
+          : status === 'COMPLETED' || status === 'RATED'
+            ? 'Trip completed'
+            : '—';
+
   const resolvedFare =
     trackedFare ??
     (booking?.fareBreakdown && 'totalFare' in booking.fareBreakdown
       ? (booking.fareBreakdown as { totalFare?: number }).totalFare
       : booking?.estimatedFare) ??
     0;
-
   const isArrivedDropoff = Boolean(
     arrivedAtDropoffAt || (booking as { arrivedAtDropoffAt?: string } | null)?.arrivedAtDropoffAt,
   );
@@ -126,10 +149,10 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
     ? 'Partner location updating live'
     : mockDriverPoint
       ? 'Preview mode · sample partner position on map'
-      : status === 'DRIVER_ASSIGNED' || status === 'CONFIRMED'
-        ? 'Driver allotted · waiting to start'
-        : status === 'PENDING'
-          ? 'Finding a partner near you'
+      : status === 'DRIVER_ASSIGNED'
+        ? 'Assigned — partner will accept shortly'
+        : status === 'CONFIRMED' || status === 'PENDING'
+          ? 'Sent to nearby partners — first to accept serves you'
           : null;
 
   return (
@@ -142,7 +165,7 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
       isLive={isLive}
       steps={TRACK_STEPS}
       activeStep={activeStep}
-      etaLabel={resolvedEta}
+      etaLabel={etaForStage}
       serviceLabel="Driver hire"
       pickupLabel={formatLocationDisplay(booking?.pickup) || 'Pickup'}
       dropLabel={

@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Linking,
   Pressable,
   Text,
@@ -25,6 +24,7 @@ import CancellationRefundPolicyModal from '../../components/booking/Cancellation
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import GoldButton from '../../components/auth/GoldButton';
 import DataSkeleton from '../../components/ui/DataSkeleton';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useBookingDetailQuery } from '../../services/bookings/useBookingQueries';
 import {
   cancelServiceBooking,
@@ -110,6 +110,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const bookingQuery = useBookingDetailQuery(route.params.bookingId, route.params.bookingType);
   const booking = bookingQuery.data ?? null;
   const queryClient = useQueryClient();
+  const { dialog, showDialog } = useAppDialog();
 
   const isCompleted = booking ? isBookingCompleted(booking) : false;
   const isOngoing = booking ? isBookingOngoing(booking) : false;
@@ -141,23 +142,21 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   if (!booking) {
     return (
       <ProfileSubScreenLayout title="Booking details" onBack={() => goBackWithinStack(navigation)}>
-        <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          {bookingQuery.isError ? (
-            <>
-              <Text style={{ color: '#DC2626', fontWeight: '600' }}>
-                Unable to load this booking
-              </Text>
-              <Pressable
-                onPress={() => bookingQuery.refetch()}
-                style={{ marginTop: px(16), paddingHorizontal: px(24), paddingVertical: px(10) }}
-                accessibilityRole="button">
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>Try again</Text>
-              </Pressable>
-            </>
-          ) : (
-            <DataSkeleton variant="detail" />
-          )}
-        </View>
+        {bookingQuery.isError ? (
+          <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
+            <Text style={{ color: '#DC2626', fontWeight: '600' }}>
+              Unable to load this booking
+            </Text>
+            <Pressable
+              onPress={() => bookingQuery.refetch()}
+              style={{ marginTop: px(16), paddingHorizontal: px(24), paddingVertical: px(10) }}
+              accessibilityRole="button">
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <DataSkeleton variant="bookingDetail" />
+        )}
       </ProfileSubScreenLayout>
     );
   }
@@ -185,7 +184,12 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
       setShowCancelModal(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch cancellation policy';
-      Alert.alert('Unable to cancel now', message);
+      showDialog({
+        tone: 'error',
+        title: 'Unable to cancel now',
+        message,
+        primaryLabel: 'OK',
+      });
     } finally {
       setPolicyLoading(false);
     }
@@ -202,16 +206,24 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
       });
       setShowCancelModal(false);
       setCancelReason('');
-      Alert.alert(
-        'Booking Cancelled',
-        result.refundAmount > 0
-          ? `Refund ₹${result.refundAmount} is pending. It has not been processed yet.`
-          : 'No refund applicable for this cancellation.',
-      );
+      showDialog({
+        tone: 'success',
+        title: 'Booking Cancelled',
+        message:
+          result.refundAmount > 0
+            ? `Refund ₹${result.refundAmount} is pending. It has not been processed yet.`
+            : 'No refund applicable for this cancellation.',
+        primaryLabel: 'OK',
+      });
       navigation.navigate('BookingsMain');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to cancel booking';
-      Alert.alert('Cancellation failed', message);
+      showDialog({
+        tone: 'error',
+        title: 'Cancellation failed',
+        message,
+        primaryLabel: 'OK',
+      });
     } finally {
       setCancelSubmitting(false);
     }
@@ -241,6 +253,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
           </Text>
         </View>
       }>
+      {dialog}
       {/* Booking ID — prominent */}
       <View
         style={{

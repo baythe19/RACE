@@ -3,19 +3,13 @@ import {
   Bell,
   FileText,
   KeyRound,
+  Lock,
   Mail,
   MessageCircle,
   Shield,
   Smartphone,
   Trash2,
 } from 'lucide-react-native';
-
-export const PROFILE_PERSONAL = {
-  dob: '12 May 1998',
-  gender: 'Male',
-  emergency: '+91 98765 43210',
-  address: '123, MG Road, Bhubaneswar',
-};
 
 export const PROFILE_MENU_ROUTES = {
   personal: 'PersonalInformation',
@@ -87,6 +81,13 @@ export const SETTINGS_SECTIONS: Array<{
     title: 'ACCOUNT SETTINGS',
     items: [
       { id: 'pin', title: 'Change PIN', subtitle: 'Update your 4-digit PIN', Icon: KeyRound, kind: 'nav' },
+      {
+        id: 'password',
+        title: 'Change Password',
+        subtitle: 'For accounts with a password set',
+        Icon: Lock,
+        kind: 'nav',
+      },
       {
         id: 'mobile',
         title: 'Change Mobile Number',

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Eye, EyeOff, Lock } from 'lucide-react-native';
 
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { getApiErrorMessage } from '../../services/api';
 import { changePassword } from '../../services/profileService';
 import { colors, typography } from '../../theme';
@@ -17,6 +18,7 @@ export default function ChangePasswordScreen() {
   const px = useProfilePx();
   const { width } = useWindowDimensions();
   const scale = width / REF_W;
+  const { dialog, showDialog } = useAppDialog();
 
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -34,26 +36,40 @@ export default function ChangePasswordScreen() {
 
   const handleSave = async () => {
     if (!current.trim()) {
-      Alert.alert('Required', 'Enter your current password.');
+      showDialog({ tone: 'warning', title: 'Required', message: 'Enter your current password.', primaryLabel: 'OK' });
       return;
     }
     if (next.length < 8) {
-      Alert.alert('Weak Password', 'New password must be at least 8 characters.');
+      showDialog({
+        tone: 'warning',
+        title: 'Weak Password',
+        message: 'New password must be at least 8 characters.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (next !== confirm) {
-      Alert.alert('Mismatch', 'New passwords do not match.');
+      showDialog({ tone: 'warning', title: 'Mismatch', message: 'New passwords do not match.', primaryLabel: 'OK' });
       return;
     }
     if (saving) return;
     setSaving(true);
     try {
       await changePassword(current, next);
-      Alert.alert('Updated', 'Your password has been changed successfully.', [
-        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
-      ]);
+      showDialog({
+        tone: 'success',
+        title: 'Updated',
+        message: 'Your password has been changed successfully.',
+        primaryLabel: 'OK',
+        onPrimary: () => goBackWithinStack(navigation),
+      });
     } catch (error) {
-      Alert.alert('Could not update password', getApiErrorMessage(error));
+      showDialog({
+        tone: 'error',
+        title: 'Could not update password',
+        message: getApiErrorMessage(error),
+        primaryLabel: 'OK',
+      });
     } finally {
       setSaving(false);
     }
@@ -61,6 +77,7 @@ export default function ChangePasswordScreen() {
 
   return (
     <ProfileSubScreenLayout title="Change Password" subtitle="Update your login password">
+      {dialog}
       <View style={{ gap: px(4), marginBottom: px(20), marginTop: px(4) }}>
         <FormField
           label="Current Password"

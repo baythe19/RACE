@@ -74,6 +74,7 @@ import NotificationsScreen from '../screens/profile/NotificationsScreen';
 import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
 import SettingsScreen from '../screens/profile/SettingsScreen';
 import ChoosePlanScreen from '../screens/profile/ChoosePlanScreen';
+import SubscriptionPlansScreen from '../screens/profile/SubscriptionPlansScreen';
 import CreatePinScreen from '../screens/profile/CreatePinScreen';
 import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
 import ChangeMobileNumberScreen from '../screens/profile/ChangeMobileNumberScreen';
@@ -505,6 +506,7 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen name="HelpSupport" component={HelpSupportScreen} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} />
       <ProfileStack.Screen name="ChoosePlan" component={ChoosePlanScreen} />
+      <ProfileStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <ProfileStack.Screen name="CreatePin" component={CreatePinScreen} />
       <ProfileStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       <ProfileStack.Screen name="ChangeMobileNumber" component={ChangeMobileNumberScreen} />

@@ -35,6 +35,7 @@ export type VendorBookingItem = {
   createdAt: string;
   scheduledAt?: string;
   serviceLabel: string;
+  onSiteAssist?: boolean;
   assignedFleetVehicleId?: string;
   assignedFleetVehicleLabel?: string;
   driver?: { id: string; name: string; phone: string; rating: number };

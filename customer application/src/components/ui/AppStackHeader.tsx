@@ -8,6 +8,7 @@ import { colors, typography } from '../../theme';
 type Props = {
   title?: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number;
   onBack?: () => void;
   headerRight?: ReactNode;
   showBack?: boolean;
@@ -22,6 +23,7 @@ type Props = {
 export default function AppStackHeader({
   title,
   subtitle,
+  subtitleNumberOfLines = 2,
   onBack,
   headerRight,
   showBack = true,
@@ -71,7 +73,7 @@ export default function AppStackHeader({
                 lineHeight: px(15),
                 textAlign: 'left',
               }}
-              numberOfLines={2}>
+              numberOfLines={subtitleNumberOfLines}>
               {subtitle}
             </Text>
           ) : null}

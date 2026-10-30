@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
 import {
-  Alert,
   Pressable,
   Text,
   View,
@@ -22,6 +21,7 @@ import {
   VehicleTypeIcon,
 } from '../../components/vehicles/vehicleUi';
 import { useVehicleStore } from '../../store/vehicleStore';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import type { ProfileStackParamList } from '../../types/navigation';
 import type { Vehicle } from '../../types/vehicle';
 import { formatVehicleNumber } from '../../utils/vehicleFormat';
@@ -326,6 +326,7 @@ function QrInfoBanner({ px }: { px: (n: number) => number }) {
 
 export default function VehicleListScreen({ navigation }: Props) {
   const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
   const { vehicles, isLoading, error, fetchVehicles, deleteVehicle } = useVehicleStore();
   const safeVehicles = Array.isArray(vehicles) ? vehicles : [];
 
@@ -334,16 +335,17 @@ export default function VehicleListScreen({ navigation }: Props) {
   }, [fetchVehicles]);
 
   const handleDelete = (id: string) => {
-    Alert.alert('Delete vehicle', 'Remove this vehicle from your account?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          void deleteVehicle(id);
-        },
+    showDialog({
+      tone: 'danger',
+      title: 'Delete vehicle',
+      message: 'Remove this vehicle from your account?',
+      secondaryLabel: 'Cancel',
+      primaryLabel: 'Delete',
+      destructive: true,
+      onPrimary: () => {
+        void deleteVehicle(id);
       },
-    ]);
+    });
   };
 
   const renderVehicle = (vehicle: Vehicle, index: number) => (
@@ -363,6 +365,7 @@ export default function VehicleListScreen({ navigation }: Props) {
       title="My Vehicles"
       subtitle="Manage your registered vehicles"
       headerRight={
+        <>
         <Pressable
           onPress={() => navigation.navigate('AddVehicle')}
           style={({ pressed }) => [
@@ -389,7 +392,9 @@ export default function VehicleListScreen({ navigation }: Props) {
             Add Vehicle
           </Text>
         </Pressable>
+        </>
       }>
+      {dialog}
       {isLoading && !safeVehicles.length ? (
         <DataSkeleton variant="cards" />
       ) : (

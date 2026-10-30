@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Linking, Pressable, Switch, Text, View } from 'react-native';
+import { Linking, Pressable, Switch, Text, View } from 'react-native';
 import { ChevronRight, Lock } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,17 +16,20 @@ import {
   useUpdateNotificationPrefMutation,
 } from '../../services/profile/useProfileQueries';
 import type { ProfileStackParamList } from '../../types/navigation';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { brand } from '../../theme/brand';
 import { colors, shadows, typography } from '../../theme';
 
 const SETTINGS_ROUTES: Partial<Record<string, keyof ProfileStackParamList>> = {
   pin: 'CreatePin',
+  password: 'ChangePassword',
   mobile: 'ChangeMobileNumber',
 };
 
 export default function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
   const { data: serverPrefs, isLoading: prefsLoading } = useNotificationPrefsQuery();
   const updatePref = useUpdateNotificationPrefMutation();
 
@@ -74,7 +77,12 @@ export default function SettingsScreen() {
       {
         onError: err => {
           setToggles(prev => ({ ...prev, [id]: !value }));
-          Alert.alert('Update failed', getApiErrorMessage(err));
+          showDialog({
+            tone: 'error',
+            title: 'Update failed',
+            message: getApiErrorMessage(err),
+            primaryLabel: 'OK',
+          });
         },
       },
     );
@@ -93,24 +101,14 @@ export default function SettingsScreen() {
     }
 
     if (danger || id === 'delete') {
-      Alert.alert(
-        'Delete account',
-        `To permanently remove your account, call ${brand.phone} or email ${brand.email}. Our team will verify and delete your data.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Call support',
-            onPress: () => void Linking.openURL(`tel:${brand.phoneRaw}`),
-          },
-          {
-            text: 'Email',
-            onPress: () =>
-              void Linking.openURL(
-                `mailto:${brand.email}?subject=${encodeURIComponent('Account deletion request')}`,
-              ),
-          },
-        ],
-      );
+      showDialog({
+        tone: 'info',
+        title: 'Delete account',
+        message: `To permanently remove your account, call ${brand.phone} or email ${brand.email}. Our team will verify and delete your data.`,
+        secondaryLabel: 'Cancel',
+        primaryLabel: 'Call support',
+        onPrimary: () => void Linking.openURL(`tel:${brand.phoneRaw}`),
+      });
       return;
     }
 
@@ -131,6 +129,7 @@ export default function SettingsScreen() {
 
   return (
     <ProfileSubScreenLayout title="Settings" subtitle="App settings and privacy">
+      {dialog}
       {SETTINGS_SECTIONS.map(section => (
         <View key={section.title} style={{ marginBottom: px(16) }}>
           <Text

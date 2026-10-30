@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -18,6 +17,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import { AuthBackHeader } from '../../components/auth/StepHeader';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useAuthActions } from '../../hooks/useAuth';
 import { getApiErrorMessage } from '../../services/api';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
@@ -35,6 +35,7 @@ export default function CreateAccountScreen({ navigation }: Props) {
   const { width } = useWindowDimensions();
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
+  const { dialog, showDialog } = useAppDialog();
 
   const [phone, setPhone] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(true);
@@ -59,7 +60,12 @@ export default function CreateAccountScreen({ navigation }: Props) {
       nextErrors.phone = 'Enter valid 10-digit number';
     }
     if (!termsAccepted) {
-      Alert.alert('Terms Required', 'Please accept terms');
+      showDialog({
+        tone: 'warning',
+        title: 'Terms Required',
+        message: 'Please accept terms',
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -95,6 +101,7 @@ export default function CreateAccountScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {dialog}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

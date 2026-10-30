@@ -1,12 +1,14 @@
 import React, { useCallback, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { Text, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { Car, MapPin, Phone, Siren, User } from 'lucide-react-native';
 
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useSosDetails } from '../../context/SosDetailsContext';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 import { colors, shadows, typography } from '../../theme';
 
 function digitsOnly(value: string, maxLen = 10): string {
@@ -30,6 +32,8 @@ function SectionTitle({ label, px }: { label: string; px: (n: number) => number 
 
 export default function SosDetailsScreen() {
   const px = useProfilePx();
+  const navigation = useNavigation();
+  const { dialog, showDialog } = useAppDialog();
   const { details, setDetails } = useSosDetails();
 
   const [ownerName, setOwnerName] = useState(details.ownerName);
@@ -58,15 +62,30 @@ export default function SosDetailsScreen() {
 
   const handleSave = () => {
     if (!ownerName.trim() || !ownerPhone.trim()) {
-      Alert.alert('Required', 'Please enter vehicle owner name and phone.');
+      showDialog({
+        tone: 'warning',
+        title: 'Required',
+        message: 'Please enter vehicle owner name and phone.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (!contactName.trim() || !contactPhone.trim()) {
-      Alert.alert('Required', 'Please enter emergency contact details.');
+      showDialog({
+        tone: 'warning',
+        title: 'Required',
+        message: 'Please enter emergency contact details.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (!vehicleNumber.trim()) {
-      Alert.alert('Required', 'Please enter your vehicle number.');
+      showDialog({
+        tone: 'warning',
+        title: 'Required',
+        message: 'Please enter your vehicle number.',
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -81,13 +100,20 @@ export default function SosDetailsScreen() {
       contactPhone: contactPhone.trim(),
       location: location.trim(),
     });
-    Alert.alert('Saved', 'Your SOS details have been updated.');
+    showDialog({
+      tone: 'success',
+      title: 'Saved',
+      message: 'Your SOS details have been updated.',
+      primaryLabel: 'OK',
+      onPrimary: () => goBackWithinStack(navigation),
+    });
   };
 
   return (
     <ProfileSubScreenLayout
       title="SOS Details"
       subtitle="Shown on your emergency assistance screen">
+      {dialog}
       <View
         style={{
           flexDirection: 'row',

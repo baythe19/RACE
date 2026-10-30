@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert } from 'react-native';
 
 import { getApiErrorMessage } from '../services/api';
 import {
@@ -16,6 +15,7 @@ import {
   previewDriverBooking,
   previewTowingBooking,
 } from '../services/bookings/previewBooking';
+import { getAppDialog } from '../utils/alertBus';
 import type {
   CreateDriverBookingRequest,
   CreateTowingBookingRequest,
@@ -71,7 +71,7 @@ export function useServiceBookingPayment() {
     } catch (err) {
       const message = getApiErrorMessage(err, 'Unable to confirm towing booking');
       setError(message);
-      Alert.alert('Booking failed', message);
+      getAppDialog().showDialog({ tone: 'error', title: 'Booking failed', message, primaryLabel: 'OK' });
       throw err;
     } finally {
       endConfirm();
@@ -97,7 +97,7 @@ export function useServiceBookingPayment() {
     } catch (err) {
       const message = getApiErrorMessage(err, 'Unable to confirm driver booking');
       setError(message);
-      Alert.alert('Booking failed', message);
+      getAppDialog().showDialog({ tone: 'error', title: 'Booking failed', message, primaryLabel: 'OK' });
       throw err;
     } finally {
       endConfirm();
@@ -121,7 +121,7 @@ export function useServiceBookingPayment() {
       } catch (err) {
         const message = getApiErrorMessage(err, 'Unable to record advance payment');
         setError(message);
-        Alert.alert('Payment failed', message);
+        getAppDialog().showDialog({ tone: 'error', title: 'Payment failed', message, primaryLabel: 'OK' });
         throw err;
       } finally {
         endConfirm();

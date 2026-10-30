@@ -26,6 +26,8 @@ import {
   listNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  deleteAllNotifications,
+  deleteNotification,
   getNotificationPreferences,
   updateNotificationPreferences,
   mapMobilePrefToBackend,
@@ -155,6 +157,26 @@ export function useMarkAllNotificationsReadMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+    },
+  });
+}
+
+export function useDeleteAllNotificationsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAllNotifications,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+    },
+  });
+}
+
+export function useDeleteNotificationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteNotification(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
     },

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   Linking,
@@ -20,6 +19,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import QRCodePlaceholder from '../../components/auth/QRCodePlaceholder';
 import StepHeader from '../../components/auth/StepHeader';
 import { QR_ACTIONS } from '../../constants/auth';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useVehicleQuery } from '../../services/vehicles/useVehicleQueries';
 import { formatFuelLabel } from '../../components/vehicles/vehicleUi';
 import { getLucideIcon } from '../../utils/lucideIcon';
@@ -41,6 +41,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'QRCode'>;
 
 export default function QRCodeScreen({ navigation, route }: Props) {
   const { vehicleId, vehicleNumber } = route.params;
+  const { dialog, showDialog } = useAppDialog();
   const { data: vehicle, isLoading } = useVehicleQuery(vehicleId);
   const { width } = useWindowDimensions();
   const s = width / REF_W;
@@ -62,7 +63,12 @@ export default function QRCodeScreen({ navigation, route }: Props) {
 
   const handleShare = () => {
     if (!vehicle?.qrCode) {
-      Alert.alert('QR Code', 'QR code is not ready yet.');
+      showDialog({
+        tone: 'warning',
+        title: 'QR Code',
+        message: 'QR code is not ready yet.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     void Share.share({
@@ -73,6 +79,7 @@ export default function QRCodeScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {dialog}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,

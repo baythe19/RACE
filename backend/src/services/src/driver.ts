@@ -59,8 +59,14 @@ async function assertDriverApproved(driverId: string): Promise<void> {
   if (!driver?.driverProfile) {
     throw new NotFoundError('Driver not found');
   }
-  if (driver.operationalStatus === 'SUSPENDED') {
+  if (
+    driver.operationalStatus === 'SUSPENDED' ||
+    driver.driverProfile.status === 'SUSPENDED'
+  ) {
     throw new ForbiddenError('Driver account has been suspended');
+  }
+  if (driver.operationalStatus === 'DISABLED') {
+    throw new ForbiddenError('Driver account has been disabled');
   }
   if (driver.reviewStatus === 'REJECTED' || driver.driverProfile.status === 'REJECTED') {
     throw new ForbiddenError('Driver account documents were rejected');

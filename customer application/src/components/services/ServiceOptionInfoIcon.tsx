@@ -1,6 +1,8 @@
 import React from 'react';
-import { Alert, Pressable, useWindowDimensions } from 'react-native';
+import { Pressable, useWindowDimensions } from 'react-native';
 import { Info } from 'lucide-react-native';
+
+import { getAppDialog } from '../../utils/alertBus';
 
 const REF_W = 390;
 
@@ -10,7 +12,7 @@ type Props = {
   accessibilityLabel?: string;
 };
 
-/** Small ℹ beside a service tier title — tap shows Alert with details. */
+/** Small ℹ beside a service tier title — tap shows the branded info dialog. */
 export default function ServiceOptionInfoIcon({
   alertTitle,
   alertBody,
@@ -21,7 +23,14 @@ export default function ServiceOptionInfoIcon({
 
   return (
     <Pressable
-      onPress={() => Alert.alert(alertTitle, alertBody)}
+      onPress={() =>
+        getAppDialog().showDialog({
+          tone: 'info',
+          title: alertTitle,
+          message: alertBody,
+          primaryLabel: 'Got it',
+        })
+      }
       hitSlop={8}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? `${alertTitle} details`}
@@ -38,5 +47,10 @@ export default function ServiceOptionInfoIcon({
 }
 
 export function showServiceHeaderInfo(title: string, body: string) {
-  Alert.alert(title, body);
+  getAppDialog().showDialog({
+    tone: 'info',
+    title,
+    message: body,
+    primaryLabel: 'Got it',
+  });
 }

@@ -1,9 +1,10 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import QRCode from 'qrcode';
-import { Alert, Platform, Share } from 'react-native';
+import { Platform, Share } from 'react-native';
 
 import { getVehicleQrScanUrl } from '../components/vehicles/vehicleUi';
 import type { Vehicle } from '../types/vehicle';
+import { getAppDialog } from './alertBus';
 import { formatVehicleNumber } from './vehicleFormat';
 
 function sanitizeFilePart(value: string): string {
@@ -118,7 +119,12 @@ function openHtmlDocument(html: string): void {
     }
     return;
   }
-  Alert.alert('Emergency page', 'Preview is available in the browser build of the app.');
+  getAppDialog().showDialog({
+    tone: 'info',
+    title: 'Emergency page',
+    message: 'Preview is available in the browser build of the app.',
+    primaryLabel: 'Got it',
+  });
 }
 
 async function fetchLiveEmergencyHtml(vehicleId: string): Promise<string | null> {
@@ -171,7 +177,12 @@ export async function downloadVehicleQrPng(vehicle: Vehicle): Promise<void> {
       message: Platform.OS === 'android' ? fileUri : `RACE emergency QR for ${formatVehicleNumber(vehicle.vehicleNumber)}`,
     });
   } catch {
-    Alert.alert('Download failed', 'Could not save the QR image. Try again.');
+    getAppDialog().showDialog({
+      tone: 'error',
+      title: 'Download failed',
+      message: 'Could not save the QR image. Try again.',
+      primaryLabel: 'OK',
+    });
   }
 }
 

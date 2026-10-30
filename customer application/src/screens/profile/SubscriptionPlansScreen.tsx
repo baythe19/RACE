@@ -1,11 +1,12 @@
 import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import SubscriptionCard from '../../components/subscription/SubscriptionCard';
 import LoadingState from '../../components/ui/LoadingState';
 import Screen, { ScreenContent } from '../../components/ui/Screen';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { setBillingPeriod } from '../../redux/subscriptions/subscriptionsSlice';
 import {
@@ -22,6 +23,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'SubscriptionPlans'>;
 
 export default function SubscriptionPlansScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
+  const { dialog, showDialog } = useAppDialog();
   const plans = useAppSelector((state) => state.subscriptions.plans);
   const billingPeriod = useAppSelector((state) => state.subscriptions.billingPeriod);
   const { isLoading } = useSubscriptionPlansQuery(billingPeriod);
@@ -31,7 +33,12 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
   const handleSelect = (planSlug: string, actionType?: string) => {
     if (subscribe.isPending) return;
     if (actionType === 'contact') {
-      Alert.alert('Corporate Plan', 'Please contact RACE support to activate corporate billing.');
+      showDialog({
+        tone: 'info',
+        title: 'Corporate Plan',
+        message: 'Please contact RACE support to activate corporate billing.',
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -40,7 +47,12 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
       {
         onSuccess: () => goBackWithinStack(navigation),
         onError: (error) => {
-          Alert.alert('Subscription failed', getApiErrorMessage(error));
+          showDialog({
+            tone: 'error',
+            title: 'Subscription failed',
+            message: getApiErrorMessage(error),
+            primaryLabel: 'OK',
+          });
         },
       },
     );
@@ -57,6 +69,7 @@ export default function SubscriptionPlansScreen({ navigation }: Props) {
   return (
     <Screen>
       <SafeAreaView style={styles.safe}>
+        {dialog}
         <ScrollView contentContainerStyle={styles.scroll}>
           <ScreenContent>
             <Text style={styles.title}>Choose Your Plan</Text>

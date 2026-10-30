@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { Building2, ChevronRight, Home, MapPin, Plus, Trash2 } from 'lucide-react-native';
 
 import LocationPickerModal from '../../components/common/LocationPickerModal';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import DataSkeleton from '../../components/ui/DataSkeleton';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { getApiErrorMessage } from '../../services/api';
 import {
   useCreateLocationMutation,
@@ -26,6 +27,7 @@ const TYPE_OPTIONS: Array<{ id: SavedLocationType; label: string }> = [
 
 export default function SavedLocationsScreen() {
   const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
   const { data: locations = [], isLoading, isError, error, refetch } = useSavedLocationsQuery();
   const createLocation = useCreateLocationMutation();
   const updateLocation = useUpdateLocationMutation();
@@ -69,7 +71,12 @@ export default function SavedLocationsScreen() {
   const handleSave = () => {
     if (createLocation.isPending || updateLocation.isPending) return;
     if (!label.trim() || !address.trim()) {
-      Alert.alert('Missing fields', 'Please enter a label and address.');
+      showDialog({
+        tone: 'warning',
+        title: 'Missing fields',
+        message: 'Please enter a label and address.',
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -86,7 +93,13 @@ export default function SavedLocationsScreen() {
         { id: editingId, payload },
         {
           onSuccess: resetForm,
-          onError: err => Alert.alert('Update failed', getApiErrorMessage(err)),
+          onError: err =>
+            showDialog({
+              tone: 'error',
+              title: 'Update failed',
+              message: getApiErrorMessage(err),
+              primaryLabel: 'OK',
+            }),
         },
       );
       return;
@@ -94,31 +107,45 @@ export default function SavedLocationsScreen() {
 
     createLocation.mutate(payload, {
       onSuccess: resetForm,
-      onError: err => Alert.alert('Add failed', getApiErrorMessage(err)),
+      onError: err =>
+        showDialog({
+          tone: 'error',
+          title: 'Add failed',
+          message: getApiErrorMessage(err),
+          primaryLabel: 'OK',
+        }),
     });
   };
 
   const handleDelete = (location: SavedLocation) => {
     if (deleteLocation.isPending) return;
-    Alert.alert('Delete location', `Remove "${location.label}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          if (deleteLocation.isPending) return;
-          deleteLocation.mutate(location.id, {
-            onError: err => Alert.alert('Delete failed', getApiErrorMessage(err)),
-          });
-        },
+    showDialog({
+      tone: 'danger',
+      title: 'Delete location',
+      message: `Remove "${location.label}"?`,
+      secondaryLabel: 'Cancel',
+      primaryLabel: 'Delete',
+      destructive: true,
+      onPrimary: () => {
+        if (deleteLocation.isPending) return;
+        deleteLocation.mutate(location.id, {
+          onError: err =>
+            showDialog({
+              tone: 'error',
+              title: 'Delete failed',
+              message: getApiErrorMessage(err),
+              primaryLabel: 'OK',
+            }),
+        });
       },
-    ]);
+    });
   };
 
   const isSaving = createLocation.isPending || updateLocation.isPending;
 
   return (
     <ProfileSubScreenLayout title="Saved Locations" subtitle="Your frequently used locations">
+      {dialog}
       {isLoading ? (
         <DataSkeleton variant="list" />
       ) : (

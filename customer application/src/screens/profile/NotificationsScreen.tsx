@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Bell,
   CheckCircle,
@@ -7,16 +7,19 @@ import {
   Star,
   Tag,
   Truck,
+  X,
   type LucideIcon,
 } from 'lucide-react-native';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import DataSkeleton from '../../components/ui/DataSkeleton';
 import { useAuthActions } from '../../hooks/useAuth';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { openBookingDetailFromAnywhere } from '../../navigation/customerNavigationRef';
 import { getApiErrorMessage } from '../../services/api';
 import {
-  useMarkAllNotificationsReadMutation,
+  useDeleteAllNotificationsMutation,
+  useDeleteNotificationMutation,
   useMarkNotificationReadMutation,
   useNotificationsQuery,
 } from '../../services/profile/useProfileQueries';
@@ -107,86 +110,112 @@ function NotificationCard({
   item,
   px,
   onPress,
+  onDismiss,
+  dismissing,
 }: {
   item: AppNotification;
   px: (n: number) => number;
   onPress: (item: AppNotification) => void;
+  onDismiss: (item: AppNotification) => void;
+  dismissing?: boolean;
 }) {
   const Icon = ICONS[item.category] ?? Bell;
   const unread = !item.read;
 
   return (
-    <Pressable
-      onPress={() => onPress(item)}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: px(10),
-        borderRadius: px(14),
-        borderWidth: 1,
-        borderColor: unread ? '#F4E8C8' : colors.border,
-        backgroundColor: unread ? '#FFFBF2' : '#FFFFFF',
-        padding: px(14),
-        marginBottom: px(10),
-        opacity: pressed ? 0.9 : 1,
-      })}>
-      <View
-        style={{
-          width: px(40),
-          height: px(40),
-          borderRadius: px(20),
-          backgroundColor: unread ? colors.goldLight : colors.lightGrey,
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-        <Icon size={px(18)} color={unread ? colors.primary : colors.grey} strokeWidth={2.2} />
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: px(8) }}>
-          <Text
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              fontSize: px(13),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            {item.title}
-          </Text>
-          <Text style={{ fontSize: px(10), color: colors.grey, flexShrink: 0 }}>
-            {formatNotificationTime(item.createdAt)}
-          </Text>
-        </View>
-        <Text
-          numberOfLines={2}
-          style={{ fontSize: px(11.5), color: colors.grey, marginTop: px(4), lineHeight: px(16) }}>
-          {item.body}
-        </Text>
-      </View>
-      {unread ? (
+    <View style={{ position: 'relative', marginBottom: px(10) }}>
+      <Pressable
+        onPress={() => onPress(item)}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: px(10),
+          borderRadius: px(14),
+          borderWidth: 1,
+          borderColor: unread ? '#F4E8C8' : colors.border,
+          backgroundColor: unread ? '#FFFBF2' : '#FFFFFF',
+          padding: px(14),
+          paddingRight: px(36),
+          opacity: pressed ? 0.9 : 1,
+        })}>
         <View
           style={{
-            width: px(8),
-            height: px(8),
-            borderRadius: px(4),
-            backgroundColor: colors.primary,
-            marginLeft: px(2),
+            width: px(40),
+            height: px(40),
+            borderRadius: px(20),
+            backgroundColor: unread ? colors.goldLight : colors.lightGrey,
+            alignItems: 'center',
+            justifyContent: 'center',
             flexShrink: 0,
-          }}
-        />
-      ) : null}
-    </Pressable>
+          }}>
+          <Icon size={px(18)} color={unread ? colors.primary : colors.grey} strokeWidth={2.2} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: px(8) }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                fontSize: px(13),
+                fontWeight: typography.weights.bold,
+                color: colors.dark,
+              }}>
+              {item.title}
+            </Text>
+            <Text style={{ fontSize: px(10), color: colors.grey, flexShrink: 0 }}>
+              {formatNotificationTime(item.createdAt)}
+            </Text>
+          </View>
+          <Text
+            numberOfLines={2}
+            style={{ fontSize: px(11), color: colors.grey, marginTop: px(4), lineHeight: px(15) }}>
+            {item.body}
+          </Text>
+        </View>
+        {unread ? (
+          <View
+            style={{
+              width: px(8),
+              height: px(8),
+              borderRadius: px(4),
+              backgroundColor: colors.primary,
+              marginTop: px(6),
+              marginLeft: px(2),
+              flexShrink: 0,
+            }}
+          />
+        ) : null}
+      </Pressable>
+      <Pressable
+        onPress={() => onDismiss(item)}
+        disabled={dismissing}
+        hitSlop={10}
+        style={{
+          position: 'absolute',
+          top: px(10),
+          right: px(10),
+          width: px(28),
+          height: px(28),
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: dismissing ? 0.4 : 1,
+        }}>
+        <X size={px(16)} color={colors.grey} strokeWidth={2.2} />
+      </Pressable>
+    </View>
   );
 }
 
 export default function NotificationsScreen({ onPressNotification }: NotificationsScreenProps) {
   const px = useProfilePx();
   const { logout } = useAuthActions();
+  const { dialog, showDialog } = useAppDialog();
   const [activeFilter, setActiveFilter] = useState<CategoryFilter>('All');
   const { data, isLoading, isError, error, refetch } = useNotificationsQuery();
-  const markAllRead = useMarkAllNotificationsReadMutation();
   const markRead = useMarkNotificationReadMutation();
+  const deleteAll = useDeleteAllNotificationsMutation();
+  const deleteOne = useDeleteNotificationMutation();
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
 
   const items = data?.notifications ?? [];
   const filtered = useMemo(() => items.filter(i => matchesFilter(i, activeFilter)), [items, activeFilter]);
@@ -208,33 +237,67 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
     }
   };
 
-  const handleMarkAllRead = () => {
-    if (markAllRead.isPending) return;
-    markAllRead.mutate(undefined, {
-      onError: err => {
-        Alert.alert('Error', getApiErrorMessage(err, 'Unable to mark notifications as read'));
+  const handleDismiss = (item: AppNotification) => {
+    if (deleteOne.isPending) return;
+    setDismissingId(item.id);
+    deleteOne.mutate(item.id, {
+      onSettled: () => setDismissingId(null),
+      onError: (err: unknown) => {
+        showDialog({
+          tone: 'error',
+          title: 'Error',
+          message: getApiErrorMessage(err, 'Unable to remove notification'),
+          primaryLabel: 'OK',
+        });
+      },
+    });
+  };
+
+  const handleClearAll = () => {
+    if (deleteAll.isPending) return;
+    showDialog({
+      tone: 'danger',
+      title: 'Clear all notifications',
+      message: 'This permanently deletes every notification. This cannot be undone.',
+      secondaryLabel: 'Cancel',
+      primaryLabel: 'Clear all',
+      destructive: true,
+      onPrimary: () => {
+        deleteAll.mutate(undefined, {
+          onSuccess: () => setActiveFilter('All'),
+          onError: (err: unknown) => {
+            showDialog({
+              tone: 'error',
+              title: 'Error',
+              message: getApiErrorMessage(err, 'Unable to clear notifications'),
+              primaryLabel: 'OK',
+            });
+          },
+        });
       },
     });
   };
 
   return (
     <ProfileSubScreenLayout
-      title={unreadCount > 0 ? `Notifications (${unreadCount})` : 'Notifications'}
+      title="Notifications"
       subtitle="Booking updates and trip alerts"
+      subtitleNumberOfLines={1}
       headerRight={
         !isError && items.length > 0 ? (
-          <Pressable onPress={handleMarkAllRead} hitSlop={8} disabled={markAllRead.isPending}>
+          <Pressable onPress={handleClearAll} hitSlop={8} disabled={deleteAll.isPending}>
             <Text
               style={{
                 fontSize: px(12),
                 fontWeight: typography.weights.bold,
-                color: markAllRead.isPending ? colors.grey : colors.primary,
+                color: deleteAll.isPending ? colors.grey : colors.error,
               }}>
-              Mark all read
+              {deleteAll.isPending ? 'Clearing…' : 'Clear all'}
             </Text>
           </Pressable>
         ) : null
       }>
+      {dialog}
       {isLoading ? (
         <DataSkeleton variant="list" />
       ) : isError ? (
@@ -272,7 +335,12 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
             <Pressable
               onPress={() => {
                 void logout().catch(() => {
-                  Alert.alert('Sign in', 'Please close and reopen the app, then log in again.');
+                  showDialog({
+                    tone: 'info',
+                    title: 'Sign in',
+                    message: 'Please close and reopen the app, then log in again.',
+                    primaryLabel: 'OK',
+                  });
                 });
               }}
               style={{
@@ -322,8 +390,8 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
             showsHorizontalScrollIndicator={false}
             bounces={false}
             keyboardShouldPersistTaps="handled"
-            style={{ marginBottom: px(12) }}
-            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: px(8), paddingRight: px(4) }}>
+            style={{ marginBottom: px(10) }}
+            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: px(6), paddingRight: px(4) }}>
             {FILTERS.map(filter => {
               const isActive = activeFilter === filter;
               return (
@@ -332,16 +400,16 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
                   onPress={() => setActiveFilter(filter)}
                   style={{
                     flexShrink: 0,
-                    paddingHorizontal: px(14),
-                    paddingVertical: px(7),
-                    borderRadius: px(999),
+                    paddingHorizontal: px(12),
+                    paddingVertical: px(5),
+                    borderRadius: px(6),
                     backgroundColor: isActive ? FILTER_ACTIVE.bg : '#FFFFFF',
                     borderWidth: 1,
                     borderColor: isActive ? FILTER_ACTIVE.bg : colors.border,
                   }}>
                   <Text
                     style={{
-                      fontSize: px(11.5),
+                      fontSize: px(11),
                       fontWeight: typography.weights.bold,
                       color: isActive ? FILTER_ACTIVE.text : colors.grey,
                     }}>
@@ -374,7 +442,14 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
                 TODAY
               </Text>
               {groups.today.map(item => (
-                <NotificationCard key={item.id} item={item} px={px} onPress={handlePress} />
+                <NotificationCard
+                  key={item.id}
+                  item={item}
+                  px={px}
+                  onPress={handlePress}
+                  onDismiss={handleDismiss}
+                  dismissing={dismissingId === item.id}
+                />
               ))}
             </>
           ) : null}
@@ -393,7 +468,14 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
                 EARLIER
               </Text>
               {groups.earlier.map(item => (
-                <NotificationCard key={item.id} item={item} px={px} onPress={handlePress} />
+                <NotificationCard
+                  key={item.id}
+                  item={item}
+                  px={px}
+                  onPress={handlePress}
+                  onDismiss={handleDismiss}
+                  dismissing={dismissingId === item.id}
+                />
               ))}
             </>
           ) : null}
