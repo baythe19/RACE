@@ -70,6 +70,11 @@ export class VehicleController {
     const prefersHtml = req.accepts(['html', 'json']) === 'html';
 
     if (prefersHtml) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Cache-Control', 'private, no-store');
+
       if (!result.valid) {
         return res.status(404).type('html').send(renderVehicleNotFoundPage());
       }

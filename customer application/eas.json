@@ -10,6 +10,7 @@
     },
     "preview": {
       "distribution": "internal",
+      "environment": "preview",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://race-api-w361.onrender.com",
         "EXPO_PUBLIC_UI_PREVIEW_AUTH_FLOW": "false",
@@ -20,6 +21,7 @@
       }
     },
     "production": {
+      "environment": "production",
       "env": {
         "EXPO_PUBLIC_API_URL": "https://race-api-w361.onrender.com",
         "EXPO_PUBLIC_UI_PREVIEW_AUTH_FLOW": "false",

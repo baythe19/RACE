@@ -39,6 +39,16 @@ import {
   useSosConfigQuery,
   useSosContextQuery,
 } from '../../services/sos/useSosQueries';
+import { useNotificationsQuery } from '../../services/profile/useProfileQueries';
+import {
+  emergencyContactDigits,
+  formatEmergencyPhoneDisplay,
+  hasSavedEmergencyContact,
+  isPlausiblePersonName,
+  telUriForDigits,
+} from '../../utils/emergencyContact';
+import { isValidIndianMobile } from '../../utils/phone';
+import { formatVehicleNumber, isValidIndianVehicleRegistration } from '../../utils/vehicleFormat';
 import { colors, typography } from '../../theme';
 import type { RootTabParamList } from '../../types/navigation';
 
@@ -53,18 +63,6 @@ type SosDialogState = {
   secondaryLabel?: string;
   onSecondary?: () => void;
 };
-
-function formatEmergencyPhone(raw: string) {
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) {
-    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
-  }
-  if (digits.length === 10) {
-    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
-  }
-  if (digits.length > 0 && !raw.startsWith('+')) return `+${digits}`;
-  return raw;
-}
 
 /**
  * SOS screen — calm urgency.
@@ -89,6 +87,8 @@ export default function EmergencyAssistanceContent({
     isUiPreviewAuthFlow() || isPreviewSosSession(accessToken);
   const { data: config, isError: configError } = useSosConfigQuery();
   const { data: context, isLoading: contextLoading } = useSosContextQuery(undefined, isAuthenticated);
+  const { data: notificationsData } = useNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
   const sosAlert = useSosAlertMutation();
   const [dialog, setDialog] = useState<SosDialogState | null>(null);
 
@@ -96,25 +96,30 @@ export default function EmergencyAssistanceContent({
   const closeDialog = useCallback(() => setDialog(null), []);
 
   const emergencyPhone = (config?.emergencyPhone ?? '112').replace(/\s/g, '');
-  const emergencyPhoneLabel = formatEmergencyPhone(emergencyPhone);
+  const emergencyPhoneLabel = formatEmergencyPhoneDisplay(emergencyPhone);
+  const emergencyTelUri = telUriForDigits(emergencyPhone);
   const supportPhone = config?.supportPhone ?? '';
 
-  const vehicleLabel = context?.vehicle
-    ? context.vehicle.label
-    : `${details.vehicleBrand} ${details.vehicleModel}`.trim();
-  const vehicleNumber = context?.vehicle?.number ?? details.vehicleNumber;
-  const ownerName = context?.owner?.name ?? details.ownerName;
-  const ownerPhoneRaw = (context?.owner?.phone ?? details.ownerPhone).replace(/\s/g, '');
-  const contactName = context?.emergencyContact?.name ?? details.contactName;
-  const contactPhone = (context?.emergencyContact?.mobileNumber ?? details.contactPhone).replace(/\s/g, '');
-  const contactRelation = context?.emergencyContact?.relationship ?? details.contactRelation;
+  const rawVehicleNumber = context?.vehicle?.number ?? '';
+  const rawVehicleLabel = context?.vehicle?.label ?? '';
+  const vehicleNumberValid = isValidIndianVehicleRegistration(rawVehicleNumber);
+  const vehicleLabel = vehicleNumberValid ? rawVehicleLabel.trim() : '';
+  const vehicleNumber = vehicleNumberValid ? formatVehicleNumber(rawVehicleNumber) : '';
+
+  const rawOwnerName = context?.owner?.name ?? '';
+  const ownerPhoneRaw = (context?.owner?.phone ?? '').replace(/\D/g, '').slice(-10);
+  const ownerReady = isPlausiblePersonName(rawOwnerName) && isValidIndianMobile(ownerPhoneRaw);
+  const ownerName = ownerReady ? rawOwnerName.trim() : '';
+  const ownerTelUri = ownerReady ? telUriForDigits(ownerPhoneRaw) : '';
+  const savedContact = context?.emergencyContact ?? null;
+  const hasContact = hasSavedEmergencyContact(savedContact);
+  const contactName = hasContact ? savedContact!.name.trim() : '';
+  const contactPhone = hasContact ? emergencyContactDigits(savedContact) : '';
+  const contactRelation = hasContact ? savedContact!.relationship?.trim() ?? '' : '';
   const vehicleId = context?.vehicle?.id;
 
   const detailsIncomplete =
-    !isAuthenticated ||
-    !vehicleNumber ||
-    vehicleNumber.replace(/\s/g, '').toUpperCase().startsWith('MH12') ||
-    !ownerPhoneRaw;
+    !isAuthenticated || !vehicleNumberValid || !hasContact || !ownerReady;
 
   const resolveLocation = useCallback(async () => {
     try {
@@ -145,6 +150,24 @@ export default function EmergencyAssistanceContent({
     });
   };
 
+  const openSosDetails = useCallback(() => {
+    closeDialog();
+    if (onConfigure) onConfigure();
+    else tabNav.navigate('Profile', { screen: 'SosDetails' });
+  }, [closeDialog, onConfigure, tabNav]);
+
+  const showDetailsRequiredDialog = useCallback(() => {
+    openDialog({
+      variant: 'info',
+      title: 'Complete SOS details',
+      message:
+        'Add your vehicle, owner on record, and emergency contact in Profile or SOS Details before sending alerts or using More help actions.',
+      primaryLabel: 'Update SOS Details',
+      onPrimary: openSosDetails,
+      secondaryLabel: 'Not now',
+    });
+  }, [openDialog, openSosDetails]);
+
   const triggerAlert = useCallback(
     async (
       action: 'sos' | 'towing' | 'ambulance' | 'share_location' | 'notify_contacts',
@@ -159,6 +182,10 @@ export default function EmergencyAssistanceContent({
           onPrimary: () => jumpToAuthScreen('MobileNumber'),
           secondaryLabel: 'Cancel',
         });
+        return;
+      }
+      if (detailsIncomplete) {
+        showDetailsRequiredDialog();
         return;
       }
       if (sosAlert.isPending) return;
@@ -194,13 +221,28 @@ export default function EmergencyAssistanceContent({
         },
       );
     },
-    [contactName, isAuthenticated, openDialog, previewSos, resolveLocation, sosAlert, vehicleId, vehicleLabel],
+    [
+      contactName,
+      detailsIncomplete,
+      isAuthenticated,
+      openDialog,
+      previewSos,
+      resolveLocation,
+      showDetailsRequiredDialog,
+      sosAlert,
+      vehicleId,
+      vehicleLabel,
+    ],
   );
 
   const handleGridAction = (id: string) => {
     switch (id) {
       case 'towing':
         if (isAuthenticated) {
+          if (detailsIncomplete) {
+            showDetailsRequiredDialog();
+            return;
+          }
           void triggerAlert('towing', 'Towing Requested');
         } else {
           tabNav.navigate('Services', { screen: 'TowingService' });
@@ -208,6 +250,10 @@ export default function EmergencyAssistanceContent({
         break;
       case 'location':
         if (isAuthenticated) {
+          if (detailsIncomplete) {
+            showDetailsRequiredDialog();
+            return;
+          }
           void triggerAlert('share_location', 'Location Shared');
         } else {
           void Share.share({ message: `Vehicle ${vehicleNumber} — ${details.location}` });
@@ -215,6 +261,10 @@ export default function EmergencyAssistanceContent({
         break;
       case 'contacts':
         if (isAuthenticated) {
+          if (detailsIncomplete) {
+            showDetailsRequiredDialog();
+            return;
+          }
           void triggerAlert('notify_contacts', 'Contact Notified');
         } else {
           openDialog({
@@ -239,7 +289,7 @@ export default function EmergencyAssistanceContent({
     {
       id: 'towing',
       label: 'Request towing',
-      sub: 'Nearest tow partner',
+      sub: 'RACE dispatch (not a phone call)',
       action: 'Request',
       icon: <Truck size={px(20)} color={colors.primaryDark} strokeWidth={2.2} />,
       tint: colors.goldLight,
@@ -269,9 +319,11 @@ export default function EmergencyAssistanceContent({
       header={
         <TabRootHeader
           title="Emergency SOS"
-          subtitle="Immediate help, one tap away"
+          notificationCount={unreadCount}
           onInfoPress={showSosInfo}
-          onBellPress={() => tabNav.navigate('Profile')}
+          onBellPress={() => {
+            tabNav.navigate('Profile', { screen: 'Notifications' });
+          }}
           onAvatarPress={() => tabNav.navigate('Profile')}
         />
       }>
@@ -290,7 +342,10 @@ export default function EmergencyAssistanceContent({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Call emergency number ${emergencyPhoneLabel}`}
-            onPress={() => void Linking.openURL(`tel:${emergencyPhone}`)}
+            disabled={!emergencyTelUri}
+            onPress={() => {
+              if (emergencyTelUri) void Linking.openURL(emergencyTelUri);
+            }}
             style={({ pressed }) => [
               styles.bigCall,
               {
@@ -400,12 +455,12 @@ export default function EmergencyAssistanceContent({
                     fontSize: px(14),
                     fontWeight: typography.weights.bold,
                   }}>
-                  {vehicleLabel}
+                  {vehicleLabel || 'Add your vehicle'}
                 </Text>
                 <Text
                   numberOfLines={1}
                   style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
-                  {vehicleNumber || 'Add your vehicle number'}
+                  {vehicleNumber || 'Add registration in Profile → My Vehicles'}
                 </Text>
               </View>
             </View>
@@ -438,31 +493,30 @@ export default function EmergencyAssistanceContent({
                 <Text
                   numberOfLines={1}
                   style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
-                  {context?.owner?.phone ?? details.ownerPhone}
+                  {ownerPhoneRaw && !ownerReady
+                    ? 'Update name & phone in Profile'
+                    : ownerPhoneRaw
+                      ? formatEmergencyPhoneDisplay(ownerPhoneRaw)
+                      : 'Sign in and complete your profile'}
                 </Text>
               </View>
-              {ownerPhoneRaw ? (
+              {ownerTelUri ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Call owner"
-                  onPress={() => void Linking.openURL(`tel:${ownerPhoneRaw}`)}
+                  onPress={() => void Linking.openURL(ownerTelUri)}
                   style={[
                     styles.callBtn,
                     {
-                      paddingHorizontal: px(12),
-                      paddingVertical: px(9),
-                      borderRadius: px(10),
+                      width: px(40),
+                      height: px(40),
+                      borderRadius: px(20),
+                      paddingHorizontal: 0,
+                      paddingVertical: 0,
+                      justifyContent: 'center',
                     },
                   ]}>
-                  <Phone size={px(13)} color="#FFFFFF" strokeWidth={2.4} />
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: px(11.5),
-                      fontWeight: typography.weights.bold,
-                    }}>
-                    Call
-                  </Text>
+                  <Phone size={px(18)} color="#FFFFFF" strokeWidth={2.4} />
                 </Pressable>
               ) : null}
             </View>
@@ -496,44 +550,61 @@ export default function EmergencyAssistanceContent({
                 <User size={px(17)} color={colors.secondary} strokeWidth={2.2} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: colors.dark,
-                    fontSize: px(13.5),
-                    fontWeight: typography.weights.bold,
-                  }}>
-                  {contactName} ({contactRelation})
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
-                  {context?.emergencyContact?.mobileNumber ?? details.contactPhone}
-                </Text>
+                {hasContact ? (
+                  <>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: colors.dark,
+                        fontSize: px(13.5),
+                        fontWeight: typography.weights.bold,
+                      }}>
+                      {contactName}
+                      {contactRelation ? ` (${contactRelation})` : ''}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
+                      {formatEmergencyPhoneDisplay(contactPhone)}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text
+                      style={{
+                        color: colors.dark,
+                        fontSize: px(13.5),
+                        fontWeight: typography.weights.bold,
+                      }}>
+                      Please add emergency contact
+                    </Text>
+                    <Text style={{ color: colors.grey, fontSize: px(12), marginTop: px(2), lineHeight: px(17) }}>
+                      Save a trusted contact in Profile → Personal Information or SOS Details.
+                    </Text>
+                  </>
+                )}
               </View>
-              {contactPhone ? (
+              {hasContact && contactPhone ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Call ${contactName}`}
-                  onPress={() => void Linking.openURL(`tel:${contactPhone}`)}
+                  onPress={() => {
+                    const uri = telUriForDigits(contactPhone);
+                    if (uri) void Linking.openURL(uri);
+                  }}
                   style={[
                     styles.callBtn,
                     {
                       backgroundColor: colors.secondary,
-                      paddingHorizontal: px(12),
-                      paddingVertical: px(9),
-                      borderRadius: px(10),
+                      width: px(40),
+                      height: px(40),
+                      borderRadius: px(20),
+                      paddingHorizontal: 0,
+                      paddingVertical: 0,
+                      justifyContent: 'center',
                     },
                   ]}>
-                  <Phone size={px(13)} color="#FFFFFF" strokeWidth={2.4} />
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: px(11.5),
-                      fontWeight: typography.weights.bold,
-                    }}>
-                    Call
-                  </Text>
+                  <Phone size={px(18)} color="#FFFFFF" strokeWidth={2.4} />
                 </Pressable>
               ) : null}
             </View>
@@ -575,11 +646,10 @@ export default function EmergencyAssistanceContent({
                 marginBottom: px(12),
               }}>
               <Text style={{ color: colors.textDark, fontSize: px(11.5), lineHeight: px(16) }}>
-                Showing sample emergency details.{' '}
+                Complete vehicle, owner, and emergency contact in Profile so SOS shows accurate details.{' '}
                 <Text style={{ fontWeight: typography.weights.bold, color: colors.primaryDark }}>
                   Update SOS Details
-                </Text>{' '}
-                so responders see the right vehicle and contacts.
+                </Text>
               </Text>
             </Pressable>
           ) : null}

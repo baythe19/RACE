@@ -1,9 +1,48 @@
 import React, { type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { ArrowLeft, Check, ChevronRight } from 'lucide-react-native';
+import { AlertTriangle, ArrowLeft, Calendar, Check, ChevronRight, Zap } from 'lucide-react-native';
 
 import type { BookingTheme } from './bookingTheme';
 import { colors, typography } from '../../theme';
+
+export type HeaderTagVariant = 'instant' | 'scheduled' | 'emergency';
+
+const TAG_ICONS: Record<HeaderTagVariant, typeof Zap> = {
+  instant: Zap,
+  scheduled: Calendar,
+  emergency: AlertTriangle,
+};
+
+function HeaderModeTag({
+  label,
+  variant,
+  accentColor,
+  t,
+}: {
+  label: string;
+  variant?: HeaderTagVariant;
+  accentColor: string;
+  t: BookingTheme;
+}) {
+  const Icon = TAG_ICONS[variant ?? 'instant'];
+  const iconSize = t.px(13);
+
+  return (
+    <View style={[styles.tagRow, { gap: t.px(4), maxWidth: t.px(92) }]}>
+      <Icon size={iconSize} color={accentColor} strokeWidth={2.4} />
+      <Text
+        numberOfLines={1}
+        style={{
+          fontSize: t.px(11),
+          fontWeight: typography.weights.bold,
+          color: accentColor,
+          letterSpacing: 0.15,
+        }}>
+        {label}
+      </Text>
+    </View>
+  );
+}
 
 /** Green used by the partner wizard for completed steps — same visual language. */
 const STEP_DONE = '#10B981';
@@ -146,6 +185,9 @@ interface BookingFlowHeaderProps {
   variant?: 'centered' | 'inline';
   accentColor?: string;
   showStep?: boolean;
+  /** Compact pill shown top-right (e.g. Instant / Scheduled). */
+  headerTag?: string;
+  headerTagVariant?: HeaderTagVariant;
 }
 
 export default function BookingFlowHeader({
@@ -157,6 +199,8 @@ export default function BookingFlowHeader({
   variant = 'centered',
   accentColor = colors.primary,
   showStep = true,
+  headerTag,
+  headerTagVariant,
 }: BookingFlowHeaderProps) {
   const showStepper = showStep && step > 0 && Array.isArray(stepLabels) && stepLabels.length > 0;
 
@@ -174,7 +218,18 @@ export default function BookingFlowHeader({
           <Text style={[styles.inlineTitle, { fontSize: t.screenTitle }]} numberOfLines={2}>
             {title}
           </Text>
-          <View style={styles.side} />
+          {headerTag ? (
+            <View style={styles.tagSide}>
+              <HeaderModeTag
+                label={headerTag}
+                variant={headerTagVariant}
+                accentColor={accentColor}
+                t={t}
+              />
+            </View>
+          ) : (
+            <View style={styles.side} />
+          )}
         </View>
       </View>
     );
@@ -187,9 +242,14 @@ export default function BookingFlowHeader({
           <ArrowLeft size={t.iconMd} color={colors.dark} strokeWidth={2.5} />
         </Pressable>
       ) : null}
-      {showStepper ? (
-        <View style={{ width: '100%', paddingHorizontal: t.px(8) }}>
-          <BookingStepper step={step} labels={stepLabels} theme={t} accentColor={accentColor} />
+      {headerTag ? (
+        <View style={[styles.tagFloating, { top: t.px(6) }]}>
+          <HeaderModeTag
+            label={headerTag}
+            variant={headerTagVariant}
+            accentColor={accentColor}
+            t={t}
+          />
         </View>
       ) : null}
       <Text
@@ -199,11 +259,17 @@ export default function BookingFlowHeader({
           {
             fontSize: t.screenTitle,
             lineHeight: t.screenTitle + 4,
-            height: t.screenTitle + 6,
+            minHeight: t.screenTitle + 6,
+            paddingTop: onBack ? t.px(2) : 0,
           },
         ]}>
         {title}
       </Text>
+      {showStepper ? (
+        <View style={{ width: '100%', paddingHorizontal: t.px(8), marginTop: t.px(6) }}>
+          <BookingStepper step={step} labels={stepLabels} theme={t} accentColor={accentColor} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -219,6 +285,8 @@ interface BookingScreenShellProps {
   headerVariant?: 'centered' | 'inline';
   accentColor?: string;
   showStep?: boolean;
+  headerTag?: string;
+  headerTagVariant?: HeaderTagVariant;
 }
 
 export function BookingScreenShell({
@@ -232,6 +300,8 @@ export function BookingScreenShell({
   headerVariant = 'centered',
   accentColor,
   showStep = true,
+  headerTag,
+  headerTagVariant,
 }: BookingScreenShellProps) {
   return (
     <View style={styles.shell}>
@@ -244,6 +314,8 @@ export function BookingScreenShell({
         variant={headerVariant}
         accentColor={accentColor}
         showStep={showStep}
+        headerTag={headerTag}
+        headerTagVariant={headerTagVariant}
       />
       <View style={[styles.body, { paddingTop: theme.contentTop }]}>{children}</View>
       {footer}
@@ -270,6 +342,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.extrabold,
     color: colors.dark,
     paddingHorizontal: 8,
+    letterSpacing: -0.3,
   },
   centeredWrap: {
     alignItems: 'center',
@@ -281,6 +354,20 @@ const styles = StyleSheet.create({
     left: 0,
     top: 4,
     padding: 4,
+  },
+  tagFloating: {
+    position: 'absolute',
+    zIndex: 2,
+    right: 0,
+  },
+  tagSide: {
+    minWidth: 32,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   stepperWrap: {
     width: '100%',
@@ -352,6 +439,7 @@ const styles = StyleSheet.create({
     color: colors.dark,
     textAlign: 'center',
     paddingHorizontal: 12,
+    letterSpacing: -0.3,
   },
   shell: {
     flex: 1,

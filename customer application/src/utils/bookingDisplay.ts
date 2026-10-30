@@ -1,7 +1,14 @@
 import type { Booking } from '../types/booking';
 import type { ActiveBooking, BookingHistoryItem } from '../types/models';
 import type { ServiceBookingType } from '../types/serviceBooking';
-import { formatLocationDisplay } from './readableAddress';
+import {
+  bookingHasNamedPartner,
+  formatCustomerBookingStatus,
+  inferCustomerBookingKind,
+  type CustomerBookingKind,
+} from './bookingFlowCopy';
+import { formatLocationCard, formatLocationDisplay } from './readableAddress';
+import { colors } from '../theme';
 
 export const ONGOING_UNIFIED_STATUSES = [
   'PENDING',
@@ -14,6 +21,24 @@ export const ONGOING_UNIFIED_STATUSES = [
 
 export const COMPLETED_UNIFIED_STATUSES = ['COMPLETED', 'RATED', 'CANCELLED'] as const;
 
+export function customerStatusChipTone(statusPill: string): {
+  bg: string;
+  fg: string;
+  dot?: string;
+} {
+  if (statusPill === 'Cancelled') {
+    return { bg: '#F3F4F6', fg: colors.grey, dot: colors.grey };
+  }
+  if (/finding|awaiting|confirmed ·/i.test(statusPill)) {
+    return { bg: '#FFF7ED', fg: '#C2410C', dot: '#F97316' };
+  }
+  if (statusPill === 'Completed') {
+    return { bg: '#E8F8EE', fg: colors.success, dot: colors.success };
+  }
+  return { bg: '#E8F8EE', fg: colors.success, dot: colors.success };
+}
+
+/** Legacy raw unified label — prefer `formatCustomerBookingStatus` for customer UI. */
 export function formatUnifiedStatusLabel(status: string): string {
   switch (status) {
     case 'PENDING':
@@ -21,7 +46,7 @@ export function formatUnifiedStatusLabel(status: string): string {
     case 'CONFIRMED':
       return 'Confirmed';
     case 'DRIVER_ASSIGNED':
-      return 'Driver Assigned';
+      return 'Partner accepting';
     case 'DRIVER_EN_ROUTE':
       return 'On the Way';
     case 'DRIVER_ARRIVED':
@@ -40,6 +65,61 @@ export function formatUnifiedStatusLabel(status: string): string {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
   }
+}
+
+/**
+ * Live Tracking bottom sheet — service-specific copy; avoid bare "Confirmed"
+ * before any partner has accepted (backend CONFIRMED = advance paid, matching).
+ */
+export function formatLiveTrackingSummary(input: {
+  kind: CustomerBookingKind;
+  status: string;
+  partnerPending: boolean;
+  etaDisplay: string;
+}): { cardLabel: string; cardValue: string; chipLabel: string } {
+  const { kind, status, partnerPending, etaDisplay } = input;
+  const copy = formatCustomerBookingStatus(kind, status, !partnerPending);
+  const awaitingPartner =
+    partnerPending &&
+    (status === 'PENDING' || status === 'CONFIRMED' || status === 'DRIVER_ASSIGNED');
+
+  if (awaitingPartner) {
+    return {
+      cardLabel: 'Status',
+      cardValue: copy.dispatchHint,
+      chipLabel: copy.statusPill,
+    };
+  }
+
+  if (status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED' || status === 'IN_PROGRESS') {
+    return {
+      cardLabel: 'Estimated arrival',
+      cardValue: etaDisplay,
+      chipLabel: copy.statusPill,
+    };
+  }
+
+  if (status === 'COMPLETED' || status === 'RATED') {
+    return {
+      cardLabel: 'Trip',
+      cardValue: etaDisplay,
+      chipLabel: 'Completed',
+    };
+  }
+
+  return {
+    cardLabel: 'Status',
+    cardValue: etaDisplay,
+    chipLabel: copy.statusPill,
+  };
+}
+
+export function getCustomerBookingPresentation(booking: Booking) {
+  const kind = inferCustomerBookingKind(booking);
+  const hasNamedPartner = bookingHasNamedPartner(booking.driver);
+  const unified = booking.unifiedStatus ?? booking.status;
+  const copy = formatCustomerBookingStatus(kind, unified, hasNamedPartner);
+  return { kind, unified, hasNamedPartner, ...copy };
 }
 
 export function isOngoingUnifiedStatus(status?: string): boolean {
@@ -84,36 +164,43 @@ export function formatBookingDisplayId(bookingNumber: string): string {
 }
 
 export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
+  const kind = inferCustomerBookingKind(booking);
+  const pickup = formatLocationCard(booking.pickup);
+  const dropLine = booking.dropoff ? formatLocationCard(booking.dropoff) : null;
+  const pickupFlat = formatLocationDisplay(booking.pickup);
+  const dropFlat = booking.dropoff ? formatLocationDisplay(booking.dropoff) : '—';
+  const onSiteOnly =
+    kind === 'roadside' ||
+    dropFlat === '—' ||
+    dropFlat === 'On-site help' ||
+    (dropFlat === pickupFlat && kind !== 'towing');
+
+  const hasNamedPartner = bookingHasNamedPartner(booking.driver);
+  const unified = booking.unifiedStatus ?? booking.status;
+  const copy = formatCustomerBookingStatus(kind, unified, hasNamedPartner);
+
   return {
     id: booking.id,
     displayId: formatBookingDisplayId(booking.bookingNumber),
     service: booking.serviceLabel,
-    status: booking.unifiedStatus
-      ? formatUnifiedStatusLabel(booking.unifiedStatus)
-      : formatUnifiedStatusLabel(booking.status),
-    pickup: formatLocationDisplay(booking.pickup),
-    drop: (() => {
-      const dropLine = formatLocationDisplay(booking.dropoff);
-      const pickupLine = formatLocationDisplay(booking.pickup);
-      if (dropLine === '—') return 'On-site help';
-      if (dropLine === pickupLine && !/towing/i.test(booking.serviceLabel)) {
-        return 'On-site help';
-      }
-      return dropLine;
-    })(),
+    status: copy.statusPill,
+    pickup,
+    drop: onSiteOnly ? null : dropLine,
     eta: booking.etaMinutes != null ? `${booking.etaMinutes} min` : 'Updating',
-    driver: booking.driver
+    driver: hasNamedPartner
       ? {
-          name: booking.driver.name,
-          photo: booking.driver.avatarUrl ?? null,
-          experience: booking.driver.experience,
-          phone: booking.driver.phone,
+          name: booking.driver!.name,
+          photo: booking.driver!.avatarUrl ?? null,
+          experience: booking.driver!.experience,
+          phone: booking.driver!.phone,
         }
       : {
-          name: 'Finding a partner',
+          name: copy.partnerLine,
           photo: null,
         },
     bookingType: booking.bookingType ?? 'towing',
+    bookingKind: kind,
+    dispatchHint: copy.dispatchHint,
     tripStartOtp: shouldShowTripStartOtp(booking.unifiedStatus)
       ? booking.tripStartOtp
       : undefined,
@@ -121,6 +208,10 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
 }
 
 export function mapBookingToHistoryRow(booking: Booking): BookingHistoryItem {
+  const kind = inferCustomerBookingKind(booking);
+  const hasNamedPartner = bookingHasNamedPartner(booking.driver);
+  const unified = booking.unifiedStatus ?? booking.status;
+  const copy = formatCustomerBookingStatus(kind, unified, hasNamedPartner);
   return {
     id: booking.id,
     displayId: formatBookingDisplayId(booking.bookingNumber),
@@ -132,9 +223,7 @@ export function mapBookingToHistoryRow(booking: Booking): BookingHistoryItem {
     }),
     location: formatLocationDisplay(booking.pickup),
     amount: booking.invoice?.total ?? 0,
-    status: booking.unifiedStatus
-      ? formatUnifiedStatusLabel(booking.unifiedStatus)
-      : 'Completed',
+    status: booking.unifiedStatus ? copy.statusPill : 'Completed',
     bookingType: booking.bookingType ?? 'towing',
   };
 }

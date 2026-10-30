@@ -1,8 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-  Alert,
   Pressable,
-  StyleSheet,
   Text,
   useWindowDimensions,
   View,
@@ -28,6 +26,7 @@ import AppScreenLayout from '../components/ui/AppScreenLayout';
 import DataSkeleton from '../components/ui/DataSkeleton';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { getProfileFirstName } from '../utils/profileDisplay';
+import { useAppDialog } from '../hooks/useAppDialog';
 import { useAuthActions } from '../hooks/useAuth';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationsQuery, useWalletQuery } from '../services/profile/useProfileQueries';
@@ -64,6 +63,7 @@ function ProfileAvatar({ size, px }: { size: number; px: (n: number) => number }
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { logout } = useAuthActions();
+  const { dialog, showDialog } = useAppDialog();
   const authUser = useAuthStore(state => state.user);
   const { profile, fetchProfile, isLoading } = useProfileStore();
   const { data: notificationsData } = useNotificationsQuery();
@@ -96,17 +96,24 @@ export default function ProfileScreen() {
   }, [isWalletError, isWalletLoading, wallet]);
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes',
-        onPress: () => {
-          void logout().catch(() => {
-            Alert.alert('Logout failed', 'Please try again or reload the app.');
+    showDialog({
+      tone: 'confirm',
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      secondaryLabel: 'No',
+      primaryLabel: 'Yes, log out',
+      destructive: true,
+      onPrimary: () => {
+        void logout().catch(() => {
+          showDialog({
+            tone: 'error',
+            title: 'Logout failed',
+            message: 'Please try again or reload the app.',
+            primaryLabel: 'OK',
           });
-        },
+        });
       },
-    ]);
+    });
   };
 
   if (isLoading && !profile) {
@@ -117,7 +124,6 @@ export default function ProfileScreen() {
         header={
           <TabRootHeader
             title="Profile"
-            subtitle="Manage your account and preferences"
             showActions={false}
           />
         }>
@@ -134,31 +140,12 @@ export default function ProfileScreen() {
       header={
         <TabRootHeader
           title="Profile"
-          subtitle="Manage your account and preferences"
-          showNotificationBadge={unreadCount > 0}
+          notificationCount={unreadCount}
+          showProfileAvatar={false}
           onBellPress={() => navigation.navigate('Notifications')}
-          actions={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(12) }}>
-              <Pressable
-                hitSlop={8}
-                style={styles.bellWrap}
-                onPress={() => navigation.navigate('Notifications')}
-                accessibilityRole="button"
-                accessibilityLabel="Notifications">
-                <Bell size={px(22)} color={colors.dark} strokeWidth={2} />
-                {unreadCount > 0 ? (
-                  <View style={styles.bellBadge}>
-                    <Text style={styles.bellBadgeText}>
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-              <ProfileAvatar size={px(40)} px={px} />
-            </View>
-          }
         />
       }>
+      {dialog}
             <View
               style={[
                 {
@@ -509,32 +496,16 @@ export default function ProfileScreen() {
                 Log out
               </Text>
             </Pressable>
+
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: px(10),
+                color: colors.grey,
+                marginBottom: px(8),
+              }}>
+              RACE Customer · v1.0.0
+            </Text>
     </AppScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  bellWrap: {
-    position: 'relative',
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.error,
-    borderWidth: 1.5,
-    borderColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  bellBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.background,
-    lineHeight: 11,
-  },
-});

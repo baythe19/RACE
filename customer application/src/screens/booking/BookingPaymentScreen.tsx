@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMutation } from '@tanstack/react-query';
@@ -14,6 +14,7 @@ import {
 import { ROADSIDE_ACCENT } from '../../constants/roadsideBooking';
 import type { HomeStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { initiateAdvancePayment, verifyAdvancePayment } from '../../services/bookings/serviceBookingApi';
 import { getApiErrorMessage } from '../../services/api';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
@@ -29,6 +30,7 @@ const NEXT_ROUTE: Record<BookingPaymentFlow, keyof HomeStackParamList> = {
 export default function BookingPaymentScreen({ navigation, route }: Props) {
   const { amount, flow, bookingId, bookingType } = route.params;
   const { t } = useBookingTheme();
+  const { dialog, showDialog } = useAppDialog();
   const accent = flow === 'roadside' ? ROADSIDE_ACCENT : colors.primary;
   const [selected, setSelected] = useState<PaymentMethodId>('wallet');
 
@@ -57,7 +59,7 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       navigation.navigate('DriverAssigned', { bookingId: bookingId!, bookingType: 'driver' });
       return;
     }
-    navigation.navigate(next as 'RoadsideHelpOnWay');
+    navigation.navigate('RoadsideHelpOnWay', { bookingId: bookingId! });
   };
 
   // MVP: UPI+Cash are the real rails. GPay option is a coming-soon showcase —
@@ -66,30 +68,54 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
   const handlePay = async () => {
     if (payMutation.isPending) return;
     if (!bookingId || !bookingType) {
-      Alert.alert('Payment unavailable', 'Booking details are missing. Please retry from booking review.');
+      showDialog({
+        tone: 'error',
+        title: 'Payment unavailable',
+        message: 'Booking details are missing. Please retry from booking review.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     if (selected === 'gpay') {
       setSelected('upi');
-      Alert.alert('Coming soon', 'Google Pay in-app is launching after MVP. UPI is selected instead.');
+      showDialog({
+        tone: 'info',
+        title: 'Coming soon',
+        message: 'Google Pay in-app is launching after MVP. UPI is selected instead.',
+        primaryLabel: 'Got it',
+      });
     }
 
     try {
       const payment = await payMutation.mutateAsync();
       if (payment.status !== 'success') {
-        Alert.alert('Payment incomplete', 'The payment could not be confirmed. Please try again.');
+        showDialog({
+          tone: 'error',
+          title: 'Payment incomplete',
+          message: 'The payment could not be confirmed. Please try again.',
+          primaryLabel: 'OK',
+        });
         return;
       }
-      Alert.alert(
-        'Payment successful',
-        'Your advance payment has been confirmed.',
-        [{ text: 'Continue', onPress: continueAfterPayment }],
-      );
+      showDialog({
+        tone: 'success',
+        title: 'Payment successful',
+        message:
+          flow === 'towing'
+            ? 'Advance paid. Tow vendors nearby can now accept your job.'
+            : flow === 'driver'
+              ? 'Advance paid. Available drivers can now accept your hire.'
+              : 'Advance paid. Roadside partners nearby can now accept.',
+        primaryLabel: 'Continue',
+        onPrimary: continueAfterPayment,
+      });
     } catch (error) {
-      Alert.alert(
-        'Payment not completed',
-        getApiErrorMessage(error, 'Could not complete the payment. Please try again.'),
-      );
+      showDialog({
+        tone: 'error',
+        title: 'Payment not completed',
+        message: getApiErrorMessage(error, 'Could not complete the payment. Please try again.'),
+        primaryLabel: 'OK',
+      });
     }
   };
 
@@ -108,9 +134,14 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       continueDisabled={payMutation.isPending}
       footerNoteBelow={
         <Text style={{ fontSize: t.caption, color: colors.grey, textAlign: 'center' }}>
-          Secure payment confirmation for RACE services.
+          {flow === 'towing'
+            ? 'Advance unlocks vendor tow dispatch. Balance after drop in Track.'
+            : flow === 'driver'
+              ? 'Advance sends your job to drivers. Pay balance after the trip.'
+              : 'Advance sends help to roadside partners near you.'}
         </Text>
       }>
+      {dialog}
       <View style={{ flex: 1 }}>
         <View
           style={[
@@ -163,8 +194,8 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
                     gap: t.px(12),
                     borderRadius: t.inputRadius,
                     borderWidth: isSelected ? 2 : 1,
-                    borderColor: isSelected ? accent : colors.border,
-                    backgroundColor: isSelected ? colors.goldLight : colors.background,
+                    borderColor: isSelected ? accent : '#E7E5E4',
+                    backgroundColor: colors.background,
                     padding: t.rowPadding,
                   },
                   shadows.card,
@@ -216,7 +247,14 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
         </View>
 
         <Pressable
-          onPress={() => Alert.alert('Add Method', 'Add a new payment method from Profile → Payment Methods.')}
+          onPress={() =>
+            showDialog({
+              tone: 'info',
+              title: 'Add Method',
+              message: 'Add a new payment method from Profile → Payment Methods.',
+              primaryLabel: 'Got it',
+            })
+          }
           style={{ marginTop: t.px(14), alignItems: 'center' }}>
           <Text style={{ fontSize: t.body, fontWeight: typography.weights.bold, color: accent }}>
             + Add New Payment Method

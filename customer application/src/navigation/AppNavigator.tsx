@@ -19,7 +19,6 @@ import { useAppSelector } from '../redux/hooks';
 import { getCustomerOnboardingRouteFromStep } from '../store/customerOnboardingRoute';
 import { useAuthStore } from '../store/authStore';
 import CreateAccountScreen from '../screens/auth/CreateAccountScreen';
-import CreatePinAuthScreen from '../screens/auth/CreatePinScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import OTPScreen from '../screens/auth/OTPScreen';
@@ -66,16 +65,13 @@ import PersonalInformationScreen from '../screens/profile/PersonalInformationScr
 import MyVehiclesScreen from '../screens/vehicles/VehicleListScreen';
 import AddVehicleScreen from '../screens/vehicles/AddVehicleScreen';
 import VehicleDetailScreen from '../screens/vehicles/VehicleDetailScreen';
-import EditVehicleScreen from '../screens/vehicles/EditVehicleScreen';
 import SosDetailsScreen from '../screens/profile/SosDetailsScreen';
 import SavedLocationsScreen from '../screens/profile/SavedLocationsScreen';
 import PaymentMethodsScreen from '../screens/profile/PaymentMethodsScreen';
 import NotificationsScreen from '../screens/profile/NotificationsScreen';
 import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
-import SettingsScreen from '../screens/profile/SettingsScreen';
 import ChoosePlanScreen from '../screens/profile/ChoosePlanScreen';
-import CreatePinScreen from '../screens/profile/CreatePinScreen';
-import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
+import SubscriptionPlansScreen from '../screens/profile/SubscriptionPlansScreen';
 import ChangeMobileNumberScreen from '../screens/profile/ChangeMobileNumberScreen';
 import BookingsScreen from '../screens/BookingsScreen';
 import BookingDetailScreen from '../screens/bookings/BookingDetailScreen';
@@ -497,16 +493,14 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen name="MyVehicles" component={MyVehiclesScreen} />
       <ProfileStack.Screen name="AddVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="VehicleDetail" component={VehicleDetailScreen} />
-      <ProfileStack.Screen name="EditVehicle" component={EditVehicleScreen} />
+      <ProfileStack.Screen name="EditVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="SosDetails" component={SosDetailsScreen} />
       <ProfileStack.Screen name="SavedLocations" component={SavedLocationsScreen} />
       <ProfileStack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
       <ProfileStack.Screen name="HelpSupport" component={HelpSupportScreen} />
-      <ProfileStack.Screen name="Settings" component={SettingsScreen} />
       <ProfileStack.Screen name="ChoosePlan" component={ChoosePlanScreen} />
-      <ProfileStack.Screen name="CreatePin" component={CreatePinScreen} />
-      <ProfileStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <ProfileStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <ProfileStack.Screen name="ChangeMobileNumber" component={ChangeMobileNumberScreen} />
     </ProfileStack.Navigator>
   );
@@ -556,7 +550,6 @@ function AuthStackNavigator() {
         component={VehicleRegistrationScreen}
       />
       <AuthStack.Screen name="QRCode" component={QRCodeScreen} />
-      <AuthStack.Screen name="CreatePin" component={CreatePinAuthScreen} />
     </AuthStack.Navigator>
   );
 }

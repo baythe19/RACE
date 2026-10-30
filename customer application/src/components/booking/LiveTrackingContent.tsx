@@ -61,6 +61,9 @@ type Props = {
   steps: string[];
   activeStep: number;
   etaLabel: string;
+  /** Override default "Estimated arrival" + status chip when partner not assigned yet. */
+  summaryLabel?: string;
+  summaryChipLabel?: string;
   serviceLabel: string;
   pickupLabel: string;
   dropLabel?: string;
@@ -89,6 +92,8 @@ export default function LiveTrackingContent({
   steps,
   activeStep,
   etaLabel,
+  summaryLabel,
+  summaryChipLabel,
   serviceLabel,
   pickupLabel,
   dropLabel,
@@ -110,6 +115,14 @@ export default function LiveTrackingContent({
   const px = (n: number) => Math.round((width / REF_W) * n);
   const callPhone = driverPhone?.trim() || brand.phoneRaw;
   const etaDisplay = etaLabel === 'updating' ? 'Calculating…' : etaLabel;
+  const cardLabel = summaryLabel ?? 'Estimated arrival';
+  const cardValue =
+    summaryLabel != null
+      ? etaLabel === 'updating'
+        ? 'Calculating…'
+        : etaLabel
+      : etaDisplay;
+  const chipText = summaryChipLabel ?? statusLabel;
   const mapMin = Math.max(px(180), Math.round(height * 0.28));
   const [sheetExpanded, setSheetExpanded] = useState(true);
   const showTripOtp = Boolean(tripOtp && shouldShowTripStartOtp(statusCode));
@@ -148,6 +161,7 @@ export default function LiveTrackingContent({
             pickup={pickup}
             dropoff={dropoff}
             driver={driver}
+            tripStatus={statusCode}
             onPress={() => setSheetExpanded(false)}
           />
 
@@ -191,10 +205,10 @@ export default function LiveTrackingContent({
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.collapsedTitle} numberOfLines={1}>
-                  ETA {etaDisplay}
+                  {cardLabel} · {cardValue}
                 </Text>
                 <Text style={styles.collapsedSub} numberOfLines={1}>
-                  {statusLabel} · {driverName}
+                  {chipText} · {driverName}
                 </Text>
               </View>
               <Text style={styles.collapsedHint}>Details</Text>
@@ -254,15 +268,15 @@ export default function LiveTrackingContent({
                   <Clock size={px(15)} color={LOCATION_ACCENT} strokeWidth={2.3} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.etaLabel}>Estimated arrival</Text>
-                  <Text style={styles.etaValue} numberOfLines={1}>
-                    {etaDisplay}
+                  <Text style={styles.etaLabel}>{cardLabel}</Text>
+                  <Text style={styles.etaValue} numberOfLines={2}>
+                    {cardValue}
                   </Text>
                 </View>
                 <View style={styles.statusChip}>
                   <Navigation size={px(11)} color={colors.dark} strokeWidth={2.3} />
                   <Text style={styles.statusChipText} numberOfLines={1}>
-                    {statusLabel}
+                    {chipText}
                   </Text>
                 </View>
               </View>

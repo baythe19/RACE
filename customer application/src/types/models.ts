@@ -108,16 +108,24 @@ export interface BookingDriver {
   phone?: string;
 }
 
+export interface ActiveBookingLocation {
+  primary: string;
+  secondary?: string;
+}
+
 export interface ActiveBooking {
   id: string;
   displayId: string;
   service: string;
   status: string;
-  pickup: string;
-  drop: string;
+  pickup: ActiveBookingLocation;
+  /** Omitted when service is on-site at pickup only. */
+  drop?: ActiveBookingLocation | null;
   eta: string;
   driver: BookingDriver;
   bookingType: 'towing' | 'driver';
+  bookingKind?: 'towing' | 'driver' | 'roadside';
+  dispatchHint?: string;
   tripStartOtp?: string;
 }
 

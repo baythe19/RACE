@@ -16,6 +16,14 @@ import { logActivity } from './activityLogger';
 import { getEntityActivities } from './entityActivities';
 import { NotFoundError } from '../../../utils/src/errors';
 
+function mapCustomerPaymentStatus(status: string): string {
+  const normalized = String(status).toLowerCase();
+  if (normalized === 'success' || normalized === 'completed') return 'COMPLETED';
+  if (normalized === 'initiated' || normalized === 'pending') return 'PENDING';
+  if (normalized === 'failed') return 'FAILED';
+  return String(status).toUpperCase();
+}
+
 function mapCustomer(
   user: {
     _id: Types.ObjectId;
@@ -153,9 +161,8 @@ export const adminCustomersService = {
       legacyBookings,
       towingBookings,
       driverBookings,
-      legacySpend,
-      paymentSpend,
       transactions,
+      paymentTransactions,
       subscriptions,
       activities,
     ] = await Promise.all([
@@ -163,21 +170,8 @@ export const adminCustomersService = {
       BookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
       TowingBookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
       DriverBookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
-      BookingModel.aggregate([
-        { $match: { customerId: customerObjectId } },
-        { $group: { _id: null, total: { $sum: '$invoice.total' } } },
-      ]),
-      PaymentTransactionModel.aggregate([
-        {
-          $match: {
-            customerId: customerObjectId,
-            paymentType: { $in: ['advance', 'final'] },
-            status: 'success',
-          },
-        },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]),
-      TransactionModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
+      TransactionModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(30).lean(),
+      PaymentTransactionModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(30).lean(),
       UserSubscriptionModel.find({ userId: customerObjectId }).sort({ createdAt: -1 }).lean(),
       getEntityActivities('customer', id),
     ]);
@@ -209,9 +203,9 @@ export const adminCustomersService = {
       ...towingBookings.map((b) => ({
         id: b._id.toString(),
         bookingNumber: b.bookingNumber,
-        service: 'Towing',
+        service: b.assistLabel?.trim() || 'Towing',
         status: b.status,
-        amount: b.estimatedFare ?? 0,
+        amount: b.finalFare ?? b.estimatedFare ?? 0,
         date: b.createdAt.toISOString(),
         vendorId: b.vendorId?.toString(),
         driverName: undefined,
@@ -220,9 +214,18 @@ export const adminCustomersService = {
       ...driverBookings.map((b) => ({
         id: b._id.toString(),
         bookingNumber: b.bookingNumber,
-        service: 'Driver Service',
+        service:
+          b.driverServiceType === 'part_time'
+            ? 'Driver Service · Part-time'
+            : b.driverServiceType === 'full_time'
+              ? 'Driver Service · Full-time'
+              : b.driverServiceType === 'outstation'
+                ? 'Driver Service · Outstation'
+                : b.driverServiceType === 'night'
+                  ? 'Driver Service · Night'
+                  : 'Driver Service',
         status: b.status,
-        amount: b.estimatedFare ?? 0,
+        amount: b.finalFare ?? b.estimatedFare ?? 0,
         date: b.createdAt.toISOString(),
         vendorId: b.vendorId?.toString(),
         driverName: undefined,
@@ -268,7 +271,33 @@ export const adminCustomersService = {
       ]),
     );
 
-    const base = mapCustomer(user, vehicleCount, unified.length);
+    const bookingCountMap = await bookingCountsByCustomer([customerObjectId]);
+    const totalBookings = bookingCountMap.get(id) ?? unified.length;
+
+    const mergedPayments = [
+      ...transactions.map((t) => ({
+        id: t._id.toString(),
+        amount: t.amount,
+        method: t.paymentMethod ?? 'UPI',
+        status: mapCustomerPaymentStatus(t.status),
+        date: t.createdAt.toISOString(),
+        reference: t.reference ?? t.transactionCode,
+      })),
+      ...paymentTransactions.map((t) => ({
+        id: t._id.toString(),
+        amount: t.amount,
+        method: t.gatewayReferenceId ? 'Online' : 'UPI',
+        status: mapCustomerPaymentStatus(t.status),
+        date: t.createdAt.toISOString(),
+        reference:
+          t.gatewayReferenceId ??
+          `${t.bookingType.toUpperCase()} · ${t.paymentType} · ${t.bookingId.toString().slice(-6)}`,
+      })),
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 40);
+
+    const base = mapCustomer(user, vehicleCount, totalBookings);
 
     return {
       ...base,
@@ -279,7 +308,6 @@ export const adminCustomersService = {
       emergencyContact: user.emergencyContact
         ? `${user.emergencyContact.name} (${user.emergencyContact.mobileNumber})`
         : undefined,
-      totalSpent: (legacySpend[0]?.total ?? 0) + (paymentSpend[0]?.total ?? 0),
       bookings: unified.map((b) => ({
         id: b.id,
         bookingNumber: b.bookingNumber,
@@ -291,14 +319,7 @@ export const adminCustomersService = {
         driverName: b.driverName,
         bookingType: b.bookingType,
       })),
-      payments: transactions.map((t) => ({
-        id: t._id.toString(),
-        amount: t.amount,
-        method: t.paymentMethod ?? 'UPI',
-        status: t.status,
-        date: t.createdAt.toISOString(),
-        reference: t.reference ?? t.transactionCode,
-      })),
+      payments: mergedPayments,
       subscriptions: subscriptions.map((s) => ({
         id: s._id.toString(),
         planName: s.planName,

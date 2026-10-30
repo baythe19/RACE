@@ -17,7 +17,7 @@ export default function MyQrScreen({ route }: Props) {
 
   if (isLoading || !vehicle) {
     return (
-      <ProfileSubScreenLayout title="My QR" subtitle="">
+      <ProfileSubScreenLayout title="My QR">
         <DataSkeleton variant="detail" />
       </ProfileSubScreenLayout>
     );
@@ -25,7 +25,7 @@ export default function MyQrScreen({ route }: Props) {
 
   if (error) {
     return (
-      <ProfileSubScreenLayout title="My QR" subtitle="">
+      <ProfileSubScreenLayout title="My QR">
         <Text style={{ color: colors.error, textAlign: 'center', marginTop: 24 }}>
           Unable to load QR
         </Text>
@@ -34,7 +34,7 @@ export default function MyQrScreen({ route }: Props) {
   }
 
   return (
-    <ProfileSubScreenLayout title="My QR" subtitle="">
+    <ProfileSubScreenLayout title="My QR">
       <VehicleEmergencyQrPanel vehicle={vehicle} px={px} showMeta />
     </ProfileSubScreenLayout>
   );

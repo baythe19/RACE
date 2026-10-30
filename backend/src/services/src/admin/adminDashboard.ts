@@ -502,8 +502,9 @@ export const adminDashboardService = {
             customerName,
             service: 'Towing Service',
             status: b.status,
-            amount: b.estimatedFare ?? 0,
+            amount: b.finalFare ?? b.estimatedFare ?? 0,
             createdAt: new Date(b.createdAt),
+            bookingType: 'towing' as const,
           };
         }),
         ...recentDriverBookings.map((b) => {
@@ -518,8 +519,9 @@ export const adminDashboardService = {
             customerName,
             service: 'Driver Service',
             status: b.status,
-            amount: b.estimatedFare ?? 0,
+            amount: b.finalFare ?? b.estimatedFare ?? 0,
             createdAt: new Date(b.createdAt),
+            bookingType: 'driver' as const,
           };
         }),
       ]

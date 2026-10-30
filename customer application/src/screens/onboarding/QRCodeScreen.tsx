@@ -1,7 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   Linking,
@@ -18,13 +17,16 @@ import { Check, Hospital, Share2 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import QRCodePlaceholder from '../../components/auth/QRCodePlaceholder';
+import GoldButton from '../../components/auth/GoldButton';
 import StepHeader from '../../components/auth/StepHeader';
 import { QR_ACTIONS } from '../../constants/auth';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useVehicleQuery } from '../../services/vehicles/useVehicleQueries';
 import { formatFuelLabel } from '../../components/vehicles/vehicleUi';
 import { getLucideIcon } from '../../utils/lucideIcon';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, shadows, typography } from '../../theme';
+import { finishCustomerOnboarding } from '../../utils/finishCustomerOnboarding';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
@@ -41,6 +43,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'QRCode'>;
 
 export default function QRCodeScreen({ navigation, route }: Props) {
   const { vehicleId, vehicleNumber } = route.params;
+  const { dialog, showDialog } = useAppDialog();
   const { data: vehicle, isLoading } = useVehicleQuery(vehicleId);
   const { width } = useWindowDimensions();
   const s = width / REF_W;
@@ -62,7 +65,12 @@ export default function QRCodeScreen({ navigation, route }: Props) {
 
   const handleShare = () => {
     if (!vehicle?.qrCode) {
-      Alert.alert('QR Code', 'QR code is not ready yet.');
+      showDialog({
+        tone: 'warning',
+        title: 'QR Code',
+        message: 'QR code is not ready yet.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     void Share.share({
@@ -73,6 +81,7 @@ export default function QRCodeScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
+      {dialog}
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -283,26 +292,13 @@ export default function QRCodeScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
 
-        <Text
-          style={{
-            fontSize: px(13),
-            color: colors.grey,
-            textAlign: 'center',
-            marginBottom: px(8),
-          }}>
-          Set up your PIN next to secure your account
-        </Text>
-        <Pressable onPress={() => navigation.navigate('CreatePin')}>
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.primary,
-              textAlign: 'center',
-            }}>
-            Set Up PIN →
-          </Text>
-        </Pressable>
+        <GoldButton
+          label="Continue to RACE"
+          onPress={() => void finishCustomerOnboarding()}
+          style={{ width: '100%', marginTop: px(8), marginBottom: px(24), ...shadows.card }}
+          height={px(52)}
+          borderRadius={px(14)}
+        />
       </ScrollView>
     </SafeAreaView>
   );

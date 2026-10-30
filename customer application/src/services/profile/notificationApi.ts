@@ -115,6 +115,16 @@ export async function markNotificationRead(id: string): Promise<void> {
   await apiClient.patch(`${API_ENDPOINTS.notifications}/${id}/read`);
 }
 
+/** Permanently deletes every notification for the signed-in customer. */
+export async function deleteAllNotifications(): Promise<void> {
+  await apiClient.delete(API_ENDPOINTS.notifications);
+}
+
+/** Permanently deletes one notification for the signed-in customer. */
+export async function deleteNotification(id: string): Promise<void> {
+  await apiClient.delete(`${API_ENDPOINTS.notifications}/${id}`);
+}
+
 export async function getNotificationPreferences(): Promise<NotificationPreference[]> {
   const { data } = await apiClient.get<ApiSuccessResponse<BackendNotificationPrefs>>(
     `${API_ENDPOINTS.notifications}/preferences`,

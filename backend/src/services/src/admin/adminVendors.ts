@@ -384,16 +384,18 @@ export const adminVendorsService = {
           status: b.status,
           amount: b.invoice?.total ?? 0,
           date: b.createdAt.toISOString(),
+          bookingType: 'legacy' as const,
         })),
         ...towingBookings.map((b) => ({
           id: b._id.toString(),
           bookingNumber: b.bookingNumber,
           customerName: customerMap.get(b.customerId.toString()) ?? 'Customer',
-          service: 'Towing',
+          service: b.assistLabel?.trim() || 'Towing',
           driverName: b.driverId ? driverMap.get(b.driverId.toString()) ?? '—' : '—',
           status: b.status,
           amount: b.finalFare ?? b.estimatedFare,
           date: b.createdAt.toISOString(),
+          bookingType: 'towing' as const,
         })),
         ...driverBookings.map((b) => ({
           id: b._id.toString(),
@@ -404,6 +406,7 @@ export const adminVendorsService = {
           status: b.status,
           amount: b.finalFare ?? b.estimatedFare,
           date: b.createdAt.toISOString(),
+          bookingType: 'driver' as const,
         })),
       ]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

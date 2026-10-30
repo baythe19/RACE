@@ -59,7 +59,7 @@ async function resolveCustomerOnboardingStep(
     await clearCustomerOnboardingComplete();
     if (profile?.isProfileCompleted) {
       const vehicles = useVehicleStore.getState().vehicles;
-      return vehicles.length === 0 ? 'vehicle' : 'pin';
+      return vehicles.length === 0 ? 'vehicle' : 'done';
     }
     return 'profile';
   }
@@ -78,7 +78,7 @@ async function resolveCustomerOnboardingStep(
     return 'vehicle';
   }
 
-  return 'pin';
+  return 'done';
 }
 
 async function completeAuthSession(

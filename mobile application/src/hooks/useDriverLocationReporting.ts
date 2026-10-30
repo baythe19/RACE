@@ -104,6 +104,29 @@ function setHealth(
   useDriverPresenceStore.getState().setLocationHealth(health, options);
 }
 
+/**
+ * Push the driver's chosen manual position to the backend and mark health OK.
+ * Used when GPS is unusable but the driver pinned a spot on the map — backend
+ * matching, customer tracking and ETAs keep working off that position.
+ */
+async function reportManualLocation(): Promise<boolean> {
+  const presence = useDriverPresenceStore.getState();
+  const manual = presence.manualLocation;
+  if (!manual) return false;
+
+  // Keep the manual point visible on maps even while GPS is broken.
+  useDriverPresenceStore.getState().setDriverLocation(manual);
+  try {
+    await updateDriverLocation(manual.latitude, manual.longitude);
+    lastSentAt = Date.now();
+    setHealth('ok', { lastLocationAt: Date.now(), isReporting: false });
+    return true;
+  } catch {
+    setHealth('error', { isReporting: false });
+    return true; // consumed the tick — do not fall through to GPS spam
+  }
+}
+
 async function runReport(): Promise<void> {
   if (inFlight) return;
   if (Date.now() - lastSentAt < MIN_GAP_MS) return;
@@ -112,6 +135,12 @@ async function runReport(): Promise<void> {
     useDriverPresenceStore.getState().locationHealth,
     { isReporting: true },
   );
+
+  // A fresh manual pick is the source of truth — report it and skip GPS entirely.
+  if (await reportManualLocation()) {
+    inFlight = false;
+    return;
+  }
 
   try {
     const granted = await ensureForegroundLocationPermission();
@@ -127,7 +156,7 @@ async function runReport(): Promise<void> {
       return;
     }
 
-    // 3. Actual fix + upload.
+    // 3. Actual fix + upload; a manual pick made while GPS was down still wins.
     const position = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
@@ -150,6 +179,7 @@ async function runReport(): Promise<void> {
     inFlight = false;
   }
 }
+
 
 function startReporter() {
   if (interval) return;
@@ -196,6 +226,12 @@ export function useDriverLocationReporting(enabled: boolean) {
 
 /** Manual retry for the dashboard's location-health card. */
 export function retryDriverLocationReport(): void {
+  lastSentAt = 0;
+  void runReport();
+}
+
+/** Re-report the driver's chosen position immediately (after a map pick). */
+export function reportDriverManualLocationNow(): void {
   lastSentAt = 0;
   void runReport();
 }

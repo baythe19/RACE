@@ -21,7 +21,7 @@ export default function ServiceListScreen({ route, navigation }: Props) {
     return (
       <AppScreenLayout backgroundColor={colors.pageBg} scrollable={false}>
         <View style={styles.loader}>
-          <DataSkeleton variant="cards" />
+          <DataSkeleton variant="services" />
         </View>
       </AppScreenLayout>
     );

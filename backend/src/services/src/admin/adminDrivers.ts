@@ -3,6 +3,8 @@ import { Types } from 'mongoose';
 import { UserModel } from '../../../models/src/user';
 import { driverRepository } from '../driverRepository';
 import { BookingModel } from '../../../models/src/booking';
+import { DriverBookingModel } from '../../../models/src/driverBooking';
+import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
 import { escapeRegex, paginate } from './pagination';
 import { logActivity } from './activityLogger';
@@ -104,13 +106,83 @@ export const adminDriversService = {
     }
     const base = await mapDriver(user, vendorName);
 
-    const [bookings, activities, fleetVehicle] = await Promise.all([
-      BookingModel.find({ 'driver.id': id }).sort({ createdAt: -1 }).limit(20).lean(),
-      getEntityActivities('driver', id),
-      driver.vehicleRegistration
-        ? VendorVehicleModel.findOne({ registrationNo: driver.vehicleRegistration }).lean()
-        : Promise.resolve(null),
-    ]);
+    const driverObjectId = user._id;
+
+    const [legacyBookings, towingBookings, driverBookings, activities, fleetVehicle] =
+      await Promise.all([
+        BookingModel.find({ 'driver.id': id }).sort({ createdAt: -1 }).limit(20).lean(),
+        TowingBookingModel.find({ driverId: driverObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
+        DriverBookingModel.find({ driverId: driverObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
+        getEntityActivities('driver', id),
+        driver.vehicleRegistration
+          ? VendorVehicleModel.findOne({ registrationNo: driver.vehicleRegistration }).lean()
+          : Promise.resolve(null),
+      ]);
+
+    type UnifiedDriverBookingRow = {
+      id: string;
+      bookingNumber: string;
+      service: string;
+      status: string;
+      amount: number;
+      date: string;
+      customerId?: string;
+      bookingType: 'legacy' | 'towing' | 'driver';
+    };
+
+    const unified: UnifiedDriverBookingRow[] = [
+      ...legacyBookings.map((b) => ({
+        id: b._id.toString(),
+        bookingNumber: b.bookingNumber,
+        service: b.serviceLabel ?? 'Roadside',
+        status: b.status,
+        amount: b.invoice?.total ?? 0,
+        date: b.createdAt.toISOString(),
+        customerId: b.customerId?.toString(),
+        bookingType: 'legacy' as const,
+      })),
+      ...towingBookings.map((b) => ({
+        id: b._id.toString(),
+        bookingNumber: b.bookingNumber,
+        service: b.assistLabel?.trim() || 'Towing',
+        status: b.status,
+        amount: b.finalFare ?? b.estimatedFare ?? 0,
+        date: b.createdAt.toISOString(),
+        customerId: b.customerId?.toString(),
+        bookingType: 'towing' as const,
+      })),
+      ...driverBookings.map((b) => ({
+        id: b._id.toString(),
+        bookingNumber: b.bookingNumber,
+        service:
+          b.driverServiceType === 'part_time'
+            ? 'Driver Service · Part-time'
+            : b.driverServiceType === 'full_time'
+              ? 'Driver Service · Full-time'
+              : b.driverServiceType === 'outstation'
+                ? 'Driver Service · Outstation'
+                : b.driverServiceType === 'night'
+                  ? 'Driver Service · Night'
+                  : 'Driver Service',
+        status: b.status,
+        amount: b.finalFare ?? b.estimatedFare ?? 0,
+        date: b.createdAt.toISOString(),
+        customerId: b.customerId?.toString(),
+        bookingType: 'driver' as const,
+      })),
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 40);
+
+    const customerIds = [
+      ...new Set(unified.map((b) => b.customerId).filter(Boolean)),
+    ] as string[];
+    const customers = customerIds.length
+      ? await UserModel.find({ _id: { $in: customerIds }, role: 'customer' }).lean()
+      : [];
+    const customerMap = new Map(
+      customers.map((c) => [c._id.toString(), c.fullName ?? 'Customer'] as const),
+    );
 
     return {
       ...base,
@@ -128,14 +200,15 @@ export const adminDriversService = {
         year: fleetVehicle?.year ?? new Date().getFullYear(),
         status: (fleetVehicle?.status ?? 'ACTIVE') as 'ACTIVE' | 'UNDER_MAINTENANCE',
       },
-      bookings: bookings.map((b) => ({
-        id: b._id.toString(),
+      bookings: unified.map((b) => ({
+        id: b.id,
         bookingNumber: b.bookingNumber,
-        service: b.serviceLabel,
+        service: b.service,
         status: b.status,
-        amount: b.invoice?.total ?? 0,
-        date: b.createdAt.toISOString(),
-        driverName: b.driver?.name,
+        amount: b.amount,
+        date: b.date,
+        customerName: b.customerId ? customerMap.get(b.customerId) : undefined,
+        bookingType: b.bookingType,
       })),
       reviews: [],
       documents: buildDriverDocuments(driver),

@@ -40,22 +40,27 @@ export default function VehicleEmergencyQrPanel({
     <View
       style={[
         styles.wrap,
-        { borderRadius: px(16), padding: px(16), marginBottom: px(14) },
+        {
+          borderRadius: px(20),
+          padding: px(20),
+          marginBottom: px(14),
+          marginTop: px(4),
+        },
         shadows.card,
       ]}>
-      <View style={{ alignItems: 'center', marginBottom: px(14) }}>
+      <View style={{ alignItems: 'center', marginBottom: px(16) }}>
         <View
           style={{
-            padding: px(10),
-            borderRadius: px(12),
+            padding: px(14),
+            borderRadius: px(16),
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: '#FDE68A',
             backgroundColor: '#FFFFFF',
           }}>
           <VehicleEmergencyQrThumb
             vehicleId={vehicle.id}
             qrCodeDataUrl={vehicle.qrCode}
-            size={px(200)}
+            size={px(210)}
           />
         </View>
         {showMeta ? (
@@ -105,13 +110,17 @@ export default function VehicleEmergencyQrPanel({
           gap: px(16),
           marginBottom: px(8),
         }}>
-        <Pressable onPress={() => void shareVehicleQr(vehicle)} hitSlop={8}>
+        <Pressable
+          onPress={() => void shareVehicleQr(vehicle)}
+          hitSlop={8}
+          style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.7 }]}>
           <Text style={styles.link}>Share link</Text>
         </Pressable>
         <Text style={{ color: colors.border }}>·</Text>
         <Pressable
           onPress={() => void openVehicleEmergencyPageInBrowser(vehicle)}
-          hitSlop={8}>
+          hitSlop={8}
+          style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.7 }]}>
           <Text style={styles.link}>Open in browser</Text>
         </Pressable>
       </View>
@@ -124,6 +133,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  linkBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
   },
   link: {
     fontSize: 13,

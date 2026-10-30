@@ -89,6 +89,8 @@ export interface TowingBookingResponseDto {
   remainingPaid: boolean;
   paymentStatus: string;
   status: string;
+  /** True when a partner is allotted but has not accepted yet (no driver PII). */
+  awaitingPartnerAccept?: boolean;
   vendorId?: string;
   driverId?: string;
   driver?: {
@@ -123,6 +125,7 @@ export interface TowingBookingResponseDto {
 export interface TowingTrackingResponseDto {
   bookingId: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   statusHistory: Array<{ status: string; timestamp: string }>;
   driver?: {
     id: string;

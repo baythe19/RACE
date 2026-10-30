@@ -1097,6 +1097,13 @@ export async function assignDriverToBooking(
     throw error;
   }
 
+  // Assigned job is gone from the open pool — refresh every partner feed live.
+  if (bookingType === 'towing') {
+    emitVendorOffersUpdated();
+  } else {
+    emitDriverOffersUpdated();
+  }
+
   emitBookingStatusUpdate(bookingId, mapPublicBookingStatus('DRIVER_ASSIGNED'), {
     internalStatus: 'DRIVER_ASSIGNED',
     driverAccepted: false,
@@ -1178,6 +1185,13 @@ export async function unassignDriverFromBooking(
   }
 
   await releaseDriver(driverId, bookingId);
+
+  // Booking is back in the open pool — repopulate partner feeds live.
+  if (bookingType === 'towing') {
+    emitVendorOffersUpdated();
+  } else {
+    emitDriverOffersUpdated();
+  }
 }
 
 export async function autoAssignDriver(

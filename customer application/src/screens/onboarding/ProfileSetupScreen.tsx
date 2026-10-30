@@ -24,6 +24,7 @@ import FormField from '../../components/auth/FormField';
 import DateOfBirthField from '../../components/auth/DateOfBirthField';
 import GoldButton from '../../components/auth/GoldButton';
 import StepHeader from '../../components/auth/StepHeader';
+import AppActionSheet from '../../components/common/AppActionSheet';
 import ProfileAddressFields, {
   type AddressFormValues,
 } from '../../components/profile/ProfileAddressFields';
@@ -31,6 +32,7 @@ import ProfileEmergencyContactFields, {
   type EmergencyContactFormValues,
 } from '../../components/profile/ProfileEmergencyContactFields';
 import { EMERGENCY_RELATIONSHIP_OPTIONS } from '../../constants/profileForm';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useProfileStore } from '../../store/profileStore';
 import { useAuthStore } from '../../store/authStore';
 import { setCustomerOnboardingStep } from '../../store/customerOnboarding';
@@ -59,6 +61,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
 
+  const { dialog, showDialog } = useAppDialog();
   const { profile, updateProfile, isLoading } = useProfileStore();
   const signupDraft = useSignupDraftStore(state => state.draft);
   const canGoBack = navigation.canGoBack();
@@ -122,13 +125,10 @@ export default function ProfileSetupScreen({ navigation }: Props) {
     }
   };
 
+  const [genderSheetOpen, setGenderSheetOpen] = useState(false);
+
   const handleGenderPress = () => {
-    Alert.alert('Select Gender', '', [
-      { text: 'Male', onPress: () => setGender('Male') },
-      { text: 'Female', onPress: () => setGender('Female') },
-      { text: 'Other', onPress: () => setGender('Other') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setGenderSheetOpen(true);
   };
 
   const handleContinue = async () => {
@@ -185,6 +185,7 @@ export default function ProfileSetupScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      {dialog}
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -400,6 +401,16 @@ export default function ProfileSetupScreen({ navigation }: Props) {
           />
         </View>
       </KeyboardAvoidingView>
+      <AppActionSheet
+        visible={genderSheetOpen}
+        title="Select Gender"
+        onCancel={() => setGenderSheetOpen(false)}
+        options={[
+          { key: 'male', label: 'Male', onPress: () => setGender('Male') },
+          { key: 'female', label: 'Female', onPress: () => setGender('Female') },
+          { key: 'other', label: 'Other', onPress: () => setGender('Other') },
+        ]}
+      />
     </SafeAreaView>
   );
 }

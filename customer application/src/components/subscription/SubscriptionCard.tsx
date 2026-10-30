@@ -1,126 +1,215 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Check, Sparkles } from 'lucide-react-native';
 
 import PrimaryButton from '../ui/PrimaryButton';
+import { getPlanPrice, getPlanPriceLabel } from '../../constants/choosePlan';
+import type { BillingCycle } from '../../constants/choosePlan';
 import type { SubscriptionPlan } from '../../types/profile';
-import { colors, radius, spacing, typography } from '../../theme';
+import { colors, shadows, spacing, typography } from '../../theme';
+
+const OUTLINE = '#E7E5E4';
 
 interface SubscriptionCardProps {
   plan: SubscriptionPlan;
+  billingPeriod: BillingCycle;
   selected?: boolean;
   onSelect: () => void;
   disabled?: boolean;
+  isCurrent?: boolean;
 }
 
 export default function SubscriptionCard({
   plan,
+  billingPeriod,
   selected,
   onSelect,
   disabled = false,
+  isCurrent,
 }: SubscriptionCardProps) {
-  const isPremium = plan.popular;
+  const highlighted = Boolean(plan.popular);
+  const monthlyBase = plan.price;
+  const displayPrice = getPlanPrice(monthlyBase, billingPeriod);
+  const priceCaption = getPlanPriceLabel(monthlyBase, billingPeriod);
+  const isContact = plan.actionType === 'contact';
 
   return (
-    <View
-      style={[
+    <Pressable
+      onPress={disabled ? undefined : onSelect}
+      style={({ pressed }) => [
         styles.card,
-        isPremium && styles.premium,
-        selected && !isPremium && styles.selected,
+        highlighted && styles.cardHighlight,
+        selected && styles.cardSelected,
+        isCurrent && styles.cardCurrent,
+        pressed && !disabled ? { opacity: 0.96 } : null,
       ]}>
-      {plan.popular ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>MOST POPULAR</Text>
+      {highlighted ? (
+        <View style={styles.badgeRow}>
+          <View style={styles.badge}>
+            <Sparkles size={12} color={colors.primaryDark} strokeWidth={2.2} />
+            <Text style={styles.badgeText}>Recommended</Text>
+          </View>
         </View>
       ) : null}
-      <Text style={[styles.name, isPremium && styles.namePremium]}>{plan.name}</Text>
-      <Text style={[styles.price, isPremium && styles.pricePremium]}>
-        ₹{plan.price}
-        <Text style={styles.period}>/{plan.period === 'yearly' ? 'year' : 'month'}</Text>
-      </Text>
+
+      {isCurrent ? (
+        <Text style={styles.currentPill}>Your plan</Text>
+      ) : null}
+
+      <Text style={styles.name}>{plan.name}</Text>
+      {plan.description ? (
+        <Text style={styles.tagline} numberOfLines={2}>
+          {plan.description}
+        </Text>
+      ) : null}
+
+      <View style={styles.priceRow}>
+        <Text style={styles.price}>₹{displayPrice.toLocaleString('en-IN')}</Text>
+        <Text style={styles.priceMeta}>
+          {billingPeriod === 'yearly' ? '/ year' : '/ month'}
+          {billingPeriod === 'yearly' ? (
+            <Text style={styles.priceSave}> · 20% off</Text>
+          ) : null}
+        </Text>
+      </View>
+      <Text style={styles.priceEquiv}>{priceCaption}</Text>
+
       <View style={styles.features}>
-        {plan.features.map((feature) => (
+        {plan.features.map(feature => (
           <View key={feature.label} style={styles.featureRow}>
-            <Ionicons
-              name={feature.included ? 'checkmark-circle' : 'close-circle'}
-              size={16}
-              color={feature.included ? (isPremium ? colors.textLight : colors.primary) : colors.textMuted}
-            />
-            <Text
+            <View
               style={[
-                styles.featureText,
-                !feature.included && styles.featureMuted,
-                isPremium && styles.featureTextPremium,
+                styles.featureIcon,
+                feature.included ? styles.featureIconOn : styles.featureIconOff,
               ]}>
+              {feature.included ? (
+                <Check size={12} color={colors.dark} strokeWidth={3} />
+              ) : null}
+            </View>
+            <Text
+              style={[styles.featureText, !feature.included && styles.featureMuted]}
+              numberOfLines={2}>
               {feature.label}
             </Text>
           </View>
         ))}
       </View>
+
       <PrimaryButton
-        label={disabled ? 'Processing…' : plan.popular ? 'Get Premium →' : 'Get Started'}
+        label={
+          disabled
+            ? 'Processing…'
+            : isCurrent
+              ? 'Current plan'
+              : isContact
+                ? 'Contact RACE'
+                : `Choose ${plan.name}`
+        }
         onPress={onSelect}
-        variant={isPremium ? 'primary' : 'outline'}
-        disabled={disabled}
+        variant={highlighted ? 'primary' : 'outline'}
+        disabled={disabled || isCurrent}
       />
-    </View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.background,
-    borderRadius: radius.lg,
+    borderRadius: 16,
     padding: spacing.lg,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: OUTLINE,
+    ...shadows.card,
   },
-  premium: {
-    backgroundColor: colors.primary,
+  cardHighlight: {
     borderColor: colors.primary,
-  },
-  selected: {
-    borderColor: colors.textDark,
     borderWidth: 2,
   },
+  cardSelected: {
+    borderColor: colors.dark,
+    borderWidth: 2,
+  },
+  cardCurrent: {
+    backgroundColor: '#FFFBF5',
+  },
+  badgeRow: { flexDirection: 'row', marginBottom: spacing.sm },
   badge: {
-    alignSelf: 'flex-end',
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radius.pill,
-    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: '#FEF3C7',
   },
   badgeText: {
-    fontSize: typography.sizes.xs,
+    fontSize: 11,
     fontWeight: typography.weights.bold,
-    color: colors.primary,
+    color: colors.primaryDark,
+  },
+  currentPill: {
+    alignSelf: 'flex-start',
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
+    color: colors.primaryDark,
+    marginBottom: spacing.xs,
   },
   name: {
     fontSize: typography.sizes.xl,
     fontWeight: typography.weights.bold,
     color: colors.textDark,
   },
-  namePremium: { color: colors.textDark },
+  tagline: {
+    marginTop: 4,
+    fontSize: typography.sizes.sm,
+    color: colors.grey,
+    lineHeight: 18,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginTop: spacing.md,
+  },
   price: {
-    fontSize: typography.sizes.xxl,
+    fontSize: 28,
     fontWeight: typography.weights.extrabold,
-    color: colors.primary,
-    marginVertical: spacing.sm,
+    color: colors.textDark,
   },
-  pricePremium: { color: colors.textDark },
-  period: {
-    fontSize: typography.sizes.md,
-    fontWeight: typography.weights.regular,
+  priceMeta: {
+    fontSize: typography.sizes.sm,
+    color: colors.grey,
+    fontWeight: typography.weights.medium,
   },
-  features: { marginBottom: spacing.lg, gap: spacing.sm },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  priceSave: {
+    color: colors.primaryDark,
+    fontWeight: typography.weights.semibold,
+  },
+  priceEquiv: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
+    marginBottom: spacing.md,
+  },
+  features: { marginBottom: spacing.lg, gap: 8 },
+  featureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  featureIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  featureIconOn: { backgroundColor: '#DCFCE7' },
+  featureIconOff: { backgroundColor: '#F3F4F6', borderWidth: 1, borderColor: OUTLINE },
   featureText: {
     flex: 1,
     fontSize: typography.sizes.sm,
     color: colors.textDark,
+    lineHeight: 19,
   },
-  featureTextPremium: { color: colors.textDark },
-  featureMuted: { color: colors.textMuted },
+  featureMuted: { color: colors.textMuted, textDecorationLine: 'line-through' },
 });

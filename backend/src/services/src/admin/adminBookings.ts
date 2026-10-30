@@ -50,6 +50,54 @@ function mapAdminBookingStatus(status: string) {
   return status;
 }
 
+async function resolveServiceBookingType(id: string): Promise<'towing' | 'driver' | null> {
+  const [towingExists, driverExists] = await Promise.all([
+    TowingBookingModel.exists({ _id: id }),
+    DriverBookingModel.exists({ _id: id }),
+  ]);
+  if (towingExists) return 'towing';
+  if (driverExists) return 'driver';
+  return null;
+}
+
+function mapServiceBookingDetailToListItem(
+  detail: {
+    id: string;
+    bookingNumber: string;
+    customerId: string;
+    customerName: string;
+    vendorId?: string;
+    vendorName?: string;
+    driverId?: string;
+    driverName?: string;
+    service?: string;
+    amount?: number;
+    city?: string;
+    status: string;
+    date: string;
+  },
+  bookingType: 'towing' | 'driver',
+) {
+  return {
+    id: detail.id,
+    bookingType,
+    bookingNumber: detail.bookingNumber,
+    customerId: detail.customerId,
+    customerName: detail.customerName,
+    vendorId: detail.vendorId ?? '',
+    vendorName: detail.vendorName ?? '—',
+    driverId: detail.driverId,
+    driverName: detail.driverName,
+    driverAssignment: detail.driverName ? 'Assigned' : 'Unassigned',
+    service: detail.service ?? (bookingType === 'towing' ? 'Towing' : 'Driver Service'),
+    serviceType: bookingType,
+    amount: detail.amount ?? 0,
+    city: detail.city ?? '—',
+    status: detail.status,
+    date: detail.date,
+  };
+}
+
 type AdminBookingType = 'legacy' | 'towing' | 'driver';
 
 type ServiceBookingRecord = {
@@ -429,9 +477,14 @@ export const adminBookingsService = {
   },
 
   async getById(id: string, type?: 'towing' | 'driver' | 'legacy') {
-    if (type === 'towing' || type === 'driver') {
+    let resolvedType = type;
+    if (!resolvedType) {
+      resolvedType = (await resolveServiceBookingType(id)) ?? undefined;
+    }
+
+    if (resolvedType === 'towing' || resolvedType === 'driver') {
       const booking =
-        type === 'towing'
+        resolvedType === 'towing'
           ? await TowingBookingModel.findById(id).lean()
           : await DriverBookingModel.findById(id).lean();
       if (!booking) throw new NotFoundError('Booking not found');
@@ -441,12 +494,14 @@ export const adminBookingsService = {
         booking.driverId ? UserModel.findById(booking.driverId).lean() : null,
         booking.vehicleId ? VehicleModel.findById(booking.vehicleId).lean() : null,
         booking.vendorId ? UserModel.findById(booking.vendorId).lean() : null,
-        PaymentTransactionModel.find({ bookingId: booking._id, bookingType: type }).sort({ createdAt: -1 }).lean(),
+        PaymentTransactionModel.find({ bookingId: booking._id, bookingType: resolvedType })
+          .sort({ createdAt: -1 })
+          .lean(),
       ]);
 
       return {
         id: booking._id.toString(),
-        bookingType: type,
+        bookingType: resolvedType,
         bookingNumber: booking.bookingNumber,
         customerId: booking.customerId.toString(),
         customerName: customer?.fullName ?? 'Customer',
@@ -738,6 +793,52 @@ export const adminBookingsService = {
   },
 
   async assignVendor(id: string, vendorId: string, actor: { id: string; name: string }) {
+    const serviceType = await resolveServiceBookingType(id);
+    if (serviceType) {
+      const vendor = await UserModel.findOne({ _id: vendorId, role: 'vendor' });
+      if (!vendor) throw new NotFoundError('Vendor not found');
+
+      const booking =
+        serviceType === 'towing'
+          ? await TowingBookingModel.findById(id).exec()
+          : await DriverBookingModel.findById(id).exec();
+      if (!booking) throw new NotFoundError('Booking not found');
+      if (booking.driverId) {
+        throw new BadRequestError('Cannot change vendor after a driver is assigned');
+      }
+      if (!['PENDING', 'CONFIRMED'].includes(booking.status)) {
+        throw new BadRequestError('Vendor can only be assigned while the booking is pending or confirmed');
+      }
+
+      booking.vendorId = vendor._id;
+      booking.statusHistory.push({
+        status: booking.status,
+        timestamp: new Date(),
+        note: `Admin assigned vendor ${vendor.vendorProfile?.businessName ?? vendor.fullName ?? 'Vendor'}`,
+      });
+      await booking.save();
+
+      await logActivity({
+        actorId: actor.id,
+        actorName: actor.name,
+        action: 'BOOKING_VENDOR_ASSIGNED',
+        entityType: 'booking',
+        entityId: id,
+        title: `Vendor assigned to ${booking.bookingNumber}`,
+      });
+
+      await createNotification({
+        title: 'Booking assigned to vendor',
+        message: `${booking.bookingNumber} assigned to ${vendor.vendorProfile?.businessName ?? vendor.vendorProfile?.ownerName ?? vendor.fullName}`,
+        category: 'booking',
+        entityType: 'booking',
+        entityId: id,
+      });
+
+      const detail = await this.getById(id, serviceType);
+      return mapServiceBookingDetailToListItem(detail, serviceType);
+    }
+
     const [booking, vendor] = await Promise.all([
       BookingModel.findById(id),
       UserModel.findOne({ _id: vendorId, role: 'vendor' }),
@@ -770,6 +871,17 @@ export const adminBookingsService = {
   },
 
   async assignDriver(id: string, driverId: string, actor: { id: string; name: string }) {
+    const serviceType = await resolveServiceBookingType(id);
+    if (serviceType) {
+      await adminServiceBookingsService.assignDriver(
+        id,
+        { driverId, bookingType: serviceType },
+        actor,
+      );
+      const detail = await this.getById(id, serviceType);
+      return mapServiceBookingDetailToListItem(detail, serviceType);
+    }
+
     const [booking, driver] = await Promise.all([
       BookingModel.findById(id),
       UserModel.findOne({ _id: driverId, role: 'driver' }),
@@ -805,18 +917,28 @@ export const adminBookingsService = {
     actor: { id: string; name: string },
     options?: { reason?: string; amount?: number; bookingType?: AdminBookingType },
   ) {
-    if (
-      status === 'CANCELLED' &&
-      (options?.bookingType === 'towing' || options?.bookingType === 'driver')
-    ) {
-      return adminServiceBookingsService.cancelBooking(id, {
-        bookingType: options.bookingType,
-        reason: options.reason?.trim() || 'Cancelled by admin',
-        refundAmount: options.amount,
-      }, actor);
+    let serviceBookingType = options?.bookingType;
+    if (serviceBookingType !== 'towing' && serviceBookingType !== 'driver') {
+      const resolved = await resolveServiceBookingType(id);
+      if (resolved) serviceBookingType = resolved;
     }
 
-    if (options?.bookingType === 'towing' || options?.bookingType === 'driver') {
+    if (
+      status === 'CANCELLED' &&
+      (serviceBookingType === 'towing' || serviceBookingType === 'driver')
+    ) {
+      return adminServiceBookingsService.cancelBooking(
+        id,
+        {
+          bookingType: serviceBookingType,
+          reason: options?.reason?.trim() || 'Cancelled by admin',
+          refundAmount: options?.amount,
+        },
+        actor,
+      );
+    }
+
+    if (serviceBookingType === 'towing' || serviceBookingType === 'driver') {
       // Current service-booking state changes have dedicated, guarded paths:
       // verified advance payment confirms, driver assignment/trip actions
       // advance operations, and the cancellation endpoint records refund state.
@@ -901,6 +1023,20 @@ export const adminBookingsService = {
   },
 
   async update(id: string, input: Record<string, string | number>, actor: { id: string; name: string }) {
+    const serviceType = await resolveServiceBookingType(id);
+    if (serviceType) {
+      if (input.status) {
+        return this.updateStatus(id, String(input.status), actor, {
+          reason: input.reason as string | undefined,
+          amount: input.amount !== undefined ? Number(input.amount) : undefined,
+          bookingType: serviceType,
+        });
+      }
+      throw new BadRequestError(
+        'Service bookings cannot be edited this way. Use assign driver, cancel, or status actions.',
+      );
+    }
+
     if (input.status) {
       return this.updateStatus(id, String(input.status), actor, {
         reason: input.reason as string | undefined,
@@ -933,6 +1069,13 @@ export const adminBookingsService = {
   },
 
   async remove(id: string, actor: { id: string; name: string }) {
+    const serviceType = await resolveServiceBookingType(id);
+    if (serviceType) {
+      throw new BadRequestError(
+        'Service bookings cannot be deleted. Cancel the booking from the admin detail page instead.',
+      );
+    }
+
     const booking = await BookingModel.findByIdAndDelete(id);
     if (!booking) throw new NotFoundError('Booking not found');
     await logActivity({

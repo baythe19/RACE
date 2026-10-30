@@ -76,6 +76,9 @@ export const VEHICLE_TYPE_OPTIONS: Array<{
 
 export const VEHICLE_TYPE_IDS: VehicleType[] = VEHICLE_TYPE_OPTIONS.map(option => option.id);
 
+/** Self-serve add vehicle — omit auto-rickshaw; bus and other fleet types stay. */
+export const ADD_VEHICLE_TYPE_OPTIONS = VEHICLE_TYPE_OPTIONS.filter(option => option.id !== 'auto');
+
 export const FUEL_TYPE_OPTIONS: Array<{
   id: FuelType;
   label: string;
@@ -96,9 +99,14 @@ export function getVehicleImageSource(type: VehicleType): ImageSourcePropType {
     case 'bike':
       return images.booking.vehicleBike;
     case 'truck':
+      return images.booking.vehicleTruck;
     case 'bus':
+      return images.booking.vehicleBus;
     case 'ev':
-      return images.booking.vehicleSuv;
+      return images.booking.vehicleEv;
+    case 'other':
+    case 'auto':
+      return images.booking.vehicleHatchback;
     default:
       return images.booking.vehicleSedan;
   }

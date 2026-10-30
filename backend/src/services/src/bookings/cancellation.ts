@@ -7,8 +7,7 @@ export type CancellationResult = {
 };
 
 /**
- * MVP demo cancellation — keep rules simple until product signs off on tiered fees.
- * Stub payments only; refund amounts are bookkeeping, not real bank transfers.
+ * Customer cancellation policy (MVP: full advance refund when allowed; no fee tiers yet).
  */
 export function getCancellationPolicy(
   status: string,
@@ -22,7 +21,7 @@ export function getCancellationPolicy(
       refundAmount: 0,
       refundPercent: 0,
       cancellationFee: 0,
-      reason: 'Cannot cancel at this stage',
+      reason: 'This booking can no longer be cancelled.',
     };
   }
 
@@ -32,7 +31,7 @@ export function getCancellationPolicy(
       refundAmount: 0,
       refundPercent: 0,
       cancellationFee: 0,
-      reason: 'Partner is already on the way. Use Help & support if you need assistance.',
+      reason: 'Your partner is already on the way. Contact support if you need help.',
     };
   }
 
@@ -42,7 +41,7 @@ export function getCancellationPolicy(
       refundAmount: 0,
       refundPercent: 0,
       cancellationFee: 0,
-      reason: 'Free cancellation — advance not paid yet',
+      reason: 'No advance was paid — you can cancel at no charge.',
     };
   }
 
@@ -51,7 +50,6 @@ export function getCancellationPolicy(
     refundAmount: advanceAmount,
     refundPercent: 100,
     cancellationFee: 0,
-    reason:
-      'Demo: full advance marked refunded in the app (stub payment — not a real bank payout)',
+    reason: 'Your advance payment is eligible for a full refund under the current policy.',
   };
 }

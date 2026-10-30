@@ -11,6 +11,7 @@ import { colors } from '../../theme';
 type Props = {
   title: string;
   subtitle?: string;
+  subtitleNumberOfLines?: number;
   headerRight?: ReactNode;
   footer?: ReactNode;
   children: ReactNode;
@@ -18,22 +19,26 @@ type Props = {
   /** Defaults to true — every profile form has inputs that must stay above
    * the keyboard. Pass false only for screens with no inputs. */
   keyboardAvoiding?: boolean;
+  contentStyle?: import('react-native').StyleProp<import('react-native').ViewStyle>;
 };
 
 export function useProfilePx() {
   return useScreenPx();
 }
 
-export default function ProfileSubScreenLayout({
+function ProfileSubScreenLayout({
   title,
   subtitle,
+  subtitleNumberOfLines,
   headerRight,
   footer,
   children,
   onBack,
   keyboardAvoiding = true,
+  contentStyle,
 }: Props) {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
+  const px = useScreenPx();
   const handleBack = onBack ?? (() => goBackWithinStack(navigation));
 
   return (
@@ -41,10 +46,12 @@ export default function ProfileSubScreenLayout({
       backgroundColor={colors.pageBg}
       keyboardAvoiding={keyboardAvoiding}
       footer={footer}
+      contentStyle={[{ paddingTop: px(14) }, contentStyle]}
       header={
         <AppStackHeader
           title={title}
           subtitle={subtitle}
+          subtitleNumberOfLines={subtitleNumberOfLines}
           onBack={handleBack}
           headerRight={headerRight}
         />
@@ -53,3 +60,5 @@ export default function ProfileSubScreenLayout({
     </AppScreenLayout>
   );
 }
+
+export default ProfileSubScreenLayout;

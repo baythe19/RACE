@@ -1,6 +1,5 @@
-import { Alert } from 'react-native';
-
 import { findServiceableCity } from '../config/serviceableAreas';
+import { getAppDialog } from './alertBus';
 
 const OUT_OF_AREA_TITLE = 'Not available here';
 const OUT_OF_AREA_MESSAGE =
@@ -8,7 +7,7 @@ const OUT_OF_AREA_MESSAGE =
 
 /**
  * Returns true if coordinates are inside a live (non–coming-soon) serviceable city.
- * Shows an alert and returns false otherwise — no email/notify CTA.
+ * Shows the branded dialog and returns false otherwise — no email/notify CTA.
  */
 export function assertServiceableBookingLocation(
   latitude: number,
@@ -19,6 +18,11 @@ export function assertServiceableBookingLocation(
     return true;
   }
 
-  Alert.alert(OUT_OF_AREA_TITLE, OUT_OF_AREA_MESSAGE);
+  getAppDialog().showDialog({
+    tone: 'warning',
+    title: OUT_OF_AREA_TITLE,
+    message: OUT_OF_AREA_MESSAGE,
+    primaryLabel: 'Got it',
+  });
   return false;
 }

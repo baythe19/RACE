@@ -15,10 +15,12 @@ type Props = {
   leading?: ReactNode;
   avatarLabel?: string;
   showActions?: boolean;
-  showNotificationBadge?: boolean;
+  /** When false, hide header profile circle (e.g. Profile tab root). */
+  showProfileAvatar?: boolean;
+  /** Unread count — numeric badge on bell (no dot, no circular outline). */
+  notificationCount?: number;
   onBellPress?: () => void;
   onAvatarPress?: () => void;
-  /** SOS / help screens: info icon in the header action row (not in page body). */
   onInfoPress?: () => void;
   actions?: ReactNode;
 };
@@ -29,7 +31,8 @@ export default function TabRootHeader({
   leading,
   avatarLabel,
   showActions = true,
-  showNotificationBadge = false,
+  showProfileAvatar = true,
+  notificationCount = 0,
   onBellPress,
   onAvatarPress,
   onInfoPress,
@@ -49,14 +52,17 @@ export default function TabRootHeader({
       onBellPress();
       return;
     }
-    // Prefer Profile stack notifications when available
     const parent = navigation.getParent();
     if (parent) {
-      (parent as any).navigate('Profile', { screen: 'Notifications' });
+      (parent as { navigate: (name: string, params?: object) => void }).navigate('Profile', {
+        screen: 'Notifications',
+      });
       return;
     }
     navigation.navigate('Notifications' as never);
   };
+
+  const badgeLabel = notificationCount > 99 ? '99+' : String(notificationCount);
 
   return (
     <View
@@ -64,21 +70,22 @@ export default function TabRootHeader({
         styles.wrap,
         {
           paddingHorizontal: px(20),
+          paddingTop: px(8),
           paddingBottom: px(12),
           backgroundColor: colors.pageBg,
         },
       ]}>
-      <View style={styles.row}>
+      <View style={[styles.row, { minHeight: px(52) }]}>
         <View style={{ flex: 1, minWidth: 0, paddingRight: px(12) }}>
           {leading ?? (
             <>
               <Text
                 style={{
-                  // Partner list screens (Fleet Vehicles) use ~18 extrabold heading.
                   fontSize: px(18),
                   fontWeight: typography.weights.extrabold,
                   color: colors.dark,
                   lineHeight: px(22),
+                  letterSpacing: -0.3,
                   textAlign: 'left',
                 }}
                 numberOfLines={1}>
@@ -102,48 +109,77 @@ export default function TabRootHeader({
         </View>
         {actions ??
           (showActions ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(10) }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(8) }}>
               {onInfoPress ? (
                 <Pressable
-                  hitSlop={8}
+                  hitSlop={10}
                   onPress={onInfoPress}
-                  style={styles.bellWrap}
+                  style={styles.iconTap}
                   accessibilityRole="button"
                   accessibilityLabel="How SOS alert works">
-                  <Info size={px(20)} color={colors.dark} strokeWidth={2.2} />
+                  <Info size={px(17)} color={colors.grey} strokeWidth={2.2} />
                 </Pressable>
               ) : null}
               <Pressable
                 hitSlop={8}
                 onPress={handleBell}
-                style={styles.bellWrap}
+                style={[styles.iconTap, { position: 'relative' }]}
                 accessibilityRole="button"
                 accessibilityLabel="Notifications">
-                <Bell size={px(22)} color={colors.dark} strokeWidth={2} />
-                {showNotificationBadge ? <View style={styles.bellDot} /> : null}
+                <Bell size={px(20)} color={colors.dark} strokeWidth={2} />
+                {notificationCount > 0 ? (
+                  <View
+                    style={[
+                      styles.bellBadge,
+                      {
+                        top: px(2),
+                        right: px(0),
+                        minWidth: px(16),
+                        height: px(16),
+                        borderRadius: px(8),
+                        paddingHorizontal: px(3),
+                      },
+                    ]}>
+                    <Text
+                      style={{
+                        fontSize: px(9),
+                        fontWeight: typography.weights.bold,
+                        color: colors.background,
+                        lineHeight: px(11),
+                      }}>
+                      {badgeLabel}
+                    </Text>
+                  </View>
+                ) : null}
               </Pressable>
+              {showProfileAvatar ? (
               <Pressable
                 onPress={onAvatarPress}
                 disabled={!onAvatarPress}
                 style={[
                   styles.avatar,
-                  { width: px(40), height: px(40), borderRadius: px(20) },
+                  {
+                    width: px(34),
+                    height: px(34),
+                    borderRadius: px(17),
+                  },
                 ]}
                 accessibilityRole={onAvatarPress ? 'button' : undefined}
                 accessibilityLabel="Profile">
                 {resolvedAvatarLabel ? (
                   <Text
                     style={{
-                      fontSize: px(15),
+                      fontSize: px(13),
                       fontWeight: typography.weights.bold,
                       color: colors.dark,
                     }}>
                     {resolvedAvatarLabel}
                   </Text>
                 ) : (
-                  <UserRound size={px(18)} color={colors.primary} strokeWidth={2} />
+                  <UserRound size={px(16)} color={colors.primary} strokeWidth={2} />
                 )}
               </Pressable>
+              ) : null}
             </View>
           ) : null)}
       </View>
@@ -160,35 +196,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 44,
   },
-  bellWrap: {
-    position: 'relative',
+  iconTap: {
     width: 36,
     height: 36,
-    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  bellDot: {
+  bellBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
     backgroundColor: colors.error,
     borderWidth: 1.5,
     borderColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
     backgroundColor: colors.goldLight,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#F5D98A',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
 });

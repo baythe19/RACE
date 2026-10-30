@@ -1,22 +1,3 @@
-import type { LucideIcon } from 'lucide-react-native';
-import {
-  Bell,
-  FileText,
-  KeyRound,
-  Mail,
-  MessageCircle,
-  Shield,
-  Smartphone,
-  Trash2,
-} from 'lucide-react-native';
-
-export const PROFILE_PERSONAL = {
-  dob: '12 May 1998',
-  gender: 'Male',
-  emergency: '+91 98765 43210',
-  address: '123, MG Road, Bhubaneswar',
-};
-
 export const PROFILE_MENU_ROUTES = {
   personal: 'PersonalInformation',
   vehicles: 'MyVehicles',
@@ -25,134 +6,77 @@ export const PROFILE_MENU_ROUTES = {
   payments: 'PaymentMethods',
   notifications: 'Notifications',
   support: 'HelpSupport',
-  settings: 'Settings',
 } as const;
 
-export const HELP_FAQ_ITEMS = [
-  {
-    question: 'How do I book a towing service?',
-    answer:
-      'From Home, tap Towing, set pickup and drop, review the fare, then pay the advance to confirm. A nearby partner gets your offer.',
-  },
-  {
-    question: 'What areas do you cover?',
-    answer:
-      'We currently serve Bhubaneswar and nearby Odisha cities. Bookings outside the service area are blocked so we can fulfill them reliably.',
-  },
-  {
-    question: 'How is the price calculated?',
-    answer:
-      'Fare uses distance, vehicle type, and service package. You see the breakdown before paying. Advance is collected first; the balance is due at drop-off.',
-  },
-  {
-    question: 'Can I cancel my booking?',
-    answer:
-      'Yes from Booking details while the trip is still cancellable. Refund amount depends on status (pending / confirmed / driver assigned). Policy shows before you confirm.',
-  },
-  {
-    question: 'How do I track my driver?',
-    answer:
-      'Open the booking and tap Track. Live map, ETA, and trip-start OTP appear when the driver is assigned and on the way.',
-  },
-] as const;
+export type HelpFaqItem = { question: string; answer: string };
 
-export type SettingsToggleId = 'push' | 'email' | 'sms' | 'emergency';
-
-export type SettingsRow =
-  | {
-      id: string;
-      title: string;
-      subtitle?: string;
-      Icon: LucideIcon;
-      kind: 'nav';
-      value?: string;
-      danger?: boolean;
-      muted?: boolean;
-    }
-  | {
-      id: SettingsToggleId;
-      title: string;
-      subtitle?: string;
-      Icon: LucideIcon;
-      kind: 'toggle';
-      defaultOn: boolean;
-      locked?: boolean;
-    };
-
-export const SETTINGS_SECTIONS: Array<{
-  title: string;
-  items: SettingsRow[];
-}> = [
+/** Grouped FAQs for Help & Support — flat list kept for any legacy imports. */
+export const HELP_FAQ_SECTIONS: Array<{ title: string; items: HelpFaqItem[] }> = [
   {
-    title: 'ACCOUNT SETTINGS',
+    title: 'BOOKINGS',
     items: [
-      { id: 'pin', title: 'Change PIN', subtitle: 'Update your 4-digit PIN', Icon: KeyRound, kind: 'nav' },
       {
-        id: 'mobile',
-        title: 'Change Mobile Number',
-        subtitle: 'Update registered phone number',
-        Icon: Smartphone,
-        kind: 'nav',
+        question: 'How do I book towing, driver hire, or roadside help?',
+        answer:
+          'From Home, choose a service, set pickup (and drop if needed), review the fare, then pay the advance to confirm. Nearby partners receive your offer.',
+      },
+      {
+        question: 'Which areas do you serve?',
+        answer:
+          'We operate in Bhubaneswar and nearby Odisha cities. If a pin is outside the service zone, the app blocks checkout so we can fulfill reliably.',
       },
     ],
   },
   {
-    title: 'NOTIFICATION SETTINGS',
+    title: 'PRICING & PAYMENTS',
     items: [
       {
-        id: 'push',
-        title: 'Push Notifications',
-        subtitle: 'Booking updates & offers',
-        Icon: Bell,
-        kind: 'toggle',
-        defaultOn: true,
+        question: 'How is my fare calculated?',
+        answer:
+          'Fare uses distance, vehicle type, service mode (instant / scheduled / emergency), and package rules. You see the breakdown before paying. Advance is collected first; any balance is due at drop-off.',
       },
       {
-        id: 'email',
-        title: 'Email Notifications',
-        subtitle: 'Receipts & newsletters',
-        Icon: Mail,
-        kind: 'toggle',
-        defaultOn: false,
-      },
-      {
-        id: 'sms',
-        title: 'SMS Alerts',
-        subtitle: 'OTP & booking alerts',
-        Icon: MessageCircle,
-        kind: 'toggle',
-        defaultOn: true,
-      },
-      {
-        id: 'emergency',
-        title: 'Emergency Alerts',
-        subtitle: 'SOS & critical updates',
-        Icon: Shield,
-        kind: 'toggle',
-        defaultOn: true,
-        locked: true,
+        question: 'Can I cancel or get a refund?',
+        answer:
+          'Yes from Booking details while the trip is still cancellable. Refund amount depends on status (pending, confirmed, partner assigned). The policy is shown before you confirm cancellation.',
       },
     ],
   },
   {
-    title: 'ACCOUNT ACTIONS',
+    title: 'YOUR TRIP',
     items: [
       {
-        id: 'delete',
-        title: 'Delete Account',
-        subtitle: 'Request removal via support',
-        Icon: Trash2,
-        kind: 'nav',
-        danger: true,
+        question: 'How do I track my partner?',
+        answer:
+          'Open the booking and tap Track. Live map, ETA, and trip-start OTP appear once a partner accepts and is on the way.',
       },
-    ],
-  },
-  {
-    title: 'APP INFO',
-    items: [
-      { id: 'version', title: 'Version', Icon: FileText, kind: 'nav', value: '1.0.0', muted: true },
-      { id: 'terms', title: 'Terms & Conditions', Icon: FileText, kind: 'nav', muted: true },
-      { id: 'privacy', title: 'Privacy Policy', Icon: Shield, kind: 'nav', muted: true },
     ],
   },
 ];
+
+export const HELP_FAQ_ITEMS: HelpFaqItem[] = HELP_FAQ_SECTIONS.flatMap(section => section.items);
+
+export const HELP_SELF_SERVE_LINKS = [
+  {
+    id: 'bookings',
+    title: 'My bookings',
+    subtitle: 'Status, track, cancel',
+  },
+  {
+    id: 'payments',
+    title: 'Payments & wallet',
+    subtitle: 'UPI, balance, passbook',
+  },
+  {
+    id: 'sos',
+    title: 'SOS & emergency',
+    subtitle: 'Contacts and vehicle QR',
+  },
+  {
+    id: 'notifications',
+    title: 'Notifications',
+    subtitle: 'Inbox & push alerts',
+  },
+] as const;
+
+export type HelpSelfServeLinkId = (typeof HELP_SELF_SERVE_LINKS)[number]['id'];

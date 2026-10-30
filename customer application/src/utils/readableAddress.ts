@@ -84,6 +84,69 @@ export function formatReadableAddress(
   return result;
 }
 
+/**
+ * Full address line for pickup/drop fields (keeps street/plot; drops country + pin only).
+ */
+export function formatBookingStopAddress(
+  address: string | undefined | null,
+  maxLen = 160,
+): string {
+  if (!address?.trim()) return '';
+
+  const trimmed = address.trim();
+  if (/^selected location$/i.test(trimmed)) return 'Pinned on map';
+
+  const parts = splitAddressParts(trimmed).filter(part => {
+    const lower = part.toLowerCase();
+    if (lower === 'india') return false;
+    if (/^\d{6}$/.test(part.trim())) return false;
+    return true;
+  });
+
+  const result = parts.join(', ') || trimmed;
+  if (result.length > maxLen) {
+    return `${result.slice(0, maxLen - 1).trim()}…`;
+  }
+  return result;
+}
+
+export type BookingStopFieldInput = {
+  address: string;
+  placeholder: string;
+  label?: string | null;
+  hasCoordinates: boolean;
+};
+
+/** Label + filled flag for pickup/drop rows on location boards. */
+export function resolveBookingStopField(input: BookingStopFieldInput): {
+  filled: boolean;
+  value: string;
+} {
+  const { address, placeholder, label, hasCoordinates } = input;
+
+  const fromAddress = formatBookingStopAddress(address);
+  if (fromAddress) {
+    return { filled: true, value: fromAddress };
+  }
+
+  const labelTrim = label?.trim();
+  if (labelTrim) {
+    const fromLabel = formatBookingStopAddress(labelTrim) || labelTrim;
+    return { filled: true, value: fromLabel };
+  }
+
+  const raw = address.trim();
+  if (raw && raw !== placeholder) {
+    return { filled: true, value: raw };
+  }
+
+  if (hasCoordinates) {
+    return { filled: true, value: 'Pinned on map' };
+  }
+
+  return { filled: false, value: '' };
+}
+
 interface AddressComponentLike {
   long_name: string;
   types: string[];
@@ -194,4 +257,34 @@ export function formatLocationDisplay(
 
 export function getShortLocation(address: string, displayLabel?: string): string {
   return formatReadableLocation(address, displayLabel);
+}
+
+/** Two-line card: bold primary (place name) + grey secondary (area/city). */
+export function formatLocationCard(
+  loc?: { address?: string | null; label?: string | null } | null,
+): { primary: string; secondary?: string } {
+  if (!loc?.address?.trim() && !loc?.label?.trim()) {
+    return { primary: '—' };
+  }
+  const fromAddress = loc.address?.trim() ? formatBookingStopAddress(loc.address) : '';
+  const full =
+    fromAddress ||
+    formatReadableLocation(loc.address, loc.label, 140) ||
+    loc.label?.trim() ||
+    '—';
+  if (/^pinned on map$/i.test(full) || /^on-site help$/i.test(full)) {
+    const retry = loc.address?.trim();
+    if (retry && retry.length > 4 && !/^selected location$/i.test(retry)) {
+      return { primary: formatBookingStopAddress(retry) || retry };
+    }
+    return { primary: full };
+  }
+  const parts = full
+    .split(',')
+    .map(part => part.trim())
+    .filter(Boolean);
+  if (parts.length >= 2) {
+    return { primary: parts[0], secondary: parts.slice(1).join(', ') };
+  }
+  return { primary: full };
 }

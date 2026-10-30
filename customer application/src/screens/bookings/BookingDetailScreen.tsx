@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Alert,
   Linking,
   Pressable,
   Text,
@@ -25,6 +24,7 @@ import CancellationRefundPolicyModal from '../../components/booking/Cancellation
 import ProfileSubScreenLayout from '../../components/profile/ProfileSubScreenLayout';
 import GoldButton from '../../components/auth/GoldButton';
 import DataSkeleton from '../../components/ui/DataSkeleton';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useBookingDetailQuery } from '../../services/bookings/useBookingQueries';
 import {
   cancelServiceBooking,
@@ -35,13 +35,17 @@ import { LOCATION_ACCENT } from '../../utils/googlePlaces';
 import type { BookingsStackParamList } from '../../types/navigation';
 import {
   formatBookingDisplayId,
-  formatUnifiedStatusLabel,
+  getCustomerBookingPresentation,
   isBookingCompleted,
   isBookingOngoing,
   resolveBookingType,
   shouldShowTripStartOtp,
 } from '../../utils/bookingDisplay';
-import { formatLocationDisplay } from '../../utils/readableAddress';
+import {
+  bookingHasNamedPartner,
+  partnerSectionTitle,
+} from '../../utils/bookingFlowCopy';
+import { formatLocationCard, formatLocationDisplay } from '../../utils/readableAddress';
 import { colors, shadows, typography } from '../../theme';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
@@ -87,17 +91,17 @@ function DetailRow({
 
 const StyleSheetHairline = 1;
 
-function statusTone(statusLabel: string, isCompleted: boolean, isOngoing: boolean) {
-  if (statusLabel === 'Cancelled') {
+function statusToneForPill(statusPill: string, isCompleted: boolean, isOngoing: boolean) {
+  if (statusPill === 'Cancelled') {
     return { bg: '#F3F4F6', fg: colors.grey, border: '#E5E7EB' };
   }
-  if (statusLabel === 'Confirmed' || statusLabel === 'Driver Assigned') {
+  if (/finding|awaiting|confirmed ·/i.test(statusPill)) {
     return { bg: '#FFFBEB', fg: '#B45309', border: '#FDE68A' };
   }
   if (isOngoing) {
     return { bg: '#ECFDF5', fg: colors.success, border: '#A7F3D0' };
   }
-  if (isCompleted) {
+  if (isCompleted || statusPill === 'Completed') {
     return { bg: '#E8F8EE', fg: colors.success, border: '#BBF7D0' };
   }
   return { bg: '#F3F4F6', fg: colors.dark, border: '#E5E7EB' };
@@ -110,13 +114,11 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const bookingQuery = useBookingDetailQuery(route.params.bookingId, route.params.bookingType);
   const booking = bookingQuery.data ?? null;
   const queryClient = useQueryClient();
+  const { dialog, showDialog } = useAppDialog();
 
   const isCompleted = booking ? isBookingCompleted(booking) : false;
   const isOngoing = booking ? isBookingOngoing(booking) : false;
   const bookingType = resolveBookingType(booking);
-  const statusLabel = booking?.unifiedStatus
-    ? formatUnifiedStatusLabel(booking.unifiedStatus)
-    : booking?.status ?? 'Loading';
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
@@ -141,29 +143,29 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   if (!booking) {
     return (
       <ProfileSubScreenLayout title="Booking details" onBack={() => goBackWithinStack(navigation)}>
-        <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          {bookingQuery.isError ? (
-            <>
-              <Text style={{ color: '#DC2626', fontWeight: '600' }}>
-                Unable to load this booking
-              </Text>
-              <Pressable
-                onPress={() => bookingQuery.refetch()}
-                style={{ marginTop: px(16), paddingHorizontal: px(24), paddingVertical: px(10) }}
-                accessibilityRole="button">
-                <Text style={{ color: colors.primary, fontWeight: '700' }}>Try again</Text>
-              </Pressable>
-            </>
-          ) : (
-            <DataSkeleton variant="detail" />
-          )}
-        </View>
+        {bookingQuery.isError ? (
+          <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
+            <Text style={{ color: '#DC2626', fontWeight: '600' }}>
+              Unable to load this booking
+            </Text>
+            <Pressable
+              onPress={() => bookingQuery.refetch()}
+              style={{ marginTop: px(16), paddingHorizontal: px(24), paddingVertical: px(10) }}
+              accessibilityRole="button">
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <DataSkeleton variant="bookingDetail" />
+        )}
       </ProfileSubScreenLayout>
     );
   }
 
   const total = booking.invoice?.total ?? 0;
   const displayId = formatBookingDisplayId(booking.bookingNumber);
+  const presentation = getCustomerBookingPresentation(booking);
+  const statusLabel = presentation.statusPill;
   const cancellableStatuses = [
     'PENDING',
     'CONFIRMED',
@@ -172,9 +174,24 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
     'DRIVER_ARRIVED',
   ];
   const canCancelBooking = cancellableStatuses.includes(booking.unifiedStatus ?? '');
-  const tone = statusTone(statusLabel, isCompleted, isOngoing);
+  const tone = statusToneForPill(statusLabel, isCompleted, isOngoing);
   const callPhone = booking.driver?.phone?.trim() || brand.phoneRaw;
-  const serviceKind = bookingType === 'driver' ? 'Driver hire' : 'Towing';
+  const serviceKind =
+    presentation.kind === 'driver'
+      ? 'Driver hire'
+      : presentation.kind === 'roadside'
+        ? 'Roadside'
+        : 'Towing';
+  const partnerTitle = partnerSectionTitle(presentation.kind);
+  const partnerDisplayName = bookingHasNamedPartner(booking.driver)
+    ? booking.driver!.name
+    : presentation.partnerLine;
+  const pickupCard = formatLocationCard(booking.pickup);
+  const dropCard = booking.dropoff ? formatLocationCard(booking.dropoff) : null;
+  const onSiteOnly =
+    presentation.kind === 'roadside' ||
+    !booking.dropoff ||
+    formatLocationDisplay(booking.dropoff) === formatLocationDisplay(booking.pickup);
 
   const openCancelModal = async () => {
     if (policyLoading || cancelSubmitting) return;
@@ -185,7 +202,12 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
       setShowCancelModal(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch cancellation policy';
-      Alert.alert('Unable to cancel now', message);
+      showDialog({
+        tone: 'error',
+        title: 'Unable to cancel now',
+        message,
+        primaryLabel: 'OK',
+      });
     } finally {
       setPolicyLoading(false);
     }
@@ -202,16 +224,24 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
       });
       setShowCancelModal(false);
       setCancelReason('');
-      Alert.alert(
-        'Booking Cancelled',
-        result.refundAmount > 0
-          ? `Refund ₹${result.refundAmount} is pending. It has not been processed yet.`
-          : 'No refund applicable for this cancellation.',
-      );
+      showDialog({
+        tone: 'success',
+        title: 'Booking Cancelled',
+        message:
+          result.refundAmount > 0
+            ? `Refund ₹${result.refundAmount} is pending. It has not been processed yet.`
+            : 'No refund applicable for this cancellation.',
+        primaryLabel: 'OK',
+      });
       navigation.navigate('BookingsMain');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to cancel booking';
-      Alert.alert('Cancellation failed', message);
+      showDialog({
+        tone: 'error',
+        title: 'Cancellation failed',
+        message,
+        primaryLabel: 'OK',
+      });
     } finally {
       setCancelSubmitting(false);
     }
@@ -241,6 +271,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
           </Text>
         </View>
       }>
+      {dialog}
       {/* Booking ID — prominent */}
       <View
         style={{
@@ -281,6 +312,19 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
           {serviceKind}
         </Text>
       </View>
+
+      {isOngoing && presentation.dispatchHint ? (
+        <Text
+          style={{
+            fontSize: px(12),
+            color: colors.grey,
+            lineHeight: px(17),
+            marginBottom: px(10),
+            paddingHorizontal: px(2),
+          }}>
+          {presentation.dispatchHint}
+        </Text>
+      ) : null}
 
       {booking.tripStartOtp && shouldShowTripStartOtp(booking.unifiedStatus) ? (
         <View style={{ marginBottom: px(10) }}>
@@ -362,6 +406,27 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
           }}>
           Trip route
         </Text>
+        {onSiteOnly ? (
+          <View>
+            <Text style={{ fontSize: px(10), color: colors.grey, fontWeight: typography.weights.semibold }}>
+              Location
+            </Text>
+            <Text
+              style={{
+                marginTop: px(2),
+                fontSize: px(13),
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
+              }}>
+              {pickupCard.primary}
+            </Text>
+            {pickupCard.secondary ? (
+              <Text style={{ marginTop: px(4), fontSize: px(12), color: colors.grey }}>
+                {pickupCard.secondary}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
         <View style={{ flexDirection: 'row', gap: px(12) }}>
           <View style={{ alignItems: 'center', width: px(28) }}>
             <View
@@ -416,8 +481,13 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                   color: colors.dark,
                   lineHeight: px(18),
                 }}>
-                {formatLocationDisplay(booking.pickup)}
+                {pickupCard.primary}
               </Text>
+              {pickupCard.secondary ? (
+                <Text style={{ marginTop: px(4), fontSize: px(12), color: colors.grey }}>
+                  {pickupCard.secondary}
+                </Text>
+              ) : null}
             </View>
             <View>
               <Text style={{ fontSize: px(10), color: colors.grey, fontWeight: typography.weights.semibold }}>
@@ -431,11 +501,17 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                   color: colors.dark,
                   lineHeight: px(18),
                 }}>
-                {booking.dropoff ? formatLocationDisplay(booking.dropoff) : 'On-site service'}
+                {dropCard?.primary ?? formatLocationDisplay(booking.dropoff)}
               </Text>
+              {dropCard?.secondary ? (
+                <Text style={{ marginTop: px(4), fontSize: px(12), color: colors.grey }}>
+                  {dropCard.secondary}
+                </Text>
+              ) : null}
             </View>
           </View>
         </View>
+        )}
         {booking.distanceKm ? (
           <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(8) }}>
             Distance · {booking.distanceKm.toFixed(1)} km
@@ -443,7 +519,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
         ) : null}
       </View>
 
-      {/* Your driver */}
+      {/* Partner */}
       <View
         style={[
           styles.card,
@@ -457,7 +533,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
             color: colors.dark,
             marginBottom: px(8),
           }}>
-          Your driver
+          {partnerTitle}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(10) }}>
           <DriverAvatar size={px(40)} />
@@ -468,16 +544,13 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                 fontWeight: typography.weights.bold,
                 color: colors.dark,
               }}
-              numberOfLines={1}>
-              {booking.driver?.name ?? 'Finding a partner'}
+              numberOfLines={2}>
+              {partnerDisplayName}
             </Text>
-            <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }} numberOfLines={1}>
+            <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }} numberOfLines={2}>
               {[booking.driver?.experience, booking.assignedFleetVehicleLabel]
                 .filter(Boolean)
-                .join(' · ') ||
-                (booking.vendorId && !booking.driver?.name
-                  ? 'Partner approved — assigning driver'
-                  : 'Details update when the trip starts')}
+                .join(' · ') || presentation.dispatchHint}
             </Text>
           </View>
           <Pressable

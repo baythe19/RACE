@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  View,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
@@ -51,20 +52,34 @@ export default function GoldButton({
         isOutlineLight && styles.outlineLight,
         isDarkOutline && styles.darkOutline,
         isDarkFilled && styles.darkFilled,
-        (disabled || loading) && styles.disabled,
+        disabled && !loading && styles.disabled,
         pressed && !disabled && styles.pressed,
         style,
       ]}>
       {loading ? (
-        <ActivityIndicator
-          color={
-            isDarkFilled || isOutlineLight
-              ? colors.background
-              : isFilled
-                ? colors.dark
-                : colors.primary
-          }
-        />
+        <View style={styles.loadingRow}>
+          <ActivityIndicator
+            color={
+              isDarkFilled || isOutlineLight
+                ? colors.background
+                : isFilled
+                  ? colors.dark
+                  : colors.primary
+            }
+          />
+          <Text
+            style={[
+              styles.label,
+              labelSize != null && { fontSize: labelSize },
+              isFilled && styles.filledLabel,
+              variant === 'outline' && styles.outlineLabel,
+              isDarkOutline && styles.darkOutlineLabel,
+              isDarkFilled && styles.darkFilledLabel,
+              isOutlineLight && styles.outlineLightLabel,
+            ]}>
+            {label}
+          </Text>
+        </View>
       ) : (
         <Text
           style={[
@@ -116,6 +131,11 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.88,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   label: {
     fontSize: typography.sizes.lg,

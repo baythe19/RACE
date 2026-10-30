@@ -1,6 +1,8 @@
 import { Alert, Linking } from 'react-native';
 import * as Location from 'expo-location';
 
+import { getAppDialog } from './alertBus';
+
 /**
  * Ask for foreground location only when the system still allows it.
  * If the user already said no, don't re-prompt — offer Settings and keep map/search usable.
@@ -14,13 +16,14 @@ export async function ensureForegroundLocation(): Promise<boolean> {
     if (next.status === 'granted') return true;
   }
 
-  Alert.alert(
-    'Location is off',
-    'You can still search or drag the pin on the map. Turn on location in Settings if you want GPS.',
-    [
-      { text: 'Not now', style: 'cancel' },
-      { text: 'Open Settings', onPress: () => void Linking.openSettings() },
-    ],
-  );
+  getAppDialog().showDialog({
+    tone: 'warning',
+    title: 'Location is off',
+    message:
+      'You can still search or drag the pin on the map. Turn on location in Settings if you want GPS.',
+    primaryLabel: 'Not now',
+    secondaryLabel: 'Open Settings',
+    onSecondary: () => void Linking.openSettings(),
+  });
   return false;
 }

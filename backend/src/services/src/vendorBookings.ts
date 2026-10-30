@@ -40,6 +40,7 @@ export type VendorBookingListItem = {
   createdAt: string;
   scheduledAt?: string;
   serviceLabel: string;
+  onSiteAssist?: boolean;
   assignedFleetVehicleLabel?: string;
   driver?: { id: string; name: string; phone: string; rating: number };
 };
@@ -238,6 +239,15 @@ export class VendorBookingsService {
       estimatedFare: booking.estimatedFare,
       finalFare: booking.finalFare,
       distanceKm: booking.distanceKm,
+      onSiteAssist:
+        bookingType === 'towing'
+          ? isOnSiteAssistBooking({
+              assistLabel: booking.assistLabel,
+              distanceKm: booking.distanceKm,
+              pickup: booking.pickup,
+              dropoff: booking.dropoff ?? null,
+            }) || undefined
+          : undefined,
       createdAt: booking.createdAt.toISOString(),
       scheduledAt: booking.scheduledAt?.toISOString(),
       serviceLabel: bookingServiceLabel(bookingType, {

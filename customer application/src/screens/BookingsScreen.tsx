@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -28,7 +27,7 @@ import {
   mapBookingToActiveCard,
   mapBookingToHistoryRow,
 } from '../utils/bookingDisplay';
-import { colors, radius, typography } from '../theme';
+import { colors, typography } from '../theme';
 
 const REF_W = 390;
 
@@ -162,6 +161,7 @@ export default function BookingsScreen() {
   return (
     <AppScreenLayout
       backgroundColor={colors.pageBg}
+      horizontalPadding={px(14)}
       refreshing={isRefetching}
       onRefresh={() => {
         void refetch();
@@ -172,8 +172,7 @@ export default function BookingsScreen() {
       header={
         <TabRootHeader
           title="Bookings"
-          subtitle="Track and manage your service requests"
-          showNotificationBadge={unreadCount > 0}
+          notificationCount={unreadCount}
           onBellPress={() => {
             const tabNav = navigation.getParent();
             if (tabNav) {
@@ -188,12 +187,15 @@ export default function BookingsScreen() {
           }}
         />
       }>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.tabsRow, { gap: px(8), paddingBottom: px(4) }]}
-        style={{ marginTop: px(12), marginBottom: px(12) }}>
+      <View
+        style={[
+          styles.tabsRow,
+          {
+            marginTop: px(12),
+            marginBottom: px(12),
+            gap: px(6),
+          },
+        ]}>
         {BOOKING_TABS.map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -203,16 +205,16 @@ export default function BookingsScreen() {
               style={[
                 styles.tab,
                 {
-                  paddingVertical: px(8),
-                  paddingHorizontal: px(14),
-                  borderRadius: radius.md,
+                  paddingVertical: px(5),
+                  paddingHorizontal: px(12),
+                  borderRadius: px(6),
                   borderColor: isActive ? colors.primary : colors.border,
-                  backgroundColor: isActive ? colors.primary : colors.background,
+                  backgroundColor: isActive ? colors.primary : '#FFFFFF',
                 },
               ]}>
               <Text
                 style={{
-                  fontSize: px(12),
+                  fontSize: px(11),
                   fontWeight: typography.weights.bold,
                   color: isActive ? colors.dark : colors.grey,
                 }}>
@@ -221,7 +223,7 @@ export default function BookingsScreen() {
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
 
       {showBookingsSkeleton ? (
         <View style={styles.centeredFill}>
@@ -292,11 +294,15 @@ const styles = StyleSheet.create({
   },
   tabsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1,
+    flexShrink: 0,
   },
 });

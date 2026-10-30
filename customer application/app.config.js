@@ -68,6 +68,7 @@ module.exports = {
             'Allow RACE to use your location to set pickup and dropoff.',
         },
       ],
+      'expo-sharing',
     ],
     extra: {
       apiUrl: productionApiUrl,

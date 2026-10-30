@@ -38,6 +38,12 @@ interface DriverPresenceState {
   lastLocationAt: number | null;
   /** Most recent device fix, used to center the active-trip map. */
   driverLocation: DriverCoordinates | null;
+  /**
+   * Driver-chosen position (map picker). Wins over GPS for 2 hours so a
+   * driver testing from home can still run the full trip flow honestly.
+   */
+  manualLocation: DriverCoordinates | null;
+  setManualLocation: (location: DriverCoordinates | null) => void;
   /** True while a location report is in flight. */
   isReporting: boolean;
   /**
@@ -59,9 +65,11 @@ export const useDriverPresenceStore = create<DriverPresenceState>((set) => ({
   locationHealth: 'unknown',
   lastLocationAt: null,
   driverLocation: null,
+  manualLocation: null,
   isReporting: false,
   simulationActive: false,
   setSimulationActive: (simulationActive) => set({ simulationActive }),
+  setManualLocation: (manualLocation) => set({ manualLocation }),
   setOnline: (isOnline) => set({ isOnline }),
   setLocationHealth: (locationHealth, options) =>
     set((state) => ({

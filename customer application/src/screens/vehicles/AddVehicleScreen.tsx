@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   UIManager,
@@ -15,12 +14,11 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AuthToast from '../../components/auth/AuthToast';
 import GoldButton from '../../components/auth/GoldButton';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
 import {
-  FUEL_TYPE_OPTIONS,
-  IndFlagBadge,
-  VEHICLE_COLOR_OPTIONS,
-  VEHICLE_TYPE_OPTIONS,
+  ADD_VEHICLE_TYPE_OPTIONS,
   VEHICLE_YELLOW,
+  VehiclePlaceholderImage,
 } from '../../components/vehicles/vehicleUi';
 import { FORM_PLACEHOLDER_COLOR } from '../../constants/profileForm';
 import { getVehicleSubtypes, hasVehicleSubtypes } from '../../constants/vehicleSubtypes';
@@ -32,9 +30,10 @@ import { colors, shadows, typography } from '../../theme';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 import { returnToDriverVehicleStep } from '../../navigation/driverWizardNavigation';
 
-type Props = NativeStackScreenProps<ProfileStackParamList, 'AddVehicle'>;
+type Props =
+  | NativeStackScreenProps<ProfileStackParamList, 'AddVehicle'>
+  | NativeStackScreenProps<ProfileStackParamList, 'EditVehicle'>;
 
-// LayoutAnimation is enabled by default in the React Native New Architecture
 if (
   Platform.OS === 'android' &&
   !('nativeFabricUIManager' in globalThis) &&
@@ -49,7 +48,13 @@ if (
 
 export default function AddVehicleScreen({ navigation, route }: Props) {
   const px = useProfilePx();
-  const returnToWizard = route.params?.returnToDriverWizard === true;
+  const isEdit = route.name === 'EditVehicle';
+  const editVehicleId = isEdit ? route.params.vehicleId : undefined;
+  const returnToWizard =
+    !isEdit && route.params && 'returnToDriverWizard' in route.params
+      ? route.params.returnToDriverWizard === true
+      : false;
+
   const leaveScreen = () => {
     if (returnToWizard) {
       returnToDriverVehicleStep(navigation);
@@ -57,8 +62,18 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
     }
     goBackWithinStack(navigation);
   };
-  const { addVehicle, isLoading, error: storeError } = useVehicleStore();
-  const sectionPad = px(16);
+
+  const {
+    addVehicle,
+    updateVehicle,
+    fetchVehicle,
+    selectedVehicle,
+    isLoading,
+    error: storeError,
+  } = useVehicleStore();
+
+  const fieldGap = px(14);
+  const blockGap = px(22);
 
   const [vehicleType, setVehicleType] = useState<VehicleType>('car');
   const [vehicleSubtype, setVehicleSubtype] = useState<string | null>(null);
@@ -66,20 +81,36 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
-  const [color, setColor] = useState('White');
-  const [customColor, setCustomColor] = useState('');
-  const [showCustomColor, setShowCustomColor] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(!isEdit);
   const numberInputRef = React.useRef<TextInput | null>(null);
   const brandInputRef = React.useRef<TextInput | null>(null);
   const modelInputRef = React.useRef<TextInput | null>(null);
-  const customColorInputRef = React.useRef<TextInput | null>(null);
   const [error, setError] = useState('');
 
-  const resolvedColor = showCustomColor ? customColor.trim() : color;
-  const resolvedFuelType = vehicleType === 'ev' ? 'electric' : fuelType;
   const subtypeOptions = getVehicleSubtypes(vehicleType);
   const showSubtypeSection = hasVehicleSubtypes(vehicleType);
+  const resolvedFuelType: FuelType = vehicleType === 'ev' ? 'electric' : fuelType;
+
+  useEffect(() => {
+    if (!editVehicleId) return;
+    void fetchVehicle(editVehicleId);
+  }, [editVehicleId, fetchVehicle]);
+
+  useEffect(() => {
+    if (!isEdit || !editVehicleId || !selectedVehicle || selectedVehicle.id !== editVehicleId) {
+      return;
+    }
+    setVehicleType(
+      selectedVehicle.vehicleType === 'auto' ? 'other' : selectedVehicle.vehicleType,
+    );
+    setVehicleSubtype(selectedVehicle.vehicleSubtype ?? null);
+    setFuelType(selectedVehicle.fuelType);
+    setVehicleNumber(selectedVehicle.vehicleNumber);
+    setBrand(selectedVehicle.brand);
+    setModel(selectedVehicle.model);
+    setHydrated(true);
+  }, [isEdit, editVehicleId, selectedVehicle]);
 
   const handleVehicleTypeChange = (type: VehicleType) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -87,6 +118,8 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
     setVehicleSubtype(null);
     if (type === 'ev') {
       setFuelType('electric');
+    } else if (fuelType === 'electric') {
+      setFuelType('petrol');
     }
   };
 
@@ -102,43 +135,45 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
       setError('Vehicle number, brand, and model are required');
       return;
     }
-    if (!resolvedColor) {
-      setError('Please select a vehicle color');
-      return;
-    }
     if (showSubtypeSection && !vehicleSubtype) {
       setError('Please select a vehicle subtype');
       return;
     }
 
+    const payload = {
+      vehicleType,
+      ...(vehicleSubtype ? { vehicleSubtype } : {}),
+      fuelType: resolvedFuelType,
+      vehicleNumber: normalizeVehicleNumberInput(vehicleNumber),
+      brand: brand.trim(),
+      model: model.trim(),
+    };
+
     try {
-      await addVehicle({
-        vehicleType,
-        ...(vehicleSubtype ? { vehicleSubtype } : {}),
-        fuelType: resolvedFuelType,
-        vehicleNumber: normalizeVehicleNumberInput(vehicleNumber),
-        brand: brand.trim(),
-        model: model.trim(),
-        color: resolvedColor,
-      });
+      if (isEdit && editVehicleId) {
+        await updateVehicle(editVehicleId, payload);
+      } else {
+        await addVehicle(payload);
+      }
       leaveScreen();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to add vehicle');
+      setError(err instanceof Error ? err.message : 'Unable to save vehicle');
     }
   };
 
-  const handleMoreColor = () => {
-    // Show the custom color input and focus it right away — no intermediate
-    // alert dialog (user asked for direct, keyboard-friendly flows).
-    setShowCustomColor(true);
-    setColor('');
-    setTimeout(() => customColorInputRef.current?.focus(), 120);
-  };
+  if (isEdit && !hydrated) {
+    return (
+      <ProfileSubScreenLayout title="Edit Vehicle" onBack={leaveScreen}>
+        <DataSkeleton variant="detail" />
+      </ProfileSubScreenLayout>
+    );
+  }
 
   return (
     <ProfileSubScreenLayout
-      title="Add Vehicle"
+      title={isEdit ? 'Edit Vehicle' : 'Add Vehicle'}
       keyboardAvoiding
+      contentStyle={{ paddingTop: px(18), paddingBottom: px(8) }}
       onBack={leaveScreen}
       footer={
         <View
@@ -151,7 +186,7 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
             borderTopColor: colors.border,
           }}>
           <GoldButton
-            label={isLoading ? 'Saving...' : 'Save Vehicle'}
+            label={isLoading ? 'Saving…' : isEdit ? 'Save changes' : 'Save Vehicle'}
             onPress={() => void handleSubmit()}
             disabled={isLoading}
             style={[shadows.card, { width: '100%' }]}
@@ -160,77 +195,68 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
           />
         </View>
       }>
-      <View style={[styles.sectionCard, { padding: sectionPad, marginBottom: px(12) }]}>
-        <SectionLabel px={px} label="Vehicle type" required />
-        <TypeRow
-          px={px}
-          options={VEHICLE_TYPE_OPTIONS.slice(0, 4)}
-          selectedId={vehicleType}
-          onSelect={handleVehicleTypeChange}
-        />
-        <View style={{ height: px(8) }} />
-        <TypeRow
-          px={px}
-          options={VEHICLE_TYPE_OPTIONS.slice(4)}
-          selectedId={vehicleType}
-          onSelect={handleVehicleTypeChange}
-        />
+      <SectionLabel px={px} label="Vehicle type" required />
+      <TypeGrid
+        px={px}
+        options={ADD_VEHICLE_TYPE_OPTIONS}
+        selectedId={vehicleType}
+        onSelect={handleVehicleTypeChange}
+      />
 
-        {showSubtypeSection ? (
-          <View style={{ marginTop: px(18) }}>
-            <SectionLabel px={px} label="Subtype" required />
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              style={{ height: px(40) }}
-              contentContainerStyle={{ alignItems: 'center', gap: px(8), paddingRight: px(4) }}>
-              {subtypeOptions.map(subtype => {
-                const selected = vehicleSubtype === subtype;
-                return (
-                  <Pressable
-                    key={subtype}
-                    onPress={() => handleSubtypeSelect(subtype)}
+      {showSubtypeSection ? (
+        <View style={{ marginTop: blockGap }}>
+          <SectionLabel px={px} label="Subtype" required />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            style={{ height: px(40) }}
+            contentContainerStyle={{ alignItems: 'center', gap: px(8), paddingRight: px(4) }}>
+            {subtypeOptions.map(subtype => {
+              const selected = vehicleSubtype === subtype;
+              return (
+                <Pressable
+                  key={subtype}
+                  onPress={() => handleSubtypeSelect(subtype)}
+                  style={{
+                    height: px(36),
+                    paddingHorizontal: px(14),
+                    borderRadius: px(10),
+                    borderWidth: 1.5,
+                    borderColor: selected ? VEHICLE_YELLOW : colors.border,
+                    backgroundColor: selected ? '#FEF3C7' : colors.background,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Text
                     style={{
-                      height: px(36),
-                      paddingHorizontal: px(14),
-                      borderRadius: px(10),
-                      borderWidth: 1.5,
-                      borderColor: selected ? VEHICLE_YELLOW : colors.border,
-                      backgroundColor: selected ? '#FEF3C7' : colors.background,
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      fontSize: px(13),
+                      fontWeight: typography.weights.bold,
+                      color: selected ? colors.dark : colors.grey,
                     }}>
-                    <Text
-                      style={{
-                        fontSize: px(13),
-                        fontWeight: typography.weights.bold,
-                        color: selected ? colors.dark : colors.grey,
-                      }}>
-                      {subtype}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        ) : null}
+                    {subtype}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
-      <View style={{ height: px(18) }} />
-      <SectionLabel px={px} label="Registration number" required />
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          height: px(52),
-          borderRadius: px(12),
-          borderWidth: 1.5,
-          borderColor: focusedField === 'number' ? VEHICLE_YELLOW : colors.border,
-          backgroundColor: colors.background,
-          paddingHorizontal: px(12),
-          marginBottom: px(4),
-        }}>
-        <IndFlagBadge px={px} />
+      <View style={{ marginTop: blockGap, marginBottom: px(6) }}>
+        <Text
+          style={{
+            fontSize: px(12),
+            fontWeight: typography.weights.bold,
+            color: colors.grey,
+            letterSpacing: 0.6,
+            textTransform: 'uppercase',
+            marginBottom: px(12),
+          }}>
+          Registration & model
+        </Text>
+
+        <SectionLabel px={px} label="Registration number" required />
         <TextInput
           ref={numberInputRef}
           value={vehicleNumber}
@@ -239,148 +265,84 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
           placeholderTextColor={FORM_PLACEHOLDER_COLOR}
           autoCapitalize="characters"
           autoCorrect={false}
-          keyboardType="default"
           returnKeyType="next"
           submitBehavior="submit"
           onSubmitEditing={() => brandInputRef.current?.focus()}
           onFocus={() => setFocusedField('number')}
           onBlur={() => setFocusedField(null)}
           style={{
-            flex: 1,
+            height: px(52),
+            borderRadius: px(12),
+            borderWidth: 1.5,
+            borderColor: focusedField === 'number' ? VEHICLE_YELLOW : colors.border,
+            backgroundColor: colors.background,
+            paddingHorizontal: px(14),
             fontSize: px(15),
             fontWeight: typography.weights.semibold,
             color: colors.dark,
-            padding: 0,
+            marginBottom: fieldGap,
           }}
         />
-      </View>
 
-      <LabeledInput
-        px={px}
-        inputRef={brandInputRef}
-        label="Brand"
-        required
-        value={brand}
-        onChangeText={setBrand}
-        placeholder="e.g. Honda"
-        focused={focusedField === 'brand'}
-        onFocus={() => setFocusedField('brand')}
-        onBlur={() => setFocusedField(null)}
-        returnKeyType="next"
-        onSubmitEditing={() => modelInputRef.current?.focus()}
-      />
-
-      <LabeledInput
-        px={px}
-        inputRef={modelInputRef}
-        label="Model"
-        required
-        value={model}
-        onChangeText={setModel}
-        placeholder="e.g. City ZX"
-        focused={focusedField === 'model'}
-        onFocus={() => setFocusedField('model')}
-        onBlur={() => setFocusedField(null)}
-        returnKeyType="done"
-        onSubmitEditing={() => void handleSubmit()}
-      />
-      </View>
-
-      <View style={[styles.sectionCard, { padding: sectionPad, marginBottom: px(12) }]}>
-      <SectionLabel px={px} label="Colour" required />
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: showCustomColor ? px(8) : px(16),
-        }}>
-        {VEHICLE_COLOR_OPTIONS.map(option => {
-          const selected = !showCustomColor && color === option.name;
-          return (
-            <Pressable
-              key={option.name}
-              onPress={() => {
-                setColor(option.name);
-                setShowCustomColor(false);
-                setCustomColor('');
-              }}
-              style={{
-                width: px(36),
-                height: px(36),
-                borderRadius: px(18),
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: selected ? 2.5 : 0,
-                borderColor: VEHICLE_YELLOW,
-              }}>
-              <View
-                style={{
-                  width: px(28),
-                  height: px(28),
-                  borderRadius: px(14),
-                  backgroundColor: option.hex,
-                  borderWidth: option.name === 'White' ? 1 : 0,
-                  borderColor: colors.border,
-                }}
-              />
-            </Pressable>
-          );
-        })}
-        <Pressable onPress={handleMoreColor}>
-          <Text
-            style={{
-              fontSize: px(13),
-              fontWeight: typography.weights.bold,
-              color: VEHICLE_YELLOW,
-            }}>
-            More
-          </Text>
-        </Pressable>
-      </View>
-
-      {showCustomColor ? (
         <LabeledInput
           px={px}
-          inputRef={customColorInputRef}
-          label="Custom Color"
+          inputRef={brandInputRef}
+          label="Brand"
           required
-          value={customColor}
-          onChangeText={setCustomColor}
-          placeholder="e.g. Maroon"
-          focused={focusedField === 'customColor'}
-          onFocus={() => setFocusedField('customColor')}
+          value={brand}
+          onChangeText={setBrand}
+          placeholder="e.g. Honda"
+          fieldGap={fieldGap}
+          focused={focusedField === 'brand'}
+          onFocus={() => setFocusedField('brand')}
+          onBlur={() => setFocusedField(null)}
+          returnKeyType="next"
+          onSubmitEditing={() => modelInputRef.current?.focus()}
+        />
+
+        <LabeledInput
+          px={px}
+          inputRef={modelInputRef}
+          label="Model"
+          required
+          value={model}
+          onChangeText={setModel}
+          placeholder="e.g. City ZX"
+          fieldGap={0}
+          focused={focusedField === 'model'}
+          onFocus={() => setFocusedField('model')}
           onBlur={() => setFocusedField(null)}
           returnKeyType="done"
           onSubmitEditing={() => void handleSubmit()}
         />
-      ) : null}
-
-      {vehicleType !== 'ev' ? (
-        <>
-          <SectionLabel px={px} label="Fuel" required />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            style={{ height: px(42) }}
-            contentContainerStyle={{ alignItems: 'center', gap: px(8) }}>
-            {FUEL_TYPE_OPTIONS.filter(option => option.id !== 'electric').map(option => (
-              <FuelChip
-                key={option.id}
-                px={px}
-                option={option}
-                selected={fuelType === option.id}
-                onPress={() => setFuelType(option.id)}
-              />
-            ))}
-          </ScrollView>
-        </>
-      ) : null}
       </View>
 
       <AuthToast message={error || storeError || ''} />
     </ProfileSubScreenLayout>
+  );
+}
+
+function TypeGrid({
+  px,
+  options,
+  selectedId,
+  onSelect,
+}: {
+  px: (n: number) => number;
+  options: typeof ADD_VEHICLE_TYPE_OPTIONS;
+  selectedId: VehicleType;
+  onSelect: (id: VehicleType) => void;
+}) {
+  const row1 = options.slice(0, 3);
+  const row2 = options.slice(3, 6);
+
+  return (
+    <View style={{ gap: px(8) }}>
+      <TypeRow px={px} options={row1} selectedId={selectedId} onSelect={onSelect} />
+      {row2.length ? (
+        <TypeRow px={px} options={row2} selectedId={selectedId} onSelect={onSelect} />
+      ) : null}
+    </View>
   );
 }
 
@@ -391,7 +353,7 @@ function TypeRow({
   onSelect,
 }: {
   px: (n: number) => number;
-  options: typeof VEHICLE_TYPE_OPTIONS;
+  options: typeof ADD_VEHICLE_TYPE_OPTIONS;
   selectedId: VehicleType;
   onSelect: (id: VehicleType) => void;
 }) {
@@ -399,26 +361,35 @@ function TypeRow({
     <View style={{ flexDirection: 'row', gap: px(8) }}>
       {options.map(option => {
         const selected = selectedId === option.id;
-        const Icon = option.Icon;
         return (
           <Pressable
             key={option.id}
             onPress={() => onSelect(option.id)}
             style={{
               flex: 1,
-              height: px(72),
-              borderRadius: px(12),
-              borderWidth: 1.5,
+              minHeight: px(84),
+              borderRadius: px(14),
+              borderWidth: selected ? 2 : 1,
               borderColor: selected ? VEHICLE_YELLOW : colors.border,
-              backgroundColor: selected ? '#FEF3C7' : colors.background,
+              backgroundColor: selected ? '#FFFBEB' : colors.background,
               alignItems: 'center',
               justifyContent: 'center',
+              paddingVertical: px(8),
+              paddingHorizontal: px(4),
             }}>
-            <Icon size={px(20)} color={selected ? VEHICLE_YELLOW : colors.grey} strokeWidth={2} />
+            <View
+              style={{
+                width: px(52),
+                height: px(40),
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: px(4),
+              }}>
+              <VehiclePlaceholderImage type={option.id} size={px(48)} />
+            </View>
             <Text
               numberOfLines={1}
               style={{
-                marginTop: px(6),
                 fontSize: px(11),
                 fontWeight: typography.weights.bold,
                 color: selected ? colors.dark : colors.grey,
@@ -429,47 +400,6 @@ function TypeRow({
         );
       })}
     </View>
-  );
-}
-
-function FuelChip({
-  px,
-  option,
-  selected,
-  onPress,
-}: {
-  px: (n: number) => number;
-  option: (typeof FUEL_TYPE_OPTIONS)[number];
-  selected: boolean;
-  onPress: () => void;
-}) {
-  const Icon = option.Icon;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: px(4),
-        paddingHorizontal: px(12),
-        height: px(36),
-        borderRadius: px(10),
-        borderWidth: 1.5,
-        borderColor: selected ? VEHICLE_YELLOW : colors.border,
-        backgroundColor: selected ? '#FEF3C7' : colors.background,
-      }}>
-      <Icon size={px(14)} color={selected ? VEHICLE_YELLOW : colors.grey} strokeWidth={2} />
-      <Text
-        numberOfLines={1}
-        style={{
-          fontSize: px(12),
-          fontWeight: typography.weights.bold,
-          color: selected ? colors.dark : colors.grey,
-        }}>
-        {option.label}
-      </Text>
-    </Pressable>
   );
 }
 
@@ -488,7 +418,7 @@ function SectionLabel({
         fontSize: px(13),
         fontWeight: typography.weights.bold,
         color: colors.dark,
-        marginBottom: px(10),
+        marginBottom: px(8),
       }}>
       {label}
       {required ? <Text style={{ color: colors.error }}> *</Text> : null}
@@ -509,6 +439,7 @@ function LabeledInput({
   inputRef,
   returnKeyType = 'next',
   onSubmitEditing,
+  fieldGap,
 }: {
   px: (n: number) => number;
   label: string;
@@ -522,9 +453,10 @@ function LabeledInput({
   inputRef?: React.RefObject<TextInput | null>;
   returnKeyType?: 'next' | 'done';
   onSubmitEditing?: () => void;
+  fieldGap?: number;
 }) {
   return (
-    <View style={{ marginBottom: px(18) }}>
+    <View style={{ marginBottom: fieldGap ?? px(14) }}>
       <SectionLabel px={px} label={label} required={required} />
       <TextInput
         ref={inputRef}
@@ -553,12 +485,3 @@ function LabeledInput({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  sectionCard: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-  },
-});

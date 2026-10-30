@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -7,6 +7,7 @@ import SosButton from '../../components/dashboard/SosButton';
 import LoadingState from '../../components/ui/LoadingState';
 import PrimaryButton from '../../components/ui/PrimaryButton';
 import Screen, { Card, ScreenContent } from '../../components/ui/Screen';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useAppSelector } from '../../redux/hooks';
 import { getApiErrorMessage } from '../../services/api/apiClient';
 import {
@@ -21,6 +22,7 @@ type Props = NativeStackScreenProps<ProfileStackParamList, 'EmergencySos'>;
 
 export default function EmergencySosScreen({}: Props) {
   const user = useAppSelector((state) => state.auth.user);
+  const { dialog, showDialog } = useAppDialog();
   const { data: config } = useSosConfigQuery();
   const { data: context, isLoading } = useSosContextQuery(undefined, Boolean(user));
   const sosAlert = useSosAlertMutation();
@@ -43,10 +45,20 @@ export default function EmergencySosScreen({}: Props) {
       { action, vehicleId, address: 'Current location' },
       {
         onSuccess: (result) => {
-          Alert.alert(successTitle, result.message);
+          showDialog({
+            tone: 'success',
+            title: successTitle,
+            message: result.message,
+            primaryLabel: 'OK',
+          });
         },
         onError: (error) => {
-          Alert.alert('Request failed', getApiErrorMessage(error));
+          showDialog({
+            tone: 'error',
+            title: 'Request failed',
+            message: getApiErrorMessage(error),
+            primaryLabel: 'OK',
+          });
         },
       },
     );
@@ -63,6 +75,7 @@ export default function EmergencySosScreen({}: Props) {
   return (
     <Screen backgroundColor={colors.surfaceDarker}>
       <SafeAreaView style={styles.safe}>
+        {dialog}
         <ScrollView contentContainerStyle={styles.scroll}>
           <ScreenContent>
             <Text style={styles.title}>Emergency SOS</Text>

@@ -77,6 +77,8 @@ export function onBookingStatus(
   callback: (data: {
     bookingId: string;
     status: string;
+    internalStatus?: string;
+    driverAccepted?: boolean;
     arrivedAtDropoff?: boolean;
     arrivedAtDropoffAt?: string;
     fare?: number;

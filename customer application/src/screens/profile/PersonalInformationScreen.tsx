@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import {
   Camera,
   ChevronDown,
+  ChevronRight,
   Mail,
   Plus,
+  Smartphone,
   User,
 } from 'lucide-react-native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import FormField from '../../components/auth/FormField';
 import DateOfBirthField from '../../components/auth/DateOfBirthField';
@@ -24,11 +27,13 @@ import ProfileEmergencyContactFields, {
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import DataSkeleton from '../../components/ui/DataSkeleton';
 import { EMERGENCY_RELATIONSHIP_OPTIONS } from '../../constants/profileForm';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useProfileStore } from '../../store/profileStore';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 import { getApiErrorMessage } from '../../services/api';
 import { apiDateToDisplay, buildUpdateProfilePayload, validateProfileForm } from '../../utils/profilePayload';
 import { colors, shadows, typography } from '../../theme';
-import { goBackWithinStack } from '../../navigation/goBackWithinStack';
+import type { ProfileStackParamList } from '../../types/navigation';
 
 function formatRelationship(value?: string): string {
   if (!value) return '';
@@ -40,7 +45,8 @@ function formatRelationship(value?: string): string {
 
 export default function PersonalInformationScreen() {
   const px = useProfilePx();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
+  const { dialog, showDialog } = useAppDialog();
   const { profile, fetchProfile, updateProfile, isLoading } = useProfileStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -143,11 +149,20 @@ export default function PersonalInformationScreen() {
       // Saved → refresh upstream pages, then return to Profile (standard
       // push/pop flow instead of leaving the user stuck on the form).
       void fetchProfile();
-      Alert.alert('Saved', 'Your profile has been updated.', [
-        { text: 'OK', onPress: () => goBackWithinStack(navigation) },
-      ]);
+      showDialog({
+        tone: 'success',
+        title: 'Saved',
+        message: 'Your profile has been updated.',
+        primaryLabel: 'OK',
+        onPrimary: () => goBackWithinStack(navigation),
+      });
     } catch (error) {
-      Alert.alert('Profile', getApiErrorMessage(error, 'Unable to update profile'));
+      showDialog({
+        tone: 'error',
+        title: 'Profile',
+        message: getApiErrorMessage(error, 'Unable to update profile'),
+        primaryLabel: 'OK',
+      });
     }
   };
 
@@ -157,18 +172,24 @@ export default function PersonalInformationScreen() {
 
   if (isLoading && !profile) {
     return (
-      <ProfileSubScreenLayout title="Personal Information" subtitle="Update your details">
+      <ProfileSubScreenLayout title="Personal Information">
         <DataSkeleton variant="profile" />
       </ProfileSubScreenLayout>
     );
   }
 
   return (
-    <ProfileSubScreenLayout
-      title="Personal Information"
-      subtitle="Update your details"
-      keyboardAvoiding>
+    <ProfileSubScreenLayout title="Personal Information">
+      {dialog}
       <Pressable
+        onPress={() =>
+          showDialog({
+            tone: 'info',
+            title: 'Profile photo',
+            message: 'Photo upload is coming soon. Your name and contact details are saved on the server.',
+            primaryLabel: 'Got it',
+          })
+        }
         style={{
           alignSelf: 'center',
           alignItems: 'center',
@@ -282,6 +303,41 @@ export default function PersonalInformationScreen() {
           onClearError={clearError}
         />
       </View>
+
+      <Pressable
+        onPress={() => navigation.navigate('ChangeMobileNumber')}
+        style={({ pressed }) => [
+          {
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: px(12),
+            marginTop: px(18),
+            marginBottom: px(8),
+            paddingHorizontal: px(14),
+            paddingVertical: px(12),
+            borderRadius: px(14),
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: pressed ? colors.pageBg : colors.background,
+          },
+          shadows.card,
+        ]}>
+        <View
+          style={{
+            width: px(34),
+            height: px(34),
+            borderRadius: px(17),
+            backgroundColor: colors.goldLight,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Smartphone size={px(16)} color={colors.primary} strokeWidth={2.2} />
+        </View>
+        <Text style={{ flex: 1, fontSize: px(13), fontWeight: typography.weights.bold, color: colors.dark }}>
+          Change mobile number
+        </Text>
+        <ChevronRight size={px(16)} color={colors.grey} />
+      </Pressable>
 
       <GoldButton
         label={isLoading ? 'Saving...' : 'Save Changes'}

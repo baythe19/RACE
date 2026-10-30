@@ -2,13 +2,16 @@ import * as SecureStore from 'expo-secure-store';
 
 const CUSTOMER_ONBOARDING_STEP_KEY = 'customer_onboarding_step';
 
-export type CustomerOnboardingStep = 'profile' | 'vehicle' | 'pin' | 'done';
+export type CustomerOnboardingStep = 'profile' | 'vehicle' | 'done';
 
-const VALID_STEPS = new Set<CustomerOnboardingStep>(['profile', 'vehicle', 'pin', 'done']);
+const VALID_STEPS = new Set<CustomerOnboardingStep>(['profile', 'vehicle', 'done']);
 
 export async function getCustomerOnboardingStep(): Promise<CustomerOnboardingStep> {
   try {
     const stored = await SecureStore.getItemAsync(CUSTOMER_ONBOARDING_STEP_KEY);
+    if (stored === 'pin') {
+      return 'done';
+    }
     if (stored && VALID_STEPS.has(stored as CustomerOnboardingStep)) {
       return stored as CustomerOnboardingStep;
     }

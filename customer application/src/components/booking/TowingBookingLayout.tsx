@@ -12,9 +12,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import GoldButton from '../auth/GoldButton';
-import { BookingScreenShell } from './BookingFlowHeader';
+import { BookingScreenShell, type HeaderTagVariant } from './BookingFlowHeader';
 import { BOOKING_REF_W, createBookingTheme } from './bookingTheme';
+import {
+  getTowingServiceModeHeaderTag,
+  getTowingServiceModeHeaderTagVariant,
+} from './TowingServiceModeBanner';
 import { TOWING_BOOKING_STEP_LABELS } from '../../constants/towingBooking';
+import { useTowingBooking } from '../../context/TowingBookingContext';
 import { colors, typography } from '../../theme';
 
 interface TowingBookingLayoutProps {
@@ -39,6 +44,9 @@ interface TowingBookingLayoutProps {
   showStep?: boolean;
   headerVariant?: 'centered' | 'inline';
   accentColor?: string;
+  /** Compact label beside title (Instant, Scheduled, …). Wizard steps 1–3 auto-fill from booking context when omitted. */
+  headerTag?: string;
+  headerTagVariant?: HeaderTagVariant;
 }
 
 const DEFAULT_STEPPER_LABELS = TOWING_BOOKING_STEP_LABELS;
@@ -63,10 +71,19 @@ export default function TowingBookingLayout({
   showStep = true,
   headerVariant = 'centered',
   accentColor = colors.primary,
+  headerTag,
+  headerTagVariant,
 }: TowingBookingLayoutProps) {
   const { width } = useWindowDimensions();
   const s = width / BOOKING_REF_W;
   const t = createBookingTheme(s);
+  const { booking } = useTowingBooking();
+  const isWizardStep = showStep && step >= 1 && step <= 3;
+  const resolvedHeaderTag =
+    headerTag ?? (isWizardStep ? getTowingServiceModeHeaderTag(booking.serviceMode) : undefined);
+  const resolvedHeaderTagVariant =
+    headerTagVariant ??
+    (isWizardStep ? getTowingServiceModeHeaderTagVariant(booking.serviceMode) : undefined);
 
   const footer = hideFooter ? null : (
     <View
@@ -132,7 +149,9 @@ export default function TowingBookingLayout({
             footer={footer}
             headerVariant={headerVariant}
             accentColor={accentColor}
-            showStep={showStep}>
+            showStep={showStep}
+            headerTag={resolvedHeaderTag}
+            headerTagVariant={resolvedHeaderTagVariant}>
             {body}
           </BookingScreenShell>
         </View>

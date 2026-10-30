@@ -22,6 +22,7 @@ export interface CombinedBookingListItemDto {
   bookingType: 'towing' | 'driver';
   serviceLabel: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   paymentStatus: string;
   vehicleId: string;
   pickup: CombinedBookingLocationDto;

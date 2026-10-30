@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
 
+import { customerStatusChipTone } from '../../utils/bookingDisplay';
 import { formatBookingDate, getBookingServiceIcon } from '../../constants/bookingsScreen';
 import type { BookingHistoryItem } from '../../types/models';
 import { colors, shadows, typography } from '../../theme';
@@ -14,6 +15,7 @@ type Props = {
 
 export default function BookingHistoryRow({ item, px, onPress }: Props) {
   const ServiceIcon = getBookingServiceIcon(item.service);
+  const chip = customerStatusChipTone(item.status);
 
   return (
     <Pressable
@@ -76,15 +78,17 @@ export default function BookingHistoryRow({ item, px, onPress }: Props) {
             paddingHorizontal: px(8),
             paddingVertical: px(3),
             borderRadius: px(10),
-            backgroundColor:
-              item.status === 'Cancelled' ? '#F3F4F6' : '#E8F8EE',
+            backgroundColor: chip.bg,
             marginBottom: px(6),
+            maxWidth: px(110),
           }}>
           <Text
+            numberOfLines={2}
             style={{
-              fontSize: px(10),
+              fontSize: px(9),
               fontWeight: typography.weights.bold,
-              color: item.status === 'Cancelled' ? colors.grey : colors.success,
+              color: chip.fg,
+              textAlign: 'right',
             }}>
             {item.status}
           </Text>

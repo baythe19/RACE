@@ -2,7 +2,7 @@
 
 > **Happy-path journeys, step by step, for each audience.**
 
-These flows trace through the **release4Aug2026** codebase. Each flow names the screens, the API calls, and what the user sees.
+Journeys for **`v2.0.1-cleanup`**. Dispatch, statuses, OTP: [`BOOKING_DISPATCH_AND_UI.md`](BOOKING_DISPATCH_AND_UI.md).
 
 ---
 
@@ -18,7 +18,7 @@ These flows trace through the **release4Aug2026** codebase. Each flow names the 
 | 6 | Taps "Towing" | `TowingServiceScreen` → `CreateBookingPage` (or booking flow) | Vehicle pre-selected if only one registered |
 | 7 | Picks pickup, drop, notes | `CreateBookingPage` | Form validation client-side + Zod server-side |
 | 8 | Reviews fare | `CreateBookingPage` | `GET /api/v1/fare/towing` with pickup+drop → fare preview rendered |
-| 9 | Confirms booking | `CreateBookingPage` | `POST /api/v1/bookings/towing` → backend pushes to driver dispatch queue |
+| 9 | Confirms booking | Review → payment | `POST /api/v1/bookings/towing` → `PENDING`; advance verify → `CONFIRMED` → vendors + tow drivers notified ([dispatch doc](BOOKING_DISPATCH_AND_UI.md)) |
 | 10 | Sees active booking | `BookingsPage` / detail | Status timeline + assigned driver info |
 | 11 | Tracks driver live | Booking detail + map | Socket.IO emits driver location → map polyline updates |
 | 12 | Service completes | Driver marks status complete | Status timeline advances |
@@ -120,8 +120,8 @@ These flows trace through the **release4Aug2026** codebase. Each flow names the 
 | 1 | From Home → "Roadside Assistance" | `RoadsideAssistanceScreen` | |
 | 2 | Picks sub-category (battery / tyre / fuel / lockout) | Same screen | |
 | 3 | App checks if nearby | `GET /api/v1/bookings/roadside/availability` | Returns ETA + partner availability |
-| 4 | Confirms | `POST /api/v1/bookings/roadside` | Creates a service-specific booking |
-| 5 | Same lifecycle as towing | (status / tracking / payment / rate) | |
+| 4 | Confirms | `POST /api/v1/bookings/roadside` | On-site jobs → `RSV-*` / `TowingBooking`; towing slugs redirect to `TOW-*`. Same vendor dispatch as towing ([dispatch doc](BOOKING_DISPATCH_AND_UI.md)) |
+| 5 | Same lifecycle as towing | Bookings + track screens | Status/OTP rules shared; on-site = no drop route |
 
 ---
 

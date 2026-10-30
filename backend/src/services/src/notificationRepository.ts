@@ -58,6 +58,14 @@ export class NotificationRepository {
     const result = await NotificationModel.deleteMany({ 'recipient.userId': userId });
     return result.deletedCount;
   }
+
+  async deleteOneForUser(userId: string, notificationId: string) {
+    const result = await NotificationModel.deleteOne({
+      _id: notificationId,
+      'recipient.userId': userId,
+    });
+    return result.deletedCount;
+  }
 }
 
 export const notificationRepository = new NotificationRepository();

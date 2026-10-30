@@ -2,6 +2,7 @@ import { Permission } from '@race/types';
 import { ErrorState, LoadingState } from '@race/ui';
 import { formatCurrency, formatDate } from '@race/utils';
 import { Card, CardContent, CardHeader, CardTitle, StatusBadge } from '@race/ui';
+import { useNavigate } from 'react-router-dom';
 
 import { ActivityTimeline } from '@/components/shared/activity-timeline';
 import { DataTable } from '@/components/shared/data-table';
@@ -94,6 +95,11 @@ const bookingColumns: ColumnDef<CustomerBookingHistoryItem, unknown>[] = [
   { accessorKey: 'service', header: 'Service' },
   { accessorKey: 'vendorName', header: 'Vendor' },
   {
+    accessorKey: 'driverName',
+    header: 'Driver',
+    cell: ({ row }) => row.original.driverName ?? '—',
+  },
+  {
     accessorKey: 'status',
     header: 'Status',
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
@@ -147,6 +153,7 @@ const subscriptionColumns: ColumnDef<CustomerSubscription, unknown>[] = [
 ];
 
 export function CustomerDetailContent({ customerId }: { customerId: string }) {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
   const { data: customer, isLoading, isError, error, refetch } = useCustomerDetail(customerId);
@@ -180,6 +187,11 @@ export function CustomerDetailContent({ customerId }: { customerId: string }) {
               columns={bookingColumns}
               data={customer.bookings}
               emptyMessage="No bookings yet"
+              onRowClick={(row) =>
+                navigate(
+                  `/bookings/${row.id}${row.bookingType ? `?type=${row.bookingType}` : ''}`,
+                )
+              }
             />
           </CardContent>
         </Card>

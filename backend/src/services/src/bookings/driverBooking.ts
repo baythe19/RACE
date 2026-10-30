@@ -25,7 +25,9 @@ import { getCancellationPolicy, type CancellationResult } from './cancellation';
 import { releaseDriver } from './driverAssignment';
 import { resolveAssignedDriver } from './assignedDriver';
 import {
+  applyCustomerBookingView,
   isDriverVisibleToCustomer,
+  isAwaitingPartnerAccept,
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
@@ -167,7 +169,10 @@ export class DriverBookingService {
     const bookings = await driverBookingRepository.findByCustomerWithOtp(customerId, { status });
     return Promise.all(
       bookings.map(async (booking) => {
-        const mapped = await mapDriverBookingWithDriver(booking);
+        const mapped = applyCustomerBookingView(
+          await mapDriverBookingWithDriver(booking),
+          booking.status,
+        );
         mapped.tripStartOtp = customerTripOtp(booking);
         return mapped;
       }),
@@ -187,8 +192,9 @@ export class DriverBookingService {
       throw new ForbiddenError('You do not have access to this booking');
     }
 
-    const mapped = await mapDriverBookingWithDriver(booking);
+    let mapped = await mapDriverBookingWithDriver(booking);
     if (requestingUser.role === 'customer') {
+      mapped = applyCustomerBookingView(mapped, booking.status);
       mapped.tripStartOtp = customerTripOtp(booking);
       mapped.completionOtp = customerCompletionOtp(booking);
     } else {
@@ -276,6 +282,7 @@ export class DriverBookingService {
     return {
       bookingId: booking.id,
       status: mapPublicBookingStatus(booking.status),
+      awaitingPartnerAccept: isAwaitingPartnerAccept(booking.status),
       statusHistory: booking.statusHistory.map((entry) => ({
         status: mapPublicBookingStatus(entry.status),
         timestamp: entry.timestamp.toISOString(),

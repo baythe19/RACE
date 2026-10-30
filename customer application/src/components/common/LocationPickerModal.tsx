@@ -14,8 +14,6 @@ import {
   type GooglePlacesAutocompleteRef,
 } from 'react-native-google-places-autocomplete';
 import MapView, {
-  PROVIDER_DEFAULT,
-  PROVIDER_GOOGLE,
   type LongPressEvent,
   type Region,
 } from 'react-native-maps';
@@ -26,6 +24,7 @@ import { ArrowLeft, Crosshair, MapPin, Search } from 'lucide-react-native';
 import TileMapSurface, { type TileMapHandle } from './TileMapSurface';
 import type { LocationResult } from '../../types/location';
 import { BHUBANESWAR_DEFAULT, getGoogleMapsApiKey } from '../../utils/googleMaps';
+import { getNativeMapProvider } from '../../utils/mapProvider';
 import {
   LOCATION_ACCENT,
   parseLocationFromPlaceDetails,
@@ -35,10 +34,7 @@ import { formatLocationDisplay } from '../../utils/readableAddress';
 import { ensureForegroundLocation } from '../../utils/locationPermission';
 import { colors, shadows, typography } from '../../theme';
 
-const MAP_PROVIDER =
-  Platform.OS === 'android' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY)
-    ? PROVIDER_GOOGLE
-    : PROVIDER_DEFAULT;
+const MAP_PROVIDER = getNativeMapProvider();
 const REVERSE_GEOCODE_DEBOUNCE_MS = 500;
 
 export type LocationPickerInitialMode = 'search' | 'map';

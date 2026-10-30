@@ -215,7 +215,7 @@ module.exports = {
   Geojson: makeStub('Geojson'),
   UrlTile: makeStub('UrlTile'),
   Callout: makeStub('Callout'),
-  PROVIDER_DEFAULT: 'default',
+  PROVIDER_DEFAULT: undefined,
   PROVIDER_GOOGLE: 'google',
   Animated: MapView,
   enableMapsExperimentalRenderer: () => {},

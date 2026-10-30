@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { Camera, Star } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import DriverAvatar from '../../../components/bookings/DriverAvatar';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import { useAppDialog } from '../../../hooks/useAppDialog';
 import { useBookingQuery, useSubmitRatingMutation } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
@@ -14,6 +15,7 @@ type Props = NativeStackScreenProps<HomeStackParamList & BookingsStackParamList,
 
 export default function TowingRateScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
+  const { dialog, showDialog } = useAppDialog();
   const bookingId = route.params?.bookingId;
   const bookingType = route.params?.bookingType ?? 'towing';
   const booking = useBookingQuery(bookingId ?? '', 'towing');
@@ -35,7 +37,12 @@ export default function TowingRateScreen({ navigation, route }: Props) {
       });
       navigation.popToTop();
     } catch {
-      Alert.alert('Unable to submit rating', 'Please try again in a moment.');
+      showDialog({
+        tone: 'error',
+        title: 'Unable to submit rating',
+        message: 'Please try again in a moment.',
+        primaryLabel: 'OK',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -60,6 +67,7 @@ export default function TowingRateScreen({ navigation, route }: Props) {
       continueDisabled={!canSubmit}
       onContinue={() => void handleSubmit()}
       scrollable>
+      {dialog}
       <View style={{ flex: 1 }}>
         <View
           style={[

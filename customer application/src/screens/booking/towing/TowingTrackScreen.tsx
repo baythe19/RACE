@@ -12,16 +12,22 @@ import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import {
   formatBookingDisplayId,
-  formatUnifiedStatusLabel,
+  formatLiveTrackingSummary,
+  getCustomerBookingPresentation,
   isCompletedUnifiedStatus,
   isOngoingUnifiedStatus,
 } from '../../../utils/bookingDisplay';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import {
+  trackEtaForStage,
+  trackLocationHint,
+  trackPartnerDisplayName,
+} from '../../../utils/bookingFlowCopy';
+import { formatLocationCard, formatLocationDisplay } from '../../../utils/readableAddress';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList & BookingsStackParamList, 'TowingTrack'>;
 
-const TRACK_STEPS = ['Confirmed', 'On the Way', 'Pickup', 'Drop-off'];
+const TRACK_STEPS = ['Placed', 'En route', 'Pickup', 'Drop-off'];
 
 function stepIndexForStatus(status: string): number {
   switch (status) {
@@ -64,20 +70,29 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
 
   const status = mergeLiveStatus(trackedStatus, booking?.unifiedStatus);
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
-  const displayDriverName = driverName ?? booking?.driver?.name ?? 'Assigning driver';
+  const kind = booking ? getCustomerBookingPresentation(booking).kind : 'towing';
+  const partnerPending = !driverName && !booking?.driver;
+  const displayDriverName = trackPartnerDisplayName(
+    kind,
+    status,
+    partnerPending,
+    driverName ?? booking?.driver?.name,
+  );
   const phone = driverPhone ?? booking?.driver?.phone;
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
   const isCompleted = isCompletedUnifiedStatus(status);
   const isLive = isOngoingUnifiedStatus(status);
 
-  const resolvedEta =
-    etaMinutes != null
-      ? `${etaMinutes} min`
-      : booking?.etaMinutes != null
-        ? `${booking.etaMinutes} min`
-        : etaLabel;
-
+  const etaForStage = trackEtaForStage(kind, status, etaMinutes);
+  const trackingUi = formatLiveTrackingSummary({
+    kind,
+    status,
+    partnerPending,
+    etaDisplay: etaForStage,
+  });
+  const pickupCard = formatLocationCard(booking?.pickup);
+  const dropCard = booking?.dropoff ? formatLocationCard(booking.dropoff) : null;
   const resolvedFare =
     trackedFare ??
     (booking?.fareBreakdown && 'totalFare' in booking.fareBreakdown
@@ -113,6 +128,9 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
   const mockDriverPoint =
     !driverLocation &&
     isCustomerMockDataEnabled() &&
+    (status === 'DRIVER_EN_ROUTE' ||
+      status === 'DRIVER_ARRIVED' ||
+      status === 'IN_PROGRESS') &&
     booking?.pickup?.latitude != null &&
     booking?.pickup?.longitude != null
       ? {
@@ -122,31 +140,36 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
         }
       : null;
 
-  const locationHint = driverLocation
-    ? 'Partner location updating live'
-    : mockDriverPoint
-      ? 'Preview mode · sample partner position on map'
-      : status === 'DRIVER_ASSIGNED' || status === 'CONFIRMED'
-        ? 'Driver allotted · waiting to start'
-        : status === 'PENDING'
-          ? 'Finding a partner near you'
-          : null;
+  const locationHint = trackLocationHint(
+    kind,
+    status,
+    Boolean(driverLocation),
+    Boolean(mockDriverPoint),
+  );
 
   return (
     <LiveTrackingContent
       bookingNumberLabel={
         booking ? formatBookingDisplayId(booking.bookingNumber) : 'Towing trip'
       }
-      statusLabel={formatUnifiedStatusLabel(status)}
+      statusLabel={trackingUi.chipLabel}
       statusCode={status}
       isLive={isLive}
       steps={TRACK_STEPS}
       activeStep={activeStep}
-      etaLabel={resolvedEta}
+      etaLabel={trackingUi.cardValue}
+      summaryLabel={trackingUi.cardLabel}
+      summaryChipLabel={trackingUi.chipLabel}
       serviceLabel="Towing"
-      pickupLabel={formatLocationDisplay(booking?.pickup) || 'Pickup'}
+      pickupLabel={
+        dropCard
+          ? `${pickupCard.primary}${pickupCard.secondary ? ` · ${pickupCard.secondary}` : ''}`
+          : formatLocationDisplay(booking?.pickup) || 'Pickup'
+      }
       dropLabel={
-        booking?.dropoff ? formatLocationDisplay(booking.dropoff) : undefined
+        dropCard
+          ? `${dropCard.primary}${dropCard.secondary ? ` · ${dropCard.secondary}` : ''}`
+          : undefined
       }
       driverName={displayDriverName}
       driverPhone={phone}
