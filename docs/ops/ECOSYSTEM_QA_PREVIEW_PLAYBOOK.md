@@ -135,10 +135,12 @@ Use this as a monthly regression script. **Columns:** C = Customer app, P = Part
 **Yes**, when:
 
 1. All apps point at the **same API** (Render URL or local `:3000`).
-2. Partner APK uses **`production-test` or `production`**, not `preview` mock flags.
+2. Partner APK uses **`production-test`**, **`preview`**, or **`production`** (all point at Render with real API mutations; no UI mock flags).
 3. Customer APK uses **`preview` or `production`** with `SKIP_OTP_AUTH=false`.
-4. QA accounts exist in Atlas (bootstrap or manual registration).
-5. You accept **stub payments**, **Render cold start** (first request 15–45s), and **admin refresh** without live sockets.
+4. QA accounts exist in Atlas — run **`npm run ensure:test-accounts`** against Atlas URI once, or login **`9000000005`** and complete profile in-app.
+5. You accept **stub payments** (Render needs `ALLOW_STUB_PAYMENTS=true`), **Render cold start** (first request 15–45s), and **admin refresh** without live sockets.
+
+**Automated Tier-B gate:** `cd backend && npm run smoke:render` (hits live Render; safe read + one book/pay if customer has vehicle).
 
 **Partial / no:**
 
@@ -251,7 +253,7 @@ Fix loop: reproduce on Tier B → patch on active branch → re-run one matrix r
 | Admin login while testing APKs? | **YES** | Browser → Vercel alias; same API |
 | Customer + partner + admin without cloud? | **YES** | Tier A local stack |
 | Real Razorpay in APK? | **NO (today)** | Stubs only — `ALLOW_STUB_PAYMENTS` |
-| EAS `preview` partner APK for real E2E? | **NO** | Preview enables UI mock mutations — use `production-test` |
+| EAS `preview` partner APK for real E2E? | **YES** | Same Render URL + preview flags off (as of 2026-10-31); prefer **`production-test`** if you want identical env to field APK |
 | Play Store submit from this doc? | **Out of scope** | Partner `production` = AAB; needs `google-services.json` for **submit**, not for sideload APK |
 | Maps on release APK? | **YES if** | `EXPO_PUBLIC_GOOGLE_MAPS_KEY` set in EAS env for that profile |
 | iOS? | **Not in cloud cut** | Android APK focus per runbook |

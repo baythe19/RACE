@@ -9,4 +9,3 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
 | 2026-10-31 | customer booking + cloud E2E blockers | real-test breaking fixes only | cursor agent |
-| 2026-10-30 | partner driver home + presence | active-trip card overlap fix, online tied to session | agent |

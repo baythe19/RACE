@@ -1,5 +1,7 @@
 ## Current focus
 
+**2026-10-31 (real E2E / Tier B):** QA customer `9000000005` in `upsertQaAccounts` (profile+vehicle). `npm run smoke:render` 10/10 vs Render. Partner EAS `preview` = real API (no UI mocks). `ensure:test-accounts` uses shared `qaAccounts.ts`.
+
 **2026-10-31 (ecosystem QA doc):** Added `docs/ops/ECOSYSTEM_QA_PREVIEW_PLAYBOOK.md` — architecture map, 3-tier preview (local / Render+Vercel+EAS / prod-like), cross-surface matrix, monthly regression checklist, APK+admin YES/NO table, known gaps. Pointer in `docs/MOCK_TESTING_PLAYBOOK.md`.
 
 **2026-10-31 (customer assign/accept sync):** Backend `applyCustomerBookingView` masks status + hides driver until en route; `awaitingPartnerAccept` on list/detail/tracking. Customer socket `internalStatus` + tracking poll resolve UI to `DRIVER_ASSIGNED` for “Partner accepting” copy. Backend + customer tracking files `tsc` 0 (unrelated LocationPickerModal PROVIDER_* errors pre-existing).

@@ -8,6 +8,7 @@ import {
   type CustomerBookingKind,
 } from './bookingFlowCopy';
 import { formatLocationCard, formatLocationDisplay } from './readableAddress';
+import { colors } from '../theme';
 
 export const ONGOING_UNIFIED_STATUSES = [
   'PENDING',
@@ -20,6 +21,24 @@ export const ONGOING_UNIFIED_STATUSES = [
 
 export const COMPLETED_UNIFIED_STATUSES = ['COMPLETED', 'RATED', 'CANCELLED'] as const;
 
+export function customerStatusChipTone(statusPill: string): {
+  bg: string;
+  fg: string;
+  dot?: string;
+} {
+  if (statusPill === 'Cancelled') {
+    return { bg: '#F3F4F6', fg: colors.grey, dot: colors.grey };
+  }
+  if (/finding|awaiting|confirmed ·/i.test(statusPill)) {
+    return { bg: '#FFF7ED', fg: '#C2410C', dot: '#F97316' };
+  }
+  if (statusPill === 'Completed') {
+    return { bg: '#E8F8EE', fg: colors.success, dot: colors.success };
+  }
+  return { bg: '#E8F8EE', fg: colors.success, dot: colors.success };
+}
+
+/** Legacy raw unified label — prefer `formatCustomerBookingStatus` for customer UI. */
 export function formatUnifiedStatusLabel(status: string): string {
   switch (status) {
     case 'PENDING':

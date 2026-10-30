@@ -6,7 +6,10 @@
 import { UserModel } from '../../models/src/user';
 import { VendorVehicleModel } from '../../models/src/vendorVehicle';
 import { DriverVendorMembershipModel } from '../../models/src/driverVendorMembership';
+import { VehicleModel } from '../../models/src/vehicle';
 import { hashDriverPassword } from '../../utils/src/driverPassword';
+import { computeProfileCompleted } from '../../utils/src/user';
+import { vehicleService } from './vehicle';
 
 export const QA_KEEP_MOBILES = [
   '+919000000001',
@@ -14,6 +17,10 @@ export const QA_KEEP_MOBILES = [
   '+919000000003',
   '+919000000004',
 ];
+
+/** Tier-B customer login for towing/driver E2E on Render (OTP 123456 when whitelisted). */
+export const QA_CUSTOMER_MOBILE = '+919000000005';
+const QA_CUSTOMER_VEHICLE_NO = 'OD02QA9005';
 const QA_DRIVER_PASSWORD = 'Test@123';
 
 async function upsertTestUser(mobileNumber: string, doc: Record<string, unknown>) {
@@ -190,10 +197,59 @@ export async function upsertQaAccounts(): Promise<string[]> {
     });
   }
 
+  const customerLine = await upsertQaCustomer();
+
   return [
     '9000000001 vendor',
     '9000000002 driver-FT',
     '9000000003 driver-PT',
     '9000000004 driver-VM',
+    customerLine,
   ];
+}
+
+export async function upsertQaCustomer(): Promise<string> {
+  const customer = await upsertTestUser(QA_CUSTOMER_MOBILE, {
+    mobileNumber: QA_CUSTOMER_MOBILE,
+    fullName: 'QA Customer Test',
+    role: 'customer',
+    capabilities: ['customer'],
+    isVerified: true,
+    accountStatus: 'ACTIVE',
+    email: 'qa.customer5@raceservice.com',
+    gender: 'male',
+    dateOfBirth: new Date('1990-01-01'),
+    address: {
+      line1: 'Khandagiri Square',
+      city: 'Bhubaneswar',
+      state: 'Odisha',
+      pincode: '751030',
+      country: 'India',
+    },
+    emergencyContact: {
+      name: 'Emergency QA',
+      mobileNumber: '9876543210',
+      relationship: 'Family',
+    },
+  });
+
+  customer!.isProfileCompleted = computeProfileCompleted(customer!);
+  await customer!.save();
+
+  const hasVehicle = await VehicleModel.exists({
+    customerId: customer!._id,
+    vehicleNumber: QA_CUSTOMER_VEHICLE_NO,
+  });
+  if (!hasVehicle) {
+    await vehicleService.createVehicle(customer!.id, {
+      vehicleNumber: QA_CUSTOMER_VEHICLE_NO,
+      vehicleType: 'car',
+      brand: 'Maruti',
+      model: 'Swift',
+      fuelType: 'petrol',
+      color: 'Red',
+    });
+  }
+
+  return '9000000005 customer (profile + vehicle)';
 }
