@@ -12,11 +12,12 @@ import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import {
   formatBookingDisplayId,
+  formatLiveTrackingSummary,
   formatUnifiedStatusLabel,
   isCompletedUnifiedStatus,
   isOngoingUnifiedStatus,
 } from '../../../utils/bookingDisplay';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import { formatLocationCard, formatLocationDisplay } from '../../../utils/readableAddress';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList & BookingsStackParamList, 'DriverTrack'>;
@@ -102,6 +103,13 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
             ? 'Trip completed'
             : '—';
 
+  const trackingUi = formatLiveTrackingSummary({
+    status,
+    partnerPending,
+    etaDisplay: etaForStage,
+  });
+  const pickupCard = formatLocationCard(booking?.pickup);
+  const dropCard = booking?.dropoff ? formatLocationCard(booking.dropoff) : null;
   const resolvedFare =
     trackedFare ??
     (booking?.fareBreakdown && 'totalFare' in booking.fareBreakdown
@@ -136,6 +144,9 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
   const mockDriverPoint =
     !driverLocation &&
     isCustomerMockDataEnabled() &&
+    (status === 'DRIVER_EN_ROUTE' ||
+      status === 'DRIVER_ARRIVED' ||
+      status === 'IN_PROGRESS') &&
     booking?.pickup?.latitude != null &&
     booking?.pickup?.longitude != null
       ? {
@@ -165,11 +176,19 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
       isLive={isLive}
       steps={TRACK_STEPS}
       activeStep={activeStep}
-      etaLabel={etaForStage}
+      etaLabel={trackingUi.cardValue}
+      summaryLabel={trackingUi.cardLabel}
+      summaryChipLabel={trackingUi.chipLabel}
       serviceLabel="Driver hire"
-      pickupLabel={formatLocationDisplay(booking?.pickup) || 'Pickup'}
+      pickupLabel={
+        dropCard
+          ? `${pickupCard.primary}${pickupCard.secondary ? ` · ${pickupCard.secondary}` : ''}`
+          : formatLocationDisplay(booking?.pickup) || 'Pickup'
+      }
       dropLabel={
-        booking?.dropoff ? formatLocationDisplay(booking.dropoff) : undefined
+        dropCard
+          ? `${dropCard.primary}${dropCard.secondary ? ` · ${dropCard.secondary}` : ''}`
+          : undefined
       }
       driverName={displayDriverName}
       driverPhone={phone}

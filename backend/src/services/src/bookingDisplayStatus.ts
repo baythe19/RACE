@@ -24,3 +24,32 @@ export function mapPublicBookingStatusForHistory(
 ): UnifiedBookingStatus | string {
   return mapPublicBookingStatus(status);
 }
+
+/** Partner allotted but has not accepted yet — safe to expose without PII. */
+export function isAwaitingPartnerAccept(internalStatus: string): boolean {
+  return internalStatus === 'DRIVER_ASSIGNED';
+}
+
+/** Customer API/list/tracking: mask status, hide driver until en route, flag accept window. */
+export function applyCustomerBookingView<
+  T extends {
+    status: string;
+    driver?: unknown;
+    driverId?: string;
+    statusHistory?: Array<{ status: string; timestamp: string; note?: string }>;
+  },
+>(dto: T, internalStatus: string): T & { awaitingPartnerAccept: boolean } {
+  const awaitingPartnerAccept = isAwaitingPartnerAccept(internalStatus);
+  const driverVisible = isDriverVisibleToCustomer(internalStatus);
+  return {
+    ...dto,
+    status: mapPublicBookingStatus(internalStatus),
+    awaitingPartnerAccept,
+    driver: driverVisible ? dto.driver : undefined,
+    driverId: driverVisible ? dto.driverId : undefined,
+    statusHistory: dto.statusHistory?.map((entry) => ({
+      ...entry,
+      status: mapPublicBookingStatus(entry.status),
+    })),
+  };
+}

@@ -48,25 +48,26 @@ export function TowingFareBreakdownCard({
   accentColor = '#F59E0B',
   compact = false,
 }: TowingFareBreakdownCardProps) {
-  const padding = compact ? 14 : 16;
+  const padding = compact ? 12 : 16;
+  const gap = compact ? 6 : 10;
 
   return (
     <View
       style={{
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: accentColor,
-        backgroundColor: '#FEF3C7',
+        borderColor: colors.border,
+        backgroundColor: colors.background,
         padding,
-        gap: compact ? 8 : 10,
+        gap,
       }}>
       <Text
         style={{
-          fontSize: compact ? 14 : 16,
-          fontWeight: typography.weights.bold,
+          fontSize: compact ? 13 : 15,
+          fontWeight: typography.weights.semibold,
           color: colors.dark,
         }}>
-        Fare Breakdown
+        Fare
       </Text>
 
       {breakdown.isFallback ? (
@@ -96,15 +97,30 @@ export function TowingFareBreakdownCard({
         />
       ) : null}
 
-      <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(245, 158, 11, 0.35)', paddingTop: 10, gap: 8 }}>
-        <FareLine label="Total" value={formatRupee(breakdown.totalFare)} bold />
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: compact ? 8 : 10, gap: gap }}>
+        <FareLine label="Total" value={formatRupee(breakdown.totalFare)} bold fontSize={compact ? 13 : 14} />
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#FFFBEB',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: compact ? 6 : 8,
+          }}>
+          <Text style={{ fontSize: compact ? 12 : 13, fontWeight: typography.weights.semibold, color: colors.dark }}>
+            Pay now · 30%
+          </Text>
+          <Text style={{ fontSize: compact ? 14 : 15, fontWeight: typography.weights.bold, color: accentColor }}>
+            {formatRupee(breakdown.advanceAmount)}
+          </Text>
+        </View>
         <FareLine
-          label="Pay now (30%)"
-          value={formatRupee(breakdown.advanceAmount)}
-          bold
-          accent={accentColor}
+          label="Pay later · 70%"
+          value={formatRupee(breakdown.remainingAmount)}
+          fontSize={compact ? 12 : 14}
         />
-        <FareLine label="Pay later (70%)" value={formatRupee(breakdown.remainingAmount)} />
       </View>
     </View>
   );

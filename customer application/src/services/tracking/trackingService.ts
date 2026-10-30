@@ -18,6 +18,7 @@ import {
   alertTripCompleted,
   requestCustomerNotificationPermissions,
 } from '../notificationService';
+import { resolveCustomerTrackStatus } from '../../utils/customerTrackStatus';
 
 export interface TrackingUpdate {
   bookingId: string;
@@ -45,6 +46,7 @@ export interface TrackingUpdate {
   paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE';
   paymentConfirmedByCustomer?: boolean;
   fare?: number;
+  awaitingPartnerAccept?: boolean;
 }
 
 type TrackingListener = (update: TrackingUpdate) => void;
@@ -59,7 +61,18 @@ class TrackingService {
 
   private pushUpdate(bookingId: string, update: TrackingUpdate): void {
     const previous = this.latestUpdates.get(bookingId);
-    const latest = { ...previous, ...update };
+    const normalizedStatus =
+      update.status != null
+        ? resolveCustomerTrackStatus({
+            status: update.status,
+            awaitingPartnerAccept: update.awaitingPartnerAccept ?? previous?.awaitingPartnerAccept,
+          })
+        : undefined;
+    const latest = {
+      ...previous,
+      ...update,
+      ...(normalizedStatus ? { status: normalizedStatus } : {}),
+    };
     this.latestUpdates.set(bookingId, latest);
 
     // Trigger outer-app lockscreen notifications on status transitions
@@ -102,9 +115,14 @@ class TrackingService {
 
     cleanups.push(onBookingStatus((data) => {
       if (data.bookingId !== bookingId) return;
+      const status = resolveCustomerTrackStatus({
+        status: data.status,
+        internalStatus: data.internalStatus,
+        driverAccepted: data.driverAccepted,
+      });
       this.pushUpdate(bookingId, {
         bookingId,
-        status: data.status,
+        status,
         ...(data.arrivedAtDropoffAt ? { arrivedAtDropoffAt: data.arrivedAtDropoffAt } : {}),
         ...(typeof data.fare === 'number' ? { fare: data.fare } : {}),
         ...(data.paymentConfirmed != null
@@ -139,6 +157,7 @@ class TrackingService {
       let pollInFlight = false;
       const applyTyped = (result: {
         status: string;
+        awaitingPartnerAccept?: boolean;
         driver?: TrackingUpdate['driver'];
         driverLocation?: TrackingUpdate['driverLocation'];
         driverUpiId?: string;
@@ -150,9 +169,14 @@ class TrackingService {
         paymentConfirmedByCustomer?: boolean;
         fare?: number;
       }) => {
+        const status = resolveCustomerTrackStatus({
+          status: result.status,
+          awaitingPartnerAccept: result.awaitingPartnerAccept,
+        });
         this.pushUpdate(bookingId, {
           bookingId,
-          status: result.status,
+          status,
+          awaitingPartnerAccept: result.awaitingPartnerAccept,
           driver: result.driver,
           driverLocation: result.driverLocation,
           driverUpiId: result.driverUpiId,

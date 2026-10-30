@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
+import { IndianRupee, Route } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
 import RideLocationBoard, { type RideSuggestion } from '../../../components/booking/RideLocationBoard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
-import TowingServiceModeBanner from '../../../components/booking/TowingServiceModeBanner';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import { useTowingBooking } from '../../../context/TowingBookingContext';
 import { estimateTowingFare } from '../../../services/bookings/fareApi';
@@ -18,25 +18,26 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { findServiceableCity } from '../../../config/serviceableAreas';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
-import { formatReadableLocation } from '../../../utils/readableAddress';
+import { formatBookingStopAddress } from '../../../utils/readableAddress';
 import {
   distanceKm as haversineKm,
+  isSameSpot,
   locationFromPlaceId,
   searchPlaceSuggestions,
   type PlaceSuggestion,
 } from '../../../utils/googlePlaces';
+import { getAppDialog } from '../../../utils/alertBus';
 import {
   TOWING_DEMO_DROP,
   TOWING_DEMO_PICKUP,
   isTowingWalkthroughEnabled,
 } from '../../../utils/towingBookingWalkthrough';
 import { formatRupee } from '../../../utils/towingPricing';
-import { colors, typography } from '../../../theme';
+import { colors, shadows, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingPickupDrop'>;
 
-const TOWING_ACCENT = '#F59E0B';
 const PICKUP_GREEN = '#10B981';
 const PLACEHOLDER = 'Select location';
 
@@ -77,10 +78,16 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
       setSearchingPlaces(false);
       return;
     }
+    const bias =
+      activeStop === 'drop' && pickupLat != null && pickupLng != null
+        ? { latitude: pickupLat, longitude: pickupLng }
+        : userLocation?.latitude != null && userLocation.longitude != null
+          ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+          : null;
     let cancelled = false;
     setSearchingPlaces(true);
     const timer = setTimeout(() => {
-      void searchPlaceSuggestions(text).then(hits => {
+      void searchPlaceSuggestions(text, bias).then(hits => {
         if (cancelled) return;
         setPlaceHits(hits);
         setSearchingPlaces(false);
@@ -90,7 +97,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [activeStop, pickupLat, pickupLng, query, userLocation]);
 
   // Ride-hailing pattern: pickup defaults to the user's current location.
   useEffect(() => {
@@ -250,6 +257,23 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         : null;
 
   const applyStop = (target: 'pickup' | 'drop', location: LocationResult) => {
+    const counterpart =
+      target === 'pickup'
+        ? dropLat != null && dropLng != null
+          ? { latitude: dropLat, longitude: dropLng }
+          : null
+        : pickupLat != null && pickupLng != null
+          ? { latitude: pickupLat, longitude: pickupLng }
+          : null;
+    if (isSameSpot(counterpart, location.latitude, location.longitude)) {
+      getAppDialog().showDialog({
+        tone: 'warning',
+        title: 'Same spot',
+        message: 'Pickup and drop need to be two different places.',
+        primaryLabel: 'OK',
+      });
+      return;
+    }
     if (!assertServiceableBookingLocation(location.latitude, location.longitude)) return;
     const resolved = applyLocation(location);
     if (target === 'pickup') {
@@ -257,14 +281,32 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
       setPickupLabel(resolved.displayLabel);
       setPickupLat(location.latitude);
       setPickupLng(location.longitude);
+      if (!dropFilled) setActiveStop('drop');
     } else {
       setDrop(resolved.address);
       setDropLabel(resolved.displayLabel);
       setDropLat(location.latitude);
       setDropLng(location.longitude);
+      if (!pickupFilled) setActiveStop('pickup');
     }
     setQuery('');
     setPlaceHits([]);
+  };
+
+  const clearActiveStop = () => {
+    setQuery('');
+    setPlaceHits([]);
+    if (activeStop === 'pickup') {
+      setPickup(PLACEHOLDER);
+      setPickupLabel('');
+      setPickupLat(undefined);
+      setPickupLng(undefined);
+      return;
+    }
+    setDrop(PLACEHOLDER);
+    setDropLabel('');
+    setDropLat(undefined);
+    setDropLng(undefined);
   };
 
   const suggestions: RideSuggestion[] = useMemo(() => {
@@ -273,6 +315,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         id: hit.placeId,
         title: hit.title,
         subtitle: hit.subtitle,
+        distanceLabel: hit.distanceLabel,
         kind: 'search' as const,
         onPress: () => {
           void locationFromPlaceId(hit.placeId, hit.title).then(location => {
@@ -290,7 +333,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           id: loc.id,
           title: loc.label,
           subtitle: loc.address,
-          distanceLabel: km != null ? `${km} km` : undefined,
+          distanceLabel: km == null ? undefined : km === 0 ? 'Nearby' : `${km} km`,
           kind: 'saved' as const,
           savedType: loc.type,
           onPress: () =>
@@ -318,11 +361,11 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
       onContinue={() => {
         updateBooking({
           pickup,
-          pickupLabel: pickupLabel || formatReadableLocation(pickup),
+          pickupLabel: formatBookingStopAddress(pickup) || pickupLabel,
           pickupLat,
           pickupLng,
           drop,
-          dropLabel: dropLabel || formatReadableLocation(drop),
+          dropLabel: formatBookingStopAddress(drop) || dropLabel,
           dropLat,
           dropLng,
           distanceKm: distanceKm ?? undefined,
@@ -330,29 +373,127 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         navigation.navigate('TowingReview');
       }}>
       <WizardStepFade>
-      <TowingServiceModeBanner mode={booking.serviceMode} t={t} />
       <RideLocationBoard
         px={t.px}
         activeId={activeStop}
         query={query}
         searching={searchingPlaces}
         suggestions={suggestions}
+        suppressIdleHint={pickupFilled && dropFilled}
         onActivate={id => {
           setActiveStop(id as 'pickup' | 'drop');
           setQuery('');
         }}
         onQueryChange={setQuery}
-        onClearActive={() => setQuery('')}
+        onClearActive={clearActiveStop}
         onSelectOnMap={() => {
           setPickerMode('map');
           if (activeStop === 'pickup') setShowPickupPicker(true);
           else setShowDropPicker(true);
         }}
+        belowMap={
+          pickupLat && pickupLng && dropLat && dropLng ? (
+            <View
+              style={[
+                {
+                  borderRadius: t.px(16),
+                  borderWidth: 1,
+                  borderColor: '#E7E5E4',
+                  backgroundColor: colors.background,
+                  paddingHorizontal: t.px(14),
+                  paddingVertical: t.px(12),
+                },
+                shadows.card,
+              ]}>
+              {isLoadingFare ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(10) }}>
+                  <ActivityIndicator color={colors.grey} size="small" />
+                  <Text style={{ fontSize: t.px(13), color: colors.grey }}>
+                    Calculating route & fare…
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+                  {distanceKm != null ? (
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(6) }}>
+                        <Route size={t.px(15)} color={colors.grey} strokeWidth={2.2} />
+                        <Text
+                          style={{
+                            fontSize: t.px(11),
+                            color: colors.grey,
+                            fontWeight: typography.weights.medium,
+                          }}>
+                          Distance
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: t.px(18),
+                          fontWeight: typography.weights.bold,
+                          color: colors.dark,
+                          marginTop: t.px(4),
+                        }}>
+                        {distanceKm} km
+                      </Text>
+                    </View>
+                  ) : null}
+                  {distanceKm != null && farePreview != null ? (
+                    <View
+                      style={{
+                        width: 1,
+                        backgroundColor: '#F3F4F6',
+                        marginHorizontal: t.px(14),
+                      }}
+                    />
+                  ) : null}
+                  {farePreview != null ? (
+                    <View
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        alignItems: distanceKm != null ? 'flex-end' : 'flex-start',
+                      }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(6) }}>
+                        <IndianRupee size={t.px(14)} color={colors.grey} strokeWidth={2.2} />
+                        <Text
+                          style={{
+                            fontSize: t.px(11),
+                            color: colors.grey,
+                            fontWeight: typography.weights.medium,
+                          }}>
+                          Est. fare
+                        </Text>
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: t.px(18),
+                          fontWeight: typography.weights.bold,
+                          color: colors.dark,
+                          marginTop: t.px(4),
+                        }}>
+                        {formatRupee(farePreview)}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: t.px(10),
+                          color: colors.grey,
+                          marginTop: t.px(2),
+                        }}>
+                        Before taxes & fees
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
+            </View>
+          ) : null
+        }
         stops={[
           {
             id: 'pickup',
             label: 'Pickup',
-            value: pickupFilled ? pickupLabel || formatReadableLocation(pickup) : '',
+            value: pickupFilled ? formatBookingStopAddress(pickup) : '',
             placeholder: 'Pickup location',
             filled: pickupFilled,
             dot: 'pickup',
@@ -360,7 +501,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           {
             id: 'drop',
             label: 'Drop',
-            value: dropFilled ? dropLabel || formatReadableLocation(drop) : '',
+            value: dropFilled ? formatBookingStopAddress(drop) : '',
             placeholder: 'Drop location',
             filled: dropFilled,
             dot: 'drop',
@@ -368,50 +509,6 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         ]}
       />
 
-      {pickupLat && pickupLng && dropLat && dropLng ? (
-        <View
-          style={{
-            marginTop: t.px(14),
-            borderRadius: t.cardRadius,
-            borderWidth: 1,
-            borderColor: TOWING_ACCENT,
-            backgroundColor: '#FEF3C7',
-            padding: t.px(14),
-            flexDirection: 'row',
-            alignItems: 'center',
-          }}>
-          {isLoadingFare ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(8) }}>
-              <ActivityIndicator color={TOWING_ACCENT} size="small" />
-              <Text style={{ fontSize: t.body, color: colors.grey }}>
-                Calculating route distance...
-              </Text>
-            </View>
-          ) : (
-            <View style={{ flex: 1 }}>
-              {distanceKm != null ? (
-                <Text style={{ fontSize: t.body, color: colors.dark }}>
-                  Distance:{' '}
-                  <Text style={{ fontWeight: typography.weights.bold }}>{distanceKm} km</Text>
-                </Text>
-              ) : null}
-              {farePreview != null ? (
-                <Text
-                  style={{
-                    fontSize: t.body,
-                    color: colors.dark,
-                    marginTop: distanceKm != null ? t.px(3) : 0,
-                  }}>
-                  Estimated fare:{' '}
-                  <Text style={{ fontWeight: typography.weights.bold, color: TOWING_ACCENT }}>
-                    {formatRupee(farePreview)}
-                  </Text>
-                </Text>
-              ) : null}
-            </View>
-          )}
-        </View>
-      ) : null}
       </WizardStepFade>
 
       <LocationPickerModal
@@ -427,12 +524,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         }
         onClose={() => setShowPickupPicker(false)}
         onLocationSelected={location => {
-          if (!assertServiceableBookingLocation(location.latitude, location.longitude)) return;
-          const resolved = resolveLocationSelection(location);
-          setPickup(resolved.address);
-          setPickupLabel(resolved.displayLabel);
-          setPickupLat(location.latitude);
-          setPickupLng(location.longitude);
+          applyStop('pickup', location);
         }}
       />
 
@@ -447,12 +539,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         }
         onClose={() => setShowDropPicker(false)}
         onLocationSelected={location => {
-          if (!assertServiceableBookingLocation(location.latitude, location.longitude)) return;
-          const resolved = resolveLocationSelection(location);
-          setDrop(resolved.address);
-          setDropLabel(resolved.displayLabel);
-          setDropLat(location.latitude);
-          setDropLng(location.longitude);
+          applyStop('drop', location);
         }}
       />
     </TowingBookingLayout>

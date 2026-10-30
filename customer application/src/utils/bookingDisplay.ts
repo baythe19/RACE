@@ -1,7 +1,7 @@
 import type { Booking } from '../types/booking';
 import type { ActiveBooking, BookingHistoryItem } from '../types/models';
 import type { ServiceBookingType } from '../types/serviceBooking';
-import { formatLocationDisplay } from './readableAddress';
+import { formatLocationCard, formatLocationDisplay } from './readableAddress';
 
 export const ONGOING_UNIFIED_STATUSES = [
   'PENDING',
@@ -21,7 +21,7 @@ export function formatUnifiedStatusLabel(status: string): string {
     case 'CONFIRMED':
       return 'Confirmed';
     case 'DRIVER_ASSIGNED':
-      return 'Driver Assigned';
+      return 'Partner accepting';
     case 'DRIVER_EN_ROUTE':
       return 'On the Way';
     case 'DRIVER_ARRIVED':
@@ -40,6 +40,65 @@ export function formatUnifiedStatusLabel(status: string): string {
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
   }
+}
+
+/**
+ * Live Tracking bottom sheet — avoid "Estimated arrival" + "Confirmed" before
+ * any partner has accepted (backend CONFIRMED = booking placed, not driver OK).
+ */
+export function formatLiveTrackingSummary(input: {
+  status: string;
+  partnerPending: boolean;
+  etaDisplay: string;
+}): { cardLabel: string; cardValue: string; chipLabel: string } {
+  const { status, partnerPending, etaDisplay } = input;
+  const awaitingPartner =
+    partnerPending &&
+    (status === 'PENDING' || status === 'CONFIRMED' || status === 'DRIVER_ASSIGNED');
+
+  if (awaitingPartner) {
+    if (status === 'DRIVER_ASSIGNED') {
+      return {
+        cardLabel: 'Partner',
+        cardValue: 'Assigned — waiting to accept',
+        chipLabel: 'Awaiting accept',
+      };
+    }
+    if (status === 'PENDING') {
+      return {
+        cardLabel: 'Status',
+        cardValue: 'Looking for a nearby partner',
+        chipLabel: 'Searching',
+      };
+    }
+    return {
+      cardLabel: 'Status',
+      cardValue: 'Sent to partners — not accepted yet',
+      chipLabel: 'Awaiting partner',
+    };
+  }
+
+  if (status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED' || status === 'IN_PROGRESS') {
+    return {
+      cardLabel: 'Estimated arrival',
+      cardValue: etaDisplay,
+      chipLabel: formatUnifiedStatusLabel(status),
+    };
+  }
+
+  if (status === 'COMPLETED' || status === 'RATED') {
+    return {
+      cardLabel: 'Trip',
+      cardValue: etaDisplay,
+      chipLabel: 'Completed',
+    };
+  }
+
+  return {
+    cardLabel: 'Status',
+    cardValue: etaDisplay,
+    chipLabel: formatUnifiedStatusLabel(status),
+  };
 }
 
 export function isOngoingUnifiedStatus(status?: string): boolean {
@@ -84,6 +143,15 @@ export function formatBookingDisplayId(bookingNumber: string): string {
 }
 
 export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
+  const pickup = formatLocationCard(booking.pickup);
+  const dropLine = formatLocationCard(booking.dropoff);
+  const pickupFlat = formatLocationDisplay(booking.pickup);
+  const dropFlat = formatLocationDisplay(booking.dropoff);
+  const onSiteOnly =
+    dropFlat === '—' ||
+    dropFlat === 'On-site help' ||
+    (dropFlat === pickupFlat && !/towing/i.test(booking.serviceLabel));
+
   return {
     id: booking.id,
     displayId: formatBookingDisplayId(booking.bookingNumber),
@@ -91,16 +159,8 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
     status: booking.unifiedStatus
       ? formatUnifiedStatusLabel(booking.unifiedStatus)
       : formatUnifiedStatusLabel(booking.status),
-    pickup: formatLocationDisplay(booking.pickup),
-    drop: (() => {
-      const dropLine = formatLocationDisplay(booking.dropoff);
-      const pickupLine = formatLocationDisplay(booking.pickup);
-      if (dropLine === '—') return 'On-site help';
-      if (dropLine === pickupLine && !/towing/i.test(booking.serviceLabel)) {
-        return 'On-site help';
-      }
-      return dropLine;
-    })(),
+    pickup,
+    drop: onSiteOnly ? null : dropLine,
     eta: booking.etaMinutes != null ? `${booking.etaMinutes} min` : 'Updating',
     driver: booking.driver
       ? {

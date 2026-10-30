@@ -6,30 +6,29 @@ import type { TowingServiceModeId } from '../../types/towingBooking';
 import type { BookingTheme } from './bookingTheme';
 import { colors, typography } from '../../theme';
 
+const CARD_OUTLINE = '#E7E5E4';
+
 const MODE_META: Record<
   TowingServiceModeId,
-  { title: string; hint: string; Icon: typeof Zap; accent: string; bg: string }
+  { title: string; hint: string; Icon: typeof Zap; accent: string }
 > = {
   instant: {
     title: 'Instant towing',
     hint: 'Normal dispatch · standard ETA',
     Icon: Zap,
     accent: colors.primary,
-    bg: colors.goldLight,
   },
   scheduled: {
     title: 'Scheduled towing',
     hint: 'Book for later · date on step 1',
     Icon: Calendar,
     accent: '#0284C7',
-    bg: '#EFF6FF',
   },
   emergency: {
     title: 'Emergency towing',
     hint: 'Priority queue · accident / breakdown',
     Icon: AlertTriangle,
     accent: colors.error,
-    bg: '#FEE2E2',
   },
 };
 
@@ -49,10 +48,10 @@ export default function TowingServiceModeBanner({ mode, t }: Props) {
         flexDirection: 'row',
         alignItems: 'center',
         gap: t.px(10),
-        borderRadius: t.px(12),
+        borderRadius: t.px(14),
         borderWidth: 1,
-        borderColor: meta.accent,
-        backgroundColor: meta.bg,
+        borderColor: CARD_OUTLINE,
+        backgroundColor: colors.background,
         paddingHorizontal: t.px(12),
         paddingVertical: t.px(10),
         marginBottom: t.px(8),
@@ -80,6 +79,25 @@ export default function TowingServiceModeBanner({ mode, t }: Props) {
       </View>
     </View>
   );
+}
+
+/** Short label for wizard header tag (right of title). */
+export function getTowingServiceModeHeaderTag(mode: TowingServiceModeId): string {
+  if (mode === 'scheduled') return 'Scheduled';
+  if (mode === 'emergency') return 'Emergency';
+  return 'Instant';
+}
+
+export type TowingHeaderTagVariant = 'instant' | 'scheduled' | 'emergency';
+
+export function getTowingServiceModeHeaderTagVariant(mode: TowingServiceModeId): TowingHeaderTagVariant {
+  if (mode === 'scheduled') return 'scheduled';
+  if (mode === 'emergency') return 'emergency';
+  return 'instant';
+}
+
+export function getTowingServiceModeHeaderIcon(mode: TowingServiceModeId): typeof Zap {
+  return (MODE_META[mode] ?? MODE_META.instant).Icon;
 }
 
 export function towingServiceTimingLabel(

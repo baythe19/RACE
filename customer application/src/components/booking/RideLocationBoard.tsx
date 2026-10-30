@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Pressable, Text, TextInput, View } from 'react-native';
 import { Briefcase, Clock, Heart, Home, Map as MapIcon, MapPin } from 'lucide-react-native';
 
-import { colors, typography } from '../../theme';
+import { colors, shadows, typography } from '../../theme';
 
 export type RideStopId = string;
 
@@ -37,6 +37,10 @@ type Props = {
   onQueryChange: (text: string) => void;
   onClearActive?: () => void;
   onSelectOnMap: () => void;
+  /** Rendered directly under “Select on map” (e.g. distance / fare). */
+  belowMap?: ReactNode;
+  /** Hide idle “Search a place…” when route is already complete. */
+  suppressIdleHint?: boolean;
 };
 
 const PICKUP = '#16A34A';
@@ -54,45 +58,69 @@ export default function RideLocationBoard({
   onQueryChange,
   onClearActive,
   onSelectOnMap,
+  belowMap,
+  suppressIdleHint = false,
 }: Props) {
   const fade = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    fade.setValue(0.4);
+    fade.setValue(0.55);
     Animated.timing(fade, {
       toValue: 1,
-      duration: 220,
+      duration: 180,
       useNativeDriver: true,
     }).start();
-  }, [activeId, suggestions.length, fade]);
+  }, [activeId, fade]);
 
   return (
     <View>
       <View
-        style={{
-          borderRadius: px(16),
-          borderWidth: 1,
-          borderColor: '#E5E7EB',
-          backgroundColor: colors.background,
-          paddingHorizontal: px(12),
-          paddingVertical: px(6),
-        }}>
+        style={[
+          {
+            borderRadius: px(16),
+            borderWidth: 1,
+            borderColor: '#E7E5E4',
+            backgroundColor: colors.background,
+            paddingHorizontal: px(12),
+            paddingVertical: px(4),
+          },
+          shadows.card,
+        ]}>
         {stops.map((stop, index) => {
           const active = stop.id === activeId;
           const color = stop.dot === 'pickup' ? PICKUP : DROP;
           return (
-            <View key={stop.id}>
-              {index > 0 ? (
-                <View style={{ marginLeft: px(11), height: px(10), borderLeftWidth: 1.5, borderStyle: 'dashed', borderColor: '#D1D5DB' }} />
-              ) : null}
-              <Pressable
-                onPress={() => onActivate(stop.id)}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  minHeight: px(52),
-                  gap: px(10),
-                }}>
+            <Pressable
+              key={stop.id}
+              onPress={() => onActivate(stop.id)}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: active ? 'center' : stop.filled ? 'flex-start' : 'center',
+                minHeight: px(56),
+                gap: px(10),
+                borderRadius: px(12),
+                backgroundColor: active ? '#F8FAFC' : pressed ? '#FAFAFA' : 'transparent',
+                paddingHorizontal: px(4),
+                paddingVertical: stop.filled && !active ? px(6) : 0,
+              })}>
+              <View style={{ width: px(18), alignItems: 'center', justifyContent: 'center' }}>
+                {index > 0 ? (
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: px(-16),
+                      height: px(16),
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}>
+                    {[0, 1, 2].map(dot => (
+                      <View
+                        key={dot}
+                        style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: '#D6D3D1' }}
+                      />
+                    ))}
+                  </View>
+                ) : null}
                 <View
                   style={{
                     width: px(12),
@@ -103,40 +131,55 @@ export default function RideLocationBoard({
                     borderColor: stop.dot === 'pickup' ? '#DCFCE7' : '#FFE4E6',
                   }}
                 />
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  {active ? (
-                    <TextInput
-                      value={query}
-                      onChangeText={onQueryChange}
-                      placeholder={stop.filled ? stop.value : stop.placeholder}
-                      placeholderTextColor={stop.filled ? colors.dark : colors.grey}
-                      autoFocus
-                      style={{
-                        fontSize: px(15),
-                        fontWeight: typography.weights.semibold,
-                        color: colors.dark,
-                        paddingVertical: px(4),
-                      }}
-                    />
-                  ) : (
-                    <Text
-                      numberOfLines={1}
-                      style={{
-                        fontSize: px(15),
-                        fontWeight: stop.filled ? typography.weights.semibold : typography.weights.regular,
-                        color: stop.filled ? colors.dark : colors.grey,
-                      }}>
-                      {stop.filled ? stop.value : stop.placeholder}
-                    </Text>
-                  )}
-                </View>
-                {active && (query.length > 0 || stop.filled) && onClearActive ? (
-                  <Pressable onPress={onClearActive} hitSlop={8}>
-                    <Text style={{ fontSize: px(16), color: colors.grey }}>×</Text>
-                  </Pressable>
-                ) : null}
-              </Pressable>
-            </View>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                {active ? (
+                  <TextInput
+                    key={stop.id}
+                    value={query}
+                    onChangeText={onQueryChange}
+                    placeholder={stop.placeholder}
+                    placeholderTextColor="#A8A29E"
+                    autoFocus
+                    autoCorrect={false}
+                    returnKeyType="search"
+                    blurOnSubmit={false}
+                    style={{
+                      fontSize: px(15),
+                      fontWeight: typography.weights.semibold,
+                      color: colors.dark,
+                      paddingVertical: px(4),
+                    }}
+                  />
+                ) : (
+                  <Text
+                    numberOfLines={3}
+                    style={{
+                      fontSize: px(14),
+                      lineHeight: px(19),
+                      fontWeight: stop.filled ? typography.weights.semibold : typography.weights.regular,
+                      color: stop.filled ? colors.dark : '#A8A29E',
+                    }}>
+                    {stop.filled ? stop.value : stop.placeholder}
+                  </Text>
+                )}
+              </View>
+              {active && (query.length > 0 || stop.filled) && onClearActive ? (
+                <Pressable
+                  onPress={onClearActive}
+                  hitSlop={8}
+                  style={{
+                    width: px(22),
+                    height: px(22),
+                    borderRadius: px(11),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#F5F5F4',
+                  }}>
+                  <Text style={{ fontSize: px(14), color: colors.grey, lineHeight: px(16) }}>×</Text>
+                </Pressable>
+              ) : null}
+            </Pressable>
           );
         })}
       </View>
@@ -160,15 +203,31 @@ export default function RideLocationBoard({
         <Text style={{ fontSize: px(13), fontWeight: typography.weights.semibold, color: colors.dark }}>
           Select on map
         </Text>
+        {searching ? <ActivityIndicator size="small" color={colors.grey} /> : null}
       </Pressable>
 
-      <Animated.View style={{ opacity: fade, marginTop: px(8) }}>
-        {searching ? (
-          <ActivityIndicator style={{ marginTop: px(16) }} color={colors.primary} />
-        ) : suggestions.length === 0 && query.trim().length >= 2 ? (
+      {belowMap ? <View style={{ marginTop: px(12) }}>{belowMap}</View> : null}
+
+      <Animated.View style={{ opacity: fade, marginTop: px(belowMap ? 10 : 8) }}>
+        {suggestions.length === 0 && query.trim().length >= 2 && !searching ? (
           <Text style={{ marginTop: px(16), fontSize: px(13), color: colors.grey, textAlign: 'center' }}>
             {emptyHint || 'No matching places. Try the map.'}
           </Text>
+        ) : suggestions.length === 0 ? (
+          suppressIdleHint ? null : (
+          <View style={{ alignItems: 'center', paddingTop: px(28), paddingBottom: px(8) }}>
+            <MapPin size={px(22)} color="#A8A29E" strokeWidth={1.8} />
+            <Text
+              style={{
+                marginTop: px(8),
+                fontSize: px(13),
+                color: colors.grey,
+                textAlign: 'center',
+              }}>
+              Search a place, or select it on the map
+            </Text>
+          </View>
+          )
         ) : (
           suggestions.map(item => {
             const Icon =

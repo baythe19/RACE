@@ -82,6 +82,7 @@ export interface DriverBookingResponseDto {
   remainingPaid: boolean;
   paymentStatus: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   vendorId?: string;
   driverId?: string;
   driver?: {
@@ -116,6 +117,7 @@ export interface DriverBookingResponseDto {
 export interface DriverTrackingResponseDto {
   bookingId: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   statusHistory: Array<{ status: string; timestamp: string }>;
   driver?: {
     id: string;

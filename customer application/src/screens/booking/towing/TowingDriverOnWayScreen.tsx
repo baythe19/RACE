@@ -64,6 +64,7 @@ export default function TowingDriverOnWayScreen({ navigation, route }: Props) {
           <LiveTripMap
             borderRadius={t.px(16)}
             style={{ flex: 1 }}
+            tripStatus={booking?.unifiedStatus ?? status}
             pickup={
               booking?.pickup?.latitude != null && booking?.pickup?.longitude != null
                 ? {

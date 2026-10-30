@@ -4,6 +4,7 @@ import type { Booking, BookingStatus, SubmitRatingRequest } from '../../types/bo
 import type { CombinedBookingListItem, ServiceBooking, ServiceBookingType } from '../../types/serviceBooking';
 import { apiClient } from '../api/apiClient';
 import { formatReadableAddress } from '../../utils/readableAddress';
+import { customerUnifiedStatusFromApi } from '../../utils/customerTrackStatus';
 import {
   getDriverBooking,
   getDriverBookingTracking,
@@ -83,12 +84,13 @@ function mapServiceBookingToBooking(
   serviceLabel?: string,
 ): Booking {
   const resolvedLabel = serviceLabel?.trim() || resolveServiceLabel(item, bookingType);
-  const status = mapUnifiedStatus(item.status);
+  const unifiedStatus = customerUnifiedStatusFromApi(item);
+  const status = mapUnifiedStatus(unifiedStatus);
   return {
     id: item.id,
     bookingNumber: item.bookingNumber,
     bookingType,
-    unifiedStatus: item.status,
+    unifiedStatus,
     categoryId: bookingType,
     serviceId: bookingType,
     serviceLabel: resolvedLabel,

@@ -161,6 +161,7 @@ export default function BookingsScreen() {
   return (
     <AppScreenLayout
       backgroundColor={colors.pageBg}
+      horizontalPadding={px(14)}
       refreshing={isRefetching}
       onRefresh={() => {
         void refetch();

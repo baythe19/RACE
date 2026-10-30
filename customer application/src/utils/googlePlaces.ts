@@ -158,9 +158,21 @@ export interface PlaceSuggestion {
   placeId: string;
   title: string;
   subtitle: string;
+  distanceLabel?: string;
 }
 
-export async function searchPlaceSuggestions(input: string): Promise<PlaceSuggestion[]> {
+function formatMeters(meters: number): string {
+  if (!Number.isFinite(meters) || meters < 0) return '';
+  if (meters < 950) return `${Math.max(50, Math.round(meters / 50) * 50)} m`;
+  const km = meters / 1000;
+  return km < 10 ? `${km.toFixed(1)} km` : `${Math.round(km)} km`;
+}
+
+/** Local-first autocomplete. `origin` ranks nearby places and adds straight-line distance. */
+export async function searchPlaceSuggestions(
+  input: string,
+  origin?: { latitude: number; longitude: number } | null,
+): Promise<PlaceSuggestion[]> {
   const key = getGoogleMapsApiKey();
   const query = input.trim();
   if (!key || query.length < 2) return [];
@@ -171,6 +183,11 @@ export async function searchPlaceSuggestions(input: string): Promise<PlaceSugges
     components: 'country:in',
     language: 'en',
   });
+  if (origin) {
+    params.set('origin', `${origin.latitude},${origin.longitude}`);
+    params.set('location', `${origin.latitude},${origin.longitude}`);
+    params.set('radius', '40000');
+  }
 
   try {
     const response = await fetch(
@@ -180,6 +197,7 @@ export async function searchPlaceSuggestions(input: string): Promise<PlaceSugges
       predictions?: Array<{
         place_id: string;
         description: string;
+        distance_meters?: number;
         structured_formatting?: { main_text?: string; secondary_text?: string };
       }>;
     };
@@ -187,6 +205,8 @@ export async function searchPlaceSuggestions(input: string): Promise<PlaceSugges
       placeId: item.place_id,
       title: item.structured_formatting?.main_text || item.description,
       subtitle: item.structured_formatting?.secondary_text || '',
+      distanceLabel:
+        typeof item.distance_meters === 'number' ? formatMeters(item.distance_meters) : undefined,
     }));
   } catch {
     return [];
@@ -230,4 +250,21 @@ export function distanceKm(
   const km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   if (!Number.isFinite(km)) return null;
   return Math.max(0, Math.round(km));
+}
+
+/** True when two pins are effectively the same curb (under 200m). */
+export function isSameSpot(
+  a: { latitude: number; longitude: number } | null | undefined,
+  latitude?: number | null,
+  longitude?: number | null,
+): boolean {
+  if (!a || latitude == null || longitude == null) return false;
+  const toRad = (n: number) => (n * Math.PI) / 180;
+  const dLat = toRad(latitude - a.latitude);
+  const dLng = toRad(longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.latitude)) * Math.cos(toRad(latitude)) * Math.sin(dLng / 2) ** 2;
+  const meters = 6371000 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return Number.isFinite(meters) && meters < 200;
 }

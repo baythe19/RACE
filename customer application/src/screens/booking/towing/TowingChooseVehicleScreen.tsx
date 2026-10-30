@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Car, Check, Plus } from 'lucide-react-native';
+import {
+  VehiclePlaceholderImage,
+  formatVehicleTypeWithSubtype,
+} from '../../../components/vehicles/vehicleUi';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
-import TowingServiceModeBanner from '../../../components/booking/TowingServiceModeBanner';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import type { BookingTheme } from '../../../components/booking/bookingTheme';
 import { TOWING_TYPES } from '../../../constants/towingBooking';
@@ -22,9 +25,41 @@ import {
 } from '../../../utils/driverCalendar';
 import { getVehicleCategory } from '../../../utils/vehicleCategory';
 import { colors, shadows, typography } from '../../../theme';
+import { formatVehicleNumber } from '../../../utils/vehicleFormat';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingChooseVehicle'>;
+
+const CARD_OUTLINE = '#E7E5E4';
+const ICON_TILE_BG = '#F9FAFB';
+
+/** White cards; brand yellow ring + tick = selected (matches stepper & Continue). */
+function selectionCardStyle(selected: boolean, t: BookingTheme) {
+  return {
+    borderRadius: t.px(14),
+    borderWidth: selected ? 2 : 1,
+    borderColor: selected ? colors.primary : CARD_OUTLINE,
+    backgroundColor: colors.background,
+  };
+}
+
+function SelectionCheck({ selected, t }: { selected: boolean; t: BookingTheme }) {
+  return (
+    <View
+      style={{
+        width: t.checkSize,
+        height: t.checkSize,
+        borderRadius: t.px(8),
+        borderWidth: selected ? 0 : 1.5,
+        borderColor: CARD_OUTLINE,
+        backgroundColor: selected ? colors.primary : colors.background,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      {selected ? <Check size={t.px(13)} color={colors.dark} strokeWidth={3} /> : null}
+    </View>
+  );
+}
 
 function formatVehicleLabel(vehicle: Vehicle): string {
   return `${vehicle.brand} ${vehicle.model} · ${vehicle.vehicleNumber}`;
@@ -132,9 +167,16 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
         navigation.navigate('TowingPickupDrop');
       }}>
       <WizardStepFade>
-      <TowingServiceModeBanner mode={booking.serviceMode} t={t} />
       <View style={{ gap: t.px(8) }}>
-        <FormSection title="Your vehicle" t={t} />
+        <FormSection
+          title={safeVehicles.length > 1 ? `Your vehicle (${safeVehicles.length})` : 'Your vehicle'}
+          t={t}
+        />
+        {safeVehicles.length > 1 ? (
+          <Text style={{ fontSize: t.px(11), color: colors.grey, marginTop: -t.px(4), marginBottom: t.px(2) }}>
+            Tap the vehicle you need towed — all saved vehicles are listed below.
+          </Text>
+        ) : null}
         {safeVehicles.length === 0 ? (
           <View
             style={[
@@ -153,7 +195,9 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                 width: t.px(52),
                 height: t.px(52),
                 borderRadius: t.px(10),
-                backgroundColor: colors.goldLight,
+                borderWidth: 1,
+                borderColor: CARD_OUTLINE,
+                backgroundColor: ICON_TILE_BG,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
@@ -200,77 +244,52 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
             </Pressable>
           </View>
         ) : (
-          safeVehicles.map(vehicle => {
-            const isSelected = selectedId === vehicle.id;
-            return (
-              <Pressable
-                key={vehicle.id}
-                onPress={() => setSelectedId(vehicle.id)}
-                style={[
-                  {
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: t.px(8),
-                    borderRadius: t.px(10),
-                    borderWidth: isSelected ? 2 : 1,
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    backgroundColor: isSelected ? colors.goldLight : colors.background,
-                    paddingVertical: t.px(10),
-                    paddingHorizontal: t.px(12),
-                  },
-                  shadows.card,
-                ]}>
-                <View
-                  style={{
-                    width: t.px(36),
-                    height: t.px(36),
-                    borderRadius: t.px(10),
-                    borderWidth: 1,
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    backgroundColor: isSelected ? colors.background : colors.goldLight,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  <Car
-                    size={t.iconSm}
-                    color={isSelected ? colors.primary : colors.dark}
-                    strokeWidth={2.2}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: t.px(14),
-                      fontWeight: typography.weights.bold,
-                      color: colors.dark,
-                    }}>
-                    {vehicle.brand} {vehicle.model}
-                  </Text>
-                  <Text
-                    style={{ fontSize: t.px(11), color: colors.grey, marginTop: t.px(1) }}
-                    numberOfLines={1}>
-                    {vehicle.vehicleNumber}
-                    {vehicle.vehicleSubtype ? ` · ${vehicle.vehicleSubtype}` : ''}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    width: t.checkSize,
-                    height: t.checkSize,
-                    borderRadius: t.px(8),
-                    borderWidth: isSelected ? 0 : 1.5,
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    backgroundColor: isSelected ? colors.primary : colors.background,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}>
-                  {isSelected ? (
-                    <Check size={t.px(13)} color={colors.background} strokeWidth={3} />
-                  ) : null}
-                </View>
-              </Pressable>
-            );
-          })
+          <View style={{ gap: t.px(8) }}>
+            {safeVehicles.map(vehicle => {
+              const isSelected = selectedId === vehicle.id;
+              return (
+                <Pressable
+                  key={vehicle.id}
+                  onPress={() => setSelectedId(vehicle.id)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  style={[
+                    {
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: t.px(10),
+                      paddingVertical: t.px(10),
+                      paddingHorizontal: t.px(12),
+                    },
+                    selectionCardStyle(isSelected, t),
+                  ]}>
+                  <VehiclePlaceholderImage type={vehicle.vehicleType} size={t.px(52)} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={{
+                        fontSize: t.px(14),
+                        fontWeight: typography.weights.bold,
+                        color: colors.dark,
+                      }}
+                      numberOfLines={2}>
+                      {vehicle.brand} {vehicle.model}
+                    </Text>
+                    <Text
+                      style={{ fontSize: t.px(11), color: colors.grey, marginTop: t.px(2) }}
+                      numberOfLines={1}>
+                      {formatVehicleNumber(vehicle.vehicleNumber)}
+                    </Text>
+                    <Text
+                      style={{ fontSize: t.px(10), color: colors.grey, marginTop: t.px(1) }}
+                      numberOfLines={1}>
+                      {formatVehicleTypeWithSubtype(vehicle)}
+                    </Text>
+                  </View>
+                  <SelectionCheck selected={isSelected} t={t} />
+                </Pressable>
+              );
+            })}
+          </View>
         )}
       </View>
 
@@ -287,33 +306,13 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                   width: '47%',
                   flexGrow: 1,
                   minWidth: t.px(128),
-                  borderRadius: t.px(10),
-                  borderWidth: selected ? 2 : 1,
-                  borderColor: selected ? colors.primary : colors.border,
-                  backgroundColor: selected ? colors.goldLight : colors.background,
                   overflow: 'hidden',
                   alignItems: 'center',
                 },
-                shadows.card,
+                selectionCardStyle(selected, t),
               ]}>
-              <View
-                style={{
-                  position: 'absolute',
-                  top: t.px(6),
-                  right: t.px(6),
-                  zIndex: 2,
-                  width: t.checkSize,
-                  height: t.checkSize,
-                  borderRadius: t.px(8),
-                  borderWidth: selected ? 0 : 1.5,
-                  borderColor: selected ? colors.primary : colors.border,
-                  backgroundColor: selected ? colors.primary : colors.background,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                {selected ? (
-                  <Check size={t.px(13)} color={colors.background} strokeWidth={3} />
-                ) : null}
+              <View style={{ position: 'absolute', top: t.px(6), right: t.px(6), zIndex: 2 }}>
+                <SelectionCheck selected={selected} t={t} />
               </View>
               <View
                 style={{
@@ -385,13 +384,10 @@ export default function TowingChooseVehicleScreen({ navigation }: Props) {
                   style={{
                     width: t.px(56),
                     minHeight: t.px(52),
-                    borderRadius: t.px(10),
-                    borderWidth: selected ? 2 : 1,
-                    borderColor: selected ? colors.primary : colors.border,
-                    backgroundColor: selected ? colors.goldLight : colors.background,
                     alignItems: 'center',
                     justifyContent: 'center',
                     paddingVertical: t.px(6),
+                    ...selectionCardStyle(selected, t),
                   }}>
                   <Text
                     style={{

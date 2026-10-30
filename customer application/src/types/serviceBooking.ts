@@ -33,6 +33,8 @@ export interface ServiceBooking {
   remainingPaid: boolean;
   paymentStatus: string;
   status: string;
+  /** Partner allotted; accept pending — no driver contact yet. */
+  awaitingPartnerAccept?: boolean;
   scheduledAt?: string;
   statusHistory: Array<{ status: string; timestamp: string }>;
   createdAt: string;
@@ -130,6 +132,7 @@ export interface VerifyPaymentRequest {
 export interface ServiceBookingTracking {
   bookingId: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   statusHistory: Array<{ status: string; timestamp: string }>;
   driver?: {
     id: string;

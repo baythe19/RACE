@@ -1,6 +1,15 @@
 ## Current focus
 
+**2026-10-31 (towing step 1 cards):** Vehicle & tow — white selection cards (#E7E5E4 outline, dark border when selected), no goldLight; multi-vehicle vertical list + count in title; tow type + schedule chips match; instant/scheduled banner white. Customer `tsc` 0.
+
+**2026-10-31 (towing pickup fare card):** Distance/est. fare white card (not #FEF3C7). Customer `tsc` 0.
+ Tighter layout — service + status + ID/copy on fewer rows; route block with **From/To** or single **At** using `formatLocationCard()` (primary + secondary lines); less card padding; `BookingsScreen` horizontal padding 14px. Customer `tsc` 0.
+
 **2026-10-30 (customer Help & Support redesign):** Less duplicate contact blocks; sections: emergency strip, self-service links (bookings/payments/SOS/notifications), grouped contact card, FAQ accordion by topic (BOOKINGS / PRICING / YOUR TRIP), legal split rows + company footer. Uses `brand.email`, inline FAQ expand (no modal spam). Customer `tsc` 0.
+
+**2026-10-31 (pickup/drop behavior):** Search is biased to GPS (pickup) or the pickup pin (drop), with straight-line distance on results. Choosing a stop moves focus to the empty one. × clears that stop. Pickup and drop under 200m are rejected. List no longer fades on every keystroke. Customer `tsc` 0.
+
+**2026-10-31 (pickup/drop Rapido-style):** Shared `RideLocationBoard` on towing pickup+drop, driver pickup (drop when the hire type needs it), driver booking location, and roadside help location. Active field searches Places; saved + recent rows with distance; Select on map opens the existing pin sheet. No “For me”, extra stops, or out-of-area vote — those are not RACE features. Customer `tsc` 0.
 
 **2026-10-30 (customer OTP-only credentials + headers):** Removed PIN/password entirely from customer app (screens, onboarding CreatePin step, profileService). Onboarding: vehicle → QR → **Continue to RACE**. Profile **Security** → only **Change mobile number** (OTP on new number; auth store sync; backend already swaps `mobileNumber` + conflict check). Headers: stack titles only (no subtitle paragraphs), taller centered row + content top gap. Personal address: searchable **Indian state** picker; map/search card with MapPinned. Customer `tsc` 0.
 
