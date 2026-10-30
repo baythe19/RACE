@@ -114,9 +114,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
       await useVehicleStore.getState().fetchVehicles().catch(() => undefined);
       const latestVehicles = useVehicleStore.getState().vehicles;
       const serviceType = roadsideServiceIdToSlug(booking.serviceId);
-      const locationForPayload = booking.landmark?.trim()
-        ? `${booking.location} (${booking.landmark.trim()})`
-        : booking.location;
+      const locationForPayload = booking.location;
       const pickupKey = roadsidePickupKey(booking);
 
       const payload = buildRoadsideBookingRequest(
@@ -221,10 +219,13 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
 
   const isBusy = isSubmitting || isConfirming;
 
-  const locationLine = formatLocationDisplay({
+  const locationCard = formatLocationCard({
     address: booking.location,
-    displayLabel: booking.locationLabel,
+    label: booking.locationLabel,
   });
+  const locationLine = locationCard.secondary
+    ? `${locationCard.primary}\n${locationCard.secondary}`
+    : locationCard.primary;
   const serviceLabel = getRoadsideServiceLabel(booking.serviceId);
   const price = getRoadsideServicePrice(booking.serviceId);
 
@@ -350,9 +351,9 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
                     color: colors.dark,
                     lineHeight: t.px(20),
                   }}>
-                  {locationLine}
+                  {locationCard.primary}
                 </Text>
-                {booking.landmark?.trim() ? (
+                {locationCard.secondary ? (
                   <Text
                     style={{
                       fontSize: t.caption,
@@ -360,7 +361,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
                       marginTop: t.px(4),
                       lineHeight: t.px(16),
                     }}>
-                    {booking.landmark.trim()}
+                    {locationCard.secondary}
                   </Text>
                 ) : null}
               </View>

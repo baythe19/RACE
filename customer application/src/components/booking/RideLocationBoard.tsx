@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, type ReactNode } from 'react';
+import React, { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Animated, Pressable, Text, TextInput, View } from 'react-native';
 import { Briefcase, Clock, Heart, Home, Map as MapIcon, MapPin } from 'lucide-react-native';
 
@@ -28,14 +28,15 @@ export type RideSuggestion = {
 type Props = {
   px: (n: number) => number;
   stops: RideStop[];
-  activeId: RideStopId;
+  /** When null, every stop shows its saved address (not an empty search field). */
+  activeId: RideStopId | null;
   query: string;
   searching?: boolean;
   suggestions: RideSuggestion[];
   emptyHint?: string;
   onActivate: (id: RideStopId) => void;
   onQueryChange: (text: string) => void;
-  onClearActive?: () => void;
+  onClearActive?: (stopId?: RideStopId) => void;
   onSelectOnMap: () => void;
   /** Rendered directly under “Select on map” (e.g. distance / fare). */
   belowMap?: ReactNode;
@@ -62,6 +63,7 @@ export default function RideLocationBoard({
   suppressIdleHint = false,
 }: Props) {
   const fade = useRef(new Animated.Value(1)).current;
+  const [editSearch, setEditSearch] = useState(false);
 
   useEffect(() => {
     fade.setValue(0.55);
@@ -71,6 +73,10 @@ export default function RideLocationBoard({
       useNativeDriver: true,
     }).start();
   }, [activeId, fade]);
+
+  useEffect(() => {
+    setEditSearch(false);
+  }, [activeId]);
 
   return (
     <View>
@@ -87,21 +93,30 @@ export default function RideLocationBoard({
           shadows.card,
         ]}>
         {stops.map((stop, index) => {
-          const active = stop.id === activeId;
+          const active = activeId != null && stop.id === activeId;
+          const inSearchMode =
+            active && (!stop.filled || query.trim().length > 0 || editSearch);
           const color = stop.dot === 'pickup' ? PICKUP : DROP;
           return (
             <Pressable
               key={stop.id}
-              onPress={() => onActivate(stop.id)}
+              onPress={() => {
+                if (activeId === stop.id && stop.filled && query.trim() === '') {
+                  setEditSearch(true);
+                } else {
+                  setEditSearch(false);
+                }
+                onActivate(stop.id);
+              }}
               style={({ pressed }) => ({
                 flexDirection: 'row',
-                alignItems: active ? 'center' : stop.filled ? 'flex-start' : 'center',
+                alignItems: inSearchMode ? 'center' : stop.filled ? 'flex-start' : 'center',
                 minHeight: px(56),
                 gap: px(10),
                 borderRadius: px(12),
                 backgroundColor: active ? '#F8FAFC' : pressed ? '#FAFAFA' : 'transparent',
                 paddingHorizontal: px(4),
-                paddingVertical: stop.filled && !active ? px(6) : 0,
+                paddingVertical: stop.filled && !inSearchMode ? px(6) : 0,
               })}>
               <View style={{ width: px(18), alignItems: 'center', justifyContent: 'center' }}>
                 {index > 0 ? (
@@ -133,7 +148,7 @@ export default function RideLocationBoard({
                 />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                {active ? (
+                {inSearchMode ? (
                   <TextInput
                     key={stop.id}
                     value={query}
@@ -166,7 +181,21 @@ export default function RideLocationBoard({
               </View>
               {active && (query.length > 0 || stop.filled) && onClearActive ? (
                 <Pressable
-                  onPress={onClearActive}
+                  onPress={() => onClearActive(stop.id)}
+                  hitSlop={8}
+                  style={{
+                    width: px(22),
+                    height: px(22),
+                    borderRadius: px(11),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#F5F5F4',
+                  }}>
+                  <Text style={{ fontSize: px(14), color: colors.grey, lineHeight: px(16) }}>×</Text>
+                </Pressable>
+              ) : !active && stop.filled && onClearActive ? (
+                <Pressable
+                  onPress={() => onClearActive(stop.id)}
                   hitSlop={8}
                   style={{
                     width: px(22),
@@ -208,7 +237,11 @@ export default function RideLocationBoard({
 
       {belowMap ? <View style={{ marginTop: px(12) }}>{belowMap}</View> : null}
 
-      <Animated.View style={{ opacity: fade, marginTop: px(belowMap ? 10 : 8) }}>
+      <Animated.View
+        style={{
+          opacity: fade,
+          marginTop: px(suppressIdleHint && suggestions.length === 0 ? 0 : belowMap ? 10 : 8),
+        }}>
         {suggestions.length === 0 && query.trim().length >= 2 && !searching ? (
           <Text style={{ marginTop: px(16), fontSize: px(13), color: colors.grey, textAlign: 'center' }}>
             {emptyHint || 'No matching places. Try the map.'}

@@ -18,7 +18,7 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { findServiceableCity } from '../../../config/serviceableAreas';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
-import { formatBookingStopAddress } from '../../../utils/readableAddress';
+import { formatBookingStopAddress, resolveBookingStopField } from '../../../utils/readableAddress';
 import {
   distanceKm as haversineKm,
   isSameSpot,
@@ -65,7 +65,11 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
   const [distanceKm, setDistanceKm] = useState<number | null>(booking.distanceKm ?? null);
   const [farePreview, setFarePreview] = useState<number | null>(null);
   const [isLoadingFare, setIsLoadingFare] = useState(false);
-  const [activeStop, setActiveStop] = useState<'pickup' | 'drop'>('drop');
+  const [activeStop, setActiveStop] = useState<'pickup' | 'drop' | null>(() => {
+    if (booking.pickupLat != null && booking.dropLat != null) return null;
+    if (booking.pickupLat != null) return 'drop';
+    return 'drop';
+  });
   const [query, setQuery] = useState('');
   const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
@@ -249,6 +253,18 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
 
   const pickupFilled = pickup.trim().length > 0 && pickup !== PLACEHOLDER;
   const dropFilled = drop.trim().length > 0 && drop !== PLACEHOLDER;
+  const pickupStop = resolveBookingStopField({
+    address: pickup,
+    placeholder: PLACEHOLDER,
+    label: pickupLabel,
+    hasCoordinates: pickupLat != null && pickupLng != null,
+  });
+  const dropStop = resolveBookingStopField({
+    address: drop,
+    placeholder: PLACEHOLDER,
+    label: dropLabel,
+    hasCoordinates: dropLat != null && dropLng != null,
+  });
   const origin =
     pickupLat != null && pickupLng != null
       ? { latitude: pickupLat, longitude: pickupLng }
@@ -276,40 +292,53 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
     }
     if (!assertServiceableBookingLocation(location.latitude, location.longitude)) return;
     const resolved = applyLocation(location);
+    const addressLine =
+      resolved.address.trim() ||
+      resolved.displayLabel.trim() ||
+      location.displayLabel?.trim() ||
+      'Pinned on map';
     if (target === 'pickup') {
-      setPickup(resolved.address);
-      setPickupLabel(resolved.displayLabel);
+      setPickup(addressLine);
+      setPickupLabel(resolved.displayLabel || formatBookingStopAddress(addressLine));
       setPickupLat(location.latitude);
       setPickupLng(location.longitude);
       if (!dropFilled) setActiveStop('drop');
+      else setActiveStop(null);
     } else {
-      setDrop(resolved.address);
-      setDropLabel(resolved.displayLabel);
+      setDrop(addressLine);
+      setDropLabel(resolved.displayLabel || formatBookingStopAddress(addressLine));
       setDropLat(location.latitude);
       setDropLng(location.longitude);
       if (!pickupFilled) setActiveStop('pickup');
+      else setActiveStop(null);
     }
     setQuery('');
     setPlaceHits([]);
   };
 
-  const clearActiveStop = () => {
+  const clearActiveStop = (stopId?: string) => {
     setQuery('');
     setPlaceHits([]);
-    if (activeStop === 'pickup') {
+    const target = (stopId ?? activeStop ?? 'pickup') as 'pickup' | 'drop';
+    if (target === 'pickup') {
       setPickup(PLACEHOLDER);
       setPickupLabel('');
       setPickupLat(undefined);
       setPickupLng(undefined);
+      setActiveStop('pickup');
       return;
     }
     setDrop(PLACEHOLDER);
     setDropLabel('');
     setDropLat(undefined);
     setDropLng(undefined);
+    setActiveStop('drop');
   };
 
   const suggestions: RideSuggestion[] = useMemo(() => {
+    const searchTarget: 'pickup' | 'drop' =
+      activeStop ?? (pickupStop.filled ? 'drop' : 'pickup');
+
     if (query.trim().length >= 2) {
       return placeHits.map(hit => ({
         id: hit.placeId,
@@ -319,7 +348,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         kind: 'search' as const,
         onPress: () => {
           void locationFromPlaceId(hit.placeId, hit.title).then(location => {
-            if (location) applyStop(activeStop, location);
+            if (location) applyStop(searchTarget, location);
           });
         },
       }));
@@ -337,7 +366,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           kind: 'saved' as const,
           savedType: loc.type,
           onPress: () =>
-            applyStop(activeStop, {
+            applyStop(searchTarget, {
               address: loc.address,
               city: '',
               state: '',
@@ -349,7 +378,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
             }),
         };
       });
-  }, [activeStop, origin, placeHits, query, savedLocations]);
+  }, [activeStop, origin, pickupStop.filled, placeHits, query, savedLocations]);
 
   return (
     <TowingBookingLayout
@@ -361,11 +390,11 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
       onContinue={() => {
         updateBooking({
           pickup,
-          pickupLabel: formatBookingStopAddress(pickup) || pickupLabel,
+          pickupLabel: pickupStop.value || formatBookingStopAddress(pickup) || pickupLabel,
           pickupLat,
           pickupLng,
           drop,
-          dropLabel: formatBookingStopAddress(drop) || dropLabel,
+          dropLabel: dropStop.value || formatBookingStopAddress(drop) || dropLabel,
           dropLat,
           dropLng,
           distanceKm: distanceKm ?? undefined,
@@ -379,7 +408,7 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         query={query}
         searching={searchingPlaces}
         suggestions={suggestions}
-        suppressIdleHint={pickupFilled && dropFilled}
+        suppressIdleHint={pickupStop.filled && dropStop.filled}
         onActivate={id => {
           setActiveStop(id as 'pickup' | 'drop');
           setQuery('');
@@ -388,7 +417,8 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
         onClearActive={clearActiveStop}
         onSelectOnMap={() => {
           setPickerMode('map');
-          if (activeStop === 'pickup') setShowPickupPicker(true);
+          const target = activeStop ?? (pickupFilled ? 'drop' : 'pickup');
+          if (target === 'pickup') setShowPickupPicker(true);
           else setShowDropPicker(true);
         }}
         belowMap={
@@ -493,17 +523,17 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
           {
             id: 'pickup',
             label: 'Pickup',
-            value: pickupFilled ? formatBookingStopAddress(pickup) : '',
+            value: pickupStop.value,
             placeholder: 'Pickup location',
-            filled: pickupFilled,
+            filled: pickupStop.filled,
             dot: 'pickup',
           },
           {
             id: 'drop',
             label: 'Drop',
-            value: dropFilled ? formatBookingStopAddress(drop) : '',
+            value: dropStop.value,
             placeholder: 'Drop location',
-            filled: dropFilled,
+            filled: dropStop.filled,
             dot: 'drop',
           },
         ]}

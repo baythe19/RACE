@@ -110,6 +110,43 @@ export function formatBookingStopAddress(
   return result;
 }
 
+export type BookingStopFieldInput = {
+  address: string;
+  placeholder: string;
+  label?: string | null;
+  hasCoordinates: boolean;
+};
+
+/** Label + filled flag for pickup/drop rows on location boards. */
+export function resolveBookingStopField(input: BookingStopFieldInput): {
+  filled: boolean;
+  value: string;
+} {
+  const { address, placeholder, label, hasCoordinates } = input;
+
+  const fromAddress = formatBookingStopAddress(address);
+  if (fromAddress) {
+    return { filled: true, value: fromAddress };
+  }
+
+  const labelTrim = label?.trim();
+  if (labelTrim) {
+    const fromLabel = formatBookingStopAddress(labelTrim) || labelTrim;
+    return { filled: true, value: fromLabel };
+  }
+
+  const raw = address.trim();
+  if (raw && raw !== placeholder) {
+    return { filled: true, value: raw };
+  }
+
+  if (hasCoordinates) {
+    return { filled: true, value: 'Pinned on map' };
+  }
+
+  return { filled: false, value: '' };
+}
+
 interface AddressComponentLike {
   long_name: string;
   types: string[];

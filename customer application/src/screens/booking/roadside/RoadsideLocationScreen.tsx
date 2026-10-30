@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
 import RideLocationBoard, { type RideSuggestion } from '../../../components/booking/RideLocationBoard';
-import FormSectionLabel from '../../../components/booking/FormSectionLabel';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
@@ -22,10 +21,9 @@ import { findServiceableCity } from '../../../config/serviceableAreas';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { locationFromPlaceId, searchPlaceSuggestions, type PlaceSuggestion } from '../../../utils/googlePlaces';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import { formatLocationCard, formatLocationDisplay } from '../../../utils/readableAddress';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { RoadsideServiceId } from '../../../types/roadsideBooking';
-import { colors, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideLocation'>;
@@ -44,12 +42,14 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
   const [locationLabel, setLocationLabel] = useState(booking.locationLabel ?? '');
   const [locationLat, setLocationLat] = useState(booking.locationLat);
   const [locationLng, setLocationLng] = useState(booking.locationLng);
-  const [landmark, setLandmark] = useState(booking.landmark);
   const [showPicker, setShowPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'search' | 'map'>('map');
   const [query, setQuery] = useState('');
   const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
+  const [activeStop, setActiveStop] = useState<'help' | null>(
+    booking.locationLat != null ? null : 'help',
+  );
   const { data: savedLocations = [] } = useSavedLocationsQuery();
 
   useEffect(() => {
@@ -59,6 +59,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
   }, [paramServiceId, updateBooking]);
 
   const serviceId = (paramServiceId ?? booking.serviceId) as RoadsideServiceId;
+  const serviceLabel = getRoadsideServiceLabel(serviceId);
 
   const hasLocation =
     location.trim().length > 0 &&
@@ -66,12 +67,21 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
     locationLat != null &&
     locationLng != null;
 
+  const locationStopValue = useMemo(() => {
+    if (!hasLocation) return '';
+    const card = formatLocationCard({ address: location, label: locationLabel });
+    return card.secondary ? `${card.primary}\n${card.secondary}` : card.primary;
+  }, [hasLocation, location, locationLabel]);
+
   const applyLocation = (result: LocationResult) => {
     const resolved = resolveLocationSelection(result);
     setLocation(resolved.address);
     setLocationLabel(resolved.displayLabel);
     setLocationLat(result.latitude);
     setLocationLng(result.longitude);
+    setQuery('');
+    setPlaceHits([]);
+    setActiveStop(null);
   };
 
   useEffect(() => {
@@ -91,6 +101,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
           setLocationLabel(resolved.displayLabel);
           setLocationLat(stored.latitude);
           setLocationLng(stored.longitude);
+          setActiveStop(null);
         }
         return;
       }
@@ -110,6 +121,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
         setLocationLabel(resolved.displayLabel);
         setLocationLat(selectedLocation.latitude);
         setLocationLng(selectedLocation.longitude);
+        setActiveStop(null);
       }
     }
 
@@ -187,16 +199,14 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
       }));
   }, [placeHits, query, savedLocations]);
 
-  const displayValue = hasLocation
-    ? locationLabel || formatLocationDisplay(location)
-    : PLACEHOLDER;
-
   return (
     <TowingBookingLayout
       title="Where you need help"
       step={1}
       stepLabels={ROADSIDE_BOOKING_STEP_LABELS}
       accentColor={ROADSIDE_ACCENT}
+      headerTag={serviceLabel}
+      headerTagVariant="emergency"
       scrollable
       onBack={() => goBackWithinStack(navigation)}
       continueDisabled={!hasLocation}
@@ -216,31 +226,23 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
           locationLabel: locationLabel || formatLocationDisplay(location),
           locationLat,
           locationLng,
-          landmark,
+          landmark: '',
         });
         navigation.navigate('RoadsideReview');
       }}>
       <WizardStepFade>
-      {dialog}
-      <View style={{ gap: t.px(8) }}>
-        <Text
-          style={{
-            fontSize: t.px(11),
-            fontWeight: typography.weights.semibold,
-            color: ROADSIDE_ACCENT,
-            marginBottom: t.px(2),
-          }}
-          numberOfLines={1}>
-          {getRoadsideServiceLabel(serviceId)}
-        </Text>
-
+        {dialog}
         <RideLocationBoard
           px={t.px}
-          activeId="help"
+          activeId={activeStop}
           query={query}
           searching={searchingPlaces}
           suggestions={suggestions}
-          onActivate={() => setQuery('')}
+          suppressIdleHint={hasLocation}
+          onActivate={() => {
+            setActiveStop('help');
+            setQuery('');
+          }}
           onQueryChange={setQuery}
           onClearActive={() => {
             setQuery('');
@@ -249,6 +251,7 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
             setLocationLabel('');
             setLocationLat(undefined);
             setLocationLng(undefined);
+            setActiveStop('help');
           }}
           onSelectOnMap={() => {
             setPickerMode('map');
@@ -258,38 +261,13 @@ export default function RoadsideLocationScreen({ navigation, route }: Props) {
             {
               id: 'help',
               label: 'Help',
-              value: hasLocation ? locationLabel || displayValue : '',
-              placeholder: 'Where should we send help?',
+              value: locationStopValue,
+              placeholder: 'Search or pick on map',
               filled: hasLocation,
               dot: 'pickup',
             },
           ]}
         />
-
-        <FormSectionLabel
-          title="Landmark"
-          hint="Optional — gate, shop, or a nearby place"
-          t={t}
-          topGap={16}
-        />
-        <TextInput
-          value={landmark}
-          onChangeText={setLandmark}
-          placeholder="Near KIIT gate, petrol pump…"
-          placeholderTextColor="#A8A29E"
-          style={{
-            borderRadius: t.px(14),
-            borderWidth: 1,
-            borderColor: '#E7E5E4',
-            backgroundColor: colors.background,
-            paddingHorizontal: t.px(14),
-            paddingVertical: t.px(12),
-            fontSize: t.px(14),
-            fontWeight: typography.weights.semibold,
-            color: colors.dark,
-          }}
-        />
-      </View>
       </WizardStepFade>
 
       <LocationPickerModal

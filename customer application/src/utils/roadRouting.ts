@@ -78,7 +78,7 @@ function buildResult(
   approximate: boolean,
 ): RoadRouteResult {
   return {
-    coordinates: coordinates.length >= 2 ? coordinates : coordinates,
+    coordinates: coordinates.length >= 2 ? coordinates : [coordinates[0], coordinates[0]],
     distanceKm: Math.round((distanceMeters / 1000) * 10) / 10,
     durationMinutes: Math.max(1, Math.round(Math.max(durationSeconds, 60) / 60)),
     approximate,

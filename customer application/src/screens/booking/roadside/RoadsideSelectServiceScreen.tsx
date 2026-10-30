@@ -98,7 +98,8 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
   return (
     <TowingBookingLayout
       title="Select Service"
-      step={1}
+      step={0}
+      showStep={false}
       accentColor={ROADSIDE_ACCENT}
       onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {

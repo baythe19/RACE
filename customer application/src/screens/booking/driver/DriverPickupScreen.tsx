@@ -25,7 +25,11 @@ import {
 } from '../../../utils/googlePlaces';
 import { getAppDialog } from '../../../utils/alertBus';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import {
+  formatBookingStopAddress,
+  formatLocationDisplay,
+  resolveBookingStopField,
+} from '../../../utils/readableAddress';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { colors, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
@@ -51,7 +55,13 @@ export default function DriverPickupScreen({ navigation }: Props) {
   const [dropoffLat, setDropoffLat] = useState(booking.dropoffLat);
   const [dropoffLng, setDropoffLng] = useState(booking.dropoffLng);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
-  const [activeStop, setActiveStop] = useState<'pickup' | 'dropoff'>('pickup');
+  const [activeStop, setActiveStop] = useState<'pickup' | 'dropoff' | null>(() => {
+    if (booking.pickupLat != null && (!flow.requiresDropoff || booking.dropoffLat != null)) {
+      return null;
+    }
+    if (booking.pickupLat != null && flow.requiresDropoff) return 'dropoff';
+    return 'pickup';
+  });
   const [query, setQuery] = useState('');
   const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
@@ -158,7 +168,13 @@ export default function DriverPickupScreen({ navigation }: Props) {
       pickupLat: latitude,
       pickupLng: longitude,
     });
-    if (flow.requiresDropoff && dropoffLat == null) setActiveStop('dropoff');
+    setQuery('');
+    setPlaceHits([]);
+    if (flow.requiresDropoff && dropoffLat == null && dropoffLng == null) {
+      setActiveStop('dropoff');
+    } else {
+      setActiveStop(null);
+    }
     return true;
   };
 
@@ -190,7 +206,13 @@ export default function DriverPickupScreen({ navigation }: Props) {
       dropoffLat: latitude,
       dropoffLng: longitude,
     });
-    if (pickupLat == null) setActiveStop('pickup');
+    setQuery('');
+    setPlaceHits([]);
+    if (pickupLat == null) {
+      setActiveStop('pickup');
+    } else {
+      setActiveStop(null);
+    }
     return true;
   };
 
@@ -207,6 +229,19 @@ export default function DriverPickupScreen({ navigation }: Props) {
     dropoffLng != null;
 
   const canContinue = hasPickup && (!flow.requiresDropoff || hasDropoff);
+
+  const pickupStop = resolveBookingStopField({
+    address: pickup,
+    placeholder: PLACEHOLDER,
+    label: pickupLabel,
+    hasCoordinates: pickupLat != null && pickupLng != null,
+  });
+  const dropoffStop = resolveBookingStopField({
+    address: dropoff,
+    placeholder: DROP_PLACEHOLDER,
+    label: dropoffLabel,
+    hasCoordinates: dropoffLat != null && dropoffLng != null,
+  });
 
   const origin =
     pickupLat != null && pickupLng != null
@@ -306,44 +341,48 @@ export default function DriverPickupScreen({ navigation }: Props) {
         query={query}
         searching={searchingPlaces}
         suggestions={suggestions}
+        suppressIdleHint={pickupStop.filled && (!flow.requiresDropoff || dropoffStop.filled)}
         onActivate={id => {
           const next = id === 'dropoff' ? 'dropoff' : 'pickup';
           setActiveStop(next);
           setQuery('');
         }}
         onQueryChange={setQuery}
-        onClearActive={() => {
+        onClearActive={stopId => {
+          const target = stopId ?? activeStop;
           setQuery('');
           setPlaceHits([]);
-          if (activeStop === 'dropoff') {
+          if (target === 'dropoff') {
             setDropoff(DROP_PLACEHOLDER);
             setDropoffLabel('');
             setDropoffLat(undefined);
             setDropoffLng(undefined);
+            setActiveStop('dropoff');
             return;
           }
           setPickup(PLACEHOLDER);
           setPickupLabel('');
           setPickupLat(undefined);
           setPickupLng(undefined);
+          setActiveStop('pickup');
         }}
         onSelectOnMap={() => setPickerTarget(activeStop)}
         stops={[
           {
             id: 'pickup',
             label: 'Pickup',
-            value: hasPickup ? pickupLabel || formatLocationDisplay(pickup) : '',
+            value: pickupStop.value,
             placeholder: flow.pickupFieldLabel,
-            filled: hasPickup,
+            filled: pickupStop.filled,
             dot: 'pickup',
           },
           ...(flow.requiresDropoff
             ? [{
                 id: 'dropoff',
                 label: 'Drop',
-                value: hasDropoff ? dropoffLabel || formatLocationDisplay(dropoff) : '',
+                value: dropoffStop.value,
                 placeholder: flow.dropFieldLabel,
-                filled: hasDropoff,
+                filled: dropoffStop.filled,
                 dot: 'drop' as const,
               }]
             : []),

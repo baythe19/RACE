@@ -1,5 +1,7 @@
 ## Current focus
 
+**2026-10-31 (customer assign/accept sync):** Backend `applyCustomerBookingView` masks status + hides driver until en route; `awaitingPartnerAccept` on list/detail/tracking. Customer socket `internalStatus` + tracking poll resolve UI to `DRIVER_ASSIGNED` for “Partner accepting” copy. Backend + customer tracking files `tsc` 0 (unrelated LocationPickerModal PROVIDER_* errors pre-existing).
+
 **2026-10-31 (towing step 1 cards):** Vehicle & tow — white selection cards (#E7E5E4 outline, dark border when selected), no goldLight; multi-vehicle vertical list + count in title; tow type + schedule chips match; instant/scheduled banner white. Customer `tsc` 0.
 
 **2026-10-31 (towing pickup fare card):** Distance/est. fare white card (not #FEF3C7). Customer `tsc` 0.

@@ -13,7 +13,11 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { getRecentDriverPickups } from '../../../utils/recentDriverPickups';
 import { locationFromPlaceId, searchPlaceSuggestions, type PlaceSuggestion } from '../../../utils/googlePlaces';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import {
+  formatBookingStopAddress,
+  formatLocationDisplay,
+  resolveBookingStopField,
+} from '../../../utils/readableAddress';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
 import { colors, shadows, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
@@ -31,6 +35,9 @@ export default function DriverBookingLocationScreen({ navigation }: Props) {
   const [pickupLat, setPickupLat] = useState(booking.pickupLat);
   const [pickupLng, setPickupLng] = useState(booking.pickupLng);
   const [showPicker, setShowPicker] = useState(false);
+  const [activeStop, setActiveStop] = useState<'pickup' | null>(
+    booking.pickupLat != null ? null : 'pickup',
+  );
   const [query, setQuery] = useState('');
   const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
   const [searchingPlaces, setSearchingPlaces] = useState(false);
@@ -113,9 +120,23 @@ export default function DriverBookingLocationScreen({ navigation }: Props) {
     setPickupLabel(displayLabel);
     setPickupLat(latitude);
     setPickupLng(longitude);
+    setQuery('');
+    setPlaceHits([]);
+    setActiveStop(null);
   };
 
-  const hasPickup = pickup.trim().length > 0 && pickup !== PLACEHOLDER;
+  const hasPickup =
+    pickup.trim().length > 0 &&
+    pickup !== PLACEHOLDER &&
+    pickupLat != null &&
+    pickupLng != null;
+
+  const pickupStop = resolveBookingStopField({
+    address: pickup,
+    placeholder: PLACEHOLDER,
+    label: pickupLabel,
+    hasCoordinates: pickupLat != null && pickupLng != null,
+  });
 
   const suggestions: RideSuggestion[] = useMemo(() => {
     if (query.trim().length >= 2) {
@@ -178,11 +199,15 @@ export default function DriverBookingLocationScreen({ navigation }: Props) {
       }}>
       <RideLocationBoard
         px={t.px}
-        activeId="pickup"
+        activeId={activeStop}
         query={query}
         searching={searchingPlaces}
         suggestions={suggestions}
-        onActivate={() => undefined}
+        suppressIdleHint={pickupStop.filled}
+        onActivate={() => {
+          setActiveStop('pickup');
+          setQuery('');
+        }}
         onQueryChange={setQuery}
           onClearActive={() => {
             setQuery('');
@@ -191,15 +216,16 @@ export default function DriverBookingLocationScreen({ navigation }: Props) {
             setPickupLabel('');
             setPickupLat(undefined);
             setPickupLng(undefined);
+            setActiveStop('pickup');
           }}
         onSelectOnMap={() => setShowPicker(true)}
         stops={[
           {
             id: 'pickup',
             label: 'Pickup',
-            value: hasPickup ? pickupLabel || formatLocationDisplay(pickup) : '',
+            value: pickupStop.value,
             placeholder: 'Pickup location',
-            filled: hasPickup,
+            filled: pickupStop.filled,
             dot: 'pickup',
           },
         ]}
@@ -220,6 +246,7 @@ export default function DriverBookingLocationScreen({ navigation }: Props) {
         onLocationSelected={location => {
           const resolved = resolveLocationSelection(location);
           applyPickup(resolved.address, location.latitude, location.longitude, resolved.displayLabel);
+          setShowPicker(false);
         }}
       />
     </TowingBookingLayout>
