@@ -3,28 +3,19 @@ import { Linking, Pressable, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  Bell,
-  CalendarDays,
   ChevronDown,
   ChevronRight,
-  CreditCard,
   Mail,
   Phone,
-  Shield,
   Siren,
-  Trash2,
 } from 'lucide-react-native';
 
 import WhatsAppIcon from '../../components/icons/WhatsAppIcon';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import {
-  HELP_FAQ_SECTIONS,
-  HELP_SELF_SERVE_LINKS,
-  type HelpSelfServeLinkId,
+  HELP_FAQ_ITEMS,
 } from '../../constants/profileSubScreens';
-import { jumpToMainTab } from '../../navigation/customerNavigationRef';
 import type { ProfileStackParamList } from '../../types/navigation';
-import { useAppDialog } from '../../hooks/useAppDialog';
 import { useProfileStore } from '../../store/profileStore';
 import { brand } from '../../theme/brand';
 import {
@@ -120,17 +111,9 @@ function ContactRow({
   );
 }
 
-const SELF_SERVE_ICONS: Record<HelpSelfServeLinkId, typeof CalendarDays> = {
-  bookings: CalendarDays,
-  payments: CreditCard,
-  sos: Siren,
-  notifications: Bell,
-};
-
 export default function HelpSupportScreen() {
   const px = useProfilePx();
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
-  const { dialog, showDialog } = useAppDialog();
   const { profile, fetchProfile } = useProfileStore();
   const [expandedFaq, setExpandedFaq] = useState<string | null>(null);
 
@@ -147,29 +130,12 @@ export default function HelpSupportScreen() {
     'Hi RACE Support, I need help with my booking.',
   )}`;
 
-  const handleSelfServe = (id: HelpSelfServeLinkId) => {
-    if (id === 'bookings') {
-      jumpToMainTab('Bookings', { screen: 'BookingsMain' });
-      return;
-    }
-    if (id === 'payments') {
-      navigation.navigate('PaymentMethods');
-      return;
-    }
-    if (id === 'sos') {
-      navigation.navigate('SosDetails');
-      return;
-    }
-    navigation.navigate('Notifications');
-  };
-
   const toggleFaq = (key: string) => {
     setExpandedFaq(prev => (prev === key ? null : key));
   };
 
   return (
     <ProfileSubScreenLayout title="Help & Support">
-      {dialog}
       {/* Personal emergency contact — from profile (not RACE helpline) */}
       {hasEmergency ? (
         <View
@@ -259,48 +225,6 @@ export default function HelpSupportScreen() {
         </Pressable>
       )}
 
-      <SectionLabel px={px}>SELF-SERVICE</SectionLabel>
-      <GroupedCard px={px}>
-        {HELP_SELF_SERVE_LINKS.map((link, index) => {
-          const Icon = SELF_SERVE_ICONS[link.id];
-          return (
-            <Pressable
-              key={link.id}
-              onPress={() => handleSelfServe(link.id)}
-              style={({ pressed }) => ({
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(12),
-                paddingHorizontal: px(14),
-                paddingVertical: px(12),
-                borderBottomWidth: index < HELP_SELF_SERVE_LINKS.length - 1 ? 1 : 0,
-                borderBottomColor: colors.border,
-                backgroundColor: pressed ? colors.pageBg : colors.background,
-              })}>
-              <View
-                style={{
-                  width: px(34),
-                  height: px(34),
-                  borderRadius: px(17),
-                  backgroundColor: colors.goldLight,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}>
-                <Icon size={px(16)} color={colors.primary} strokeWidth={2.2} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.dark }}>
-                  {link.title}
-                </Text>
-                <Text style={{ fontSize: px(10), color: colors.grey, marginTop: px(2) }}>{link.subtitle}</Text>
-              </View>
-              <ChevronRight size={px(16)} color={colors.grey} />
-            </Pressable>
-          );
-        })}
-      </GroupedCard>
-
       <SectionLabel px={px}>CONTACT US</SectionLabel>
       <GroupedCard px={px}>
         <ContactRow
@@ -327,78 +251,64 @@ export default function HelpSupportScreen() {
         />
       </GroupedCard>
 
-      <SectionLabel px={px}>COMMON QUESTIONS</SectionLabel>
-      {HELP_FAQ_SECTIONS.map(section => (
-        <View key={section.title} style={{ marginBottom: px(12) }}>
-          <Text
-            style={{
-              fontSize: px(11),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(6),
-              marginLeft: px(2),
-            }}>
-            {section.title.charAt(0) + section.title.slice(1).toLowerCase()}
-          </Text>
-          <GroupedCard px={px}>
-            {section.items.map((item, index) => {
-              const key = `${section.title}-${index}`;
-              const open = expandedFaq === key;
-              return (
-                <View
-                  key={item.question}
+      <SectionLabel px={px}>FAQ</SectionLabel>
+      <GroupedCard px={px}>
+        {HELP_FAQ_ITEMS.map((item, index) => {
+          const key = item.question;
+          const open = expandedFaq === key;
+          return (
+            <View
+              key={item.question}
+              style={{
+                borderBottomWidth: index < HELP_FAQ_ITEMS.length - 1 ? 1 : 0,
+                borderBottomColor: colors.border,
+              }}>
+              <Pressable
+                onPress={() => toggleFaq(key)}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: px(10),
+                  paddingHorizontal: px(14),
+                  paddingVertical: px(13),
+                  backgroundColor: pressed ? colors.pageBg : colors.background,
+                })}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: open }}>
+                <Text
                   style={{
-                    borderBottomWidth: index < section.items.length - 1 ? 1 : 0,
-                    borderBottomColor: colors.border,
+                    flex: 1,
+                    fontSize: px(13),
+                    fontWeight: typography.weights.semibold,
+                    color: colors.dark,
+                    lineHeight: px(18),
                   }}>
-                  <Pressable
-                    onPress={() => toggleFaq(key)}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: px(10),
-                      paddingHorizontal: px(14),
-                      paddingVertical: px(13),
-                      backgroundColor: pressed ? colors.pageBg : colors.background,
-                    })}
-                    accessibilityRole="button"
-                    accessibilityState={{ expanded: open }}>
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: px(13),
-                        fontWeight: typography.weights.semibold,
-                        color: colors.dark,
-                        lineHeight: px(18),
-                      }}>
-                      {item.question}
-                    </Text>
-                    <ChevronDown
-                      size={px(18)}
-                      color={colors.grey}
-                      style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}
-                    />
-                  </Pressable>
-                  {open ? (
-                    <Text
-                      style={{
-                        paddingHorizontal: px(14),
-                        paddingBottom: px(14),
-                        paddingTop: 0,
-                        marginTop: px(-4),
-                        fontSize: px(12),
-                        color: colors.grey,
-                        lineHeight: px(18),
-                      }}>
-                      {item.answer}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            })}
-          </GroupedCard>
-        </View>
-      ))}
+                  {item.question}
+                </Text>
+                <ChevronDown
+                  size={px(18)}
+                  color={colors.grey}
+                  style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}
+                />
+              </Pressable>
+              {open ? (
+                <Text
+                  style={{
+                    paddingHorizontal: px(14),
+                    paddingBottom: px(14),
+                    paddingTop: 0,
+                    marginTop: px(-4),
+                    fontSize: px(12),
+                    color: colors.grey,
+                    lineHeight: px(18),
+                  }}>
+                  {item.answer}
+                </Text>
+              ) : null}
+            </View>
+          );
+        })}
+      </GroupedCard>
 
       <SectionLabel px={px}>LEGAL</SectionLabel>
       <GroupedCard px={px}>
@@ -407,109 +317,17 @@ export default function HelpSupportScreen() {
           style={({ pressed }) => ({
             flexDirection: 'row',
             alignItems: 'center',
-            gap: px(12),
+            justifyContent: 'space-between',
             paddingHorizontal: px(14),
             paddingVertical: px(13),
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
             backgroundColor: pressed ? colors.pageBg : colors.background,
           })}>
-          <View
-            style={{
-              width: px(34),
-              height: px(34),
-              borderRadius: px(17),
-              backgroundColor: colors.lightGrey,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Shield size={px(16)} color={colors.grey} strokeWidth={2.2} />
-          </View>
-          <Text style={{ flex: 1, fontSize: px(13), fontWeight: typography.weights.semibold, color: colors.dark }}>
-            Terms of service
+          <Text style={{ fontSize: px(13), fontWeight: typography.weights.semibold, color: colors.dark }}>
+            Terms & Privacy Policy
           </Text>
           <ChevronRight size={px(16)} color={colors.grey} />
-        </Pressable>
-        <Pressable
-          onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: px(12),
-            paddingHorizontal: px(14),
-            paddingVertical: px(13),
-            backgroundColor: pressed ? colors.pageBg : colors.background,
-          })}>
-          <View
-            style={{
-              width: px(34),
-              height: px(34),
-              borderRadius: px(17),
-              backgroundColor: colors.lightGrey,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Shield size={px(16)} color={colors.grey} strokeWidth={2.2} />
-          </View>
-          <Text style={{ flex: 1, fontSize: px(13), fontWeight: typography.weights.semibold, color: colors.dark }}>
-            Privacy policy
-          </Text>
-          <ChevronRight size={px(16)} color={colors.grey} />
-        </Pressable>
-        <Pressable
-          onPress={() => {
-            showDialog({
-              tone: 'info',
-              title: 'Delete account',
-              message: `To permanently remove your account, call ${brand.phone} or email ${brand.email}. Our team will verify and delete your data.`,
-              secondaryLabel: 'Cancel',
-              primaryLabel: 'Call support',
-              onPrimary: () => void Linking.openURL(`tel:${brand.phoneRaw}`),
-            });
-          }}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: px(12),
-            paddingHorizontal: px(14),
-            paddingVertical: px(13),
-            borderTopWidth: 1,
-            borderTopColor: colors.border,
-            backgroundColor: pressed ? colors.pageBg : colors.background,
-          })}>
-          <View
-            style={{
-              width: px(34),
-              height: px(34),
-              borderRadius: px(17),
-              backgroundColor: '#FEE2E2',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Trash2 size={px(16)} color={colors.error} strokeWidth={2.2} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: px(13), fontWeight: typography.weights.semibold, color: colors.error }}>
-              Delete account
-            </Text>
-            <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }}>
-              Contact support to remove your data
-            </Text>
-          </View>
         </Pressable>
       </GroupedCard>
-
-      <Text
-        style={{
-          textAlign: 'center',
-          fontSize: px(10),
-          color: colors.grey,
-          marginTop: px(4),
-          marginBottom: px(8),
-          lineHeight: px(15),
-        }}>
-        RACE Customer · Version 1.0.0 · {brand.location}
-      </Text>
     </ProfileSubScreenLayout>
   );
 }

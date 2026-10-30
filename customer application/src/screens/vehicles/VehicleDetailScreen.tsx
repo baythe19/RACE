@@ -9,7 +9,6 @@ import VehicleEmergencyQrPanel from '../../components/vehicles/VehicleEmergencyQ
 import { useVehicleStore } from '../../store/vehicleStore';
 import { useAppDialog } from '../../hooks/useAppDialog';
 import type { ProfileStackParamList } from '../../types/navigation';
-import { formatVehicleNumber } from '../../utils/vehicleFormat';
 import { colors, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'VehicleDetail'>;

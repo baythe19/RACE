@@ -39,6 +39,7 @@ import {
   useSosConfigQuery,
   useSosContextQuery,
 } from '../../services/sos/useSosQueries';
+import { useNotificationsQuery } from '../../services/profile/useProfileQueries';
 import { colors, typography } from '../../theme';
 import type { RootTabParamList } from '../../types/navigation';
 
@@ -83,6 +84,8 @@ export default function EmergencyAssistanceContent({
     isUiPreviewAuthFlow() || isPreviewSosSession(accessToken);
   const { data: config, isError: configError } = useSosConfigQuery();
   const { data: context, isLoading: contextLoading } = useSosContextQuery(undefined, isAuthenticated);
+  const { data: notificationsData } = useNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
   const sosAlert = useSosAlertMutation();
   const [dialog, setDialog] = useState<SosDialogState | null>(null);
 
@@ -260,9 +263,11 @@ export default function EmergencyAssistanceContent({
       header={
         <TabRootHeader
           title="Emergency SOS"
-          subtitle="Immediate help, one tap away"
+          notificationCount={unreadCount}
           onInfoPress={showSosInfo}
-          onBellPress={() => tabNav.navigate('Profile')}
+          onBellPress={() => {
+            tabNav.navigate('Profile', { screen: 'Notifications' });
+          }}
           onAvatarPress={() => tabNav.navigate('Profile')}
         />
       }>

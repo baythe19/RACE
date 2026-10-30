@@ -18,10 +18,10 @@ import { NotFoundError } from '../../../utils/src/errors';
 
 function mapCustomerPaymentStatus(status: string): string {
   const normalized = String(status).toLowerCase();
-  if (normalized === 'success') return 'COMPLETED';
-  if (normalized === 'initiated') return 'PENDING';
+  if (normalized === 'success' || normalized === 'completed') return 'COMPLETED';
+  if (normalized === 'initiated' || normalized === 'pending') return 'PENDING';
   if (normalized === 'failed') return 'FAILED';
-  return status;
+  return String(status).toUpperCase();
 }
 
 function mapCustomer(
@@ -161,8 +161,6 @@ export const adminCustomersService = {
       legacyBookings,
       towingBookings,
       driverBookings,
-      legacySpend,
-      paymentSpend,
       transactions,
       paymentTransactions,
       subscriptions,
@@ -172,20 +170,6 @@ export const adminCustomersService = {
       BookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
       TowingBookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
       DriverBookingModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(20).lean(),
-      BookingModel.aggregate([
-        { $match: { customerId: customerObjectId } },
-        { $group: { _id: null, total: { $sum: '$invoice.total' } } },
-      ]),
-      PaymentTransactionModel.aggregate([
-        {
-          $match: {
-            customerId: customerObjectId,
-            paymentType: { $in: ['advance', 'final'] },
-            status: 'success',
-          },
-        },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]),
       TransactionModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(30).lean(),
       PaymentTransactionModel.find({ customerId: customerObjectId }).sort({ createdAt: -1 }).limit(30).lean(),
       UserSubscriptionModel.find({ userId: customerObjectId }).sort({ createdAt: -1 }).lean(),
@@ -324,7 +308,6 @@ export const adminCustomersService = {
       emergencyContact: user.emergencyContact
         ? `${user.emergencyContact.name} (${user.emergencyContact.mobileNumber})`
         : undefined,
-      totalSpent: (legacySpend[0]?.total ?? 0) + (paymentSpend[0]?.total ?? 0),
       bookings: unified.map((b) => ({
         id: b.id,
         bookingNumber: b.bookingNumber,

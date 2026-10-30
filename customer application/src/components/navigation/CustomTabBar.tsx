@@ -53,7 +53,6 @@ export default function CustomTabBar({
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const activeRoute = state.routes[state.index];
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {

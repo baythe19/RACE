@@ -65,7 +65,6 @@ import PersonalInformationScreen from '../screens/profile/PersonalInformationScr
 import MyVehiclesScreen from '../screens/vehicles/VehicleListScreen';
 import AddVehicleScreen from '../screens/vehicles/AddVehicleScreen';
 import VehicleDetailScreen from '../screens/vehicles/VehicleDetailScreen';
-import EditVehicleScreen from '../screens/vehicles/EditVehicleScreen';
 import SosDetailsScreen from '../screens/profile/SosDetailsScreen';
 import SavedLocationsScreen from '../screens/profile/SavedLocationsScreen';
 import PaymentMethodsScreen from '../screens/profile/PaymentMethodsScreen';
@@ -494,7 +493,7 @@ function ProfileStackNavigator() {
       <ProfileStack.Screen name="MyVehicles" component={MyVehiclesScreen} />
       <ProfileStack.Screen name="AddVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="VehicleDetail" component={VehicleDetailScreen} />
-      <ProfileStack.Screen name="EditVehicle" component={EditVehicleScreen} />
+      <ProfileStack.Screen name="EditVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="SosDetails" component={SosDetailsScreen} />
       <ProfileStack.Screen name="SavedLocations" component={SavedLocationsScreen} />
       <ProfileStack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />

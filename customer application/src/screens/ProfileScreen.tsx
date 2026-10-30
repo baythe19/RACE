@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import {
   Pressable,
-  StyleSheet,
   Text,
   useWindowDimensions,
   View,
@@ -141,28 +140,9 @@ export default function ProfileScreen() {
       header={
         <TabRootHeader
           title="Profile"
-          showNotificationBadge={unreadCount > 0}
+          notificationCount={unreadCount}
+          showProfileAvatar={false}
           onBellPress={() => navigation.navigate('Notifications')}
-          actions={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(12) }}>
-              <Pressable
-                hitSlop={8}
-                style={styles.bellWrap}
-                onPress={() => navigation.navigate('Notifications')}
-                accessibilityRole="button"
-                accessibilityLabel="Notifications">
-                <Bell size={px(22)} color={colors.dark} strokeWidth={2} />
-                {unreadCount > 0 ? (
-                  <View style={styles.bellBadge}>
-                    <Text style={styles.bellBadgeText}>
-                      {unreadCount > 99 ? '99+' : unreadCount}
-                    </Text>
-                  </View>
-                ) : null}
-              </Pressable>
-              <ProfileAvatar size={px(40)} px={px} />
-            </View>
-          }
         />
       }>
       {dialog}
@@ -529,29 +509,3 @@ export default function ProfileScreen() {
     </AppScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  bellWrap: {
-    position: 'relative',
-  },
-  bellBadge: {
-    position: 'absolute',
-    top: -5,
-    right: -8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.error,
-    borderWidth: 1.5,
-    borderColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  bellBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: colors.background,
-    lineHeight: 11,
-  },
-});

@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import {
   Bell,
   CheckCircle,
@@ -21,7 +21,9 @@ import {
   useDeleteAllNotificationsMutation,
   useDeleteNotificationMutation,
   useMarkNotificationReadMutation,
+  useNotificationPrefsQuery,
   useNotificationsQuery,
+  useUpdateNotificationPrefMutation,
 } from '../../services/profile/useProfileQueries';
 import type { AppNotification } from '../../types/profile';
 import type { ServiceBookingTypeParam } from '../../types/navigation';
@@ -216,6 +218,72 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
   const deleteAll = useDeleteAllNotificationsMutation();
   const deleteOne = useDeleteNotificationMutation();
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const { data: serverPrefs } = useNotificationPrefsQuery();
+  const updatePref = useUpdateNotificationPrefMutation();
+  const [pushOn, setPushOn] = useState(true);
+  const [offersOn, setOffersOn] = useState(false);
+
+  useEffect(() => {
+    if (!serverPrefs) return;
+    let push = true;
+    let offers = false;
+    serverPrefs.forEach(pref => {
+      if (pref.id === 'push' || pref.id === 'booking_updates') push = pref.enabled;
+      if (pref.id === 'offers') offers = pref.enabled;
+    });
+    setPushOn(push);
+    setOffersOn(offers);
+  }, [serverPrefs]);
+
+  const setPref = (prefId: 'push' | 'offers', enabled: boolean) => {
+    if (updatePref.isPending) return;
+    const apply = prefId === 'push' ? setPushOn : setOffersOn;
+    apply(enabled);
+    updatePref.mutate(
+      { prefId, enabled },
+      { onError: () => apply(!enabled) },
+    );
+  };
+
+  const alertPrefs = !isLoading && !isError ? (
+    <View
+      style={{
+        borderRadius: px(14),
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background,
+        marginBottom: px(16),
+        overflow: 'hidden',
+      }}>
+      {[
+        { id: 'push' as const, label: 'Push alerts', value: pushOn },
+        { id: 'offers' as const, label: 'Offers & tips', value: offersOn },
+      ].map((row, index) => (
+        <View
+          key={row.id}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingHorizontal: px(14),
+            paddingVertical: px(11),
+            borderBottomWidth: index === 0 ? 1 : 0,
+            borderBottomColor: colors.border,
+          }}>
+          <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.dark }}>
+            {row.label}
+          </Text>
+          <Switch
+            value={row.value}
+            onValueChange={v => setPref(row.id, v)}
+            disabled={updatePref.isPending}
+            trackColor={{ false: colors.lightGrey, true: colors.primary }}
+            thumbColor={colors.background}
+          />
+        </View>
+      ))}
+    </View>
+  ) : null;
 
   const items = data?.notifications ?? [];
   const filtered = useMemo(() => items.filter(i => matchesFilter(i, activeFilter)), [items, activeFilter]);
@@ -238,7 +306,7 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
   };
 
   const handleDismiss = (item: AppNotification) => {
-    if (deleteOne.isPending) return;
+    if (dismissingId === item.id) return;
     setDismissingId(item.id);
     deleteOne.mutate(item.id, {
       onSettled: () => setDismissingId(null),
@@ -270,6 +338,209 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
     });
   };
 
+  const filterRow = (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      bounces={false}
+      keyboardShouldPersistTaps="handled"
+      style={{ marginBottom: px(16) }}
+      contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: px(6), paddingRight: px(4) }}>
+      {FILTERS.map(filter => {
+        const isActive = activeFilter === filter;
+        return (
+          <Pressable
+            key={filter}
+            onPress={() => setActiveFilter(filter)}
+            style={{
+              flexShrink: 0,
+              paddingHorizontal: px(12),
+              paddingVertical: px(5),
+              borderRadius: px(6),
+              backgroundColor: isActive ? FILTER_ACTIVE.bg : '#FFFFFF',
+              borderWidth: 1,
+              borderColor: isActive ? FILTER_ACTIVE.bg : colors.border,
+            }}>
+            <Text
+              style={{
+                fontSize: px(11),
+                fontWeight: typography.weights.bold,
+                color: isActive ? FILTER_ACTIVE.text : colors.grey,
+              }}>
+              {filter}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+
+  let mainContent: React.ReactNode;
+
+  if (isLoading) {
+    mainContent = <DataSkeleton variant="list" />;
+  } else if (isError) {
+    mainContent = (
+      <View style={{ alignItems: 'center', paddingVertical: px(36), gap: px(12) }}>
+        <View
+          style={{
+            width: px(56),
+            height: px(56),
+            borderRadius: px(28),
+            backgroundColor: colors.goldLight,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Bell size={px(26)} color={colors.primary} strokeWidth={2} />
+        </View>
+        <Text
+          style={{
+            fontSize: px(16),
+            fontWeight: typography.weights.bold,
+            color: colors.dark,
+          }}>
+          {sessionExpired ? 'Session expired' : 'Couldn’t load notifications'}
+        </Text>
+        <Text
+          style={{
+            fontSize: px(13),
+            color: colors.grey,
+            textAlign: 'center',
+            lineHeight: px(19),
+            paddingHorizontal: px(12),
+          }}>
+          {errorMessage}
+        </Text>
+        {sessionExpired ? (
+          <Pressable
+            onPress={() => {
+              void logout().catch(() => {
+                showDialog({
+                  tone: 'info',
+                  title: 'Sign in',
+                  message: 'Please close and reopen the app, then log in again.',
+                  primaryLabel: 'OK',
+                });
+              });
+            }}
+            style={{
+              marginTop: px(4),
+              paddingHorizontal: px(20),
+              paddingVertical: px(12),
+              borderRadius: px(12),
+              backgroundColor: colors.primary,
+            }}>
+            <Text style={{ fontSize: px(14), fontWeight: typography.weights.bold, color: colors.dark }}>
+              Sign in again
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => void refetch()}>
+            <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.primary }}>
+              Try again
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  } else if (items.length === 0) {
+    mainContent = (
+      <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
+        <View
+          style={{
+            width: px(56),
+            height: px(56),
+            borderRadius: px(28),
+            backgroundColor: colors.goldLight,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: px(4),
+          }}>
+          <Bell size={px(26)} color={colors.primary} strokeWidth={2} />
+        </View>
+        <Text style={{ marginTop: px(10), fontSize: px(15), fontWeight: typography.weights.bold, color: colors.dark }}>
+          No notifications yet
+        </Text>
+        <Text style={{ marginTop: px(6), fontSize: px(12), color: colors.grey, textAlign: 'center' }}>
+          Booking and payment updates will show up here.
+        </Text>
+      </View>
+    );
+  } else {
+    mainContent = (
+      <>
+        {filterRow}
+        {filtered.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: px(32) }}>
+            <Bell size={px(24)} color={colors.grey} strokeWidth={1.8} />
+            <Text style={{ marginTop: px(8), fontSize: px(12.5), color: colors.grey }}>
+              {activeFilter === 'All'
+                ? 'No notifications'
+                : `No ${activeFilter.toLowerCase()} notifications`}
+            </Text>
+          </View>
+        ) : null}
+        {groups.today.length > 0 ? (
+          <>
+            <Text
+              style={{
+                fontSize: px(11),
+                fontWeight: typography.weights.bold,
+                color: colors.grey,
+                letterSpacing: 0.8,
+                marginBottom: px(8),
+              }}>
+              TODAY
+            </Text>
+            {groups.today.map(item => (
+              <NotificationCard
+                key={item.id}
+                item={item}
+                px={px}
+                onPress={handlePress}
+                onDismiss={handleDismiss}
+                dismissing={dismissingId === item.id}
+              />
+            ))}
+          </>
+        ) : null}
+        {groups.earlier.length > 0 ? (
+          <>
+            <Text
+              style={{
+                fontSize: px(11),
+                fontWeight: typography.weights.bold,
+                color: colors.grey,
+                letterSpacing: 0.8,
+                marginTop: groups.today.length > 0 ? px(8) : 0,
+                marginBottom: px(8),
+              }}>
+              EARLIER
+            </Text>
+            {groups.earlier.map(item => (
+              <NotificationCard
+                key={item.id}
+                item={item}
+                px={px}
+                onPress={handlePress}
+                onDismiss={handleDismiss}
+                dismissing={dismissingId === item.id}
+              />
+            ))}
+          </>
+        ) : null}
+        {unreadCount === 0 && filtered.length > 0 ? (
+          <View style={{ alignItems: 'center', paddingTop: px(16), paddingBottom: px(8) }}>
+            <CheckCircle size={px(28)} color={colors.success} />
+            <Text style={{ marginTop: px(8), fontSize: px(13), color: colors.grey }}>
+              You're all caught up!
+            </Text>
+          </View>
+        ) : null}
+      </>
+    );
+  }
+
   return (
     <ProfileSubScreenLayout
       title="Notifications"
@@ -288,202 +559,8 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
         ) : null
       }>
       {dialog}
-      {isLoading ? (
-        <DataSkeleton variant="list" />
-      ) : (
-        <>
-      {isError ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(36), gap: px(12) }}>
-          <View
-            style={{
-              width: px(56),
-              height: px(56),
-              borderRadius: px(28),
-              backgroundColor: colors.goldLight,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Bell size={px(26)} color={colors.primary} strokeWidth={2} />
-          </View>
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            {sessionExpired ? 'Session expired' : 'Couldn’t load notifications'}
-          </Text>
-          <Text
-            style={{
-              fontSize: px(13),
-              color: colors.grey,
-              textAlign: 'center',
-              lineHeight: px(19),
-              paddingHorizontal: px(12),
-            }}>
-            {errorMessage}
-          </Text>
-          {sessionExpired ? (
-            <Pressable
-              onPress={() => {
-                void logout().catch(() => {
-                  showDialog({
-                    tone: 'info',
-                    title: 'Sign in',
-                    message: 'Please close and reopen the app, then log in again.',
-                    primaryLabel: 'OK',
-                  });
-                });
-              }}
-              style={{
-                marginTop: px(4),
-                paddingHorizontal: px(20),
-                paddingVertical: px(12),
-                borderRadius: px(12),
-                backgroundColor: colors.primary,
-              }}>
-              <Text style={{ fontSize: px(14), fontWeight: typography.weights.bold, color: colors.dark }}>
-                Sign in again
-              </Text>
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => void refetch()}>
-              <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.primary }}>
-                Try again
-              </Text>
-            </Pressable>
-          )}
-        </View>
-      ) : items.length === 0 ? (
-        <View style={{ alignItems: 'center', paddingVertical: px(40) }}>
-          <View
-            style={{
-              width: px(56),
-              height: px(56),
-              borderRadius: px(28),
-              backgroundColor: colors.goldLight,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: px(4),
-            }}>
-            <Bell size={px(26)} color={colors.primary} strokeWidth={2} />
-          </View>
-          <Text style={{ marginTop: px(10), fontSize: px(15), fontWeight: typography.weights.bold, color: colors.dark }}>
-            No notifications yet
-          </Text>
-          <Text style={{ marginTop: px(6), fontSize: px(12), color: colors.grey, textAlign: 'center' }}>
-            Booking and payment updates will show up here.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            bounces={false}
-            keyboardShouldPersistTaps="handled"
-            style={{ marginTop: px(14), marginBottom: px(16) }}
-            contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: px(6), paddingRight: px(4) }}>
-            {FILTERS.map(filter => {
-              const isActive = activeFilter === filter;
-              return (
-                <Pressable
-                  key={filter}
-                  onPress={() => setActiveFilter(filter)}
-                  style={{
-                    flexShrink: 0,
-                    paddingHorizontal: px(12),
-                    paddingVertical: px(5),
-                    borderRadius: px(6),
-                    backgroundColor: isActive ? FILTER_ACTIVE.bg : '#FFFFFF',
-                    borderWidth: 1,
-                    borderColor: isActive ? FILTER_ACTIVE.bg : colors.border,
-                  }}>
-                  <Text
-                    style={{
-                      fontSize: px(11),
-                      fontWeight: typography.weights.bold,
-                      color: isActive ? FILTER_ACTIVE.text : colors.grey,
-                    }}>
-                    {filter}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-          {filtered.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: px(32) }}>
-              <Bell size={px(24)} color={colors.grey} strokeWidth={1.8} />
-              <Text style={{ marginTop: px(8), fontSize: px(12.5), color: colors.grey }}>
-                {activeFilter === 'All'
-                  ? 'No notifications'
-                  : `No ${activeFilter.toLowerCase()} notifications`}
-              </Text>
-            </View>
-          ) : null}
-          {groups.today.length > 0 ? (
-            <>
-              <Text
-                style={{
-                  fontSize: px(11),
-                  fontWeight: typography.weights.bold,
-                  color: colors.grey,
-                  letterSpacing: 0.8,
-                  marginBottom: px(8),
-                }}>
-                TODAY
-              </Text>
-              {groups.today.map(item => (
-                <NotificationCard
-                  key={item.id}
-                  item={item}
-                  px={px}
-                  onPress={handlePress}
-                  onDismiss={handleDismiss}
-                  dismissing={dismissingId === item.id}
-                />
-              ))}
-            </>
-          ) : null}
-
-          {groups.earlier.length > 0 ? (
-            <>
-              <Text
-                style={{
-                  fontSize: px(11),
-                  fontWeight: typography.weights.bold,
-                  color: colors.grey,
-                  letterSpacing: 0.8,
-                  marginTop: px(8),
-                  marginBottom: px(8),
-                }}>
-                EARLIER
-              </Text>
-              {groups.earlier.map(item => (
-                <NotificationCard
-                  key={item.id}
-                  item={item}
-                  px={px}
-                  onPress={handlePress}
-                  onDismiss={handleDismiss}
-                  dismissing={dismissingId === item.id}
-                />
-              ))}
-            </>
-          ) : null}
-
-          {unreadCount === 0 && filtered.length > 0 ? (
-            <View style={{ alignItems: 'center', paddingTop: px(16), paddingBottom: px(8) }}>
-              <CheckCircle size={px(28)} color={colors.success} />
-              <Text style={{ marginTop: px(8), fontSize: px(13), color: colors.grey }}>
-                You're all caught up!
-              </Text>
-            </View>
-          ) : null}
-        </>
-      )}
-        </>
-      )}
+      {alertPrefs}
+      {mainContent}
     </ProfileSubScreenLayout>
   );
 }

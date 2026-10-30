@@ -24,7 +24,8 @@ function inferRouteFromSavedData(): CustomerOnboardingRoute {
     return 'VehicleRegistration';
   }
 
-  return 'VehicleRegistration';
+  // Profile + vehicle exist — onboarding should be `done` and Main app shown.
+  return 'ProfileSetup';
 }
 
 export function getCustomerOnboardingRouteFromStep(

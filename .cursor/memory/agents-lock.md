@@ -9,4 +9,3 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
 | 2026-10-30 | partner driver home + presence | active-trip card overlap fix, online tied to session | agent |
-| 2026-10-30 | customer profile credentials UI | remove PIN/password; mobile change + headers + states | agent |

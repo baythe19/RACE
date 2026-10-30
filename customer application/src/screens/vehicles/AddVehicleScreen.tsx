@@ -118,6 +118,8 @@ export default function AddVehicleScreen({ navigation, route }: Props) {
     setVehicleSubtype(null);
     if (type === 'ev') {
       setFuelType('electric');
+    } else if (fuelType === 'electric') {
+      setFuelType('petrol');
     }
   };
 

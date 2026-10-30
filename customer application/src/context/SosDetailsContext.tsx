@@ -8,11 +8,11 @@ import React, {
   type ReactNode,
 } from 'react';
 
-import { getSosContext } from '../services/sos/sosApi';
 import { useAuthStore } from '../store/authStore';
 import { useProfileStore } from '../store/profileStore';
 import type { SosDetails } from '../types/sos';
 import { emergencyContactDigits, hasSavedEmergencyContact } from '../utils/emergencyContact';
+import { getPhoneDigits } from '../utils/phone';
 
 function createEmptyDetails(): SosDetails {
   return {
@@ -47,6 +47,7 @@ interface SosDetailsContextValue {
 
 const SosDetailsContext = createContext<SosDetailsContextValue | undefined>(undefined);
 
+/** Local SOS form state — hydrated from profile only (vehicle from `/sos/context` on SOS Details screen). */
 export function SosDetailsProvider({ children }: { children: ReactNode }) {
   const [details, setDetailsState] = useState<SosDetails>(createEmptyDetails);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
@@ -65,51 +66,18 @@ export function SosDetailsProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    let cancelled = false;
+    const ec = profile.emergencyContact;
+    const ownerDigits = getPhoneDigits(profile.mobileNumber ?? '');
 
-    const applyFromProfile = () => {
-      const ec = profile.emergencyContact;
-      setDetailsState(prev => ({
-        ...prev,
-        ownerName: profile.fullName?.trim() ?? prev.ownerName,
-        ownerPhone: profile.mobileNumber?.trim() ?? prev.ownerPhone,
-        contactName: hasSavedEmergencyContact(ec) ? ec!.name.trim() : '',
-        contactRelation: ec?.relationship?.trim() ?? '',
-        contactPhone: hasSavedEmergencyContact(ec) ? emergencyContactDigits(ec) : '',
-        location: locationFromProfileAddress(profile.address) || prev.location,
-      }));
-    };
-
-    applyFromProfile();
-
-    void getSosContext()
-      .then(ctx => {
-        if (cancelled) return;
-        setDetailsState(prev => {
-          const next = { ...prev };
-          if (ctx.owner?.name) next.ownerName = ctx.owner.name;
-          if (ctx.owner?.phone) next.ownerPhone = ctx.owner.phone.replace(/\D/g, '').slice(-10);
-          if (ctx.emergencyContact && hasSavedEmergencyContact(ctx.emergencyContact)) {
-            next.contactName = ctx.emergencyContact.name.trim();
-            next.contactPhone = emergencyContactDigits(ctx.emergencyContact);
-            next.contactRelation = ctx.emergencyContact.relationship?.trim() ?? '';
-          }
-          if (ctx.vehicle) {
-            const parts = ctx.vehicle.label.split(' ').filter(Boolean);
-            next.vehicleBrand = parts[0] ?? '';
-            next.vehicleModel = parts.slice(1).join(' ') || next.vehicleModel;
-            next.vehicleNumber = ctx.vehicle.number ?? '';
-          }
-          return next;
-        });
-      })
-      .catch(() => {
-        /* keep profile-only hydration */
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    setDetailsState(prev => ({
+      ...prev,
+      ownerName: profile.fullName?.trim() ?? '',
+      ownerPhone: ownerDigits.length >= 10 ? ownerDigits.slice(-10) : '',
+      contactName: hasSavedEmergencyContact(ec) ? ec!.name.trim() : '',
+      contactRelation: ec?.relationship?.trim() ?? '',
+      contactPhone: hasSavedEmergencyContact(ec) ? emergencyContactDigits(ec) : '',
+      location: locationFromProfileAddress(profile.address) || prev.location,
+    }));
   }, [isAuthenticated, profile]);
 
   const updateDetails = useCallback((patch: Partial<SosDetails>) => {

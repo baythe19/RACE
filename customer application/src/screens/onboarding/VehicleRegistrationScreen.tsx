@@ -38,7 +38,6 @@ import { useCreateVehicleMutation } from '../../services/vehicles/useVehicleQuer
 import { getApiErrorMessage } from '../../services/api';
 import { useAppDialog } from '../../hooks/useAppDialog';
 import { buildCreateVehiclePayload } from '../../utils/vehicleFormPayload';
-import { useAuthStore } from '../../store/authStore';
 import { finishCustomerOnboarding } from '../../utils/finishCustomerOnboarding';
 import type { AuthStackParamList } from '../../types/navigation';
 import type { VehicleType } from '../../types/vehicle';

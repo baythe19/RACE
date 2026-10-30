@@ -27,15 +27,6 @@ export const PARTNER_DEMO_VENDORS = [
 
 export const DEMO_PIN = '1234';
 
-export const DEMO_VEHICLE = {
-  number: 'MH 12 AB 1234',
-  brand: 'Toyota',
-  model: 'Innova Crysta',
-  color: 'Black',
-  fuel: 'Petrol',
-  type: 'Car',
-};
-
 export const ONBOARDING_SLIDES = [
   {
     id: '1',

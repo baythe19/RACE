@@ -324,10 +324,10 @@ export default function HomeScreen({ navigation }: Props) {
                     tabNav?.navigate('Profile');
                   }}
                   style={{
-                    width: px(36),
-                    height: px(36),
-                    borderRadius: px(18),
-                    borderWidth: 2,
+                    width: px(34),
+                    height: px(34),
+                    borderRadius: px(17),
+                    borderWidth: 1.5,
                     borderColor: colors.primary,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -341,7 +341,7 @@ export default function HomeScreen({ navigation }: Props) {
                       resizeMode="cover"
                     />
                   ) : (
-                    <User size={px(18)} color={colors.primary} strokeWidth={2.2} />
+                    <User size={px(16)} color={colors.primary} strokeWidth={2.2} />
                   )}
                 </Pressable>
               </View>

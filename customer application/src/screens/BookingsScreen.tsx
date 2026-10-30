@@ -171,8 +171,7 @@ export default function BookingsScreen() {
       header={
         <TabRootHeader
           title="Bookings"
-          subtitle="Track and manage your service requests"
-          showNotificationBadge={unreadCount > 0}
+          notificationCount={unreadCount}
           onBellPress={() => {
             const tabNav = navigation.getParent();
             if (tabNav) {

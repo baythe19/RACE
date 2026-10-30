@@ -100,10 +100,6 @@ export default function QRScanScreen({ navigation }: Props) {
     navigation.navigate('VehicleQrEmergency', { vehicleId });
   };
 
-  const handleDemoScan = () => {
-    navigation.navigate('VehicleQrEmergency', { vehicleId: 'demo_veh_101' });
-  };
-
   const handleSos = () => {
     navigation.replace('SOSEmergency');
   };
@@ -273,22 +269,6 @@ export default function QRScanScreen({ navigation }: Props) {
         </View>
 
         {/* Action buttons */}
-        <Pressable
-          onPress={handleDemoScan}
-          style={{
-            width: '100%',
-            height: px(50),
-            borderRadius: px(14),
-            backgroundColor: SOS_COLORS.gold,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: px(10),
-          }}>
-          <Text style={{ fontSize: px(15), fontWeight: typography.weights.bold, color: '#000000' }}>
-            🔍 Test Demo Vehicle QR
-          </Text>
-        </Pressable>
-
         <Pressable
           onPress={handleSos}
           style={{

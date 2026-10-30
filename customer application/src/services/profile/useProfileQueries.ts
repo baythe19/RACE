@@ -183,7 +183,7 @@ export function useDeleteNotificationMutation() {
         await deleteNotification(id);
         return { deletedOnServer: true as const };
       } catch (err) {
-        // Render prod (pre-deploy) lacks DELETE /:id — still dismiss in UI.
+        // Prod API may return 404 until DELETE /:id is deployed — UI still dismisses.
         if (isAxiosError(err) && err.response?.status === 404) {
           return { deletedOnServer: false as const };
         }

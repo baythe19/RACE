@@ -10,6 +10,7 @@ import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/P
 import { useAppDialog } from '../../hooks/useAppDialog';
 import { useSosDetails } from '../../context/SosDetailsContext';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
+import { useSosContextQuery } from '../../services/sos/useSosQueries';
 import { useProfileStore } from '../../store/profileStore';
 import { getApiErrorMessage } from '../../services/api';
 import type { ProfileStackParamList } from '../../types/navigation';
@@ -44,6 +45,7 @@ export default function SosDetailsScreen() {
   const { dialog, showDialog } = useAppDialog();
   const { details, setDetails } = useSosDetails();
   const { profile, fetchProfile, updateProfile, isLoading } = useProfileStore();
+  const { data: sosContext } = useSosContextQuery(undefined, Boolean(profile));
 
   const [ownerName, setOwnerName] = useState(details.ownerName);
   const [ownerPhone, setOwnerPhone] = useState(details.ownerPhone);
@@ -70,6 +72,14 @@ export default function SosDetailsScreen() {
     setContactPhone(details.contactPhone);
     setLocation(details.location);
   }, [details]);
+
+  useEffect(() => {
+    if (!sosContext?.vehicle) return;
+    const parts = sosContext.vehicle.label.split(' ').filter(Boolean);
+    setVehicleBrand(parts[0] ?? '');
+    setVehicleModel(parts.slice(1).join(' '));
+    setVehicleNumber(sosContext.vehicle.number);
+  }, [sosContext?.vehicle?.id, sosContext?.vehicle?.label, sosContext?.vehicle?.number]);
 
   const handleSave = async () => {
     if (isLoading) return;

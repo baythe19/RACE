@@ -16,7 +16,8 @@ export const SOS_COLORS = {
   contactsBg: 'rgba(230,81,0,0.12)',
 };
 
-export const SOS_COLORS = {
+/** Quick helpers only — Call Emergency is the big red strip, not a grid tile. */
+export const SOS_GRID_ACTIONS = [
   {
     id: 'towing',
     label: 'Request Towing',
