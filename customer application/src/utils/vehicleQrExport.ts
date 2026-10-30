@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import QRCode from 'qrcode';
-import { Platform, Share } from 'react-native';
+import { Linking, Platform, Share } from 'react-native';
 
 import { getVehicleQrScanUrl } from '../components/vehicles/vehicleUi';
 import type { Vehicle } from '../types/vehicle';
@@ -143,6 +144,9 @@ async function fetchLiveEmergencyHtml(vehicleId: string): Promise<string | null>
 }
 
 async function buildQrPngDataUrl(vehicle: Vehicle): Promise<string> {
+  if (vehicle.qrCode?.startsWith('data:image')) {
+    return vehicle.qrCode;
+  }
   const payload = getVehicleEmergencyPageUrl(vehicle.id);
   return QRCode.toDataURL(payload, {
     errorCorrectionLevel: 'M',
@@ -151,10 +155,35 @@ async function buildQrPngDataUrl(vehicle: Vehicle): Promise<string> {
   });
 }
 
+function isShareDismissed(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const message = 'message' in error ? String((error as { message?: string }).message) : '';
+  return /did not share|cancel/i.test(message);
+}
+
+async function shareNativeFile(fileUri: string, dialogTitle: string): Promise<void> {
+  const available = await Sharing.isAvailableAsync();
+  if (!available) {
+    getAppDialog().showDialog({
+      tone: 'error',
+      title: 'Sharing unavailable',
+      message: 'This device cannot open the share sheet. Try again on a physical phone.',
+      primaryLabel: 'OK',
+    });
+    return;
+  }
+  await Sharing.shareAsync(fileUri, {
+    mimeType: 'image/png',
+    dialogTitle,
+    UTI: 'public.png',
+  });
+}
+
 export async function downloadVehicleQrPng(vehicle: Vehicle): Promise<void> {
   try {
     const dataUrl = await buildQrPngDataUrl(vehicle);
     const fileName = `RACE-Emergency-QR-${sanitizeFilePart(vehicle.vehicleNumber)}.png`;
+    const plate = formatVehicleNumber(vehicle.vehicleNumber);
 
     if (typeof document !== 'undefined') {
       const anchor = document.createElement('a');
@@ -167,16 +196,18 @@ export async function downloadVehicleQrPng(vehicle: Vehicle): Promise<void> {
     }
 
     const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
-    const fileUri = `${FileSystem.cacheDirectory ?? ''}${fileName}`;
+    const cacheDir = FileSystem.cacheDirectory;
+    if (!cacheDir) {
+      throw new Error('No cache directory');
+    }
+    const fileUri = `${cacheDir}${fileName}`;
     await FileSystem.writeAsStringAsync(fileUri, base64, {
       encoding: FileSystem.EncodingType.Base64,
     });
-    await Share.share({
-      title: fileName,
-      url: Platform.OS === 'ios' ? fileUri : undefined,
-      message: Platform.OS === 'android' ? fileUri : `RACE emergency QR for ${formatVehicleNumber(vehicle.vehicleNumber)}`,
-    });
-  } catch {
+
+    await shareNativeFile(fileUri, `Save RACE QR · ${plate}`);
+  } catch (error) {
+    if (isShareDismissed(error)) return;
     getAppDialog().showDialog({
       tone: 'error',
       title: 'Download failed',
@@ -191,15 +222,55 @@ export async function shareVehicleQr(vehicle: Vehicle): Promise<void> {
   const plate = formatVehicleNumber(vehicle.vehicleNumber);
   const message = isLocalApi(scanUrl)
     ? `RACE emergency QR for ${plate}. Scan opens help for this vehicle.`
-    : `RACE emergency QR for ${plate}. Scan for help: ${scanUrl}`;
+    : `RACE emergency QR for ${plate}. Scan for help:\n${scanUrl}`;
   try {
-    await Share.share({ message, url: isLocalApi(scanUrl) ? undefined : scanUrl });
-  } catch {
-    // User dismissed the share sheet.
+    const result = await Share.share(
+      Platform.OS === 'ios' && !isLocalApi(scanUrl)
+        ? { message, url: scanUrl }
+        : { message },
+    );
+    if (result.action === Share.dismissedAction) return;
+  } catch (error) {
+    if (isShareDismissed(error)) return;
+    getAppDialog().showDialog({
+      tone: 'error',
+      title: 'Share failed',
+      message: isLocalApi(scanUrl)
+        ? 'Could not open the share sheet. Use Download QR to send the image instead.'
+        : 'Could not open the share sheet. Try again.',
+      primaryLabel: 'OK',
+    });
   }
 }
 
 export async function openVehicleEmergencyPageInBrowser(vehicle: Vehicle): Promise<void> {
-  const live = await fetchLiveEmergencyHtml(vehicle.id);
-  openHtmlDocument(live ?? buildVehicleEmergencyPreviewHtml(vehicle));
+  const pageUrl = getVehicleEmergencyPageUrl(vehicle.id);
+
+  if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+    const live = await fetchLiveEmergencyHtml(vehicle.id);
+    openHtmlDocument(live ?? buildVehicleEmergencyPreviewHtml(vehicle));
+    return;
+  }
+
+  if (isLocalApi(pageUrl)) {
+    getAppDialog().showDialog({
+      tone: 'info',
+      title: 'Emergency page',
+      message:
+        'This dev build points at a local API, so there is no public web page to open. Share the link or download the QR — in production, scan opens the live help page.',
+      primaryLabel: 'OK',
+    });
+    return;
+  }
+
+  try {
+    await Linking.openURL(pageUrl);
+  } catch {
+    getAppDialog().showDialog({
+      tone: 'error',
+      title: 'Could not open browser',
+      message: 'No browser could open the emergency page. Try Share link instead.',
+      primaryLabel: 'OK',
+    });
+  }
 }

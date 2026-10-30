@@ -59,7 +59,7 @@ export default function VehicleDetailScreen({ navigation, route }: Props) {
 
   if (isLoading && !vehicle) {
     return (
-      <ProfileSubScreenLayout title="Vehicle QR" subtitle="Loading…">
+      <ProfileSubScreenLayout title="Vehicle QR">
         <DataSkeleton variant="detail" />
       </ProfileSubScreenLayout>
     );
@@ -67,7 +67,7 @@ export default function VehicleDetailScreen({ navigation, route }: Props) {
 
   if (!vehicle) {
     return (
-      <ProfileSubScreenLayout title="Vehicle QR" subtitle="">
+      <ProfileSubScreenLayout title="Vehicle QR">
         <Text style={styles.error}>{error ?? 'Vehicle not found'}</Text>
       </ProfileSubScreenLayout>
     );
@@ -76,7 +76,7 @@ export default function VehicleDetailScreen({ navigation, route }: Props) {
   return (
     <ProfileSubScreenLayout
       title="Vehicle QR"
-      subtitle={formatVehicleNumber(vehicle.vehicleNumber)}
+      contentStyle={{ paddingTop: px(18) }}
       footer={
         <View style={[styles.footer, { paddingHorizontal: px(20), paddingBottom: px(16) }]}>
           {dialog}

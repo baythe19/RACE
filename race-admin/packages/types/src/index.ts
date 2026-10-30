@@ -100,6 +100,7 @@ export interface RecentBookingRow {
   status: string;
   amount: number;
   createdAt: string;
+  bookingType?: BookingType;
 }
 
 export interface RecentVendorRow {
@@ -192,6 +193,8 @@ export interface CustomerBookingHistoryItem {
   date: string;
   vendorName?: string;
   driverName?: string;
+  customerName?: string;
+  bookingType?: 'legacy' | 'towing' | 'driver';
 }
 
 export interface CustomerPayment {
@@ -288,6 +291,7 @@ export interface VendorBookingRow {
   amount: number;
   status: string;
   date: string;
+  bookingType?: BookingType;
 }
 
 export interface VendorQuickStat {

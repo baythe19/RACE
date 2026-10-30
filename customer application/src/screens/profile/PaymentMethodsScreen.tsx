@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { Trash2 } from 'lucide-react-native';
+import { CircleHelp, Trash2 } from 'lucide-react-native';
 
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import DataSkeleton from '../../components/ui/DataSkeleton';
@@ -172,18 +172,20 @@ export default function PaymentMethodsScreen() {
             })
           }
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Payments help"
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: px(5),
+            gap: px(6),
             borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: px(16),
+            borderColor: '#BFDBFE',
+            backgroundColor: '#EFF6FF',
+            borderRadius: px(20),
             paddingHorizontal: px(12),
-            paddingVertical: px(6),
+            paddingVertical: px(7),
           }}>
-          <Text style={{ fontSize: px(13), color: '#2563EB', fontWeight: typography.weights.semibold }}>(
-            ?</Text>
+          <CircleHelp size={px(16)} color="#2563EB" strokeWidth={2.2} />
           <Text style={{ fontSize: px(13), color: '#2563EB', fontWeight: typography.weights.semibold }}>Help</Text>
         </Pressable>
       }>

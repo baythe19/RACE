@@ -21,6 +21,7 @@ import ProfileAddressFields, {
 import ProfileEmergencyContactFields, {
   type EmergencyContactFormValues,
 } from '../../components/profile/ProfileEmergencyContactFields';
+import ProfileSecurityLinks from '../../components/profile/ProfileSecurityLinks';
 import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
 import DataSkeleton from '../../components/ui/DataSkeleton';
 import { EMERGENCY_RELATIONSHIP_OPTIONS } from '../../constants/profileForm';
@@ -168,17 +169,14 @@ export default function PersonalInformationScreen() {
 
   if (isLoading && !profile) {
     return (
-      <ProfileSubScreenLayout title="Personal Information" subtitle="Update your details">
+      <ProfileSubScreenLayout title="Personal Information">
         <DataSkeleton variant="profile" />
       </ProfileSubScreenLayout>
     );
   }
 
   return (
-    <ProfileSubScreenLayout
-      title="Personal Information"
-      subtitle="Update your details"
-      keyboardAvoiding>
+    <ProfileSubScreenLayout title="Personal Information">
       {dialog}
       <Pressable
         onPress={() =>
@@ -302,6 +300,8 @@ export default function PersonalInformationScreen() {
           onClearError={clearError}
         />
       </View>
+
+      <ProfileSecurityLinks />
 
       <GoldButton
         label={isLoading ? 'Saving...' : 'Save Changes'}

@@ -92,7 +92,7 @@ export class SosService {
             fuelType: vehicle.fuelType,
           }
         : null,
-      emergencyNumber: env.SOS_EMERGENCY_PHONE,
+      emergencyNumber: user.emergencyContact?.mobileNumber?.replace(/\D/g, '').slice(-10) ?? '',
     };
   }
 }

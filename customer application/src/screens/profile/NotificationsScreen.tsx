@@ -242,14 +242,6 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
     setDismissingId(item.id);
     deleteOne.mutate(item.id, {
       onSettled: () => setDismissingId(null),
-      onError: (err: unknown) => {
-        showDialog({
-          tone: 'error',
-          title: 'Error',
-          message: getApiErrorMessage(err, 'Unable to remove notification'),
-          primaryLabel: 'OK',
-        });
-      },
     });
   };
 
@@ -281,8 +273,6 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
   return (
     <ProfileSubScreenLayout
       title="Notifications"
-      subtitle="Booking updates and trip alerts"
-      subtitleNumberOfLines={1}
       headerRight={
         !isError && items.length > 0 ? (
           <Pressable onPress={handleClearAll} hitSlop={8} disabled={deleteAll.isPending}>
@@ -300,7 +290,9 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
       {dialog}
       {isLoading ? (
         <DataSkeleton variant="list" />
-      ) : isError ? (
+      ) : (
+        <>
+      {isError ? (
         <View style={{ alignItems: 'center', paddingVertical: px(36), gap: px(12) }}>
           <View
             style={{
@@ -390,7 +382,7 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
             showsHorizontalScrollIndicator={false}
             bounces={false}
             keyboardShouldPersistTaps="handled"
-            style={{ marginBottom: px(10) }}
+            style={{ marginTop: px(14), marginBottom: px(16) }}
             contentContainerStyle={{ flexDirection: 'row', alignItems: 'center', gap: px(6), paddingRight: px(4) }}>
             {FILTERS.map(filter => {
               const isActive = activeFilter === filter;
@@ -462,7 +454,7 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
                   fontWeight: typography.weights.bold,
                   color: colors.grey,
                   letterSpacing: 0.8,
-                  marginTop: px(4),
+                  marginTop: px(8),
                   marginBottom: px(8),
                 }}>
                 EARLIER
@@ -488,6 +480,8 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
               </Text>
             </View>
           ) : null}
+        </>
+      )}
         </>
       )}
     </ProfileSubScreenLayout>

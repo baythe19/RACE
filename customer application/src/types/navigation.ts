@@ -120,7 +120,6 @@ export type AuthStackParamList = {
     vehicleId: string;
     vehicleNumber: string;
   };
-  CreatePin: undefined;
 };
 
 export type BookingsStackParamList = {
@@ -206,7 +205,6 @@ export type ProfileStackParamList = {
   Notifications: undefined;
   HelpSupport: undefined;
   SupportCenter: undefined;
-  Settings: undefined;
   ChoosePlan: undefined;
   SubscriptionPlans: undefined;
   EmergencySos: undefined;
@@ -215,8 +213,6 @@ export type ProfileStackParamList = {
   VendorReview: { vendorType?: string } | undefined;
   VendorVerificationStatus: { vendorType?: string } | undefined;
   MyQr: { vehicleId: string };
-  CreatePin: undefined;
-  ChangePassword: undefined;
   ChangeMobileNumber: undefined;
 };
 

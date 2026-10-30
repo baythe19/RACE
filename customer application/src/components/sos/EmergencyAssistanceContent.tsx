@@ -54,17 +54,11 @@ type SosDialogState = {
   onSecondary?: () => void;
 };
 
-function formatEmergencyPhone(raw: string) {
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 12 && digits.startsWith('91')) {
-    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
-  }
-  if (digits.length === 10) {
-    return `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`;
-  }
-  if (digits.length > 0 && !raw.startsWith('+')) return `+${digits}`;
-  return raw;
-}
+import {
+  emergencyContactDigits,
+  formatEmergencyPhoneDisplay,
+  hasSavedEmergencyContact,
+} from '../../utils/emergencyContact';
 
 /**
  * SOS screen — calm urgency.
@@ -96,25 +90,22 @@ export default function EmergencyAssistanceContent({
   const closeDialog = useCallback(() => setDialog(null), []);
 
   const emergencyPhone = (config?.emergencyPhone ?? '112').replace(/\s/g, '');
-  const emergencyPhoneLabel = formatEmergencyPhone(emergencyPhone);
+  const emergencyPhoneLabel = formatEmergencyPhoneDisplay(emergencyPhone);
   const supportPhone = config?.supportPhone ?? '';
 
-  const vehicleLabel = context?.vehicle
-    ? context.vehicle.label
-    : `${details.vehicleBrand} ${details.vehicleModel}`.trim();
-  const vehicleNumber = context?.vehicle?.number ?? details.vehicleNumber;
-  const ownerName = context?.owner?.name ?? details.ownerName;
-  const ownerPhoneRaw = (context?.owner?.phone ?? details.ownerPhone).replace(/\s/g, '');
-  const contactName = context?.emergencyContact?.name ?? details.contactName;
-  const contactPhone = (context?.emergencyContact?.mobileNumber ?? details.contactPhone).replace(/\s/g, '');
-  const contactRelation = context?.emergencyContact?.relationship ?? details.contactRelation;
+  const vehicleLabel = context?.vehicle?.label ?? '';
+  const vehicleNumber = context?.vehicle?.number ?? '';
+  const ownerName = context?.owner?.name ?? '';
+  const ownerPhoneRaw = (context?.owner?.phone ?? '').replace(/\D/g, '').slice(-10);
+  const savedContact = context?.emergencyContact ?? null;
+  const hasContact = hasSavedEmergencyContact(savedContact);
+  const contactName = hasContact ? savedContact!.name.trim() : '';
+  const contactPhone = hasContact ? emergencyContactDigits(savedContact) : '';
+  const contactRelation = hasContact ? savedContact!.relationship?.trim() ?? '' : '';
   const vehicleId = context?.vehicle?.id;
 
   const detailsIncomplete =
-    !isAuthenticated ||
-    !vehicleNumber ||
-    vehicleNumber.replace(/\s/g, '').toUpperCase().startsWith('MH12') ||
-    !ownerPhoneRaw;
+    !isAuthenticated || !vehicleNumber || !hasContact || ownerPhoneRaw.length < 10;
 
   const resolveLocation = useCallback(async () => {
     try {
@@ -438,31 +429,28 @@ export default function EmergencyAssistanceContent({
                 <Text
                   numberOfLines={1}
                   style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
-                  {context?.owner?.phone ?? details.ownerPhone}
+                  {ownerPhoneRaw
+                    ? formatEmergencyPhoneDisplay(ownerPhoneRaw)
+                    : 'Sign in and complete your profile'}
                 </Text>
               </View>
-              {ownerPhoneRaw ? (
+              {ownerPhoneRaw.length >= 10 ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Call owner"
-                  onPress={() => void Linking.openURL(`tel:${ownerPhoneRaw}`)}
+                  onPress={() => void Linking.openURL(`tel:+91${ownerPhoneRaw}`)}
                   style={[
                     styles.callBtn,
                     {
-                      paddingHorizontal: px(12),
-                      paddingVertical: px(9),
-                      borderRadius: px(10),
+                      width: px(40),
+                      height: px(40),
+                      borderRadius: px(20),
+                      paddingHorizontal: 0,
+                      paddingVertical: 0,
+                      justifyContent: 'center',
                     },
                   ]}>
-                  <Phone size={px(13)} color="#FFFFFF" strokeWidth={2.4} />
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: px(11.5),
-                      fontWeight: typography.weights.bold,
-                    }}>
-                    Call
-                  </Text>
+                  <Phone size={px(18)} color="#FFFFFF" strokeWidth={2.4} />
                 </Pressable>
               ) : null}
             </View>
@@ -496,44 +484,58 @@ export default function EmergencyAssistanceContent({
                 <User size={px(17)} color={colors.secondary} strokeWidth={2.2} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: colors.dark,
-                    fontSize: px(13.5),
-                    fontWeight: typography.weights.bold,
-                  }}>
-                  {contactName} ({contactRelation})
-                </Text>
-                <Text
-                  numberOfLines={1}
-                  style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
-                  {context?.emergencyContact?.mobileNumber ?? details.contactPhone}
-                </Text>
+                {hasContact ? (
+                  <>
+                    <Text
+                      numberOfLines={1}
+                      style={{
+                        color: colors.dark,
+                        fontSize: px(13.5),
+                        fontWeight: typography.weights.bold,
+                      }}>
+                      {contactName}
+                      {contactRelation ? ` (${contactRelation})` : ''}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      style={{ color: colors.grey, fontSize: px(12), marginTop: px(2) }}>
+                      {formatEmergencyPhoneDisplay(contactPhone)}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text
+                      style={{
+                        color: colors.dark,
+                        fontSize: px(13.5),
+                        fontWeight: typography.weights.bold,
+                      }}>
+                      Please add emergency contact
+                    </Text>
+                    <Text style={{ color: colors.grey, fontSize: px(12), marginTop: px(2), lineHeight: px(17) }}>
+                      Save a trusted contact in Profile → Personal Information or SOS Details.
+                    </Text>
+                  </>
+                )}
               </View>
-              {contactPhone ? (
+              {hasContact && contactPhone ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Call ${contactName}`}
-                  onPress={() => void Linking.openURL(`tel:${contactPhone}`)}
+                  onPress={() => void Linking.openURL(`tel:+91${contactPhone}`)}
                   style={[
                     styles.callBtn,
                     {
                       backgroundColor: colors.secondary,
-                      paddingHorizontal: px(12),
-                      paddingVertical: px(9),
-                      borderRadius: px(10),
+                      width: px(40),
+                      height: px(40),
+                      borderRadius: px(20),
+                      paddingHorizontal: 0,
+                      paddingVertical: 0,
+                      justifyContent: 'center',
                     },
                   ]}>
-                  <Phone size={px(13)} color="#FFFFFF" strokeWidth={2.4} />
-                  <Text
-                    style={{
-                      color: '#FFFFFF',
-                      fontSize: px(11.5),
-                      fontWeight: typography.weights.bold,
-                    }}>
-                    Call
-                  </Text>
+                  <Phone size={px(18)} color="#FFFFFF" strokeWidth={2.4} />
                 </Pressable>
               ) : null}
             </View>

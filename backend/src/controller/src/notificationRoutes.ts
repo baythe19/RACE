@@ -10,11 +10,11 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', notificationController.list);
+router.get('/preferences', notificationController.getPrefs);
+router.patch('/preferences', validate(updateNotificationPrefsSchema), notificationController.updatePrefs);
 router.patch('/read-all', notificationController.markAllRead);
 router.patch('/:id/read', notificationController.markRead);
 router.delete('/', notificationController.deleteAll);
 router.delete('/:id', notificationController.deleteOne);
-router.get('/preferences', notificationController.getPrefs);
-router.patch('/preferences', validate(updateNotificationPrefsSchema), notificationController.updatePrefs);
 
 export default router;

@@ -193,11 +193,12 @@ function renderVariant(variant: DataSkeletonVariant): React.ReactNode {
     // service row, two route lines, driver, actions) → history rows.
     return (
       <>
-        <Row style={[styles.spacedXs, { gap: 8, marginBottom: 12 }]}>
-          <Bone width={64} height={30} radius={8} />
-          <Bone width={78} height={30} radius={8} />
-          <Bone width={70} height={30} radius={8} />
-          <Bone width={82} height={30} radius={8} />
+        <Row style={[styles.spacedXs, { gap: 6, marginBottom: 12, justifyContent: 'center' }]}>
+          <Bone width={44} height={28} radius={6} />
+          <Bone width={68} height={28} radius={6} />
+          <Bone width={48} height={28} radius={6} />
+          <Bone width={58} height={28} radius={6} />
+          <Bone width={54} height={28} radius={6} />
         </Row>
         {[0, 1].map(index => (
           <Card key={index} style={styles.spacedSm}>

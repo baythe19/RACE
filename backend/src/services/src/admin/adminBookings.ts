@@ -429,9 +429,19 @@ export const adminBookingsService = {
   },
 
   async getById(id: string, type?: 'towing' | 'driver' | 'legacy') {
-    if (type === 'towing' || type === 'driver') {
+    let resolvedType = type;
+    if (!resolvedType) {
+      const [towingExists, driverExists] = await Promise.all([
+        TowingBookingModel.exists({ _id: id }),
+        DriverBookingModel.exists({ _id: id }),
+      ]);
+      if (towingExists) resolvedType = 'towing';
+      else if (driverExists) resolvedType = 'driver';
+    }
+
+    if (resolvedType === 'towing' || resolvedType === 'driver') {
       const booking =
-        type === 'towing'
+        resolvedType === 'towing'
           ? await TowingBookingModel.findById(id).lean()
           : await DriverBookingModel.findById(id).lean();
       if (!booking) throw new NotFoundError('Booking not found');
@@ -441,12 +451,14 @@ export const adminBookingsService = {
         booking.driverId ? UserModel.findById(booking.driverId).lean() : null,
         booking.vehicleId ? VehicleModel.findById(booking.vehicleId).lean() : null,
         booking.vendorId ? UserModel.findById(booking.vendorId).lean() : null,
-        PaymentTransactionModel.find({ bookingId: booking._id, bookingType: type }).sort({ createdAt: -1 }).lean(),
+        PaymentTransactionModel.find({ bookingId: booking._id, bookingType: resolvedType })
+          .sort({ createdAt: -1 })
+          .lean(),
       ]);
 
       return {
         id: booking._id.toString(),
-        bookingType: type,
+        bookingType: resolvedType,
         bookingNumber: booking.bookingNumber,
         customerId: booking.customerId.toString(),
         customerName: customer?.fullName ?? 'Customer',

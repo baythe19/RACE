@@ -5,13 +5,12 @@ import { useVehicleStore } from './vehicleStore';
 
 export type CustomerOnboardingRoute = keyof Pick<
   AuthStackParamList,
-  'ProfileSetup' | 'VehicleRegistration' | 'CreatePin'
+  'ProfileSetup' | 'VehicleRegistration'
 >;
 
 const STEP_ROUTE: Record<Exclude<CustomerOnboardingStep, 'done'>, CustomerOnboardingRoute> = {
   profile: 'ProfileSetup',
   vehicle: 'VehicleRegistration',
-  pin: 'CreatePin',
 };
 
 function inferRouteFromSavedData(): CustomerOnboardingRoute {
@@ -25,7 +24,7 @@ function inferRouteFromSavedData(): CustomerOnboardingRoute {
     return 'VehicleRegistration';
   }
 
-  return 'CreatePin';
+  return 'VehicleRegistration';
 }
 
 export function getCustomerOnboardingRouteFromStep(

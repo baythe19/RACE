@@ -528,7 +528,11 @@ export function VendorDetailContent({ vendorId }: { vendorId: string }) {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Recent Bookings</CardTitle>
-                <button type="button" className="text-sm font-medium text-[#F5A623] hover:underline">
+                <button
+                  type="button"
+                  className="text-sm font-medium text-[#F5A623] hover:underline"
+                  onClick={() => navigate('/bookings')}
+                >
                   View All
                 </button>
               </CardHeader>
@@ -537,6 +541,11 @@ export function VendorDetailContent({ vendorId }: { vendorId: string }) {
                   columns={bookingColumns}
                   data={vendor.recentBookings ?? []}
                   emptyMessage="No bookings"
+                  onRowClick={(row) =>
+                    navigate(
+                      `/bookings/${row.id}${row.bookingType ? `?type=${row.bookingType}` : ''}`,
+                    )
+                  }
                 />
               </CardContent>
             </Card>

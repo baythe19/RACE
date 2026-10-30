@@ -41,9 +41,9 @@ export function renderVehicleEmergencyPage(data: VehicleEmergencyPageData): stri
   const ownerTel = telHref(data.ownerMobile);
   const emergencyTel = telHref(data.emergencyMobile);
   const ownerWa = waHref(data.ownerMobile, plate);
-  const ownerLabel = data.ownerName ? `Call ${data.ownerName}` : 'Call owner';
+  const ownerLabel = data.ownerName ? `Call ${data.ownerName}` : 'Call vehicle owner';
   const emergencyLabel = data.emergencyName
-    ? `Call ${data.emergencyName}${data.emergencyRelationship ? ` (${data.emergencyRelationship})` : ''}`
+    ? `Call ${data.emergencyName}${data.emergencyRelationship ? ` · ${data.emergencyRelationship}` : ''}`
     : 'Call emergency contact';
 
   const chipHtml = chips
@@ -51,12 +51,12 @@ export function renderVehicleEmergencyPage(data: VehicleEmergencyPageData): stri
     .join('');
 
   const ownerBlock = ownerTel
-    ? `<a class="btn btn-red" href="${ownerTel}">${escapeHtml(ownerLabel)}</a>
-       ${ownerWa ? `<a class="btn btn-ghost" href="${ownerWa}">WhatsApp owner</a>` : ''}`
-    : `<a class="btn btn-red" href="tel:112">Call 112 · emergency</a>`;
+    ? `<a class="btn btn-primary" href="${ownerTel}">${escapeHtml(ownerLabel)}</a>
+       ${ownerWa ? `<a class="btn btn-secondary" href="${ownerWa}">WhatsApp owner</a>` : ''}`
+    : `<p class="hint">Owner contact is not on file. Use emergency numbers below.</p>`;
 
   const emergencyBlock = emergencyTel
-    ? `<a class="btn btn-gold" href="${emergencyTel}">${escapeHtml(emergencyLabel)}</a>`
+    ? `<a class="btn btn-secondary" href="${emergencyTel}">${escapeHtml(emergencyLabel)}</a>`
     : '';
 
   return `<!DOCTYPE html>
@@ -64,32 +64,35 @@ export function renderVehicleEmergencyPage(data: VehicleEmergencyPageData): stri
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#16161E" />
+  <meta name="theme-color" content="#FFF7ED" />
+  <meta name="referrer" content="no-referrer" />
   <title>RACE · Help for ${escapeHtml(plate)}</title>
   ${emergencyPageStyles()}
 </head>
 <body>
-  <main class="wrap">
-    <header class="brand">
-      <span class="logo">RACE</span>
-      <span class="brand-sub">Roadside help</span>
+  <main class="page">
+    <header class="top">
+      <div class="brand-mark">RACE</div>
+      <p class="brand-tag">Verified emergency sticker</p>
     </header>
 
-    <p class="kicker">This vehicle needs help</p>
-    <div class="plate">${escapeHtml(plate)}</div>
-    <h1 class="vehicle">${escapeHtml(vehicleLine || 'Registered vehicle')}</h1>
-    ${chipHtml ? `<div class="chips">${chipHtml}</div>` : ''}
+    <section class="card hero">
+      <p class="eyebrow">Vehicle needs help</p>
+      <div class="plate">${escapeHtml(plate)}</div>
+      <h1 class="title">${escapeHtml(vehicleLine || 'Registered vehicle')}</h1>
+      ${chipHtml ? `<div class="chips">${chipHtml}</div>` : ''}
+      <p class="lede">Tap to reach the registered owner or their emergency contact. If someone is in immediate danger, call <strong>112</strong>.</p>
+    </section>
 
-    <p class="lede">One tap to reach the owner. If no one answers, call 112.</p>
-
-    <section class="actions">
+    <section class="card actions">
+      <h2 class="section-title">Reach someone now</h2>
       ${ownerBlock}
       ${emergencyBlock}
-      <a class="btn btn-gold" href="tel:112">Call 112</a>
+      <a class="btn btn-danger" href="tel:112">Call 112 · national emergency</a>
       <button class="btn btn-ghost" type="button" id="shareBtn">Share this page</button>
     </section>
 
-    <p class="foot">RACE emergency sticker · numbers stay private until you tap Call</p>
+    <p class="foot">Phone numbers stay on this device until you tap Call or WhatsApp. RACE roadside assistance.</p>
   </main>
   ${shareScript(plate, vehicleLine)}
 </body>
@@ -101,22 +104,29 @@ export function renderVehicleNotFoundPage(): string {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#16161E" />
-  <title>RACE · Vehicle not found</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#FFF7ED" />
+  <meta name="referrer" content="no-referrer" />
+  <title>RACE · QR not linked</title>
   ${emergencyPageStyles()}
 </head>
 <body>
-  <main class="wrap">
-    <header class="brand">
-      <span class="logo">RACE</span>
-      <span class="brand-sub">Roadside help</span>
+  <main class="page">
+    <header class="top">
+      <div class="brand-mark">RACE</div>
+      <p class="brand-tag">Emergency scan</p>
     </header>
-    <p class="kicker">QR not recognised</p>
-    <h1 class="vehicle">This sticker is not linked to a live vehicle.</h1>
-    <p class="lede">It may have been removed, or this is a preview. If someone is in danger, call 112 now.</p>
-    <section class="actions">
-      <a class="btn btn-red" href="tel:112">Call 112</a>
+
+    <section class="card hero">
+      <div class="status-icon" aria-hidden="true">!</div>
+      <p class="eyebrow eyebrow-warn">QR not linked</p>
+      <h1 class="title">This sticker is not active on RACE.</h1>
+      <p class="lede">It may be a demo, removed, or not registered yet. If someone needs urgent help at this vehicle, call emergency services now.</p>
+    </section>
+
+    <section class="card actions">
+      <a class="btn btn-danger" href="tel:112">Call 112 · national emergency</a>
+      <p class="hint">To register a vehicle sticker, open the RACE app → Profile → My Vehicles.</p>
     </section>
   </main>
 </body>
@@ -137,12 +147,12 @@ function shareScript(plate: string, vehicleLine: string): string {
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(payload.text + ' ' + payload.url).then(function () {
-        btn.textContent = 'Copied';
+        btn.textContent = 'Link copied';
         setTimeout(function () { btn.textContent = 'Share this page'; }, 1600);
       });
       return;
     }
-    window.location.href = 'sms:?body=' + encodeURIComponent(payload.text);
+    window.location.href = 'sms:?body=' + encodeURIComponent(payload.text + ' ' + payload.url);
   });
 })();
 </script>`;
@@ -150,52 +160,92 @@ function shareScript(plate: string, vehicleLine: string): string {
 
 function emergencyPageStyles(): string {
   return `<style>
-    :root { color-scheme: dark; }
+    :root {
+      color-scheme: light;
+      --bg: #FFF7ED;
+      --card: #FFFFFF;
+      --text: #111827;
+      --muted: #6B7280;
+      --border: #E5E7EB;
+      --gold: #F59E0B;
+      --gold-soft: #FEF3C7;
+      --danger: #DC2626;
+      --danger-soft: #FEE2E2;
+    }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       min-height: 100vh;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #16161E;
-      color: #F9FAFB;
-      padding: 20px 20px 32px;
+      background: linear-gradient(180deg, var(--bg) 0%, #FFFFFF 48%);
+      color: var(--text);
+      padding: 20px 16px 40px;
     }
-    .wrap { max-width: 420px; margin: 0 auto; }
-    .brand { display: flex; align-items: baseline; gap: 10px; margin-bottom: 22px; }
-    .logo { font-weight: 800; letter-spacing: 0.18em; font-size: 13px; color: #F5A623; }
-    .brand-sub { font-size: 12px; color: #9CA3AF; }
-    .kicker {
+    .page { max-width: 440px; margin: 0 auto; }
+    .top { margin-bottom: 18px; }
+    .brand-mark {
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      font-size: 14px;
+      color: var(--gold);
+    }
+    .brand-tag { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 20px 18px;
+      box-shadow: 0 8px 30px rgba(17, 24, 39, 0.06);
+      margin-bottom: 14px;
+    }
+    .eyebrow {
       margin: 0 0 10px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #E23744;
+      color: var(--gold);
+    }
+    .eyebrow-warn { color: var(--danger); }
+    .status-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: var(--danger-soft);
+      color: var(--danger);
+      font-weight: 800;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
     }
     .plate {
       display: inline-block;
-      background: #F5A623;
-      color: #16161E;
+      background: var(--gold-soft);
+      border: 1px solid #FDE68A;
+      color: var(--text);
       font-weight: 800;
-      font-size: 22px;
-      letter-spacing: 0.12em;
-      padding: 10px 16px;
-      border-radius: 8px;
-      margin-bottom: 14px;
+      font-size: 20px;
+      letter-spacing: 0.1em;
+      padding: 10px 14px;
+      border-radius: 12px;
+      margin-bottom: 12px;
     }
-    .vehicle { margin: 0 0 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
-    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    .title { margin: 0 0 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .chip {
-      background: #1F2030;
-      border: 1px solid #2A2B3A;
-      color: #D1D5DB;
+      background: #F9FAFB;
+      border: 1px solid var(--border);
+      color: #374151;
       font-size: 12px;
       font-weight: 700;
       padding: 6px 10px;
       border-radius: 999px;
       text-transform: capitalize;
     }
-    .lede { margin: 0 0 20px; color: #9CA3AF; line-height: 1.5; font-size: 14px; }
+    .lede { margin: 0; color: var(--muted); line-height: 1.55; font-size: 14px; }
+    .section-title { margin: 0 0 12px; font-size: 15px; font-weight: 800; }
     .actions { display: grid; gap: 10px; }
     .btn {
       display: block;
@@ -203,17 +253,19 @@ function emergencyPageStyles(): string {
       text-align: center;
       text-decoration: none;
       font-weight: 800;
-      font-size: 16px;
-      padding: 16px 18px;
+      font-size: 15px;
+      padding: 15px 16px;
       border-radius: 14px;
       border: 0;
       cursor: pointer;
       font-family: inherit;
     }
-    .btn-red { background: #E23744; color: #fff; }
-    .btn-gold { background: #F5A623; color: #16161E; }
-    .btn-ghost { background: #1F2030; color: #F9FAFB; border: 1px solid #2A2B3A; }
-    .foot { margin: 22px 0 0; font-size: 11px; color: #6B7280; text-align: center; line-height: 1.5; }
+    .btn-primary { background: var(--gold); color: #111827; }
+    .btn-secondary { background: #FFFFFF; color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: var(--danger); color: #FFFFFF; }
+    .btn-ghost { background: #F9FAFB; color: var(--text); border: 1px solid var(--border); }
+    .hint { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .foot { margin: 8px 4px 0; font-size: 11px; color: var(--muted); text-align: center; line-height: 1.5; }
   </style>`;
 }
 

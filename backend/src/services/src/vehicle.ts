@@ -106,6 +106,11 @@ export class VehicleService {
       return { valid: false as const, vehicleId };
     }
 
+    const qrRecord = await vehicleQrRepository.findByVehicleId(vehicleId);
+    if (!qrRecord?.isActive) {
+      return { valid: false as const, vehicleId };
+    }
+
     await vehicleQrRepository.recordScan(vehicleId);
 
     const owner = await userRepository.findById(vehicle.customerId.toString());

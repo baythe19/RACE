@@ -32,7 +32,7 @@ export default function AppStackHeader({
 
   return (
     <View style={[styles.wrap, { backgroundColor: colors.pageBg }]}>
-      <View style={[styles.row, { paddingHorizontal: px(20), minHeight: px(48), paddingTop: px(6), paddingBottom: subtitle ? px(4) : px(10) }]}>
+      <View style={[styles.row, { paddingHorizontal: px(20), minHeight: px(52), paddingVertical: px(8) }]}>
         {showBack && onBack ? (
           <Pressable
             onPress={onBack}

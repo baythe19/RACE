@@ -39,7 +39,7 @@ import { getApiErrorMessage } from '../../services/api';
 import { useAppDialog } from '../../hooks/useAppDialog';
 import { buildCreateVehiclePayload } from '../../utils/vehicleFormPayload';
 import { useAuthStore } from '../../store/authStore';
-import { setCustomerOnboardingStep } from '../../store/customerOnboarding';
+import { finishCustomerOnboarding } from '../../utils/finishCustomerOnboarding';
 import type { AuthStackParamList } from '../../types/navigation';
 import type { VehicleType } from '../../types/vehicle';
 import { colors, shadows, typography } from '../../theme';
@@ -121,8 +121,6 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
           fuelLabel: selectedFuel,
         }),
       );
-      await setCustomerOnboardingStep('pin');
-      useAuthStore.getState().setCustomerOnboardingStep('pin');
       navigation.navigate('QRCode', {
         vehicleId: vehicle.id,
         vehicleNumber: vehicle.vehicleNumber,
@@ -138,9 +136,7 @@ export default function VehicleRegistrationScreen({ navigation }: Props) {
   };
 
   const handleSkip = async () => {
-    await setCustomerOnboardingStep('pin');
-    useAuthStore.getState().setCustomerOnboardingStep('pin');
-    navigation.navigate('CreatePin');
+    await finishCustomerOnboarding();
   };
 
   const sectionLabel = (text: string) => (

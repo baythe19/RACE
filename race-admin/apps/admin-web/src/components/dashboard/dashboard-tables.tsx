@@ -3,6 +3,7 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { RecentBookingRow, RecentVendorRow } from '@race/types';
 import { formatCurrency, formatRelativeTime } from '@race/utils';
 import { Card, CardContent, CardHeader, CardTitle, StatusBadge } from '@race/ui';
+import { useNavigate } from 'react-router-dom';
 
 import { DataTable } from '@/components/shared/data-table';
 
@@ -52,13 +53,24 @@ const vendorColumns: ColumnDef<RecentVendorRow, unknown>[] = [
 ];
 
 export function RecentBookingsTable({ data }: { data: RecentBookingRow[] }) {
+  const navigate = useNavigate();
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Recent Bookings</CardTitle>
       </CardHeader>
       <CardContent className="p-0 pb-2">
-        <DataTable columns={bookingColumns} data={data} emptyMessage="No recent bookings" />
+        <DataTable
+          columns={bookingColumns}
+          data={data}
+          emptyMessage="No recent bookings"
+          onRowClick={(row) =>
+            navigate(
+              `/bookings/${row.id}${row.bookingType ? `?type=${row.bookingType}` : ''}`,
+            )
+          }
+        />
       </CardContent>
     </Card>
   );

@@ -14,6 +14,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { colors, typography } from '../../theme';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
+import { formatPhoneE164, getPhoneDigits } from '../../utils/phone';
 
 export default function ChangeMobileNumberScreen() {
   const px = useProfilePx();
@@ -22,6 +23,7 @@ export default function ChangeMobileNumberScreen() {
   const authUser = useAuthStore(state => state.user);
   const profile = useProfileStore(state => state.profile);
   const fetchProfile = useProfileStore(state => state.fetchProfile);
+  const setUser = useAuthStore(state => state.setUser);
   const [newPhone, setNewPhone] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
@@ -32,6 +34,7 @@ export default function ChangeMobileNumberScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const currentPhone = profile?.mobileNumber ?? authUser?.mobileNumber ?? '';
+  const currentDisplay = currentPhone ? formatPhoneE164(currentPhone) : '—';
 
   useEffect(() => {
     void fetchProfile();
@@ -43,21 +46,24 @@ export default function ChangeMobileNumberScreen() {
     return () => clearInterval(interval);
   }, [timer]);
 
+  const normalizedNew = () => getPhoneDigits(newPhone).slice(-10);
+
   const handleSendOtp = async () => {
-    if (!newPhone.trim() || newPhone.replace(/\D/g, '').length < 10) {
+    const nextDigits = normalizedNew();
+    if (nextDigits.length < 10) {
       showDialog({
         tone: 'warning',
-        title: 'Invalid Number',
-        message: 'Please enter a valid mobile number.',
+        title: 'Invalid number',
+        message: 'Enter a valid 10-digit mobile number.',
         primaryLabel: 'OK',
       });
       return;
     }
-    if (newPhone.replace(/\D/g, '').slice(-10) === currentPhone.replace(/\D/g, '').slice(-10)) {
+    if (nextDigits === getPhoneDigits(currentPhone).slice(-10)) {
       showDialog({
         tone: 'warning',
-        title: 'Same Number',
-        message: 'New number must be different from current number.',
+        title: 'Same number',
+        message: 'Choose a number different from your current one.',
         primaryLabel: 'OK',
       });
       return;
@@ -65,19 +71,13 @@ export default function ChangeMobileNumberScreen() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      const result = await requestMobileChange(newPhone.replace(/\D/g, '').slice(-10));
+      const result = await requestMobileChange(nextDigits);
       setPendingToken(result.pendingToken);
       setDevOtp(result.devOtp ?? null);
       setOtpSent(true);
       setTimer(result.expiresIn ? Math.max(1, Math.round(result.expiresIn)) : 300);
       setDigits(['', '', '', '', '', '']);
       setActiveIndex(0);
-      showDialog({
-        tone: 'success',
-        title: 'OTP Sent',
-        message: `Verification code sent to ${result.newMobile}`,
-        primaryLabel: 'OK',
-      });
     } catch (error) {
       showDialog({
         tone: 'error',
@@ -101,7 +101,7 @@ export default function ChangeMobileNumberScreen() {
       showDialog({
         tone: 'warning',
         title: 'Invalid OTP',
-        message: 'Please enter the complete 6-digit code.',
+        message: 'Enter the 6-digit code sent to your new number.',
         primaryLabel: 'OK',
       });
       return;
@@ -113,20 +113,23 @@ export default function ChangeMobileNumberScreen() {
       await fetchProfile();
       const updatedProfile = useProfileStore.getState().profile;
       const updatedAuthUser = useAuthStore.getState().user;
-      if (updatedAuthUser && updatedProfile) {
-        useAuthStore.getState().setUser({ ...updatedAuthUser, mobileNumber: updatedProfile.mobileNumber });
+      if (updatedAuthUser && updatedProfile?.mobileNumber) {
+        setUser({ ...updatedAuthUser, mobileNumber: updatedProfile.mobileNumber });
       }
+      const updatedDisplay = formatPhoneE164(updatedProfile?.mobileNumber ?? normalizedNew());
       showDialog({
         tone: 'success',
-        title: 'Updated',
-        message: `Your mobile number has been updated to ${newPhone}.`,
+        title: 'Mobile updated',
+        message: `Your login number is now ${updatedDisplay}. Use this number the next time you sign in.`,
         primaryLabel: 'OK',
         onPrimary: () => goBackWithinStack(navigation),
       });
+      setPendingToken(null);
+      setOtpSent(false);
     } catch (error) {
       showDialog({
         tone: 'error',
-        title: 'Could not update number',
+        title: 'Could not update',
         message: getApiErrorMessage(error),
         primaryLabel: 'OK',
       });
@@ -136,9 +139,7 @@ export default function ChangeMobileNumberScreen() {
   };
 
   return (
-    <ProfileSubScreenLayout
-      title="Change Mobile Number"
-      subtitle="Verify your new number with OTP">
+    <ProfileSubScreenLayout title="Change Mobile Number">
       {dialog}
       <View
         style={{
@@ -147,40 +148,37 @@ export default function ChangeMobileNumberScreen() {
           borderColor: colors.border,
           backgroundColor: colors.lightGrey,
           padding: px(14),
-          marginBottom: px(16),
+          marginBottom: px(18),
         }}>
-        <Text style={{ fontSize: px(11), color: colors.grey, marginBottom: px(4) }}>Current Number</Text>
+        <Text style={{ fontSize: px(11), color: colors.grey, marginBottom: px(4) }}>Current number</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(8) }}>
           <Smartphone size={px(18)} color={colors.primary} strokeWidth={2} />
           <Text style={{ fontSize: px(16), fontWeight: typography.weights.bold, color: colors.dark }}>
-            {currentPhone || '—'}
+            {currentDisplay}
           </Text>
         </View>
       </View>
 
       <FormField
-        label="New Mobile Number"
+        label="New mobile number"
         value={newPhone}
-        onChangeText={setNewPhone}
-        placeholder="+91 98765 43210"
+        onChangeText={text => setNewPhone(getPhoneDigits(text).slice(0, 10))}
+        placeholder="10-digit number"
         Icon={Phone}
         variant="outlined"
         compact
         keyboardType="phone-pad"
+        maxLength={10}
       />
-
-      <Text style={{ fontSize: px(12), color: colors.grey, marginBottom: px(16), lineHeight: px(17) }}>
-        We'll send a 6-digit OTP to your new number to confirm the change.
-      </Text>
 
       {otpSent && devOtp ? (
         <Text style={{ fontSize: px(11), color: colors.grey, marginBottom: px(12) }}>
-          Dev OTP for testing: {devOtp}
+          Dev OTP: {devOtp}
         </Text>
       ) : null}
 
       {otpSent ? (
-        <View style={{ marginBottom: px(16) }}>
+        <View style={{ marginTop: px(8), marginBottom: px(18) }}>
           <Text
             style={{
               fontSize: px(13),
@@ -189,7 +187,7 @@ export default function ChangeMobileNumberScreen() {
               textAlign: 'center',
               marginBottom: px(12),
             }}>
-            Enter Verification Code
+            Enter OTP
           </Text>
           <OtpInput
             digits={digits}
@@ -198,11 +196,20 @@ export default function ChangeMobileNumberScreen() {
             onActiveIndexChange={setActiveIndex}
             px={px}
           />
-          <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: px(14), gap: px(8) }}>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginTop: px(14),
+              gap: px(8),
+            }}>
             {timer > 0 ? (
-              <Text style={{ fontSize: px(12), color: colors.grey }}>Resend code in 00:{String(timer).padStart(2, '0')}</Text>
+              <Text style={{ fontSize: px(12), color: colors.grey }}>
+                Resend in 00:{String(timer).padStart(2, '0')}
+              </Text>
             ) : (
-              <Pressable onPress={handleSendOtp}>
+              <Pressable onPress={() => void handleSendOtp()} disabled={submitting}>
                 <Text style={{ fontSize: px(12), fontWeight: typography.weights.bold, color: colors.primary }}>
                   Resend OTP
                 </Text>
@@ -213,10 +220,10 @@ export default function ChangeMobileNumberScreen() {
       ) : null}
 
       <GoldButton
-        label={submitting ? 'Please wait…' : otpSent ? 'Update Mobile Number' : 'Send OTP'}
+        label={submitting ? 'Please wait…' : otpSent ? 'Confirm new number' : 'Send OTP'}
         disabled={submitting}
-        onPress={handleUpdate}
-        style={{ width: '100%' }}
+        onPress={() => void handleUpdate()}
+        style={{ width: '100%', marginTop: px(4) }}
         height={px(52)}
         borderRadius={px(14)}
       />

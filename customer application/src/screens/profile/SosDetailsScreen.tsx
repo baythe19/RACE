@@ -1,7 +1,8 @@
-import React, { useCallback, useState } from 'react';
-import { Text, View } from 'react-native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
-import { Car, MapPin, Phone, Siren, User } from 'lucide-react-native';
+import React, { useEffect, useState } from 'react';
+import { Linking, Pressable, Text, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Car, ChevronRight, MapPin, Phone, Siren, User } from 'lucide-react-native';
 
 import FormField from '../../components/auth/FormField';
 import GoldButton from '../../components/auth/GoldButton';
@@ -9,6 +10,13 @@ import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/P
 import { useAppDialog } from '../../hooks/useAppDialog';
 import { useSosDetails } from '../../context/SosDetailsContext';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
+import { useProfileStore } from '../../store/profileStore';
+import { getApiErrorMessage } from '../../services/api';
+import type { ProfileStackParamList } from '../../types/navigation';
+import {
+  apiDateToDisplay,
+  buildUpdateProfilePayload,
+} from '../../utils/profilePayload';
 import { colors, shadows, typography } from '../../theme';
 
 function digitsOnly(value: string, maxLen = 10): string {
@@ -32,9 +40,10 @@ function SectionTitle({ label, px }: { label: string; px: (n: number) => number 
 
 export default function SosDetailsScreen() {
   const px = useProfilePx();
-  const navigation = useNavigation();
+  const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { dialog, showDialog } = useAppDialog();
   const { details, setDetails } = useSosDetails();
+  const { profile, fetchProfile, updateProfile, isLoading } = useProfileStore();
 
   const [ownerName, setOwnerName] = useState(details.ownerName);
   const [ownerPhone, setOwnerPhone] = useState(details.ownerPhone);
@@ -46,21 +55,33 @@ export default function SosDetailsScreen() {
   const [contactPhone, setContactPhone] = useState(details.contactPhone);
   const [location, setLocation] = useState(details.location);
 
-  useFocusEffect(
-    useCallback(() => {
-      setOwnerName(details.ownerName);
-      setOwnerPhone(details.ownerPhone);
-      setVehicleBrand(details.vehicleBrand);
-      setVehicleModel(details.vehicleModel);
-      setVehicleNumber(details.vehicleNumber);
-      setContactName(details.contactName);
-      setContactRelation(details.contactRelation);
-      setContactPhone(details.contactPhone);
-      setLocation(details.location);
-    }, [details]),
-  );
+  useEffect(() => {
+    void fetchProfile();
+  }, [fetchProfile]);
 
-  const handleSave = () => {
+  useEffect(() => {
+    setOwnerName(details.ownerName);
+    setOwnerPhone(details.ownerPhone);
+    setVehicleBrand(details.vehicleBrand);
+    setVehicleModel(details.vehicleModel);
+    setVehicleNumber(details.vehicleNumber);
+    setContactName(details.contactName);
+    setContactRelation(details.contactRelation);
+    setContactPhone(details.contactPhone);
+    setLocation(details.location);
+  }, [details]);
+
+  const handleSave = async () => {
+    if (isLoading) return;
+    if (!profile) {
+      showDialog({
+        tone: 'warning',
+        title: 'Profile not loaded',
+        message: 'Please wait a moment and try again.',
+        primaryLabel: 'OK',
+      });
+      return;
+    }
     if (!ownerName.trim() || !ownerPhone.trim()) {
       showDialog({
         tone: 'warning',
@@ -89,30 +110,56 @@ export default function SosDetailsScreen() {
       return;
     }
 
-    setDetails({
-      ownerName: ownerName.trim(),
-      ownerPhone: ownerPhone.trim(),
-      vehicleBrand: vehicleBrand.trim(),
-      vehicleModel: vehicleModel.trim(),
-      vehicleNumber: vehicleNumber.trim(),
-      contactName: contactName.trim(),
-      contactRelation: contactRelation.trim(),
-      contactPhone: contactPhone.trim(),
-      location: location.trim(),
-    });
-    showDialog({
-      tone: 'success',
-      title: 'Saved',
-      message: 'Your SOS details have been updated.',
-      primaryLabel: 'OK',
-      onPrimary: () => goBackWithinStack(navigation),
-    });
+    try {
+      await updateProfile(
+        buildUpdateProfilePayload({
+          fullName: ownerName.trim() || profile.fullName || '',
+          email: profile.email,
+          gender: profile.gender ?? 'prefer_not_to_say',
+          dateOfBirth: apiDateToDisplay(profile.dateOfBirth),
+          emergencyName: contactName.trim(),
+          emergencyPhone: contactPhone.trim(),
+          emergencyRelationship: contactRelation.trim() || 'Other',
+          addressLine1: profile.address?.line1 ?? '',
+          addressLine2: profile.address?.line2 ?? '',
+          city: profile.address?.city ?? '',
+          state: profile.address?.state ?? '',
+          pincode: profile.address?.pincode ?? '',
+          country: profile.address?.country,
+        }),
+      );
+
+      setDetails({
+        ownerName: ownerName.trim(),
+        ownerPhone: ownerPhone.trim(),
+        vehicleBrand: vehicleBrand.trim(),
+        vehicleModel: vehicleModel.trim(),
+        vehicleNumber: vehicleNumber.trim(),
+        contactName: contactName.trim(),
+        contactRelation: contactRelation.trim(),
+        contactPhone: contactPhone.trim(),
+        location: location.trim(),
+      });
+      void fetchProfile();
+      showDialog({
+        tone: 'success',
+        title: 'Saved',
+        message: 'Your SOS details have been updated on your account.',
+        primaryLabel: 'OK',
+        onPrimary: () => goBackWithinStack(navigation),
+      });
+    } catch (error) {
+      showDialog({
+        tone: 'error',
+        title: 'Save failed',
+        message: getApiErrorMessage(error, 'Unable to save SOS details'),
+        primaryLabel: 'OK',
+      });
+    }
   };
 
   return (
-    <ProfileSubScreenLayout
-      title="SOS Details"
-      subtitle="Shown on your emergency assistance screen">
+    <ProfileSubScreenLayout title="SOS Details">
       {dialog}
       <View
         style={{

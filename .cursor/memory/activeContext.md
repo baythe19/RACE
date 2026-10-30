@@ -1,5 +1,15 @@
 ## Current focus
 
+**2026-10-30 (customer Help & Support redesign):** Less duplicate contact blocks; sections: emergency strip, self-service links (bookings/payments/SOS/notifications), grouped contact card, FAQ accordion by topic (BOOKINGS / PRICING / YOUR TRIP), legal split rows + company footer. Uses `brand.email`, inline FAQ expand (no modal spam). Customer `tsc` 0.
+
+**2026-10-30 (customer profile settings simplify):** Removed standalone **Settings** row from Profile (was clutter above Premium). Security: PIN / password / mobile under **Personal Information → Security**. Alert prefs: 2 toggles on **Notifications** (push + offers). Delete account + app version moved to **Help & Support** (Legal). Profile footer shows `v1.0.0`. Deleted `SettingsScreen`. Customer `tsc` 0.
+
+**2026-10-30 (customer Saved Locations UX):** Empty state uses `EmptyState` (icon, title, subtitle, spacing) + primary CTA — removed cramped inline “No saved locations yet” above dashed card. Add flow: white card form with map-first (`Pick on map` / `Search address` → `LocationPickerModal` initialMode), pinned address summary, FormField label, type chips with icons; save requires lat/lng. List add trigger = row card (MapPin) not dashed Plus. Customer `tsc` 0.
+
+**2026-10-30 (customer Add Vehicle UI):** Header gap; type grid 3×2 (Car/Bike/EV + Truck/Bus/Other) — **Auto removed** (`ADD_VEHICLE_TYPE_OPTIONS`); realistic PNG thumbs via `VehiclePlaceholderImage`; divider + “Registration & model” block; balanced field spacing; colour/fuel card spacing. Customer `tsc` 0.
+
+**2026-10-30 (customer My Vehicles + QR actions):** My Vehicles — header/content gap (`paddingTop`), richer cards (primary tint, pill actions, QR thumb frame). Vehicle QR — same top gap; panel styling. **Android APK fixes:** `openVehicleEmergencyPageInBrowser` now `Linking.openURL` (was web-only blob); `shareVehicleQr` Android message+URL + error dialog; `downloadVehicleQrPng` uses `expo-sharing` shareAsync after FileSystem write (was broken Share with file path in message). Added `expo-sharing` dep + app.config plugin. Customer `tsc` 0. **Rebuild APK** for native sharing module.
+
 **2026-10-30 (partner pre-trip inspection redesign):** `VehicleDamageInspectionModal` — full light driverUi theme, sheet slide/fade animations, progress bar, photo fade-in, branded photo source sheet + camera permission dialog (no `Alert.alert`), removed yellow left-border notice. Partner `tsc` 0.
 
 **2026-10-30 (customer profile audit):** Profile stack recheck — `AppStackHeader` `subtitleNumberOfLines` prop (tsc); registered `SubscriptionPlans` (Premium/Upgrade navigation was broken); Settings → Change Password; removed mock `PROFILE_PERSONAL`; Personal Info photo + Payments passbook info dialogs; SOS save returns to Profile; ProfileScreen unused Alert import. Customer `tsc` 0.

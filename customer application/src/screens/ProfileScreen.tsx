@@ -125,7 +125,6 @@ export default function ProfileScreen() {
         header={
           <TabRootHeader
             title="Profile"
-            subtitle="Manage your account and preferences"
             showActions={false}
           />
         }>
@@ -142,7 +141,6 @@ export default function ProfileScreen() {
       header={
         <TabRootHeader
           title="Profile"
-          subtitle="Manage your account and preferences"
           showNotificationBadge={unreadCount > 0}
           onBellPress={() => navigation.navigate('Notifications')}
           actions={
@@ -518,6 +516,16 @@ export default function ProfileScreen() {
                 Log out
               </Text>
             </Pressable>
+
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: px(10),
+                color: colors.grey,
+                marginBottom: px(8),
+              }}>
+              RACE Customer · v1.0.0
+            </Text>
     </AppScreenLayout>
   );
 }

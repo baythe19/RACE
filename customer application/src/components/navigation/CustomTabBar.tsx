@@ -33,6 +33,20 @@ const TAB_CONFIG: Record<
   Profile: { label: 'Profile', Icon: User },
 };
 
+/** Root screen per tab stack — tapping an active tab pops back here (iOS/Material pattern). */
+const TAB_ROOT_SCREEN: Record<TabRouteName, string> = {
+  Home: 'HomeMain',
+  Bookings: 'BookingsMain',
+  Services: 'ServicesMain',
+  Profile: 'ProfileMain',
+};
+
+function nestedStackIndex(route: { state?: { index?: number } | undefined }): number {
+  const nested = route.state;
+  if (!nested || nested.index == null) return 0;
+  return nested.index;
+}
+
 export default function CustomTabBar({
   state,
   descriptors,
@@ -104,13 +118,24 @@ export default function CustomTabBar({
             canPreventDefault: true,
           });
 
-          if (!event.defaultPrevented) {
-            if (route.name === 'Services') {
-              (navigation as any).navigate('Services', { screen: 'ServicesMain' });
-            } else if (!isFocused) {
-              navigation.navigate(route.name, route.params);
-            }
+          if (event.defaultPrevented) {
+            return;
           }
+
+          const rootScreen = TAB_ROOT_SCREEN[routeName];
+          const deepInStack = nestedStackIndex(route) > 0;
+
+          if (isFocused && deepInStack) {
+            navigation.navigate(route.name, { screen: rootScreen } as never);
+            return;
+          }
+
+          if (!isFocused) {
+            navigation.navigate(route.name, route.params);
+            return;
+          }
+
+          // Already on this tab's root — optional re-tap could scroll-to-top later.
         };
 
         return (

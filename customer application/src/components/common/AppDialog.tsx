@@ -190,8 +190,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   singleButton: {
-    flex: 0,
+    flex: 1,
     alignSelf: 'stretch',
+    width: '100%',
   },
   primaryButton: {
     backgroundColor: colors.primary,

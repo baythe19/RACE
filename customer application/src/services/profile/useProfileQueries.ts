@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 
 import { useAppDispatch } from '../../redux/hooks';
 import { useAuthStore } from '../../store/authStore';
@@ -9,7 +10,7 @@ import {
   setSavedLocations,
   setWalletBalance,
 } from '../../redux/profile/profileSlice';
-import type { NotificationPreference, PaymentMethod, SavedLocation } from '../../types/profile';
+import type { NotificationPreference, PaymentMethod, SavedLocation, AppNotification } from '../../types/profile';
 import {
   listSavedLocations,
   createSavedLocation,
@@ -175,10 +176,49 @@ export function useDeleteAllNotificationsMutation() {
 
 export function useDeleteNotificationMutation() {
   const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
   return useMutation({
-    mutationFn: (id: string) => deleteNotification(id),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+    mutationFn: async (id: string) => {
+      try {
+        await deleteNotification(id);
+        return { deletedOnServer: true as const };
+      } catch (err) {
+        // Render prod (pre-deploy) lacks DELETE /:id — still dismiss in UI.
+        if (isAxiosError(err) && err.response?.status === 404) {
+          return { deletedOnServer: false as const };
+        }
+        throw err;
+      }
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: profileKeys.notifications });
+      const previous = queryClient.getQueryData<{
+        notifications: AppNotification[];
+        unreadCount: number;
+      }>(profileKeys.notifications);
+      if (previous) {
+        const removed = previous.notifications.find(n => n.id === id);
+        const notifications = previous.notifications.filter(n => n.id !== id);
+        const unreadCount = Math.max(
+          0,
+          previous.unreadCount - (removed && !removed.read ? 1 : 0),
+        );
+        const next = { notifications, unreadCount };
+        queryClient.setQueryData(profileKeys.notifications, next);
+        dispatch(setNotifications(notifications));
+      }
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(profileKeys.notifications, context.previous);
+        dispatch(setNotifications(context.previous.notifications));
+      }
+    },
+    onSuccess: result => {
+      if (result.deletedOnServer) {
+        void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+      }
     },
   });
 }
