@@ -4,6 +4,8 @@
 
 **2026-10-31 (customer assign/accept sync):** Backend `applyCustomerBookingView` masks status + hides driver until en route; `awaitingPartnerAccept` on list/detail/tracking. Customer socket `internalStatus` + tracking poll resolve UI to `DRIVER_ASSIGNED` for “Partner accepting” copy. Backend + customer tracking files `tsc` 0 (unrelated LocationPickerModal PROVIDER_* errors pre-existing).
 
+**2026-10-31 (booking dispatch UI patch — track/detail/history):** Wired `bookingFlowCopy` through `formatLiveTrackingSummary`, `TowingTrackScreen` / `DriverTrackScreen` (`trackEtaForStage`, `trackPartnerDisplayName`, `trackLocationHint`), `BookingDetailScreen` (service-specific pill + dispatch hint + partner section), history rows, advance payment success copy, `RoadsideHelpOnWay` footer. Doc §5/§9 updated. Customer `tsc` 0.
+
 **2026-10-31 (booking dispatch + cards UX):** Documented dispatch: TOW→vendors, DRV→drivers, RSV roadside→vendor pipeline (same as tow). `bookingFlowCopy.ts` service-specific status/partner lines; cards no misleading green "Confirmed" while searching; drop addresses use full `formatBookingStopAddress`; payment screen white method rows + flow footnotes. See `docs/client/BOOKING_DISPATCH_AND_UI.md`. Customer `tsc` 0.
  Vehicle & tow — white selection cards (#E7E5E4 outline, dark border when selected), no goldLight; multi-vehicle vertical list + count in title; tow type + schedule chips match; instant/scheduled banner white. Customer `tsc` 0.
 

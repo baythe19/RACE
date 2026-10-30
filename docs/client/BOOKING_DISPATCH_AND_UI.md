@@ -108,7 +108,7 @@ Open offers: `listOpenOffersForDriver` reads `CONFIRMED` towing + driver booking
 |-------|--------|-------------|----------|
 | Advance | `BookingPaymentScreen` (stub verify) | Same | Same |
 | Waiting | `BookingsScreen` + `bookingFlowCopy.ts` | Same | Same + `roadsideHelpUi.ts` on `RoadsideHelpOnWayScreen` |
-| Live trip | `TowingTrackScreen` / `TowingDriverOnWayScreen` | `DriverTrackScreen` / `DriverOnWayScreen` | `RoadsideHelpOnWayScreen` |
+| Live trip | `TowingTrackScreen` / `TowingDriverOnWayScreen` — `formatLiveTrackingSummary` + `track*` helpers in `bookingFlowCopy.ts` | Same | `RoadsideHelpOnWayScreen` |
 | Balance | `DropoffPaymentModal` (when tracking exposes dropoff + payment flags) | Same where drop exists | Usually on-site; may skip drop modal |
 
 ---
@@ -156,7 +156,7 @@ Implementation: `customer application/src/utils/bookingFlowCopy.ts` + `ActiveBoo
 |------|--------|-------------------|
 | Create + dispatch notify | Yes (CONFIRMED broadcast) | Real payment gateway |
 | Vendor approve + driver claim | Yes | Guaranteed SLA / auto-assign |
-| Status + OTP rules | Yes in API | Some customer track screens still scaffold / polling gaps |
+| Status + OTP rules | Yes in API | Customer track/detail/history use `bookingFlowCopy`; live map polish still partial |
 | Live map | Partial socket | Admin live map; full customer polyline polish |
 | Towing “instant vs emergency” | UI labels | Not separate backend product flags |
 | Driver “four products” | Generic `driverServiceType` on some paths | Not all home cards map 1:1 |
@@ -179,6 +179,7 @@ For scores and module breakdown see [`CLIENT_DOC_VS_BUILD_SHORT.md`](CLIENT_DOC_
 | OTP rules | `backend/src/services/src/bookings/tripOtp.ts` |
 | Customer list card | `customer application/src/utils/bookingDisplay.ts`, `components/bookings/ActiveBookingCard.tsx` |
 | Customer status copy | `customer application/src/utils/bookingFlowCopy.ts` |
+| Track ETA / partner honesty | `bookingFlowCopy.ts` (`trackEtaForStage`, `trackPartnerDisplayName`, …) + `formatLiveTrackingSummary` in `bookingDisplay.ts` |
 | Map API → UI booking | `customer application/src/services/bookings/bookingApi.ts` |
 
 ---

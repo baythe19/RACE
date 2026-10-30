@@ -481,8 +481,13 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                   color: colors.dark,
                   lineHeight: px(18),
                 }}>
-                {formatLocationDisplay(booking.pickup)}
+                {pickupCard.primary}
               </Text>
+              {pickupCard.secondary ? (
+                <Text style={{ marginTop: px(4), fontSize: px(12), color: colors.grey }}>
+                  {pickupCard.secondary}
+                </Text>
+              ) : null}
             </View>
             <View>
               <Text style={{ fontSize: px(10), color: colors.grey, fontWeight: typography.weights.semibold }}>
@@ -496,11 +501,17 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                   color: colors.dark,
                   lineHeight: px(18),
                 }}>
-                {booking.dropoff ? formatLocationDisplay(booking.dropoff) : 'On-site service'}
+                {dropCard?.primary ?? formatLocationDisplay(booking.dropoff)}
               </Text>
+              {dropCard?.secondary ? (
+                <Text style={{ marginTop: px(4), fontSize: px(12), color: colors.grey }}>
+                  {dropCard.secondary}
+                </Text>
+              ) : null}
             </View>
           </View>
         </View>
+        )}
         {booking.distanceKm ? (
           <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(8) }}>
             Distance · {booking.distanceKm.toFixed(1)} km
@@ -508,7 +519,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
         ) : null}
       </View>
 
-      {/* Your driver */}
+      {/* Partner */}
       <View
         style={[
           styles.card,
@@ -522,7 +533,7 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
             color: colors.dark,
             marginBottom: px(8),
           }}>
-          Your driver
+          {partnerTitle}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(10) }}>
           <DriverAvatar size={px(40)} />
@@ -533,16 +544,13 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
                 fontWeight: typography.weights.bold,
                 color: colors.dark,
               }}
-              numberOfLines={1}>
-              {booking.driver?.name ?? 'Finding a partner'}
+              numberOfLines={2}>
+              {partnerDisplayName}
             </Text>
-            <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }} numberOfLines={1}>
+            <Text style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }} numberOfLines={2}>
               {[booking.driver?.experience, booking.assignedFleetVehicleLabel]
                 .filter(Boolean)
-                .join(' · ') ||
-                (booking.vendorId && !booking.driver?.name
-                  ? 'Partner approved — assigning driver'
-                  : 'Details update when the trip starts')}
+                .join(' · ') || presentation.dispatchHint}
             </Text>
           </View>
           <Pressable

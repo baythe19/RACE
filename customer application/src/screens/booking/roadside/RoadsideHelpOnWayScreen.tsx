@@ -9,7 +9,7 @@ import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import { ROADSIDE_ACCENT } from '../../../constants/roadsideBooking';
 import { brand } from '../../../theme/brand';
 import type { HomeStackParamList } from '../../../types/navigation';
-import { formatBookingDisplayId } from '../../../utils/bookingDisplay';
+import { formatBookingDisplayId, getCustomerBookingPresentation } from '../../../utils/bookingDisplay';
 import { formatLocationCard } from '../../../utils/readableAddress';
 import {
   ROADSIDE_HELP_STEPS,
@@ -32,6 +32,9 @@ export default function RoadsideHelpOnWayScreen({ navigation, route }: Props) {
   );
 
   const unifiedStatus = booking?.unifiedStatus ?? trackedStatus ?? 'CONFIRMED';
+  const dispatchHint = booking
+    ? getCustomerBookingPresentation(booking).dispatchHint
+    : 'Roadside jobs broadcast to vendor partners near you.';
   const hasPartnerName = Boolean(driverName ?? booking?.driver?.name);
   const phase = roadsideHelpPhase(unifiedStatus, hasPartnerName);
   const copy = roadsideHelpCopy(phase);
@@ -281,7 +284,9 @@ export default function RoadsideHelpOnWayScreen({ navigation, route }: Props) {
                 textAlign: 'center',
                 lineHeight: t.px(17),
               }}>
-              Live map and updates are in Bookings once a partner accepts and is en route.
+              {dispatchHint}
+              {' '}
+              Open Bookings for live map once a partner accepts and is en route.
             </Text>
           </>
         )}

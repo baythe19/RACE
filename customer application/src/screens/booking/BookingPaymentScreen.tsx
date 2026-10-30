@@ -100,7 +100,12 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       showDialog({
         tone: 'success',
         title: 'Payment successful',
-        message: 'Your advance payment has been confirmed.',
+        message:
+          flow === 'towing'
+            ? 'Advance paid. Tow vendors nearby can now accept your job.'
+            : flow === 'driver'
+              ? 'Advance paid. Available drivers can now accept your hire.'
+              : 'Advance paid. Roadside partners nearby can now accept.',
         primaryLabel: 'Continue',
         onPrimary: continueAfterPayment,
       });
