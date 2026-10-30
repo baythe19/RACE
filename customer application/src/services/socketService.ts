@@ -77,6 +77,8 @@ export function onBookingStatus(
   callback: (data: {
     bookingId: string;
     status: string;
+    internalStatus?: string;
+    driverAccepted?: boolean;
     arrivedAtDropoff?: boolean;
     arrivedAtDropoffAt?: string;
     fare?: number;
@@ -103,4 +105,12 @@ export function onDriverArrivedDropoff(
   const activeSocket = connectSocket();
   activeSocket.on('booking:driver_arrived_dropoff', callback);
   return () => activeSocket.off('booking:driver_arrived_dropoff', callback);
+}
+
+export function onNotificationNew(
+  callback: (payload: { notificationId?: string; createdAt?: string }) => void,
+): () => void {
+  const activeSocket = connectSocket();
+  activeSocket.on('notification:new', callback);
+  return () => activeSocket.off('notification:new', callback);
 }

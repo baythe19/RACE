@@ -57,6 +57,9 @@ export function legForJobStatus(status: string): TripLeg {
   ) {
     return 'idle';
   }
+  // P-05 (v8 audit): a job that is only CONFIRMED (routed, not yet assigned or
+  // accepted) has no driver leg yet — show idle instead of a bogus "to pickup".
+  if (status === 'CONFIRMED' || status === 'PENDING') return 'idle';
   return 'to_pickup';
 }
 

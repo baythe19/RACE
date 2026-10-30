@@ -23,17 +23,24 @@ import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { images } from '../assets';
+import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import LocationSelectorSheet from '../components/location/LocationSelectorSheet';
 import NotServiceableScreen from '../components/location/NotServiceableScreen';
-import AppScreenLayout from '../components/ui/AppScreenLayout';
 import { useAuthStore } from '../store/authStore';
+import { useTowingBooking } from '../context/TowingBookingContext';
 import { useCatalogStore } from '../store/catalogStore';
 import { useLocationStore } from '../store/locationStore';
 import { useProfileStore } from '../store/profileStore';
+import { useNotificationsQuery } from '../services/profile/useProfileQueries';
 import { getProfileFirstName } from '../utils/profileDisplay';
 import { brand } from '../theme/brand';
 import type { HomeStackParamList, RootTabParamList } from '../types/navigation';
 import { openServiceCategory } from '../utils/serviceNavigation';
+import {
+  openRoadsideLocation,
+  popularServiceToRoadsideId,
+} from '../utils/roadsideBookingFlow';
 import { colors, shadows, typography } from '../theme';
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Path, Stop } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -110,14 +117,11 @@ export default function HomeScreen({ navigation }: Props) {
 
   const [showLocationSheet, setShowLocationSheet] = useState(false);
 
-  const { fetchServices, fetchBrand, brand: apiBrand } = useCatalogStore();
+  const { servicesReady, hasHydrated, isLoading: catalogLoading } = useCatalogStore();
   const profile = useProfileStore(state => state.profile);
   const authUser = useAuthStore(state => state.user);
-
-  useEffect(() => {
-    void fetchServices();
-    void fetchBrand();
-  }, [fetchBrand, fetchServices]);
+  const { data: notificationsData } = useNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
 
   useEffect(() => {
     if (isLocationHydrated && !hasSelectedLocation) {
@@ -151,6 +155,9 @@ export default function HomeScreen({ navigation }: Props) {
     return displayLocation.split(',')[0].trim() || 'Bhubaneswar';
   }, [displayLocation]);
 
+  const showHomeSkeleton =
+    !isLocationHydrated || !hasHydrated || (!servicesReady && catalogLoading);
+
   const cardWidth = Math.max(280, width - px(40));
   const cardHeight = px(196);
   const R = px(22);
@@ -182,6 +189,22 @@ export default function HomeScreen({ navigation }: Props) {
 
   const openCategory = (categoryId: string, categoryTitle: string) => {
     openServiceCategory(navigation, categoryId, categoryTitle);
+  };
+
+  const { updateBooking: updateTowingBooking } = useTowingBooking();
+
+  const openPopularService = (item: (typeof POPULAR_SERVICES)[number]) => {
+    if (item.id === 'towing') {
+      updateTowingBooking({ serviceMode: 'instant' });
+      navigation.navigate('TowingChooseVehicle');
+      return;
+    }
+    const roadsideId = popularServiceToRoadsideId(item.id);
+    if (roadsideId) {
+      openRoadsideLocation(navigation, roadsideId);
+      return;
+    }
+    openCategory(item.id, item.categoryTitle);
   };
 
   const openLocationSheet = () => setShowLocationSheet(true);
@@ -266,17 +289,33 @@ export default function HomeScreen({ navigation }: Props) {
                     position: 'relative',
                   }}>
                   <Bell size={px(20)} color={colors.dark} strokeWidth={2} />
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: px(6),
-                      right: px(7),
-                      width: px(7),
-                      height: px(7),
-                      borderRadius: px(4),
-                      backgroundColor: colors.error,
-                    }}
-                  />
+                  {unreadCount > 0 ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: px(4),
+                        right: px(4),
+                        minWidth: px(16),
+                        height: px(16),
+                        borderRadius: px(8),
+                        paddingHorizontal: px(3),
+                        backgroundColor: colors.error,
+                        borderWidth: 1.5,
+                        borderColor: colors.background,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: px(9),
+                          fontWeight: typography.weights.bold,
+                          color: colors.background,
+                          lineHeight: px(11),
+                        }}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  ) : null}
                 </Pressable>
 
                 <Pressable
@@ -285,10 +324,10 @@ export default function HomeScreen({ navigation }: Props) {
                     tabNav?.navigate('Profile');
                   }}
                   style={{
-                    width: px(36),
-                    height: px(36),
-                    borderRadius: px(18),
-                    borderWidth: 2,
+                    width: px(34),
+                    height: px(34),
+                    borderRadius: px(17),
+                    borderWidth: 1.5,
                     borderColor: colors.primary,
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -302,13 +341,17 @@ export default function HomeScreen({ navigation }: Props) {
                       resizeMode="cover"
                     />
                   ) : (
-                    <User size={px(18)} color={colors.primary} strokeWidth={2.2} />
+                    <User size={px(16)} color={colors.primary} strokeWidth={2.2} />
                   )}
                 </Pressable>
               </View>
             </View>
           </View>
         }>
+        {showHomeSkeleton ? (
+          <DataSkeleton variant="home" testID="homeSkeleton" />
+        ) : (
+          <>
         {/* Hero Section: Road Scenery Background + Highlighted Greeting + Curved 24/7 Card */}
         <View style={{ marginBottom: px(22), position: 'relative' }}>
           {/* Atmospheric Road & Tow Truck Background Visual extending edge-to-edge under greeting */}
@@ -615,12 +658,7 @@ export default function HomeScreen({ navigation }: Props) {
             {POPULAR_SERVICES.map(item => (
               <Pressable
                 key={item.id}
-                onPress={() =>
-                  openCategory(
-                    item.id === 'fuel' || item.id === 'battery' ? 'roadside' : item.id,
-                    item.categoryTitle
-                  )
-                }
+                onPress={() => openPopularService(item)}
                 style={({ pressed }) => [
                   {
                     width: '48.5%',
@@ -688,6 +726,8 @@ export default function HomeScreen({ navigation }: Props) {
             ))}
           </View>
         </View>
+          </>
+        )}
       </AppScreenLayout>
 
       <LocationSelectorSheet

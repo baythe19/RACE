@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
+  BackHandler,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,7 @@ import {
   User,
   type LucideIcon,
 } from 'lucide-react-native';
+import { CommonActions } from '@react-navigation/native';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -31,13 +33,70 @@ const TAB_CONFIG: Record<
   Profile: { label: 'Profile', Icon: User },
 };
 
+/** Root screen per tab stack — tapping an active tab pops back here (iOS/Material pattern). */
+const TAB_ROOT_SCREEN: Record<TabRouteName, string> = {
+  Home: 'HomeMain',
+  Bookings: 'BookingsMain',
+  Services: 'ServicesMain',
+  Profile: 'ProfileMain',
+};
+
+function nestedStackIndex(route: { state?: { index?: number } | undefined }): number {
+  const nested = route.state;
+  if (!nested || nested.index == null) return 0;
+  return nested.index;
+}
+
+const PROFILE_DOUBLE_TAP_MS = 400;
+
 export default function CustomTabBar({
   state,
   descriptors,
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
-  const activeRoute = state.routes[state.index];
+  const profileLastTapAt = useRef(0);
+
+  const popTabStackToRoot = (
+    route: (typeof state.routes)[number],
+    routeName: TabRouteName,
+  ) => {
+    const rootScreen = TAB_ROOT_SCREEN[routeName];
+    const nested = route.state;
+    if (nested?.key) {
+      navigation.dispatch({
+        ...CommonActions.reset({
+          index: 0,
+          routes: [{ name: rootScreen }],
+        }),
+        target: nested.key,
+      });
+      return;
+    }
+    navigation.navigate(routeName, { screen: rootScreen } as never);
+  };
+
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      const tab = state.routes[state.index];
+      const nested = tab.state;
+      if (!nested || nested.index == null || nested.index > 0 || !nested.key) {
+        return false;
+      }
+      const root = nested.routeNames?.[0];
+      const current = nested.routes[nested.index]?.name;
+      if (!root || !current || current === root) return false;
+      navigation.dispatch({
+        ...CommonActions.reset({
+          index: 0,
+          routes: [{ name: root }],
+        }),
+        target: nested.key,
+      });
+      return true;
+    });
+    return () => sub.remove();
+  }, [navigation, state]);
 
   // v6 SOS redesign: the SOS screen now uses the standard light chrome, so
   // the tab bar stays visible. Users keep an always-visible escape hatch out
@@ -80,13 +139,34 @@ export default function CustomTabBar({
             canPreventDefault: true,
           });
 
-          if (!event.defaultPrevented) {
-            if (route.name === 'Services') {
-              (navigation as any).navigate('Services', { screen: 'ServicesMain' });
-            } else if (!isFocused) {
-              navigation.navigate(route.name, route.params);
-            }
+          if (event.defaultPrevented) {
+            return;
           }
+
+          const deepInStack = nestedStackIndex(route) > 0;
+
+          if (routeName === 'Profile' && isFocused) {
+            const now = Date.now();
+            const isDoubleTap = now - profileLastTapAt.current < PROFILE_DOUBLE_TAP_MS;
+            profileLastTapAt.current = now;
+            if (isDoubleTap || deepInStack) {
+              popTabStackToRoot(route, routeName);
+            }
+            return;
+          }
+
+          if (isFocused && deepInStack) {
+            popTabStackToRoot(route, routeName);
+            return;
+          }
+
+          if (!isFocused) {
+            profileLastTapAt.current = 0;
+            navigation.navigate(route.name, route.params);
+            return;
+          }
+
+          // Already on this tab's root — optional re-tap could scroll-to-top later.
         };
 
         return (

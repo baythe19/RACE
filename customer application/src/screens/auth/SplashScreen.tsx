@@ -74,8 +74,10 @@ function SplashScreen({ onFinished }: SplashScreenProps) {
       images.onboarding4,
     ];
     for (const moduleId of prefetch) {
-      // Prefetch only. A dropped Expo tunnel must not surface as an uncaught rejection;
-      // the Image still loads from the same Metro URL.
+      // Download to cache only — never render hidden <Image> copies here.
+      // Hidden 1px Images force-decode ~5 large bitmaps on the UI thread
+      // during splash, which freezes the screen before text/logo paint
+      // (observed on real Android devices). Downloading does not decode.
       void Asset.fromModule(moduleId).downloadAsync().catch(() => undefined);
     }
   }, []);
@@ -256,13 +258,6 @@ function SplashScreen({ onFinished }: SplashScreenProps) {
           ))}
         </View>
       </View>
-
-      <View pointerEvents="none" style={styles.preloadContainer}>
-        <Image source={images.onboarding1} style={styles.preload} fadeDuration={0} />
-        <Image source={images.onboarding2} style={styles.preload} fadeDuration={0} />
-        <Image source={images.onboarding3} style={styles.preload} fadeDuration={0} />
-        <Image source={images.onboarding4} style={styles.preload} fadeDuration={0} />
-      </View>
     </View>
   );
 }
@@ -341,19 +336,6 @@ const styles = StyleSheet.create({
     color: '#3D4650',
     fontWeight: '500',
     textAlign: 'center',
-  },
-  preloadContainer: {
-    position: 'absolute',
-    top: 0,
-    left: -9999,
-    width: 1,
-    height: 1,
-  },
-  preload: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0,
   },
 });
 

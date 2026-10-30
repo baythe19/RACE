@@ -11,6 +11,7 @@ import { useProfileStore } from '../../../store/profileStore';
 import { createEnquiry, type EnquiryDto } from '../../../services/enquiryService';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverEnquiry'>;
 
@@ -42,6 +43,7 @@ export default function DriverEnquiryScreen({ navigation }: Props) {
   }, [profile, fetchProfile]);
 
   const handleCreateEnquiry = async () => {
+    if (submitting) return;
     try {
       setSubmitting(true);
       setErrorMsg(null);
@@ -71,7 +73,7 @@ export default function DriverEnquiryScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'bottom']}>
       <View style={{ flex: 1, paddingHorizontal: 24, paddingTop: 8 }}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ marginBottom: 20 }}>
+        <Pressable onPress={() => goBackWithinStack(navigation)} hitSlop={12} style={{ marginBottom: 20 }}>
           <Ionicons name="arrow-back" size={24} color={colors.dark} />
         </Pressable>
 
@@ -109,7 +111,12 @@ export default function DriverEnquiryScreen({ navigation }: Props) {
             <Text style={{ fontSize: 14, color: colors.grey, textAlign: 'center', marginTop: 8, marginBottom: 24 }}>
               {errorMsg}
             </Text>
-            <GoldButton label="Try Again" onPress={handleCreateEnquiry} />
+            <GoldButton
+              label={submitting ? 'Submitting...' : 'Try Again'}
+              onPress={() => void handleCreateEnquiry()}
+              disabled={submitting}
+              loading={submitting}
+            />
           </View>
         ) : (
           <>

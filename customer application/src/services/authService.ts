@@ -2,7 +2,8 @@ import axios from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
 import { API_BASE_URL, TOKEN_KEYS } from '../config/env';
-import { clearTokens, saveTokens, unwrapApi, api } from './api';
+import { clearTokens, unwrapApi, api } from './api';
+import { persistSessionTokens } from './sessionTokens';
 import type { User, VerifyOtpResponse } from '../types/auth';
 
 export interface SendOtpPayload {
@@ -42,7 +43,7 @@ export async function verifyOtp(payload: VerifyOtpPayload): Promise<VerifyOtpRes
       role: payload.role ?? 'customer',
     }),
   );
-  await saveTokens(result.accessToken, result.refreshToken);
+  await persistSessionTokens(result.accessToken, result.refreshToken);
   return result;
 }
 
@@ -60,7 +61,7 @@ export async function refreshAuthSession(): Promise<VerifyOtpResponse> {
   const result = await unwrapApi<VerifyOtpResponse>(
     axios.post(`${API_BASE_URL}/api/v1/auth/refresh-token`, { refreshToken }),
   );
-  await saveTokens(result.accessToken, result.refreshToken);
+  await persistSessionTokens(result.accessToken, result.refreshToken);
   return result;
 }
 

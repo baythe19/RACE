@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
   Animated,
   BackHandler,
   Easing,
   Keyboard,
+  Linking,
   Platform,
   Pressable,
   StatusBar,
@@ -18,6 +18,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { TextInput } from 'react-native';
 
 import { KeyboardScreen } from '../../components/ui/AppKeyboard';
+import { useAppDialog } from '../../hooks/useAppDialog';
 
 import {
   AUTH_COLORS as COLORS,
@@ -49,9 +50,10 @@ import {
   useVerifyOtpMutation,
 } from '../../services/auth/useAuthMutations';
 import { ensurePreviewAuthSession, previewAdvanceFromMobileNumber } from '../../config/uiPreviewAuth';
-import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'MobileNumber'>;
 
@@ -89,6 +91,7 @@ function extractOtpFromMessage(message?: string): string | null {
 export default function MobileNumberScreen({ navigation }: Props) {
   const dispatch = useAppDispatch();
   const loading = useAppSelector(state => state.auth.loading);
+  const { dialog, showDialog } = useAppDialog();
   const signupAccountType = useAppSelector(state => state.onboarding.signupAccountType);
   const signupVendorType = useAppSelector(state => state.onboarding.signupVendorType);
   const partnerSignupRequired = useAppSelector(state => state.onboarding.partnerSignupRequired);
@@ -142,7 +145,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
       return;
     }
     if (navigation.canGoBack()) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     const parent = navigation.getParent();
@@ -197,7 +200,9 @@ export default function MobileNumberScreen({ navigation }: Props) {
   }, [chromeOpacity, heroFactor]);
 
   const handleContinue = async () => {
-    if (UI_PREVIEW_AUTH_FLOW) {
+    if (loading || sendOtpMutation.isPending) return;
+
+    if (isUiPreviewAuthFlow()) {
       Keyboard.dismiss();
       setError('');
       previewAdvanceFromMobileNumber(navigation, dispatch, isSignup);
@@ -242,7 +247,10 @@ export default function MobileNumberScreen({ navigation }: Props) {
           setError('Could not sign you in automatically. Try Continue again.');
           return;
         }
-        const verifyResult = await verifyOtpMutation.mutateAsync({ mobileNumber: digits, otp });
+        const verifyResult = await verifyOtpMutation.mutateAsync({
+          mobileNumber: digits,
+          otp,
+        });
         if (isExistingUser || verifyResult.user.isProfileCompleted) {
           dispatch(clearSignupPath());
         }
@@ -273,7 +281,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
         );
         return;
       }
-      if (__DEV__ || UI_PREVIEW_AUTH_FLOW) {
+      if (__DEV__ || isUiPreviewAuthFlow()) {
         navigation.navigate('OtpVerification', {
           mobileNumber: digits,
           isExistingUser: !isSignup,
@@ -291,15 +299,21 @@ export default function MobileNumberScreen({ navigation }: Props) {
   };
 
   const handleHelp = () => {
-    Alert.alert('24/7 roadside support', "We're here whenever you need us.");
+    showDialog({
+      tone: 'info',
+      title: '24/7 roadside support',
+      message: "We're here whenever you need us.",
+      primaryLabel: 'Got it',
+    });
   };
 
   const handleTerms = () => {
-    Alert.alert('Terms & Privacy', "RACE's Terms and Privacy Policy will open here.");
+    void Linking.openURL('https://www.raceservice.in/terms.html');
   };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      {dialog}
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
 
       <KeyboardScreen>
@@ -368,7 +382,8 @@ export default function MobileNumberScreen({ navigation }: Props) {
               inputRef={inputRef}
               menuOpen={countryMenuOpen}
               onPhoneChange={value => {
-                setPhone(value.replace(/[^\d\s]/g, ''));
+                // Indian mobile: digits only, hard-capped at 10.
+                setPhone(value.replace(/\D/g, '').slice(0, 10));
                 if (error) setError('');
               }}
               onToggleCountryMenu={() => {
@@ -404,7 +419,7 @@ export default function MobileNumberScreen({ navigation }: Props) {
             isSignup={isSignup}
             marginTop={keyboardOpen ? 12 : 22}
             onPress={() => void handleContinue()}
-            disabled={loading}
+            disabled={loading || sendOtpMutation.isPending}
           />
 
           <Animated.View
@@ -452,34 +467,36 @@ export default function MobileNumberScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
-          {/* Quick Demo Mode Card */}
-          <View
-            style={{
-              marginTop: 14 * scale,
-              padding: 12 * scale,
-              backgroundColor: '#F3F4F6',
-              borderRadius: 12 * scale,
-              alignItems: 'center',
-            }}>
-            <Text style={{ fontSize: 11 * scale, fontWeight: '700', color: COLORS.orange }}>
-              ⚡ QUICK DEMO MODE (NO BACKEND)
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => ensurePreviewAuthSession(dispatch, true)}
-              style={({ pressed }) => ({
-                marginTop: 8 * scale,
-                backgroundColor: COLORS.orange,
-                paddingVertical: 8 * scale,
-                paddingHorizontal: 16 * scale,
-                borderRadius: 8 * scale,
-                opacity: pressed ? 0.85 : 1,
-              })}>
-              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 * scale }}>
-                🚀 Explore Customer App (Demo)
+          {/* Preview builds only — never show in APK when isUiPreviewAuthFlow()=false */}
+          {isUiPreviewAuthFlow() ? (
+            <View
+              style={{
+                marginTop: 14 * scale,
+                padding: 12 * scale,
+                backgroundColor: '#F3F4F6',
+                borderRadius: 12 * scale,
+                alignItems: 'center',
+              }}>
+              <Text style={{ fontSize: 11 * scale, fontWeight: '700', color: COLORS.orange }}>
+                ⚡ QUICK DEMO MODE (NO BACKEND)
               </Text>
-            </Pressable>
-          </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => ensurePreviewAuthSession(dispatch, true)}
+                style={({ pressed }) => ({
+                  marginTop: 8 * scale,
+                  backgroundColor: COLORS.orange,
+                  paddingVertical: 8 * scale,
+                  paddingHorizontal: 16 * scale,
+                  borderRadius: 8 * scale,
+                  opacity: pressed ? 0.85 : 1,
+                })}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 * scale }}>
+                  🚀 Explore Customer App (Demo)
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
 
           {isSignup ? (
             <>

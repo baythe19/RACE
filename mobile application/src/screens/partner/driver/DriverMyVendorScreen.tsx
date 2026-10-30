@@ -163,50 +163,15 @@ export default function DriverMyVendorScreen() {
           style={[
             styles.header,
             {
-              paddingHorizontal: px(16),
-              paddingTop: px(12),
-              paddingBottom: px(12),
+              paddingHorizontal: px(12),
+              paddingTop: px(10),
+              paddingBottom: px(10),
             },
           ]}>
-          <View style={styles.headerRow}>
-            <View style={styles.headerTextCol}>
-              {vendor ? (
-                <>
-                  <View style={styles.fleetBadgeRow}>
-                    <View style={styles.fleetTag}>
-                      <ShieldCheck size={px(11)} color={C.green} />
-                      <PartnerText style={styles.fleetTagText}>
-                        CONNECTED FLEET
-                      </PartnerText>
-                    </View>
-                  </View>
-                  <PartnerText
-                    numberOfLines={1}
-                    style={[styles.headerTitle, { fontSize: px(18) }]}>
-                    {vendor.name}
-                  </PartnerText>
-                  <PartnerText
-                    numberOfLines={1}
-                    style={[styles.headerSubtitle, { fontSize: px(12) }]}>
-                    {vendor.ownerName
-                      ? `Managed by ${vendor.ownerName}`
-                      : 'Authorized Towing Partner'}
-                  </PartnerText>
-                </>
-              ) : (
-                <>
-                  <PartnerText style={[styles.headerTitle, { fontSize: px(20) }]}>
-                    {(invitations.data?.length ?? 0) > 0 ? 'Fleet request' : 'My Vendor'}
-                  </PartnerText>
-                  <PartnerText style={[styles.headerSubtitle, { fontSize: px(12.5) }]}>
-                    {(invitations.data?.length ?? 0) > 0
-                      ? 'A towing vendor invited you to their fleet'
-                      : 'Fleet connection and invitations'}
-                  </PartnerText>
-                </>
-              )}
-            </View>
-
+          <PartnerText style={[styles.headerTitle, { fontSize: px(20) }]}>
+            My Vendor
+          </PartnerText>
+          <View style={styles.headerActions}>
             {vendor ? (
               <Pressable
                 accessibilityRole="button"
@@ -215,14 +180,14 @@ export default function DriverMyVendorScreen() {
                 style={({ pressed }) => [
                   styles.bellButton,
                   {
-                    width: px(38),
-                    height: px(38),
-                    borderRadius: px(19),
+                    width: px(34),
+                    height: px(34),
+                    borderRadius: px(17),
                     marginRight: px(8),
                     opacity: pressed ? 0.75 : 1,
                   },
                 ]}>
-                <Info size={px(18)} color={C.ink} />
+                <Info size={px(17)} color={C.ink} />
               </Pressable>
             ) : null}
 
@@ -234,13 +199,13 @@ export default function DriverMyVendorScreen() {
               style={({ pressed }) => [
                 styles.bellButton,
                 {
-                  width: px(38),
-                  height: px(38),
-                  borderRadius: px(19),
+                  width: px(34),
+                  height: px(34),
+                  borderRadius: px(17),
                   opacity: pressed ? 0.75 : 1,
                 },
               ]}>
-              <Bell size={px(18)} color={C.ink} />
+              <Bell size={px(17)} color={C.ink} />
               {unreadNotifs > 0 ? (
                 <View
                   style={[
@@ -311,6 +276,38 @@ export default function DriverMyVendorScreen() {
         </View>
       ) : vendor ? (
         <>
+          {/* Connected vendor identity — header stays consistent across tabs */}
+          <View
+            style={[
+              styles.card,
+              {
+                borderRadius: px(14),
+                padding: px(14),
+                marginBottom: px(14),
+              },
+            ]}>
+            <View style={styles.fleetBadgeRow}>
+              <View style={styles.fleetTag}>
+                <ShieldCheck size={px(11)} color={C.green} />
+                <PartnerText style={styles.fleetTagText}>
+                  CONNECTED FLEET
+                </PartnerText>
+              </View>
+            </View>
+            <PartnerText
+              numberOfLines={1}
+              style={[styles.vendorCardTitle, { fontSize: px(16), marginTop: px(6) }]}>
+              {vendor.name}
+            </PartnerText>
+            <PartnerText
+              numberOfLines={1}
+              style={[styles.headerSubtitle, { fontSize: px(12.5) }]}>
+              {vendor.ownerName
+                ? `Managed by ${vendor.ownerName}`
+                : 'Authorized Towing Partner'}
+            </PartnerText>
+          </View>
+
           {/* Vendor Assignments Section */}
           <View style={{ marginBottom: px(14) }}>
             <View style={styles.sectionHeader}>
@@ -753,7 +750,7 @@ const styles = StyleSheet.create({
   },
   historyTitle: {
     color: C.ink,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   historyMeta: {
     color: C.grey,
@@ -781,14 +778,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.hairline,
   },
-  headerRow: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTextCol: {
-    flex: 1,
-    paddingRight: 10,
   },
   fleetBadgeRow: {
     flexDirection: 'row',
@@ -806,12 +798,18 @@ const styles = StyleSheet.create({
   fleetTagText: {
     color: C.green,
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.3,
   },
   headerTitle: {
     color: C.ink,
-    fontWeight: '800',
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 10,
+  },
+  vendorCardTitle: {
+    color: C.ink,
+    fontWeight: '700',
   },
   headerSubtitle: {
     color: C.grey,
@@ -852,7 +850,7 @@ const styles = StyleSheet.create({
   },
   vendorName: {
     color: C.ink,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   verifiedRow: {
     flexDirection: 'row',
@@ -900,7 +898,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: C.ink,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   counterBadge: {
     backgroundColor: C.light,
@@ -911,7 +909,7 @@ const styles = StyleSheet.create({
   },
   counterText: {
     color: C.grey,
-    fontWeight: '700',
+    fontWeight: '600',
   },
   assignmentCard: {
     borderWidth: 1,
@@ -923,14 +921,14 @@ const styles = StyleSheet.create({
   },
   assignmentNumber: {
     color: C.ink,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   actionNeededBadge: {
     backgroundColor: '#FEF3C7',
   },
   actionNeededText: {
     color: '#B45309',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   serviceLabel: {
     color: C.grey,
@@ -953,7 +951,7 @@ const styles = StyleSheet.create({
   },
   policyHeading: {
     color: C.ink,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   policyRow: {
     flexDirection: 'row',
@@ -987,7 +985,7 @@ const styles = StyleSheet.create({
   },
   noVendorTitle: {
     color: C.ink,
-    fontWeight: '800',
+    fontWeight: '700',
   },
   noVendorDesc: {
     color: C.grey,

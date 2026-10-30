@@ -1,160 +1,123 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import PrimaryButton from '../../components/ui/PrimaryButton';
-import Screen, { ScreenContent } from '../../components/ui/Screen';
+import GoldButton from '../../components/auth/GoldButton';
+import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
+import VehicleEmergencyQrPanel from '../../components/vehicles/VehicleEmergencyQrPanel';
 import { useVehicleStore } from '../../store/vehicleStore';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import type { ProfileStackParamList } from '../../types/navigation';
-import { colors, radius, spacing, typography } from '../../theme';
+import { colors, typography } from '../../theme';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'VehicleDetail'>;
 
 export default function VehicleDetailScreen({ navigation, route }: Props) {
   const { vehicleId } = route.params;
-  const { selectedVehicle, isLoading, error, fetchVehicle, deleteVehicle } = useVehicleStore();
+  const px = useProfilePx();
+  const { dialog, showDialog } = useAppDialog();
+  const { vehicles, selectedVehicle, isLoading, error, fetchVehicle, deleteVehicle } =
+    useVehicleStore();
+
+  const listFallback = useMemo(
+    () => vehicles.find(item => item.id === vehicleId) ?? null,
+    [vehicleId, vehicles],
+  );
+
+  const vehicle =
+    selectedVehicle?.id === vehicleId ? selectedVehicle : listFallback;
 
   useEffect(() => {
     void fetchVehicle(vehicleId);
   }, [fetchVehicle, vehicleId]);
 
   const handleDelete = () => {
-    Alert.alert('Delete vehicle', 'Remove this vehicle from your account?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await deleteVehicle(vehicleId);
-            navigation.navigate('MyVehicles');
-          } catch (err) {
-            Alert.alert('Vehicle', err instanceof Error ? err.message : 'Unable to delete vehicle');
-          }
-        },
+    showDialog({
+      tone: 'danger',
+      title: 'Delete vehicle',
+      message: 'Remove this vehicle from your account?',
+      secondaryLabel: 'Cancel',
+      primaryLabel: 'Delete',
+      destructive: true,
+      onPrimary: async () => {
+        try {
+          await deleteVehicle(vehicleId);
+          navigation.navigate('MyVehicles');
+        } catch (err) {
+          showDialog({
+            tone: 'error',
+            title: 'Vehicle',
+            message: err instanceof Error ? err.message : 'Unable to delete vehicle',
+            primaryLabel: 'OK',
+          });
+        }
       },
-    ]);
+    });
   };
 
-  if (isLoading && !selectedVehicle) {
+  if (isLoading && !vehicle) {
     return (
-      <Screen>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </Screen>
+      <ProfileSubScreenLayout title="Vehicle QR">
+        <DataSkeleton variant="detail" />
+      </ProfileSubScreenLayout>
     );
   }
 
-  const vehicle = selectedVehicle;
   if (!vehicle) {
     return (
-      <Screen>
-        <View style={styles.loader}>
-          <Text style={styles.error}>{error ?? 'Vehicle not found'}</Text>
-        </View>
-      </Screen>
+      <ProfileSubScreenLayout title="Vehicle QR">
+        <Text style={styles.error}>{error ?? 'Vehicle not found'}</Text>
+      </ProfileSubScreenLayout>
     );
   }
 
   return (
-    <Screen>
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <ScreenContent>
-            <View style={styles.card}>
-              <Text style={styles.plate}>{vehicle.vehicleNumber}</Text>
-              <Text style={styles.meta}>
-                {vehicle.brand} {vehicle.model}
-              </Text>
-              <Text style={styles.meta}>
-                {vehicle.vehicleType} · {vehicle.fuelType}
-                {vehicle.color ? ` · ${vehicle.color}` : ''}
-              </Text>
-            </View>
-
-            <Text style={styles.qrTitle}>Vehicle QR Code</Text>
-            <Text style={styles.qrHint}>
-              Technicians can scan this to verify your vehicle on RACE. Keep it on your windshield
-              or share from this screen.
-            </Text>
-            <View style={styles.qrWrap}>
-              <Image source={{ uri: vehicle.qrCode }} style={styles.qrImage} resizeMode="contain" />
-            </View>
-
-            <PrimaryButton
-              label="Edit Vehicle"
-              onPress={() => navigation.navigate('EditVehicle', { vehicleId })}
-            />
-
-            <PrimaryButton
-              label={isLoading ? 'Deleting...' : 'Delete Vehicle'}
-              onPress={handleDelete}
-              disabled={isLoading}
-              variant="outline"
-            />
-          </ScreenContent>
-        </ScrollView>
-      </SafeAreaView>
-    </Screen>
+    <ProfileSubScreenLayout
+      title="Vehicle QR"
+      contentStyle={{ paddingTop: px(18) }}
+      footer={
+        <View style={[styles.footer, { paddingHorizontal: px(20), paddingBottom: px(16) }]}>
+          {dialog}
+          <GoldButton
+            label="Edit vehicle"
+            onPress={() => navigation.navigate('EditVehicle', { vehicleId })}
+            height={px(48)}
+            borderRadius={px(12)}
+            style={{ width: '100%' }}
+          />
+        </View>
+      }>
+      <VehicleEmergencyQrPanel vehicle={vehicle} px={px} showMeta={false} />
+      <Pressable
+        onPress={handleDelete}
+        disabled={isLoading}
+        style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.7 }]}>
+        <Text style={styles.deleteText}>{isLoading ? 'Please wait…' : 'Delete vehicle'}</Text>
+      </Pressable>
+    </ProfileSubScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  content: { paddingBottom: spacing.xxl },
-  card: {
+  footer: {
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 195, 38, 0.25)',
   },
-  plate: {
-    fontSize: typography.sizes.xxl,
-    fontWeight: typography.weights.bold,
-    color: colors.textDark,
-  },
-  meta: {
-    marginTop: spacing.xs,
-    color: colors.text,
-    textTransform: 'capitalize',
-  },
-  qrTitle: {
-    fontSize: typography.sizes.lg,
-    fontWeight: typography.weights.bold,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
-  },
-  qrHint: {
-    color: colors.text,
-    lineHeight: 20,
-    marginBottom: spacing.md,
-  },
-  qrWrap: {
+  deleteBtn: {
     alignItems: 'center',
-    backgroundColor: colors.background,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
+    paddingVertical: 12,
   },
-  qrImage: {
-    width: 220,
-    height: 220,
+  deleteText: {
+    color: colors.error,
+    fontWeight: typography.weights.bold,
+    fontSize: 14,
   },
   error: {
-    color: colors.accentRed,
+    color: colors.error,
     textAlign: 'center',
+    marginTop: 24,
   },
 });

@@ -1,336 +1,295 @@
-import React from 'react';
-import { Image, Linking, Pressable, Share, Text, View } from 'react-native';
-import {
-  Check,
-  MapPin,
-  Phone,
-  ShieldCheck,
-  Star,
-  Truck,
-} from 'lucide-react-native';
+import React, { useMemo } from 'react';
+import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native';
+import { MapPin, Phone, Wrench } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
-import DriverAvatar from '../../../components/bookings/DriverAvatar';
-import { images } from '../../../assets';
-import {
-  ROADSIDE_ACCENT,
-  ROADSIDE_ACCENT_LIGHT,
-  ROADSIDE_MECHANIC,
-  ROADSIDE_TRACK_ETA_MINUTES,
-} from '../../../constants/roadsideBooking';
+import { useBookingTracking } from '../../../hooks/useBookingTracking';
+import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
+import { ROADSIDE_ACCENT } from '../../../constants/roadsideBooking';
 import { brand } from '../../../theme/brand';
 import type { HomeStackParamList } from '../../../types/navigation';
-import { colors, shadows, typography } from '../../../theme';
+import { formatBookingDisplayId, getCustomerBookingPresentation } from '../../../utils/bookingDisplay';
+import { formatLocationCard } from '../../../utils/readableAddress';
+import {
+  ROADSIDE_HELP_STEPS,
+  roadsideHelpCopy,
+  roadsideHelpPhase,
+  roadsideHelpStepIndex,
+} from '../../../utils/roadsideHelpUi';
+import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideHelpOnWay'>;
 
-const TRACK_STEPS = [
-  { id: 'dispatched', label: 'Dispatched', state: 'done' as const },
-  { id: 'on_route', label: 'On Route', state: 'active' as const },
-  { id: 'arrived', label: 'Arrived', state: 'pending' as const },
-];
-
-export default function RoadsideHelpOnWayScreen({ navigation }: Props) {
+export default function RoadsideHelpOnWayScreen({ navigation, route }: Props) {
   const { t } = useBookingTheme();
+  const bookingId = route.params?.bookingId;
+  const booking = useBookingQuery(bookingId ?? '', 'towing');
+  const { status: trackedStatus, etaMinutes, driverName, driverPhone } = useBookingTracking(
+    bookingId,
+    'towing',
+  );
+
+  const unifiedStatus = booking?.unifiedStatus ?? trackedStatus ?? 'CONFIRMED';
+  const dispatchHint = booking
+    ? getCustomerBookingPresentation(booking).dispatchHint
+    : 'Roadside jobs broadcast to vendor partners near you.';
+  const hasPartnerName = Boolean(driverName ?? booking?.driver?.name);
+  const phase = roadsideHelpPhase(unifiedStatus, hasPartnerName);
+  const copy = roadsideHelpCopy(phase);
+  const activeStep = roadsideHelpStepIndex(phase);
+
+  const locationCard = useMemo(
+    () =>
+      booking?.pickup
+        ? formatLocationCard({
+            address: booking.pickup.address,
+            label: booking.pickup.label,
+          })
+        : null,
+    [booking?.pickup],
+  );
+
+  const showPartnerRow =
+    hasPartnerName &&
+    (phase === 'en_route' || phase === 'at_site' || phase === 'completed');
+  const partnerName = driverName ?? booking?.driver?.name ?? 'Partner';
+  const partnerPhone = driverPhone ?? booking?.driver?.phone;
+  const showEta = phase === 'en_route' && etaMinutes != null;
+
+  const goBookings = () => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.navigate('Bookings' as never);
+    } else {
+      navigation.navigate('HomeMain' as never);
+    }
+  };
+
+  const callHelpline = () => {
+    void Linking.openURL(`tel:${brand.phoneRaw}`);
+  };
+
+  const callPartner = () => {
+    const phone = partnerPhone?.trim();
+    if (phone) void Linking.openURL(`tel:${phone}`);
+    else callHelpline();
+  };
 
   return (
     <TowingBookingLayout
-      title="Help is on the way!"
-      step={4}
+      title="Roadside help"
+      step={0}
+      showStep={false}
       accentColor={ROADSIDE_ACCENT}
-      hideFooter
-      onBack={() => navigation.goBack()}>
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{
-            fontSize: t.body,
-            fontWeight: typography.weights.semibold,
-            color: colors.grey,
-            textAlign: 'center',
-            marginBottom: t.px(16),
-          }}>
-          Mechanic dispatched to your location
-        </Text>
-
-        <View style={{ alignItems: 'center', marginBottom: t.px(18) }}>
-          <View
-            style={{
-              width: t.px(150),
-              height: t.px(150),
-              borderRadius: t.px(75),
-              borderWidth: 3,
-              borderColor: ROADSIDE_ACCENT,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}>
-            <Image
-              source={images.booking.roadsideHelpTruck}
-              style={{ width: t.px(110), height: t.px(80) }}
-              resizeMode="contain"
-            />
-          </View>
-        </View>
-
-        <View
-          style={[
-            {
-              borderRadius: t.cardRadius,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.background,
-              padding: t.cardPadding,
-              marginBottom: t.px(16),
-            },
-            shadows.card,
-          ]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(12) }}>
-            <DriverAvatar
-              size={t.px(64)}
-              accentColor={ROADSIDE_ACCENT}
-              borderColor={ROADSIDE_ACCENT}
-              role="mechanic"
-            />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(6) }}>
-                <Text
-                  style={{
-                    fontSize: t.labelBold,
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {ROADSIDE_MECHANIC.name}
-                </Text>
-                <Star size={t.px(14)} color={ROADSIDE_ACCENT} fill={ROADSIDE_ACCENT} />
-                <Text
-                  style={{
-                    fontSize: t.body,
-                    fontWeight: typography.weights.semibold,
-                    color: colors.grey,
-                  }}>
-                  {ROADSIDE_MECHANIC.rating}
-                </Text>
-              </View>
-              <View
-                style={{
-                  alignSelf: 'flex-start',
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: t.px(4),
-                  marginTop: t.px(6),
-                  paddingHorizontal: t.px(10),
-                  paddingVertical: t.px(4),
-                  borderRadius: t.px(14),
-                  backgroundColor: ROADSIDE_ACCENT_LIGHT,
-                }}>
-                <ShieldCheck size={t.px(12)} color={ROADSIDE_ACCENT} />
-                <Text
-                  style={{
-                    fontSize: t.caption,
-                    fontWeight: typography.weights.bold,
-                    color: ROADSIDE_ACCENT,
-                  }}>
-                  Verified Mechanic
-                </Text>
-              </View>
-              <Text
-                style={{
-                  marginTop: t.px(8),
-                  fontSize: t.caption,
-                  fontWeight: typography.weights.semibold,
-                  color: colors.grey,
-                }}>
-                ETA: {ROADSIDE_TRACK_ETA_MINUTES} min
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        <View style={{ alignItems: 'center', marginBottom: t.px(20) }}>
-          <Text
-            style={{
-              fontSize: t.bodyLarge,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-            }}>
-            Arriving in
+      scrollable
+      onBack={() => goBackWithinStack(navigation)}
+      buttonLabel="Open in Bookings"
+      onContinue={goBookings}
+      secondaryLabel="Call helpline"
+      onSecondary={callHelpline}
+      secondaryVariant="outline">
+      <View style={{ gap: t.px(16), paddingBottom: t.px(4) }}>
+        {!bookingId ? (
+          <Text style={{ fontSize: t.body, color: colors.grey, textAlign: 'center' }}>
+            Your request was submitted. Open Bookings to track live updates.
           </Text>
-          <Text
-            style={{
-              fontSize: t.px(32),
-              fontWeight: typography.weights.extrabold,
-              color: ROADSIDE_ACCENT,
-            }}>
-            {ROADSIDE_TRACK_ETA_MINUTES} min
-          </Text>
-        </View>
-
-        <View style={{ marginBottom: t.px(20) }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: t.px(4),
-            }}>
-            {TRACK_STEPS.map((step, index) => {
-              const isDone = step.state === 'done';
-              const isActive = step.state === 'active';
-              const Icon =
-                step.id === 'dispatched' ? Check : step.id === 'on_route' ? Truck : MapPin;
-
-              return (
-                <React.Fragment key={step.id}>
-                  {index > 0 ? (
-                    <View
-                      style={{
-                        flex: 1,
-                        height: 2,
-                        backgroundColor: index === 1 ? colors.success : colors.border,
-                      }}
-                    />
-                  ) : null}
+        ) : !booking ? (
+          <View style={{ alignItems: 'center', paddingVertical: t.px(24) }}>
+            <ActivityIndicator color={ROADSIDE_ACCENT} />
+          </View>
+        ) : (
+          <>
+            <View
+              style={{
+                borderRadius: t.px(16),
+                borderWidth: 1,
+                borderColor: '#E7E5E4',
+                backgroundColor: colors.background,
+                padding: t.px(16),
+                gap: t.px(12),
+              }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: t.px(12) }}>
+                <View
+                  style={{
+                    width: t.px(44),
+                    height: t.px(44),
+                    borderRadius: t.px(12),
+                    backgroundColor: '#FFF7ED',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                  <Wrench size={t.px(22)} color={ROADSIDE_ACCENT} strokeWidth={2.2} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <View
                     style={{
-                      width: t.px(36),
-                      height: t.px(36),
-                      borderRadius: t.px(18),
-                      backgroundColor: isDone
-                        ? colors.success
-                        : isActive
-                          ? ROADSIDE_ACCENT
-                          : colors.lightGrey,
+                      alignSelf: 'flex-start',
+                      paddingHorizontal: t.px(10),
+                      paddingVertical: t.px(4),
+                      borderRadius: t.px(8),
+                      backgroundColor: '#F5F5F4',
+                      marginBottom: t.px(8),
+                    }}>
+                    <Text
+                      style={{
+                        fontSize: t.px(11),
+                        fontWeight: typography.weights.bold,
+                        color: colors.dark,
+                      }}>
+                      {copy.chip}
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      fontSize: t.px(17),
+                      fontWeight: typography.weights.bold,
+                      color: colors.dark,
+                    }}>
+                    {copy.title}
+                  </Text>
+                  <Text
+                    style={{
+                      marginTop: t.px(4),
+                      fontSize: t.px(13),
+                      color: colors.grey,
+                      lineHeight: t.px(18),
+                    }}>
+                    {copy.subtitle}
+                  </Text>
+                  {showEta ? (
+                    <Text
+                      style={{
+                        marginTop: t.px(8),
+                        fontSize: t.px(14),
+                        fontWeight: typography.weights.semibold,
+                        color: ROADSIDE_ACCENT,
+                      }}>
+                      ETA ~{etaMinutes} min
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: '#F3F4F6' }} />
+
+              <View style={{ gap: t.px(6) }}>
+                <Text style={{ fontSize: t.px(11), color: colors.grey }}>
+                  {formatBookingDisplayId(booking.bookingNumber)}
+                  {booking.serviceLabel ? ` · ${booking.serviceLabel}` : ''}
+                </Text>
+                {locationCard ? (
+                  <View style={{ flexDirection: 'row', gap: t.px(8), alignItems: 'flex-start' }}>
+                    <MapPin size={t.px(16)} color="#10B981" strokeWidth={2.2} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: t.px(14),
+                          fontWeight: typography.weights.semibold,
+                          color: colors.dark,
+                        }}>
+                        {locationCard.primary}
+                      </Text>
+                      {locationCard.secondary ? (
+                        <Text style={{ fontSize: t.px(12), color: colors.grey, marginTop: 2 }}>
+                          {locationCard.secondary}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: t.px(4) }}>
+                {ROADSIDE_HELP_STEPS.map((label, index) => {
+                  const done = index < activeStep;
+                  const active = index === activeStep;
+                  return (
+                    <View key={label} style={{ flex: 1, alignItems: 'center' }}>
+                      <View
+                        style={{
+                          width: t.px(8),
+                          height: t.px(8),
+                          borderRadius: t.px(4),
+                          backgroundColor: done || active ? ROADSIDE_ACCENT : '#E5E7EB',
+                        }}
+                      />
+                      <Text
+                        numberOfLines={1}
+                        style={{
+                          marginTop: t.px(6),
+                          fontSize: t.px(9),
+                          fontWeight: active ? typography.weights.bold : typography.weights.medium,
+                          color: active ? colors.dark : colors.grey,
+                        }}>
+                        {label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+
+            {showPartnerRow ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: t.px(12),
+                  borderRadius: t.px(14),
+                  borderWidth: 1,
+                  borderColor: '#E7E5E4',
+                  padding: t.px(12),
+                }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ fontSize: t.px(11), color: colors.grey }}>Assigned partner</Text>
+                  <Text
+                    style={{
+                      marginTop: t.px(2),
+                      fontSize: t.px(15),
+                      fontWeight: typography.weights.semibold,
+                      color: colors.dark,
+                    }}>
+                    {partnerName}
+                  </Text>
+                  {booking.assignedFleetVehicleLabel ? (
+                    <Text style={{ marginTop: t.px(2), fontSize: t.px(11), color: colors.grey }}>
+                      {booking.assignedFleetVehicleLabel}
+                    </Text>
+                  ) : null}
+                </View>
+                {partnerPhone ? (
+                  <Pressable
+                    onPress={callPartner}
+                    style={{
+                      width: t.px(44),
+                      height: t.px(44),
+                      borderRadius: t.px(12),
+                      borderWidth: 1,
+                      borderColor: colors.border,
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}>
-                    <Icon
-                      size={t.px(16)}
-                      color={isDone || isActive ? colors.background : colors.grey}
-                      strokeWidth={2.5}
-                    />
-                  </View>
-                </React.Fragment>
-              );
-            })}
-          </View>
+                    <Phone size={t.px(18)} color={colors.dark} strokeWidth={2.2} />
+                  </Pressable>
+                ) : null}
+              </View>
+            ) : null}
 
-          <View
-            style={{
-              flexDirection: 'row',
-              marginTop: t.px(8),
-            }}>
-            {TRACK_STEPS.map(step => {
-              const isActive = step.state === 'active';
-              return (
-                <Text
-                  key={step.id}
-                  numberOfLines={1}
-                  style={{
-                    flex: 1,
-                    fontSize: t.px(11),
-                    fontWeight: typography.weights.bold,
-                    color: isActive ? ROADSIDE_ACCENT : colors.dark,
-                    textAlign: 'center',
-                  }}>
-                  {step.label}
-                </Text>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: t.px(10), marginTop: 'auto' }}>
-          <Pressable
-            onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-            style={{
-              flex: 1,
-              minHeight: t.px(52),
-              borderRadius: t.inputRadius,
-              borderWidth: 1.5,
-              borderColor: ROADSIDE_ACCENT,
-              backgroundColor: colors.background,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: t.px(8),
-              paddingVertical: t.px(10),
-              gap: t.px(4),
-            }}>
-            <Phone size={t.px(18)} color={ROADSIDE_ACCENT} />
             <Text
               style={{
                 fontSize: t.px(12),
-                fontWeight: typography.weights.bold,
-                color: ROADSIDE_ACCENT,
+                color: colors.grey,
                 textAlign: 'center',
+                lineHeight: t.px(17),
               }}>
-              Call Mechanic
+              {dispatchHint}
+              {' '}
+              Open Bookings for live map once a partner accepts and is en route.
             </Text>
-          </Pressable>
-          <Pressable
-            onPress={async () => {
-              try {
-                await Share.share({
-                  message: `RACE Roadside Assistance: A mechanic (${ROADSIDE_MECHANIC.name}) is on the way to my breakdown location. ETA: ~${ROADSIDE_TRACK_ETA_MINUTES} mins. Emergency Helpline: ${brand.phone}`,
-                  title: 'RACE Live Roadside Help',
-                });
-              } catch {
-                // share sheet closed
-              }
-            }}
-            style={{
-              flex: 1,
-              minHeight: t.px(52),
-              borderRadius: t.inputRadius,
-              borderWidth: 1.5,
-              borderColor: ROADSIDE_ACCENT,
-              backgroundColor: colors.background,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: t.px(8),
-              paddingVertical: t.px(10),
-              gap: t.px(4),
-            }}>
-            <MapPin size={t.px(18)} color={ROADSIDE_ACCENT} />
-            <Text
-              numberOfLines={2}
-              style={{
-                fontSize: t.px(11),
-                fontWeight: typography.weights.bold,
-                color: ROADSIDE_ACCENT,
-                textAlign: 'center',
-                lineHeight: t.px(14),
-              }}>
-              Share Live Location
-            </Text>
-          </Pressable>
-        </View>
-
-        <Pressable
-          onPress={() => {
-            const parent = navigation.getParent();
-            if (parent) {
-              parent.navigate('Bookings' as any);
-            } else {
-              navigation.navigate('HomeMain' as any);
-            }
-          }}
-          style={{
-            marginTop: t.px(12),
-            width: '100%',
-            height: t.px(48),
-            borderRadius: t.inputRadius,
-            backgroundColor: ROADSIDE_ACCENT,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <Text
-            style={{
-              fontSize: t.body,
-              fontWeight: typography.weights.bold,
-              color: colors.background,
-            }}>
-            Done · Go to Bookings
-          </Text>
-        </Pressable>
+          </>
+        )}
       </View>
     </TowingBookingLayout>
   );

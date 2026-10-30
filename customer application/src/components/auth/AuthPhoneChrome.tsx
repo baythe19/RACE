@@ -246,7 +246,7 @@ export function MobileNumberField({
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundColor: '#FAFAFA',
+            backgroundColor: '#FFFFFF',
           }}>
           <Text
             style={{
@@ -286,7 +286,7 @@ export function MobileNumberField({
           textContentType="telephoneNumber"
           autoComplete="tel"
           autoCorrect={false}
-          maxLength={12}
+          maxLength={10}
           returnKeyType="done"
           selectionColor={COLORS.orange}
           onSubmitEditing={onSubmit}

@@ -12,13 +12,22 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import GoldButton from '../auth/GoldButton';
-import { BookingScreenShell } from './BookingFlowHeader';
+import { BookingScreenShell, type HeaderTagVariant } from './BookingFlowHeader';
 import { BOOKING_REF_W, createBookingTheme } from './bookingTheme';
+import {
+  getTowingServiceModeHeaderTag,
+  getTowingServiceModeHeaderTagVariant,
+} from './TowingServiceModeBanner';
+import { TOWING_BOOKING_STEP_LABELS } from '../../constants/towingBooking';
+import { useTowingBooking } from '../../context/TowingBookingContext';
 import { colors, typography } from '../../theme';
 
 interface TowingBookingLayoutProps {
   title: string;
+  /** 1-based wizard step (1–3). Pass 0 for non-wizard screens (confirmation, tracking, rate). */
   step: number;
+  /** Labels for the horizontal stepper. Defaults to the 3-step towing wizard labels. */
+  stepLabels?: readonly string[];
   onBack?: () => void;
   children: ReactNode;
   buttonLabel?: string;
@@ -31,14 +40,21 @@ interface TowingBookingLayoutProps {
   scrollable?: boolean;
   hideFooter?: boolean;
   continueDisabled?: boolean;
+  continueLoading?: boolean;
   showStep?: boolean;
   headerVariant?: 'centered' | 'inline';
   accentColor?: string;
+  /** Compact label beside title (Instant, Scheduled, …). Wizard steps 1–3 auto-fill from booking context when omitted. */
+  headerTag?: string;
+  headerTagVariant?: HeaderTagVariant;
 }
+
+const DEFAULT_STEPPER_LABELS = TOWING_BOOKING_STEP_LABELS;
 
 export default function TowingBookingLayout({
   title,
   step,
+  stepLabels,
   onBack,
   children,
   buttonLabel = 'Continue',
@@ -51,13 +67,23 @@ export default function TowingBookingLayout({
   scrollable = false,
   hideFooter = false,
   continueDisabled = false,
+  continueLoading = false,
   showStep = true,
   headerVariant = 'centered',
   accentColor = colors.primary,
+  headerTag,
+  headerTagVariant,
 }: TowingBookingLayoutProps) {
   const { width } = useWindowDimensions();
   const s = width / BOOKING_REF_W;
   const t = createBookingTheme(s);
+  const { booking } = useTowingBooking();
+  const isWizardStep = showStep && step >= 1 && step <= 3;
+  const resolvedHeaderTag =
+    headerTag ?? (isWizardStep ? getTowingServiceModeHeaderTag(booking.serviceMode) : undefined);
+  const resolvedHeaderTagVariant =
+    headerTagVariant ??
+    (isWizardStep ? getTowingServiceModeHeaderTagVariant(booking.serviceMode) : undefined);
 
   const footer = hideFooter ? null : (
     <View
@@ -68,38 +94,15 @@ export default function TowingBookingLayout({
       }}>
       {footerNote}
       {onContinue ? (
-        accentColor === colors.primary ? (
-          <GoldButton
-            label={buttonLabel}
-            onPress={onContinue}
-            height={t.buttonHeight}
-            borderRadius={t.cardRadius}
-            labelSize={t.buttonLabel}
-            disabled={continueDisabled}
-          />
-        ) : (
-          <Pressable
-            onPress={onContinue}
-            disabled={continueDisabled}
-            style={({ pressed }) => ({
-              minHeight: t.buttonHeight,
-              borderRadius: t.cardRadius,
-              backgroundColor: continueDisabled ? colors.border : accentColor,
-              opacity: continueDisabled ? 0.55 : pressed ? 0.9 : 1,
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingHorizontal: t.px(20),
-            })}>
-            <Text
-              style={{
-                fontSize: t.buttonLabel,
-                fontWeight: typography.weights.bold,
-                color: continueDisabled ? colors.grey : colors.dark,
-              }}>
-              {buttonLabel}
-            </Text>
-          </Pressable>
-        )
+        <GoldButton
+          label={buttonLabel}
+          onPress={onContinue}
+          height={t.buttonHeight}
+          borderRadius={t.cardRadius}
+          labelSize={t.buttonLabel}
+          disabled={continueDisabled}
+          loading={continueLoading}
+        />
       ) : null}
       {secondaryLabel && onSecondary ? (
         <GoldButton
@@ -118,7 +121,7 @@ export default function TowingBookingLayout({
   const body = scrollable ? (
     <ScrollView
       style={styles.flex}
-      contentContainerStyle={{ flexGrow: 1, paddingBottom: t.px(8) }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: t.px(20) }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}>
       {children}
@@ -140,12 +143,15 @@ export default function TowingBookingLayout({
           <BookingScreenShell
             title={title}
             step={step}
+            stepLabels={stepLabels ?? DEFAULT_STEPPER_LABELS}
             onBack={onBack}
             theme={t}
             footer={footer}
             headerVariant={headerVariant}
             accentColor={accentColor}
-            showStep={showStep}>
+            showStep={showStep}
+            headerTag={resolvedHeaderTag}
+            headerTagVariant={resolvedHeaderTagVariant}>
             {body}
           </BookingScreenShell>
         </View>

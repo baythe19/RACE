@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 
 import { useAppDispatch } from '../../redux/hooks';
+import { useAuthStore } from '../../store/authStore';
 import {
   setNotifications,
   setNotificationPreferences,
@@ -8,7 +10,7 @@ import {
   setSavedLocations,
   setWalletBalance,
 } from '../../redux/profile/profileSlice';
-import type { NotificationPreference, PaymentMethod, SavedLocation } from '../../types/profile';
+import type { NotificationPreference, PaymentMethod, SavedLocation, AppNotification } from '../../types/profile';
 import {
   listSavedLocations,
   createSavedLocation,
@@ -24,6 +26,9 @@ import {
 import {
   listNotifications,
   markAllNotificationsRead,
+  markNotificationRead,
+  deleteAllNotifications,
+  deleteNotification,
   getNotificationPreferences,
   updateNotificationPreferences,
   mapMobilePrefToBackend,
@@ -39,6 +44,7 @@ export const profileKeys = {
 
 export function useSavedLocationsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.locations,
     queryFn: async () => {
@@ -46,6 +52,7 @@ export function useSavedLocationsQuery() {
       dispatch(setSavedLocations(locations));
       return locations;
     },
+    enabled: isAuthenticated,
   });
 }
 
@@ -82,6 +89,7 @@ export function useDeleteLocationMutation() {
 
 export function usePaymentMethodsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.payments,
     queryFn: async () => {
@@ -89,11 +97,13 @@ export function usePaymentMethodsQuery() {
       dispatch(setPaymentMethods(methods));
       return methods;
     },
+    enabled: isAuthenticated,
   });
 }
 
 export function useWalletQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.wallet,
     queryFn: async () => {
@@ -101,6 +111,7 @@ export function useWalletQuery() {
       dispatch(setWalletBalance(wallet));
       return wallet;
     },
+    enabled: isAuthenticated,
   });
 }
 
@@ -131,6 +142,7 @@ export function useDeletePaymentMethodMutation() {
 
 export function useNotificationsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.notifications,
     queryFn: async () => {
@@ -138,6 +150,7 @@ export function useNotificationsQuery() {
       dispatch(setNotifications(result.notifications));
       return result;
     },
+    enabled: isAuthenticated,
   });
 }
 
@@ -151,8 +164,80 @@ export function useMarkAllNotificationsReadMutation() {
   });
 }
 
+export function useDeleteAllNotificationsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteAllNotifications,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+    },
+  });
+}
+
+export function useDeleteNotificationMutation() {
+  const queryClient = useQueryClient();
+  const dispatch = useAppDispatch();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      try {
+        await deleteNotification(id);
+        return { deletedOnServer: true as const };
+      } catch (err) {
+        // Optimistic dismiss: row already removed in onMutate if DELETE fails with 404
+        // (already gone on server) or after a transient network error. Render serves
+        // DELETE /profile/notifications/:id for authed customers when deployed.
+        if (isAxiosError(err) && err.response?.status === 404) {
+          return { deletedOnServer: false as const };
+        }
+        throw err;
+      }
+    },
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: profileKeys.notifications });
+      const previous = queryClient.getQueryData<{
+        notifications: AppNotification[];
+        unreadCount: number;
+      }>(profileKeys.notifications);
+      if (previous) {
+        const removed = previous.notifications.find(n => n.id === id);
+        const notifications = previous.notifications.filter(n => n.id !== id);
+        const unreadCount = Math.max(
+          0,
+          previous.unreadCount - (removed && !removed.read ? 1 : 0),
+        );
+        const next = { notifications, unreadCount };
+        queryClient.setQueryData(profileKeys.notifications, next);
+        dispatch(setNotifications(notifications));
+      }
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(profileKeys.notifications, context.previous);
+        dispatch(setNotifications(context.previous.notifications));
+      }
+    },
+    onSuccess: result => {
+      if (result.deletedOnServer) {
+        void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+      }
+    },
+  });
+}
+
+export function useMarkNotificationReadMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => markNotificationRead(id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: profileKeys.notifications });
+    },
+  });
+}
+
 export function useNotificationPrefsQuery() {
   const dispatch = useAppDispatch();
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   return useQuery({
     queryKey: profileKeys.notificationPrefs,
     queryFn: async () => {
@@ -160,6 +245,7 @@ export function useNotificationPrefsQuery() {
       dispatch(setNotificationPreferences(prefs));
       return prefs;
     },
+    enabled: isAuthenticated,
   });
 }
 

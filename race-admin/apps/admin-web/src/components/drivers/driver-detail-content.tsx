@@ -1,7 +1,7 @@
 import type { ColumnDef } from '@tanstack/react-table';
 import { Loader2, Star } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import type {
   CustomerBookingHistoryItem,
@@ -183,6 +183,11 @@ const bookingColumns: ColumnDef<CustomerBookingHistoryItem, unknown>[] = [
   },
   { accessorKey: 'service', header: 'Service' },
   {
+    accessorKey: 'customerName',
+    header: 'Customer',
+    cell: ({ row }) => row.original.customerName ?? '—',
+  },
+  {
     accessorKey: 'status',
     header: 'Status',
     cell: ({ row }) => <StatusBadge status={row.original.status} />,
@@ -227,6 +232,7 @@ function ReviewsSection({ reviews }: { reviews: DriverReview[] }) {
 }
 
 export function DriverDetailContent({ driverId }: { driverId: string }) {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const { data: driver, isLoading, isError, refetch } = useDriverDetail(driverId);
   const { approve, reject } = useDriverActions(driverId);
@@ -320,7 +326,16 @@ export function DriverDetailContent({ driverId }: { driverId: string }) {
             <CardTitle>Booking History</CardTitle>
           </CardHeader>
           <CardContent className="p-0 pb-2">
-            <DataTable columns={bookingColumns} data={driver.bookings ?? []} emptyMessage="No bookings" />
+            <DataTable
+              columns={bookingColumns}
+              data={driver.bookings ?? []}
+              emptyMessage="No bookings"
+              onRowClick={(row) =>
+                navigate(
+                  `/bookings/${row.id}${row.bookingType ? `?type=${row.bookingType}` : ''}`,
+                )
+              }
+            />
           </CardContent>
         </Card>
 

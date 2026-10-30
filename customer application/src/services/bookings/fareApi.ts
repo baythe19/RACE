@@ -14,6 +14,7 @@ export async function estimateTowingFare(params: {
   dropoff_lat: number;
   dropoff_lng: number;
   scheduledAt?: string;
+  towingMode?: 'instant' | 'scheduled' | 'emergency';
 }): Promise<TowingFareEstimate> {
   return unwrap(
     apiClient.get<ApiSuccessResponse<TowingFareEstimate>>(API_ENDPOINTS.fareTowing, { params }),

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import * as vehicleService from '../services/vehicleService';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, readAccessToken } from '../services/api';
 import type { Vehicle, VehicleInput } from '../types/vehicle';
 
 interface VehicleState {
@@ -17,80 +17,70 @@ interface VehicleState {
   clearVehicles: () => void;
 }
 
-// BUG-C1 fix: booking endpoints validate vehicleId as a 24-char MongoDB
-// ObjectId (zod regex). Demo ids like "veh_sample_1" made every preview
-// booking fail with "Invalid vehicle id" — so demo vehicles now carry
-// ObjectId-shaped ids that pass validation end-to-end.
-export const DEMO_VEHICLE_ID_1 = '6aa0000000000000000000a1';
-export const DEMO_VEHICLE_ID_2 = '6aa0000000000000000000a2';
-
-export const DEFAULT_VEHICLES: Vehicle[] = [
-  {
-    id: DEMO_VEHICLE_ID_1,
-    customerId: 'cust_sample_1',
-    vehicleType: 'car',
-    vehicleSubtype: 'SUV',
-    vehicleNumber: 'OD 02 AB 1234',
-    brand: 'Hyundai',
-    model: 'Creta SX',
-    color: 'White',
-    fuelType: 'diesel',
-    qrCode: 'https://raceservice.in/qr/veh_sample_1',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  },
-  {
-    id: DEMO_VEHICLE_ID_2,
-    customerId: 'cust_sample_1',
-    vehicleType: 'car',
-    vehicleSubtype: 'Hatchback',
-    vehicleNumber: 'OD 02 XY 5678',
-    brand: 'Maruti Suzuki',
-    model: 'Swift ZXi',
-    color: 'Red',
-    fuelType: 'petrol',
-    qrCode: 'https://raceservice.in/qr/veh_sample_2',
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-  },
-];
+/** Shared in-flight list fetch — Home / Vehicles / booking review remounts share one GET. */
+let vehiclesFetchInFlight: Promise<void> | null = null;
+let vehicleMutating = false;
 
 export const useVehicleStore = create<VehicleState>((set, get) => ({
-  vehicles: DEFAULT_VEHICLES,
+  vehicles: [],
   selectedVehicle: null,
   isLoading: false,
   error: null,
 
   fetchVehicles: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const vehicles = await vehicleService.getVehicles();
-      const list = Array.isArray(vehicles) && vehicles.length > 0 ? vehicles : DEFAULT_VEHICLES;
-      set({ vehicles: list, isLoading: false });
-    } catch (error) {
-      set(state => ({
-        vehicles: Array.isArray(state.vehicles) && state.vehicles.length > 0 ? state.vehicles : DEFAULT_VEHICLES,
-        isLoading: false,
-        error: getApiErrorMessage(error, 'Unable to load vehicles'),
-      }));
-    }
+    if (vehiclesFetchInFlight) return vehiclesFetchInFlight;
+    vehiclesFetchInFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const token = await readAccessToken();
+        if (!token) {
+          set({ vehicles: [], isLoading: false, error: null });
+          return;
+        }
+        const vehicles = await vehicleService.getVehicles();
+        const list = Array.isArray(vehicles) ? vehicles : [];
+        set({ vehicles: list, isLoading: false, error: null });
+      } catch (error) {
+        set(state => ({
+          vehicles: Array.isArray(state.vehicles) ? state.vehicles : [],
+          isLoading: false,
+          error: getApiErrorMessage(error, 'Unable to load vehicles'),
+        }));
+      } finally {
+        vehiclesFetchInFlight = null;
+      }
+    })();
+    return vehiclesFetchInFlight;
   },
 
   fetchVehicle: async id => {
-    set({ isLoading: true, error: null });
+    const cached = get().vehicles.find(item => item.id === id) ?? null;
+    set({ isLoading: true, error: null, selectedVehicle: cached ?? get().selectedVehicle });
     try {
       const vehicle = await vehicleService.getVehicle(id);
-      set({ selectedVehicle: vehicle, isLoading: false });
+      set(state => ({
+        selectedVehicle: vehicle,
+        vehicles: state.vehicles.map(item => (item.id === id ? vehicle : item)),
+        isLoading: false,
+        error: null,
+      }));
     } catch (error) {
+      if (cached) {
+        set({ selectedVehicle: cached, isLoading: false, error: null });
+        return;
+      }
       set({
         isLoading: false,
         error: getApiErrorMessage(error, 'Unable to load vehicle'),
       });
-      throw error;
     }
   },
 
   addVehicle: async data => {
+    if (vehicleMutating) {
+      throw new Error('Vehicle save already in progress');
+    }
+    vehicleMutating = true;
     set({ isLoading: true, error: null });
     try {
       const vehicle = await vehicleService.addVehicle(data);
@@ -105,10 +95,16 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
         error: getApiErrorMessage(error, 'Unable to add vehicle'),
       });
       throw error;
+    } finally {
+      vehicleMutating = false;
     }
   },
 
   updateVehicle: async (id, data) => {
+    if (vehicleMutating) {
+      throw new Error('Vehicle save already in progress');
+    }
+    vehicleMutating = true;
     set({ isLoading: true, error: null });
     try {
       const vehicle = await vehicleService.updateVehicle(id, data);
@@ -124,10 +120,16 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
         error: getApiErrorMessage(error, 'Unable to update vehicle'),
       });
       throw error;
+    } finally {
+      vehicleMutating = false;
     }
   },
 
   deleteVehicle: async id => {
+    if (vehicleMutating) {
+      throw new Error('Vehicle delete already in progress');
+    }
+    vehicleMutating = true;
     set({ isLoading: true, error: null });
     try {
       await vehicleService.deleteVehicle(id);
@@ -142,6 +144,8 @@ export const useVehicleStore = create<VehicleState>((set, get) => ({
         error: getApiErrorMessage(error, 'Unable to delete vehicle'),
       });
       throw error;
+    } finally {
+      vehicleMutating = false;
     }
   },
 

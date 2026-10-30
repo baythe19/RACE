@@ -3,6 +3,7 @@ import {
   getNotificationPreferences,
   getNotifications,
   deleteAllNotifications,
+  deleteNotification,
   markAllNotificationsRead,
   markNotificationRead,
   updateNotificationPreferences,
@@ -48,6 +49,16 @@ export function useDeleteAllNotificationsMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteAllNotifications,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
+    },
+  });
+}
+
+export function useDeleteNotificationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteNotification(id),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: notificationQueryKeys.list });
     },

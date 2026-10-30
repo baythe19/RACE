@@ -16,6 +16,8 @@ export interface ServiceBooking {
   pickup: BookingLocation;
   dropoff?: BookingLocation;
   towingMode?: 'instant' | 'scheduled' | 'emergency';
+  /** On-site roadside assist label from towing booking row. */
+  assistLabel?: string;
   driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   distanceKm?: number;
   estimatedDurationHours?: number;
@@ -31,6 +33,8 @@ export interface ServiceBooking {
   remainingPaid: boolean;
   paymentStatus: string;
   status: string;
+  /** Partner allotted; accept pending — no driver contact yet. */
+  awaitingPartnerAccept?: boolean;
   scheduledAt?: string;
   statusHistory: Array<{ status: string; timestamp: string }>;
   createdAt: string;
@@ -128,6 +132,7 @@ export interface VerifyPaymentRequest {
 export interface ServiceBookingTracking {
   bookingId: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   statusHistory: Array<{ status: string; timestamp: string }>;
   driver?: {
     id: string;
@@ -142,6 +147,8 @@ export interface ServiceBookingTracking {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement deep-link. */
+  driverUpiId?: string;
   pickup: BookingLocation;
   dropoff?: BookingLocation;
   assignedFleetVehicleLabel?: string;

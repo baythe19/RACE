@@ -15,13 +15,41 @@ export const createTowingBookingSchema = z
     pickup: locationSchema,
     dropoff: locationSchema,
     towingMode: z.enum(['instant', 'scheduled', 'emergency']).optional(),
-    scheduledAt: z.string().datetime().optional(),
+    // D-12: accept UTC offsets ("+05:30") as well as "Z" so third-party callers
+    // with valid future dates are not rejected. Client always sends Z (toISOString).
+    scheduledAt: z.string().datetime({ offset: true }).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.scheduledAt && new Date(data.scheduledAt) <= new Date()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'scheduledAt must be a future date',
+        path: ['scheduledAt'],
+      });
+    }
+
+    const mode = data.towingMode ?? (data.scheduledAt ? 'scheduled' : 'instant');
+
+    if (mode === 'scheduled' && !data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'scheduledAt is required for scheduled towing',
+        path: ['scheduledAt'],
+      });
+    }
+
+    if (mode === 'emergency' && data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Emergency towing cannot include a future schedule',
+        path: ['scheduledAt'],
+      });
+    }
+
+    if (mode === 'instant' && data.scheduledAt) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Instant towing cannot include scheduledAt',
         path: ['scheduledAt'],
       });
     }
@@ -50,6 +78,7 @@ export interface TowingBookingResponseDto {
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
   towingMode?: 'instant' | 'scheduled' | 'emergency';
+  assistLabel?: string;
   distanceKm?: number;
   estimatedFare: number;
   fareBreakdown?: TowingFareBreakdown;
@@ -60,6 +89,8 @@ export interface TowingBookingResponseDto {
   remainingPaid: boolean;
   paymentStatus: string;
   status: string;
+  /** True when a partner is allotted but has not accepted yet (no driver PII). */
+  awaitingPartnerAccept?: boolean;
   vendorId?: string;
   driverId?: string;
   driver?: {
@@ -94,6 +125,7 @@ export interface TowingBookingResponseDto {
 export interface TowingTrackingResponseDto {
   bookingId: string;
   status: string;
+  awaitingPartnerAccept?: boolean;
   statusHistory: Array<{ status: string; timestamp: string }>;
   driver?: {
     id: string;
@@ -108,6 +140,8 @@ export interface TowingTrackingResponseDto {
     driverName?: string;
     driverPhone?: string;
   };
+  /** P-UPI-01: assigned driver's saved UPI VPA for dropoff settlement deep-link. */
+  driverUpiId?: string;
   pickup: { address: string; latitude: number; longitude: number };
   dropoff?: { address: string; latitude: number; longitude: number };
   assignedFleetVehicleLabel?: string;

@@ -11,3 +11,10 @@ export function formatVehicleNumber(value: string): string {
 export function normalizeVehicleNumberInput(value: string): string {
   return value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 }
+
+/** Indian registration plate (e.g. OD02AB1234). Used on SOS to avoid showing junk test strings. */
+export function isValidIndianVehicleRegistration(value: string): boolean {
+  const cleaned = normalizeVehicleNumberInput(value);
+  if (cleaned.length < 6 || cleaned.length > 12) return false;
+  return /^[A-Z]{2}\d{1,2}[A-Z]{1,3}\d{1,4}$/.test(cleaned);
+}

@@ -2,7 +2,7 @@
   "name": "race-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "RACE Service \u2014 production backend API",
+  "description": "RACE Service — production backend API",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
@@ -19,7 +19,10 @@
     "reset-test-data": "tsx src/scripts/reset-for-testing.ts",
     "lint": "tsc --noEmit",
     "audit:partner-v6": "tsx src/scripts/partner-v6-offer-routing-audit.ts",
-    "seed:test-accounts": "tsx src/scripts/seed-test-accounts.ts"
+    "seed:test-accounts": "tsx src/scripts/seed-test-accounts.ts",
+    "ensure:test-accounts": "tsx src/scripts/ensure-test-accounts.ts",
+    "smoke:render": "tsx src/scripts/verify-render-tier-b-smoke.ts",
+    "mvp:smoke": "tsx src/scripts/mvp-local-smoke.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.21.0",

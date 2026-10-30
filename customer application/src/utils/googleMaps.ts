@@ -106,5 +106,34 @@ export async function reverseGeocode(latitude: number, longitude: number): Promi
     // ignore
   }
 
+  const openStreet = await reverseGeocodeOpenStreetMap(latitude, longitude);
+  if (openStreet) return openStreet;
+
   return 'Selected location';
+}
+
+/** Used when Google billing/key is unavailable. Browser-safe (CORS *). */
+async function reverseGeocodeOpenStreetMap(
+  latitude: number,
+  longitude: number,
+): Promise<string | null> {
+  try {
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      lat: String(latitude),
+      lon: String(longitude),
+      zoom: '18',
+      addressdetails: '0',
+    });
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?${params.toString()}`,
+      { headers: { Accept: 'application/json' } },
+    );
+    if (!response.ok) return null;
+    const data = (await response.json()) as { display_name?: string };
+    const name = data.display_name?.trim();
+    return name || null;
+  } catch {
+    return null;
+  }
 }

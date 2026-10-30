@@ -1,7 +1,8 @@
 import type { Request, Response } from 'express';
+import { storageService } from '../../storage/src';
 
 import { asyncHandler } from '../../utils/src/asyncHandler';
-import { sendSuccess } from '../../utils/src/apiResponse';
+import { sendError, sendSuccess } from '../../utils/src/apiResponse';
 import { getAuthUser, getParamId } from '../../utils/src/request';
 import {
   renderVehicleEmergencyPage,
@@ -10,6 +11,26 @@ import {
 import { vehicleService } from '../../services/src/vehicle';
 
 export class VehicleController {
+  uploadPhoto = asyncHandler(async (req: Request, res: Response) => {
+    const user = getAuthUser(req);
+    const file = req.file;
+    if (!file) {
+      return sendError(res, 'Vehicle photo file is required', 400);
+    }
+    const vehicle = await vehicleService.getVehicle(user.id, getParamId(req.params.id));
+    const upload = await storageService.uploadCustomerVehiclePhoto({
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      originalName: file.originalname,
+      vendorType: 'customer',
+      documentType: 'vehicle_photo',
+      customerId: user.id,
+      vehicleId: vehicle.id,
+    });
+    const updated = await vehicleService.updateVehicle(user.id, vehicle.id, { photo: upload.fileUrl });
+    return sendSuccess(res, updated);
+  });
+
   create = asyncHandler(async (req: Request, res: Response) => {
     const user = getAuthUser(req);
     const vehicle = await vehicleService.createVehicle(user.id, req.body);
@@ -49,6 +70,11 @@ export class VehicleController {
     const prefersHtml = req.accepts(['html', 'json']) === 'html';
 
     if (prefersHtml) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Cache-Control', 'private, no-store');
+
       if (!result.valid) {
         return res.status(404).type('html').send(renderVehicleNotFoundPage());
       }

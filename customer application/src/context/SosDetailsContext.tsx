@@ -2,26 +2,42 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
 
-import { AUTH_USER, DEMO_VEHICLE } from '../constants/auth';
-import { SOS_EMERGENCY_CONTACT, SOS_LOCATION } from '../constants/sosTheme';
+import { useAuthStore } from '../store/authStore';
+import { useProfileStore } from '../store/profileStore';
 import type { SosDetails } from '../types/sos';
+import { emergencyContactDigits, hasSavedEmergencyContact } from '../utils/emergencyContact';
+import { getPhoneDigits } from '../utils/phone';
 
-const DEFAULT_SOS_DETAILS: SosDetails = {
-  ownerName: AUTH_USER.name,
-  ownerPhone: AUTH_USER.phone,
-  vehicleBrand: DEMO_VEHICLE.brand,
-  vehicleModel: DEMO_VEHICLE.model,
-  vehicleNumber: DEMO_VEHICLE.number,
-  contactName: SOS_EMERGENCY_CONTACT.name,
-  contactRelation: SOS_EMERGENCY_CONTACT.relation,
-  contactPhone: SOS_EMERGENCY_CONTACT.phone,
-  location: SOS_LOCATION,
-};
+function createEmptyDetails(): SosDetails {
+  return {
+    ownerName: '',
+    ownerPhone: '',
+    vehicleBrand: '',
+    vehicleModel: '',
+    vehicleNumber: '',
+    contactName: '',
+    contactRelation: '',
+    contactPhone: '',
+    location: '',
+  };
+}
+
+function locationFromProfileAddress(
+  address?: {
+    line2?: string;
+    city?: string;
+    state?: string;
+  } | null,
+): string {
+  if (!address) return '';
+  return [address.line2, address.city, address.state].filter(Boolean).join(', ');
+}
 
 interface SosDetailsContextValue {
   details: SosDetails;
@@ -31,8 +47,38 @@ interface SosDetailsContextValue {
 
 const SosDetailsContext = createContext<SosDetailsContextValue | undefined>(undefined);
 
+/** Local SOS form state — hydrated from profile only (vehicle from `/sos/context` on SOS Details screen). */
 export function SosDetailsProvider({ children }: { children: ReactNode }) {
-  const [details, setDetailsState] = useState<SosDetails>(DEFAULT_SOS_DETAILS);
+  const [details, setDetailsState] = useState<SosDetails>(createEmptyDetails);
+  const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const profile = useProfileStore(state => state.profile);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setDetailsState(createEmptyDetails());
+      return;
+    }
+    void useProfileStore.getState().fetchProfile();
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !profile) {
+      return;
+    }
+
+    const ec = profile.emergencyContact;
+    const ownerDigits = getPhoneDigits(profile.mobileNumber ?? '');
+
+    setDetailsState(prev => ({
+      ...prev,
+      ownerName: profile.fullName?.trim() ?? '',
+      ownerPhone: ownerDigits.length >= 10 ? ownerDigits.slice(-10) : '',
+      contactName: hasSavedEmergencyContact(ec) ? ec!.name.trim() : '',
+      contactRelation: ec?.relationship?.trim() ?? '',
+      contactPhone: hasSavedEmergencyContact(ec) ? emergencyContactDigits(ec) : '',
+      location: locationFromProfileAddress(profile.address) || prev.location,
+    }));
+  }, [isAuthenticated, profile]);
 
   const updateDetails = useCallback((patch: Partial<SosDetails>) => {
     setDetailsState(prev => ({ ...prev, ...patch }));

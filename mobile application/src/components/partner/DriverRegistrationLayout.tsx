@@ -50,7 +50,6 @@ export default function DriverRegistrationLayout({
 
   const scrollViewRef = useRef<any>(null);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     // Reset to top smoothly when changing registration steps
@@ -65,15 +64,11 @@ export default function DriverRegistrationLayout({
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
-    const showSub = Keyboard.addListener(showEvent, (e) => {
+    const showSub = Keyboard.addListener(showEvent, () => {
       setKeyboardVisible(true);
-      if (e?.endCoordinates?.height) {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
     });
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardVisible(false);
-      setKeyboardHeight(0);
     });
 
     return () => {
@@ -255,13 +250,15 @@ export default function DriverRegistrationLayout({
       <DriverRegScrollContext.Provider
         value={{
           liftFocusedField: () => {
+            // Soft safety net only — KeyboardAwareScrollView already keeps the
+            // focused input visible (enableAutomaticScroll + extraScrollHeight).
+            // Aggressive scrollToEnd/4000px calls here used to fling the page
+            // far past the form, leaving a blank screen (user report 27 Oct).
             const scroller = scrollViewRef.current;
             if (!scroller) return;
             setTimeout(() => {
-              if (typeof scroller.scrollToEnd === 'function') {
-                scroller.scrollToEnd({ animated: true });
-              } else if (typeof scroller.scrollToPosition === 'function') {
-                scroller.scrollToPosition(0, 4000, true);
+              if (typeof scroller.scrollResponderScrollTo === 'function') {
+                scroller.scrollResponderScrollTo({ y: 0, animated: true });
               }
             }, 280);
           },
@@ -274,8 +271,8 @@ export default function DriverRegistrationLayout({
         bounces={false}
         enableOnAndroid={true}
         enableAutomaticScroll={true}
-        extraScrollHeight={px(160)}
-        extraHeight={px(220)}
+        extraScrollHeight={px(90)}
+        extraHeight={px(110)}
         keyboardOpeningTime={Platform.OS === 'ios' ? 250 : 0}
         scrollEnabled={scrollEnabled !== undefined ? scrollEnabled : true}
         showsVerticalScrollIndicator={false}
@@ -288,10 +285,11 @@ export default function DriverRegistrationLayout({
           {
             paddingHorizontal: px(12),
             paddingTop: px(10),
-            paddingBottom:
-              insets.bottom +
-              px(showFooter ? (step === 4 ? 80 : 94) : 28) +
-              (keyboardVisible ? Math.max(keyboardHeight, px(220)) : 0),
+            // Footer padding only — keyboard spacing is handled by
+            // KeyboardAwareScrollView (extraHeight/extraScrollHeight). Adding
+            // keyboardHeight here too used to double-compensate and blow a big
+            // blank gap under the form when the keyboard opened.
+            paddingBottom: insets.bottom + px(showFooter ? (step === 4 ? 80 : 94) : 28),
           },
         ]}>
         {/* Children Screen Body */}

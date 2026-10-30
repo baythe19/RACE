@@ -176,6 +176,10 @@ export async function verifyFinalPayment(payload: VerifyPaymentRequest): Promise
   );
 }
 
+/**
+ * MVP local: server-side stub advance/final (no card charge). Requires
+ * ALLOW_STUB_PAYMENTS=true on the API in development.
+ */
 /** Stub gateway flow: initiate advance payment then verify success. */
 export async function completeAdvancePayment(
   bookingId: string,

@@ -48,25 +48,26 @@ export function TowingFareBreakdownCard({
   accentColor = '#F59E0B',
   compact = false,
 }: TowingFareBreakdownCardProps) {
-  const padding = compact ? 14 : 16;
+  const padding = compact ? 12 : 16;
+  const gap = compact ? 6 : 10;
 
   return (
     <View
       style={{
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: accentColor,
-        backgroundColor: '#FEF3C7',
+        borderColor: colors.border,
+        backgroundColor: colors.background,
         padding,
-        gap: compact ? 8 : 10,
+        gap,
       }}>
       <Text
         style={{
-          fontSize: compact ? 14 : 16,
-          fontWeight: typography.weights.bold,
+          fontSize: compact ? 13 : 15,
+          fontWeight: typography.weights.semibold,
           color: colors.dark,
         }}>
-        Fare Breakdown
+        Fare
       </Text>
 
       {breakdown.isFallback ? (
@@ -83,17 +84,43 @@ export function TowingFareBreakdownCard({
       {breakdown.extraKmCharge > 0 ? (
         <FareLine label="Extra km charge" value={formatRupee(breakdown.extraKmCharge)} />
       ) : null}
-      <FareLine label="Night surcharge" value={formatRupee(breakdown.nightSurcharge)} />
-
-      <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(245, 158, 11, 0.35)', paddingTop: 10, gap: 8 }}>
-        <FareLine label="Total" value={formatRupee(breakdown.totalFare)} bold />
+      {breakdown.nightSurcharge > 0 ? (
+        <FareLine label="Night surcharge" value={formatRupee(breakdown.nightSurcharge)} />
+      ) : null}
+      {breakdown.prioritySurcharge ? (
+        <FareLine label="Emergency priority" value={formatRupee(breakdown.prioritySurcharge)} />
+      ) : null}
+      {breakdown.scheduledDiscount ? (
         <FareLine
-          label="Pay now (30%)"
-          value={formatRupee(breakdown.advanceAmount)}
-          bold
-          accent={accentColor}
+          label="Scheduled booking"
+          value={`−${formatRupee(breakdown.scheduledDiscount)}`}
         />
-        <FareLine label="Pay later (70%)" value={formatRupee(breakdown.remainingAmount)} />
+      ) : null}
+
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: compact ? 8 : 10, gap: gap }}>
+        <FareLine label="Total" value={formatRupee(breakdown.totalFare)} bold fontSize={compact ? 13 : 14} />
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#FFFBEB',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: compact ? 6 : 8,
+          }}>
+          <Text style={{ fontSize: compact ? 12 : 13, fontWeight: typography.weights.semibold, color: colors.dark }}>
+            Pay now · 30%
+          </Text>
+          <Text style={{ fontSize: compact ? 14 : 15, fontWeight: typography.weights.bold, color: accentColor }}>
+            {formatRupee(breakdown.advanceAmount)}
+          </Text>
+        </View>
+        <FareLine
+          label="Pay later · 70%"
+          value={formatRupee(breakdown.remainingAmount)}
+          fontSize={compact ? 12 : 14}
+        />
       </View>
     </View>
   );
@@ -121,33 +148,44 @@ export function DriverFareBreakdownCard({
       style={{
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: accentColor,
-        backgroundColor: '#FEF3C7',
+        borderColor: colors.border,
+        backgroundColor: colors.background,
         padding,
         gap: compact ? 8 : 10,
       }}>
       <Text
         style={{
-          fontSize: compact ? 14 : 16,
-          fontWeight: typography.weights.bold,
+          fontSize: compact ? 14 : 15,
+          fontWeight: typography.weights.semibold,
           color: colors.dark,
         }}>
-        Fare Breakdown
+        Fare
       </Text>
 
-      <FareLine label="Package" value={`${breakdown.packageHours} Hours`} />
+      <FareLine label="Package" value={`${breakdown.packageHours} hours`} />
       <FareLine label="Included" value={`${breakdown.includedKm} km`} />
       <FareLine label="Vehicle" value={category} />
 
-      <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(245, 158, 11, 0.35)', paddingTop: 10, gap: 8 }}>
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 10, gap: 8 }}>
         <FareLine label="Total" value={formatRupee(breakdown.totalFare)} bold />
-        <FareLine
-          label="Pay now (30%)"
-          value={formatRupee(breakdown.advanceAmount)}
-          bold
-          accent={accentColor}
-        />
-        <FareLine label="Pay later (70%)" value={formatRupee(breakdown.remainingAmount)} />
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            backgroundColor: '#FEF3C7',
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 8,
+          }}>
+          <Text style={{ fontSize: 14, fontWeight: typography.weights.semibold, color: colors.dark }}>
+            Pay now · 30%
+          </Text>
+          <Text style={{ fontSize: 16, fontWeight: typography.weights.bold, color: accentColor }}>
+            {formatRupee(breakdown.advanceAmount)}
+          </Text>
+        </View>
+        <FareLine label="Pay later · 70%" value={formatRupee(breakdown.remainingAmount)} />
       </View>
     </View>
   );

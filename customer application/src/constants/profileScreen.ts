@@ -4,7 +4,6 @@ import {
   CreditCard,
   Headphones,
   MapPin,
-  Settings,
   Siren,
   User as UserIcon,
   Wallet,
@@ -50,19 +49,13 @@ export const PROFILE_MENU_ITEMS: Array<{
   {
     id: 'notifications',
     title: 'Notifications',
-    subtitle: 'Manage your preferences',
+    subtitle: 'Inbox & alert preferences',
     Icon: Bell,
   },
   {
     id: 'support',
     title: 'Help & Support',
-    subtitle: 'FAQs, Chat and more',
+    subtitle: 'FAQs, chat & account help',
     Icon: Headphones,
-  },
-  {
-    id: 'settings',
-    title: 'Settings',
-    subtitle: 'App settings and privacy',
-    Icon: Settings,
   },
 ];

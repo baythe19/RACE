@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -15,6 +14,7 @@ import { MapPin } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
+import { getAppDialog } from '../../utils/alertBus';
 import { formatLocationDisplay } from '../../utils/readableAddress';
 import { useLocationStore } from '../../store/locationStore';
 import { colors, shadows, typography } from '../../theme';
@@ -37,7 +37,12 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
   const handleNotify = async () => {
     const trimmed = email.trim();
     if (!trimmed || !trimmed.includes('@')) {
-      Alert.alert('Valid email needed', 'Enter a valid email so we can notify you.');
+      getAppDialog().showDialog({
+        tone: 'warning',
+        title: 'Valid email needed',
+        message: 'Enter a valid email so we can notify you.',
+        primaryLabel: 'OK',
+      });
       return;
     }
 
@@ -53,7 +58,12 @@ export default function NotServiceableScreen({ onChangeLocation }: NotServiceabl
       );
       setSubmitted(true);
     } catch {
-      Alert.alert('Could not save', 'Please try again.');
+      getAppDialog().showDialog({
+        tone: 'error',
+        title: 'Could not save',
+        message: 'Please try again.',
+        primaryLabel: 'OK',
+      });
     } finally {
       setIsSaving(false);
     }

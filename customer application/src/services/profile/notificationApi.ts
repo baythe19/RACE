@@ -29,6 +29,7 @@ interface NotificationsListResponse {
 
 function mapNotificationType(type: string): AppNotification['category'] {
   if (type.includes('BOOKING')) return 'booking';
+  if (type.includes('PAYMENT')) return 'payment';
   if (type.includes('PROMOTION') || type.includes('OFFER')) return 'offers';
   if (type.includes('SUBSCRIPTION')) return 'subscription';
   return 'general';
@@ -101,12 +102,27 @@ export async function listNotifications(): Promise<{
       category: mapNotificationType(n.type),
       read: n.isRead,
       createdAt: n.createdAt,
+      metadata: n.metadata,
     })),
   };
 }
 
 export async function markAllNotificationsRead(): Promise<void> {
   await apiClient.patch(`${API_ENDPOINTS.notifications}/read-all`);
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  await apiClient.patch(`${API_ENDPOINTS.notifications}/${id}/read`);
+}
+
+/** Permanently deletes every notification for the signed-in customer. */
+export async function deleteAllNotifications(): Promise<void> {
+  await apiClient.delete(API_ENDPOINTS.notifications);
+}
+
+/** Permanently deletes one notification for the signed-in customer. */
+export async function deleteNotification(id: string): Promise<void> {
+  await apiClient.delete(`${API_ENDPOINTS.notifications}/${id}`);
 }
 
 export async function getNotificationPreferences(): Promise<NotificationPreference[]> {

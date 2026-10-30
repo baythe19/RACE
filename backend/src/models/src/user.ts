@@ -46,6 +46,10 @@ export interface IUser extends Document {
   isVerified: boolean;
   isProfileCompleted: boolean;
   role: UserRole;
+  /** bcrypt hash of an optional account password (customers default to OTP-only). */
+  passwordHash?: string;
+  /** bcrypt hash of the optional in-app security PIN (screen lock). */
+  appPinHash?: string;
   /** Additive app capabilities. Legacy rows derive their initial capability from role. */
   capabilities?: UserRole[];
   customerCode?: string;
@@ -114,6 +118,8 @@ const UserSchema = new Schema<IUser>(
     profilePhoto: { type: String },
     isVerified: { type: Boolean, default: false },
     isProfileCompleted: { type: Boolean, default: false },
+    passwordHash: { type: String },
+    appPinHash: { type: String },
     role: { type: String, enum: USER_ROLES, default: 'customer', index: true },
     capabilities: { type: [{ type: String, enum: USER_ROLES }], default: undefined },
     customerCode: { type: String, unique: true, sparse: true, index: true },

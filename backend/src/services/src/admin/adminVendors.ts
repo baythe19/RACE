@@ -128,18 +128,26 @@ function mapStoredVendorDocument(document: {
 
 function deriveVendorCity(user: IUser, address?: string) {
   if (user.address?.city?.trim()) return user.address.city.trim();
-  if (!address?.trim()) return 'Odisha';
+  if (!address?.trim()) return '—';
   const parts = address
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean);
-  if (parts.length === 0) return 'Odisha';
+  if (parts.length === 0) return '—';
+  // Strip PIN codes from the trailing segment ("Odisha 751007" → "Odisha").
+  const cleaned = parts.map((part) => part.replace(/\s*\d{6}\s*$/, '').trim()).filter(Boolean);
+  if (cleaned.length === 0) return '—';
   // The trailing segment is often the state ("…, Odisha") — prefer the
   // segment before it when it looks like a state name.
-  const STATE_NAMES = new Set(['odisha', 'orissa']);
-  const last = parts[parts.length - 1];
-  if (parts.length >= 2 && STATE_NAMES.has(last.toLowerCase())) {
-    return parts[parts.length - 2];
+  const STATE_NAMES = new Set([
+    'odisha', 'orissa', 'madhya pradesh', 'mp', 'maharashtra', 'delhi',
+    'west bengal', 'bihar', 'jharkhand', 'uttar pradesh', 'up', 'rajasthan',
+    'gujarat', 'karnataka', 'tamil nadu', 'telangana', 'andhra pradesh',
+    'kerala', 'punjab', 'haryana', 'assam', 'chhattisgarh', 'uk', 'goa',
+  ]);
+  const last = cleaned[cleaned.length - 1];
+  if (cleaned.length >= 2 && STATE_NAMES.has(last.toLowerCase())) {
+    return cleaned[cleaned.length - 2];
   }
   return last;
 }
@@ -376,16 +384,18 @@ export const adminVendorsService = {
           status: b.status,
           amount: b.invoice?.total ?? 0,
           date: b.createdAt.toISOString(),
+          bookingType: 'legacy' as const,
         })),
         ...towingBookings.map((b) => ({
           id: b._id.toString(),
           bookingNumber: b.bookingNumber,
           customerName: customerMap.get(b.customerId.toString()) ?? 'Customer',
-          service: 'Towing',
+          service: b.assistLabel?.trim() || 'Towing',
           driverName: b.driverId ? driverMap.get(b.driverId.toString()) ?? '—' : '—',
           status: b.status,
           amount: b.finalFare ?? b.estimatedFare,
           date: b.createdAt.toISOString(),
+          bookingType: 'towing' as const,
         })),
         ...driverBookings.map((b) => ({
           id: b._id.toString(),
@@ -396,6 +406,7 @@ export const adminVendorsService = {
           status: b.status,
           amount: b.finalFare ?? b.estimatedFare,
           date: b.createdAt.toISOString(),
+          bookingType: 'driver' as const,
         })),
       ]
         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -416,6 +427,9 @@ export const adminVendorsService = {
       phone?: string;
       email?: string;
       city?: string;
+      state?: string;
+      addressLine?: string;
+      pincode?: string;
       vendorType?: string;
       status?: string;
     },
@@ -426,6 +440,9 @@ export const adminVendorsService = {
     const phone = input.phone?.trim();
     const email = input.email?.trim();
     const city = input.city?.trim();
+    const state = input.state?.trim() || 'Odisha';
+    const addressLine = input.addressLine?.trim();
+    const pincode = input.pincode?.trim();
 
     if (!businessName) throw new BadRequestError('Business name is required');
     if (!ownerName) throw new BadRequestError('Owner name is required');
@@ -445,7 +462,12 @@ export const adminVendorsService = {
       ownerName,
       mobileNumber: phone,
       email: email || undefined,
-      address: city ? `${city}, Odisha` : undefined,
+      address: [
+        addressLine,
+        city,
+        pincode,
+        state,
+      ].filter(Boolean).join(', ') || undefined,
       submittedAt: new Date(),
       approvedAt: isApproved ? new Date() : undefined,
       statusHistory: [{ status: vendorStatus, changedAt: new Date(), note: 'Created by admin' }],

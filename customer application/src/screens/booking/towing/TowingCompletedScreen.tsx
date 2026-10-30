@@ -9,6 +9,7 @@ import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import { useTowingBooking } from '../../../context/TowingBookingContext';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'TowingCompleted'>;
 
@@ -46,8 +47,8 @@ export default function TowingCompletedScreen({ navigation, route }: Props) {
   return (
     <TowingBookingLayout
       title="Service Completed"
-      step={9}
-      onBack={() => navigation.goBack()}
+      step={0}
+      onBack={() => goBackWithinStack(navigation)}
       buttonLabel="Book Again"
       onContinue={() => {
         resetBooking();

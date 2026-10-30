@@ -1,9 +1,6 @@
 import React, { useEffect, useMemo } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
   Pressable,
-  StyleSheet,
   Text,
   useWindowDimensions,
   View,
@@ -14,6 +11,7 @@ import {
   Check,
   ChevronRight,
   Crown,
+  IndianRupee,
   LogOut,
   Pencil,
   Shield,
@@ -25,8 +23,10 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { PROFILE_MENU_ITEMS } from '../constants/profileScreen';
 import { PROFILE_MENU_ROUTES } from '../constants/profileSubScreens';
 import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { getProfileFirstName } from '../utils/profileDisplay';
+import { useAppDialog } from '../hooks/useAppDialog';
 import { useAuthActions } from '../hooks/useAuth';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationsQuery, useWalletQuery } from '../services/profile/useProfileQueries';
@@ -63,6 +63,7 @@ function ProfileAvatar({ size, px }: { size: number; px: (n: number) => number }
 export default function ProfileScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<ProfileStackParamList>>();
   const { logout } = useAuthActions();
+  const { dialog, showDialog } = useAppDialog();
   const authUser = useAuthStore(state => state.user);
   const { profile, fetchProfile, isLoading } = useProfileStore();
   const { data: notificationsData } = useNotificationsQuery();
@@ -95,17 +96,24 @@ export default function ProfileScreen() {
   }, [isWalletError, isWalletLoading, wallet]);
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes',
-        onPress: () => {
-          void logout().catch(() => {
-            Alert.alert('Logout failed', 'Please try again or reload the app.');
+    showDialog({
+      tone: 'confirm',
+      title: 'Logout',
+      message: 'Are you sure you want to logout?',
+      secondaryLabel: 'No',
+      primaryLabel: 'Yes, log out',
+      destructive: true,
+      onPrimary: () => {
+        void logout().catch(() => {
+          showDialog({
+            tone: 'error',
+            title: 'Logout failed',
+            message: 'Please try again or reload the app.',
+            primaryLabel: 'OK',
           });
-        },
+        });
       },
-    ]);
+    });
   };
 
   if (isLoading && !profile) {
@@ -116,12 +124,11 @@ export default function ProfileScreen() {
         header={
           <TabRootHeader
             title="Profile"
-            subtitle="Manage your account and preferences"
             showActions={false}
           />
         }>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={{ flex: 1, paddingTop: 8 }}>
+          <DataSkeleton variant="profile" />
         </View>
       </AppScreenLayout>
     );
@@ -133,31 +140,18 @@ export default function ProfileScreen() {
       header={
         <TabRootHeader
           title="Profile"
-          subtitle="Manage your account and preferences"
-          showNotificationBadge={unreadCount > 0}
+          notificationCount={unreadCount}
+          showProfileAvatar={false}
           onBellPress={() => navigation.navigate('Notifications')}
-          actions={
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(12) }}>
-              <Pressable
-                hitSlop={8}
-                style={styles.bellWrap}
-                onPress={() => navigation.navigate('Notifications')}
-                accessibilityRole="button"
-                accessibilityLabel="Notifications">
-                <Bell size={px(22)} color={colors.dark} strokeWidth={2} />
-                {unreadCount > 0 ? <View style={styles.bellDot} /> : null}
-              </Pressable>
-              <ProfileAvatar size={px(40)} px={px} />
-            </View>
-          }
         />
       }>
+      {dialog}
             <View
               style={[
                 {
                   marginTop: px(16),
-                  marginBottom: px(14),
-                  borderRadius: px(16),
+                  marginBottom: px(12),
+                  borderRadius: px(18),
                   borderWidth: 1,
                   borderColor: colors.border,
                   backgroundColor: colors.background,
@@ -165,23 +159,23 @@ export default function ProfileScreen() {
                 },
                 shadows.card,
               ]}>
-              <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: px(12) }}>
-                <ProfileAvatar size={px(64)} px={px} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(12) }}>
+                <ProfileAvatar size={px(62)} px={px} />
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <View
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: px(6),
-                      marginBottom: px(4),
                     }}>
                     <Text
                       numberOfLines={1}
                       style={{
                         flexShrink: 1,
                         fontSize: px(16),
-                        fontWeight: typography.weights.bold,
+                        fontWeight: typography.weights.extrabold,
                         color: colors.dark,
+                        letterSpacing: -0.2,
                       }}>
                       {displayName}
                     </Text>
@@ -193,24 +187,31 @@ export default function ProfileScreen() {
                       <Pencil size={px(14)} color={colors.grey} strokeWidth={2} />
                     </Pressable>
                   </View>
-                  <Text style={{ fontSize: px(12), color: colors.grey, marginBottom: px(2) }}>
-                    {displayPhone}
-                  </Text>
                   <Text
                     numberOfLines={1}
-                    style={{ fontSize: px(12), color: colors.grey, marginBottom: px(8) }}>
-                    {profile?.email ?? ''}
+                    style={{ fontSize: px(12.5), color: colors.grey, marginTop: px(3) }}>
+                    {displayPhone}
                   </Text>
+                  {profile?.email ? (
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontSize: px(11.5), color: colors.grey, marginTop: px(1) }}>
+                      {profile.email}
+                    </Text>
+                  ) : null}
                   <View
                     style={{
                       alignSelf: 'flex-start',
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: px(4),
-                      paddingHorizontal: px(8),
+                      paddingHorizontal: px(7),
                       paddingVertical: px(4),
-                      borderRadius: px(12),
+                      borderRadius: px(6),
                       backgroundColor: '#E8F8EE',
+                      marginTop: px(7),
+                      borderWidth: 1,
+                      borderColor: 'rgba(22,163,74,0.18)',
                     }}>
                     <Check size={px(11)} color={colors.success} strokeWidth={3} />
                     <Text
@@ -219,49 +220,36 @@ export default function ProfileScreen() {
                         fontWeight: typography.weights.bold,
                         color: colors.success,
                       }}>
-                      Verified User
+                      Verified
                     </Text>
                   </View>
                 </View>
-                <View
-                  style={{
-                    width: 1,
-                    backgroundColor: colors.border,
-                    marginVertical: px(2),
-                  }}
-                />
+                {/* Premium chip — compact pill, single text line, no stray arrow */}
                 <Pressable
                   onPress={() => navigation.navigate('SubscriptionPlans')}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
                     alignSelf: 'center',
+                    alignItems: 'center',
                     flexShrink: 0,
-                    gap: px(2),
+                    gap: px(4),
+                    paddingHorizontal: px(10),
+                    paddingVertical: px(9),
+                    borderRadius: px(14),
+                    backgroundColor: colors.goldLight,
+                    borderWidth: 1,
+                    borderColor: 'rgba(245,166,35,0.35)',
                   }}>
-                  <View style={{ alignItems: 'center' }}>
-                    <Crown size={px(20)} color={colors.primary} fill={colors.primary} />
-                    <Text
-                      style={{
-                        marginTop: px(3),
-                        fontSize: px(9),
-                        fontWeight: typography.weights.bold,
-                        color: colors.primary,
-                        lineHeight: px(11),
-                      }}>
-                      Premium
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: px(9),
-                        fontWeight: typography.weights.bold,
-                        color: colors.primary,
-                        lineHeight: px(11),
-                      }}>
-                      Member
-                    </Text>
-                  </View>
-                  <ChevronRight size={px(12)} color={colors.primary} strokeWidth={2.5} />
+                  <Crown size={px(18)} color={colors.primary} fill={colors.primary} />
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: px(8.5),
+                      fontWeight: typography.weights.bold,
+                      color: colors.primary,
+                      lineHeight: px(10),
+                    }}>
+                    PREMIUM
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -274,31 +262,66 @@ export default function ProfileScreen() {
                 }
                 navigation.navigate('PaymentMethods');
               }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                borderRadius: px(14),
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.background,
-                paddingVertical: px(14),
-                paddingHorizontal: px(16),
-                marginBottom: px(14),
-              }}>
-              <View>
+              style={[
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  borderRadius: px(16),
+                  borderWidth: 1,
+                  borderColor: 'rgba(245,166,35,0.35)',
+                  backgroundColor: colors.goldLight,
+                  paddingVertical: px(13),
+                  paddingHorizontal: px(14),
+                  marginBottom: px(14),
+                  gap: px(10),
+                },
+                shadows.card,
+              ]}>
+              <View
+                style={{
+                  width: px(42),
+                  height: px(42),
+                  borderRadius: px(21),
+                  backgroundColor: colors.background,
+                  borderWidth: 1,
+                  borderColor: 'rgba(245,166,35,0.25)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                <IndianRupee size={px(20)} color={colors.primary} strokeWidth={2.4} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: px(11), color: colors.grey }}>Wallet Balance</Text>
                 <Text
                   style={{
-                    marginTop: px(4),
-                    fontSize: px(18),
-                    fontWeight: typography.weights.bold,
-                    color: colors.primary,
+                    marginTop: px(2),
+                    fontSize: px(19),
+                    fontWeight: typography.weights.extrabold,
+                    color: colors.dark,
+                    letterSpacing: -0.3,
                   }}>
                   {walletLabel}
                 </Text>
               </View>
-              <ChevronRight size={px(18)} color={colors.primary} strokeWidth={2} />
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: px(2),
+                  backgroundColor: colors.background,
+                  borderRadius: px(12),
+                  paddingHorizontal: px(10),
+                  paddingVertical: px(7),
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}>
+                <Text style={{ fontSize: px(11), fontWeight: typography.weights.bold, color: colors.dark }}>
+                  Top Up
+                </Text>
+                <ChevronRight size={px(13)} color={colors.dark} strokeWidth={2.4} />
+              </View>
             </Pressable>
 
             <View
@@ -353,7 +376,29 @@ export default function ProfileScreen() {
                       {item.subtitle}
                     </Text>
                   </View>
-                  <ChevronRight size={px(16)} color={colors.primary} strokeWidth={2} />
+                  {item.id === 'notifications' && unreadCount > 0 ? (
+                    <View
+                      style={{
+                        minWidth: px(22),
+                        height: px(22),
+                        borderRadius: px(11),
+                        paddingHorizontal: px(6),
+                        backgroundColor: colors.error,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                      <Text
+                        style={{
+                          fontSize: px(10),
+                          fontWeight: typography.weights.bold,
+                          color: colors.background,
+                        }}>
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </Text>
+                    </View>
+                  ) : (
+                    <ChevronRight size={px(16)} color={colors.primary} strokeWidth={2} />
+                  )}
                 </Pressable>
               ))}
             </View>
@@ -425,41 +470,42 @@ export default function ProfileScreen() {
 
             <Pressable
               onPress={handleLogout}
-              style={{
+              accessibilityRole="button"
+              accessibilityLabel="Log out of your account"
+              style={({ pressed }) => ({
+                marginTop: px(6),
+                marginBottom: px(16),
+                borderRadius: px(14),
+                borderWidth: 1,
+                borderColor: 'rgba(220,38,38,0.28)',
+                backgroundColor: pressed ? '#FEE2E2' : '#FEF2F2',
+                paddingVertical: px(14),
+                paddingHorizontal: px(16),
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: px(10),
-                paddingVertical: px(12),
-              }}>
+                justifyContent: 'center',
+                gap: px(8),
+              })}>
               <LogOut size={px(18)} color={colors.error} strokeWidth={2.2} />
               <Text
                 style={{
-                  flex: 1,
-                  fontSize: px(14),
+                  fontSize: px(15),
                   fontWeight: typography.weights.bold,
                   color: colors.error,
                 }}>
-                Logout
+                Log out
               </Text>
-              <ChevronRight size={px(16)} color={colors.error} strokeWidth={2} />
             </Pressable>
+
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: px(10),
+                color: colors.grey,
+                marginBottom: px(8),
+              }}>
+              RACE Customer · v1.0.0
+            </Text>
     </AppScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  bellWrap: {
-    position: 'relative',
-  },
-  bellDot: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    borderWidth: 1.5,
-    borderColor: colors.background,
-  },
-});

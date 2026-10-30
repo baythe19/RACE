@@ -18,9 +18,25 @@ import { useCustomers } from '@/hooks/use-customers';
 
 const CUSTOMER_FIELDS = [
   { name: 'name', label: 'Full Name', required: true, placeholder: 'Enter customer full name' },
-  { name: 'email', label: 'Email', type: 'email' as const, required: true, placeholder: 'Enter email address' },
+  { name: 'email', label: 'Email', type: 'email' as const, placeholder: 'Enter email address' },
   { name: 'phone', label: 'Phone', type: 'tel' as const, required: true, placeholder: 'Enter 10-digit mobile number' },
+  { name: 'gender', label: 'Gender', type: 'select' as const, placeholder: 'Select gender', options: [
+    { label: 'Male', value: 'male' },
+    { label: 'Female', value: 'female' },
+    { label: 'Other', value: 'other' },
+    { label: 'Prefer not to say', value: 'prefer_not_to_say' },
+  ] },
+  { name: 'dateOfBirth', label: 'Date of Birth', type: 'date' as const },
+];
+
+const CUSTOMER_ADDRESS_FIELDS = [
+  { name: 'addressLine', label: 'Address', placeholder: 'House / street / area' },
   { name: 'city', label: 'City', required: true, placeholder: 'Enter city name' },
+  { name: 'pincode', label: 'PIN Code', placeholder: '6-digit PIN code' },
+  { name: 'state', label: 'State', placeholder: 'Odisha' },
+];
+
+const CUSTOMER_STATUS_FIELDS = [
   {
     name: 'status',
     label: 'Status',
@@ -32,6 +48,12 @@ const CUSTOMER_FIELDS = [
       { label: 'Inactive', value: 'INACTIVE' },
     ],
   },
+];
+
+const CUSTOMER_EMERGENCY_FIELDS = [
+  { name: 'emergencyContactName', label: 'Emergency Contact Name', placeholder: "Contact person's name" },
+  { name: 'emergencyContactPhone', label: 'Emergency Contact Phone', type: 'tel' as const, placeholder: '10-digit mobile number' },
+  { name: 'emergencyContactRelation', label: 'Relationship', placeholder: 'e.g. Father, Spouse, Friend' },
 ];
 
 export function CustomerList() {
@@ -116,9 +138,17 @@ export function CustomerList() {
   const handleFormSubmit = async (values: Record<string, string>) => {
     const payload = {
       name: values.name,
-      email: values.email,
+      email: values.email || undefined,
       phone: values.phone,
-      city: values.city,
+      city: values.city || undefined,
+      state: values.state || undefined,
+      addressLine: values.addressLine || undefined,
+      pincode: values.pincode || undefined,
+      gender: values.gender || undefined,
+      dateOfBirth: values.dateOfBirth || undefined,
+      emergencyContactName: values.emergencyContactName || undefined,
+      emergencyContactPhone: values.emergencyContactPhone || undefined,
+      emergencyContactRelation: values.emergencyContactRelation || undefined,
       status: values.status as CustomerListItem['status'],
     };
     if (editing) {
@@ -200,7 +230,16 @@ export function CustomerList() {
         resetKey={editing?.id ?? 'create'}
         title={editing ? 'Edit Customer' : 'Add Customer'}
         description={editing ? 'Update customer details' : 'Create a new customer record'}
-        fields={CUSTOMER_FIELDS}
+        sections={[
+          { title: 'Personal Details', fields: CUSTOMER_FIELDS },
+          { title: 'Address', description: 'Used for service location defaults.', fields: CUSTOMER_ADDRESS_FIELDS },
+          {
+            title: 'Emergency Contact',
+            description: 'Optional — recommended for safety.',
+            fields: CUSTOMER_EMERGENCY_FIELDS,
+          },
+          { title: 'Account', fields: CUSTOMER_STATUS_FIELDS },
+        ]}
         initialValues={
           editing
             ? {
@@ -210,7 +249,7 @@ export function CustomerList() {
                 city: editing.city,
                 status: editing.status,
               }
-            : { status: 'ACTIVE' }
+            : { status: 'ACTIVE', state: 'Odisha' }
         }
         onSubmit={handleFormSubmit}
         loading={create.isPending || update.isPending}

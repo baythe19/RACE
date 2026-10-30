@@ -52,6 +52,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     dropoffAddress,
     estimatedFare,
     preferredDriverId,
+    onSiteAssist = false,
   } = route.params;
   const { dialog: partnerDialog, showAlert } = usePartnerDialog();
 
@@ -106,13 +107,12 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
   // Auto-select when only 1 vehicle or 1 driver is available to reduce dispatch friction
   React.useEffect(() => {
-    if (bookingType === 'towing' && !vehicleId && vehicles.length > 0) {
-      const availableVehicles = vehicles.filter(v => !reservedVehicleIds.has(v.id));
-      if (availableVehicles.length === 1) {
-        setVehicleId(availableVehicles[0].id);
-      }
+    if (onSiteAssist || bookingType !== 'towing' || vehicleId || vehicles.length === 0) return;
+    const availableVehicles = vehicles.filter(v => !reservedVehicleIds.has(v.id));
+    if (availableVehicles.length === 1) {
+      setVehicleId(availableVehicles[0].id);
     }
-  }, [bookingType, vehicleId, vehicles, reservedVehicleIds]);
+  }, [bookingType, onSiteAssist, vehicleId, vehicles, reservedVehicleIds]);
 
   React.useEffect(() => {
     if (!driverId && preferredDriverId) {
@@ -132,6 +132,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
     }
   }, [driverId, eligibleDrivers, preferredDriverId]);
   const selectedVehicleIsAvailable =
+    onSiteAssist ||
     bookingType === 'driver' ||
     (Boolean(vehicleId) &&
       vehicles.some(vehicle => vehicle.id === vehicleId) &&
@@ -149,7 +150,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
       });
       return;
     }
-    if (bookingType === 'towing' && (!vehicleId || !selectedVehicleIsAvailable)) {
+    if (!onSiteAssist && bookingType === 'towing' && (!vehicleId || !selectedVehicleIsAvailable)) {
       showAlert({
         tone: 'warning',
         title: 'Select an available vehicle',
@@ -187,7 +188,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
 
   const activeVehicles = vehicles.filter(vehicle => vehicle.status === 'ACTIVE');
 
-  if (!vehiclesLoading && activeVehicles.length === 0) {
+  if (!onSiteAssist && !vehiclesLoading && activeVehicles.length === 0) {
     return (
       <View style={{ flex: 1 }}>
         <PartnerScreenLayout
@@ -207,6 +208,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
             <PartnerText style={styles.emptyTitle}>This job is waiting</PartnerText>
             <PartnerText style={styles.emptySub}>
               The request stays on your jobs list. Assignment opens after one towing vehicle is active.
+              Roadside on-site jobs only need a connected driver — no truck.
             </PartnerText>
           </View>
         </PartnerScreenLayout>
@@ -313,7 +315,7 @@ export default function VendorAssignJobScreen({ navigation, route }: Props) {
         </View>
       </View>
 
-      {bookingType === 'towing' ? (
+      {bookingType === 'towing' && !onSiteAssist ? (
         <>
           <View style={styles.sectionHeader}>
             <PartnerText style={styles.sectionTitle}>1. Select Fleet Tow Truck</PartnerText>

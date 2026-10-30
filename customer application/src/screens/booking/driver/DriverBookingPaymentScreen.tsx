@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Pressable, Text, View } from 'react-native';
+import { Animated, Pressable, Text, View } from 'react-native';
 import { Check, ChevronDown, ChevronUp, Smartphone } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
 import { DriverFareBreakdownCard } from '../../../components/booking/FareBreakdownCard';
 import {
   DRIVER_ACCENT,
@@ -19,8 +20,10 @@ import type { HomeStackParamList } from '../../../types/navigation';
 import { formatRupee } from '../../../utils/driverPricing';
 import { parseStoredDate } from '../../../utils/driverCalendar';
 import { buildDriverBookingRequest } from '../../../utils/serviceBookingPayload';
+import { getDriverServiceFlow } from '../../../utils/driverServiceFlow';
 import type { DriverFareBreakdown } from '../../../types/fare';
-import { colors, shadows, typography } from '../../../theme';
+import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingPayment'>;
 
@@ -34,22 +37,19 @@ const PAYMENT_METHODS: Array<{
 }> = [
   {
     id: 'upi',
-    label: __DEV__ ? 'UPI demo' : 'UPI',
-    description: __DEV__ ? 'Simulated in development; no charge' : 'Online payment unavailable',
+    label: __DEV__ ? 'Demo payment' : 'UPI',
+    description: __DEV__ ? 'No real charge in development' : 'Online payment unavailable',
     Icon: Smartphone,
   },
 ];
 
-function formatBookingNumber(bookingNumber: string): string {
-  return bookingNumber.startsWith('#') ? bookingNumber : `#${bookingNumber}`;
-}
-
 export default function DriverBookingPaymentScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, resetBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
   const { vehicles, fetchVehicles } = useVehicleStore();
   const { confirmDriver, isConfirming } = useServiceBookingPayment();
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodId>('upi');
   const [showSuccess, setShowSuccess] = useState(false);
   const [confirmedFare, setConfirmedFare] = useState<DriverFareBreakdown | null>(
@@ -67,7 +67,7 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
 
   useEffect(() => {
     if (!booking.vehicleCategory) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
     }
   }, [booking.vehicleCategory, navigation]);
 
@@ -77,9 +77,8 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
   const summaryRows = [
     { label: 'Service', value: getDriverTypeLabel(booking.driverType) },
     { label: 'Pickup', value: getShortLocation(booking.pickup, booking.pickupLabel) },
-    { label: 'Date', value: getDateReviewLabel(parseStoredDate(booking.dateId)) },
+    { label: 'When', value: `${getDateReviewLabel(parseStoredDate(booking.dateId))} · ${booking.startTime}` },
     { label: 'Duration', value: `${booking.packageHours} hours` },
-    { label: 'Total', value: formatRupee(booking.totalPrice) },
   ];
 
   const handleConfirm = async (_method: PaymentMethodId) => {
@@ -88,7 +87,9 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
 
     try {
       const payload = buildDriverBookingRequest(booking, vehicles);
-      const { booking: created } = await confirmDriver(payload);
+      const confirmed = await confirmDriver(payload);
+      if (!confirmed) return;
+      const { booking: created } = confirmed;
       const breakdown =
         (created.fareBreakdown as DriverFareBreakdown | undefined) ?? booking.fareBreakdown ?? null;
       setConfirmedFare(breakdown);
@@ -101,8 +102,6 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
         useNativeDriver: true,
       }).start();
 
-      const bookingId = formatBookingNumber(created.bookingNumber);
-
       setTimeout(() => {
         navigation.replace('DriverAssigned', {
           bookingId: created.id,
@@ -114,42 +113,55 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
       if (__DEV__) {
         console.warn('[DriverBookingPayment] confirm booking failed', error);
       }
-      Alert.alert(
-        'Payment not completed',
-        error instanceof Error ? error.message : 'Online payment is unavailable. Please try again later.',
-      );
     }
   };
 
   if (showSuccess) {
     return (
-      <TowingBookingLayout title="Pay Advance" step={5} showStep={false} hideFooter accentColor={DRIVER_ACCENT}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 16 }}>
+      <TowingBookingLayout
+        title="Booking confirmed"
+        step={4}
+        stepLabels={flow.wizardStepLabels}
+        accentColor={DRIVER_ACCENT}
+        hideFooter
+        showStep={false}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: t.px(8) }}>
           <Animated.View
             style={{
-              width: t.px(88),
-              height: t.px(88),
-              borderRadius: t.px(44),
+              width: t.px(72),
+              height: t.px(72),
+              borderRadius: t.px(36),
               backgroundColor: colors.success,
               alignItems: 'center',
               justifyContent: 'center',
               transform: [{ scale: successScale }],
             }}>
-            <Check size={t.px(42)} color={colors.background} strokeWidth={3} />
+            <Check size={t.px(36)} color={colors.background} strokeWidth={3} />
           </Animated.View>
           <Text
             style={{
-              fontSize: t.px(20),
+              marginTop: t.px(14),
+              fontSize: t.px(18),
               fontWeight: typography.weights.bold,
-              color: colors.success,
+              color: colors.dark,
+              textAlign: 'center',
             }}>
-            Demo booking confirmed
+            {__DEV__ ? 'Demo booking placed' : 'Advance recorded'}
           </Text>
-          <Text style={{ fontSize: t.body, color: colors.grey, textAlign: 'center' }}>
-            No real money was charged. This is a development preview.
+          <Text
+            style={{
+              marginTop: t.px(6),
+              fontSize: t.caption,
+              color: colors.grey,
+              textAlign: 'center',
+              lineHeight: t.px(18),
+            }}>
+            {__DEV__
+              ? 'No money was charged. We are finding your driver.'
+              : 'Your driver will be assigned shortly.'}
           </Text>
           {confirmedFare ? (
-            <View style={{ width: '100%', marginTop: t.px(8) }}>
+            <View style={{ width: '100%', marginTop: t.px(16) }}>
               <DriverFareBreakdownCard breakdown={confirmedFare} accentColor={DRIVER_ACCENT} compact />
             </View>
           ) : null}
@@ -160,195 +172,165 @@ export default function DriverBookingPaymentScreen({ navigation }: Props) {
 
   return (
     <TowingBookingLayout
-      title="Pay Advance"
-      step={5}
+      title="Pay advance"
+      step={4}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
       scrollable
-      showStep={false}
-      onBack={() => navigation.goBack()}
-      hideFooter>
-      <Pressable
-        onPress={() => setSummaryExpanded(prev => !prev)}
-        style={[
-          {
-            borderRadius: t.cardRadius,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.background,
-            paddingHorizontal: t.px(16),
-            paddingVertical: t.px(14),
-            marginBottom: t.px(16),
-          },
-          shadows.card,
-        ]}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      onBack={() => goBackWithinStack(navigation)}
+      buttonLabel={isConfirming ? 'Processing…' : `Pay ${formatRupee(advance)}`}
+      continueDisabled={isConfirming || !readyToPay}
+      onContinue={() => void handleConfirm(paymentMethod)}>
+      <WizardStepFade>
+        <View style={{ gap: t.px(12) }}>
+          <Pressable
+            onPress={() => setSummaryExpanded(prev => !prev)}
+            style={{
+              borderRadius: t.px(12),
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.background,
+              paddingHorizontal: t.px(14),
+              paddingVertical: t.px(12),
+            }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text
+                style={{
+                  fontSize: t.body,
+                  fontWeight: typography.weights.semibold,
+                  color: colors.dark,
+                }}>
+                Trip summary
+              </Text>
+              {summaryExpanded ? (
+                <ChevronUp size={t.iconSm} color={colors.grey} />
+              ) : (
+                <ChevronDown size={t.iconSm} color={colors.grey} />
+              )}
+            </View>
+            {!summaryExpanded ? (
+              <Text style={{ marginTop: t.px(4), fontSize: t.caption, color: colors.grey }} numberOfLines={1}>
+                {summaryRows[1]?.value}
+              </Text>
+            ) : (
+              <View style={{ marginTop: t.px(10), gap: t.px(8) }}>
+                {summaryRows.map(row => (
+                  <View
+                    key={row.label}
+                    style={{ flexDirection: 'row', justifyContent: 'space-between', gap: t.px(10) }}>
+                    <Text style={{ fontSize: t.caption, color: colors.grey, width: t.px(72) }}>{row.label}</Text>
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: t.caption,
+                        fontWeight: typography.weights.semibold,
+                        color: colors.dark,
+                        textAlign: 'right',
+                      }}
+                      numberOfLines={2}>
+                      {row.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Pressable>
+
+          {booking.fareBreakdown ? (
+            <DriverFareBreakdownCard breakdown={booking.fareBreakdown} accentColor={DRIVER_ACCENT} compact />
+          ) : (
+            <View
+              style={{
+                borderRadius: t.px(12),
+                borderWidth: 1,
+                borderColor: colors.border,
+                padding: t.px(14),
+              }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: t.body, color: colors.grey }}>Advance due now</Text>
+                <Text style={{ fontSize: t.px(18), fontWeight: typography.weights.bold, color: DRIVER_ACCENT }}>
+                  {formatRupee(advance)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <View>
+            <Text
+              style={{
+                fontSize: t.caption,
+                fontWeight: typography.weights.semibold,
+                color: colors.grey,
+                marginBottom: t.px(8),
+              }}>
+              Payment
+            </Text>
+            {PAYMENT_METHODS.map(method => {
+              const selected = paymentMethod === method.id;
+              const Icon = method.Icon;
+              return (
+                <Pressable
+                  key={method.id}
+                  onPress={() => setPaymentMethod(method.id)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: t.px(10),
+                    borderRadius: t.px(12),
+                    borderWidth: 1,
+                    borderColor: selected ? DRIVER_ACCENT : colors.border,
+                    backgroundColor: selected ? DRIVER_LIGHT_BG : colors.background,
+                    paddingHorizontal: t.px(12),
+                    paddingVertical: t.px(12),
+                  }}>
+                  <View
+                    style={{
+                      width: t.px(34),
+                      height: t.px(34),
+                      borderRadius: t.px(10),
+                      backgroundColor: colors.background,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    <Icon size={t.iconSm} color={colors.dark} strokeWidth={2} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: t.body, fontWeight: typography.weights.semibold, color: colors.dark }}>
+                      {method.label}
+                    </Text>
+                    <Text style={{ fontSize: t.px(11), color: colors.grey }}>{method.description}</Text>
+                  </View>
+                  <View
+                    style={{
+                      width: t.px(20),
+                      height: t.px(20),
+                      borderRadius: t.px(10),
+                      borderWidth: selected ? 0 : 1,
+                      borderColor: colors.border,
+                      backgroundColor: selected ? DRIVER_ACCENT : colors.background,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}>
+                    {selected ? <Check size={t.px(11)} color={colors.dark} strokeWidth={3} /> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+
           <Text
             style={{
-              fontSize: t.labelBold,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
+              fontSize: t.px(11),
+              color: colors.grey,
+              textAlign: 'center',
+              lineHeight: t.px(16),
             }}>
-            Booking Summary
+            {__DEV__
+              ? 'Development preview only — confirms booking without charging.'
+              : 'Balance is due when your driver arrives.'}
           </Text>
-          {summaryExpanded ? (
-            <ChevronUp size={t.iconSm} color={colors.dark} />
-          ) : (
-            <ChevronDown size={t.iconSm} color={colors.dark} />
-          )}
         </View>
-        {summaryExpanded ? (
-          <View style={{ marginTop: t.px(12), gap: t.px(8) }}>
-            {summaryRows.map(row => (
-              <View
-                key={row.label}
-                style={{ flexDirection: 'row', justifyContent: 'space-between', gap: t.px(12) }}>
-                <Text style={{ fontSize: t.body, color: colors.grey }}>{row.label}</Text>
-                <Text
-                  style={{
-                    fontSize: t.body,
-                    fontWeight: typography.weights.semibold,
-                    color: colors.dark,
-                    textAlign: 'right',
-                    flex: 1,
-                  }}>
-                  {row.value}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </Pressable>
-
-      <View
-        style={{
-          borderRadius: t.cardRadius,
-          backgroundColor: DRIVER_LIGHT_BG,
-          borderWidth: 1,
-          borderColor: DRIVER_ACCENT,
-          paddingVertical: t.px(16),
-          paddingHorizontal: t.px(16),
-          marginBottom: t.px(20),
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-        <Text style={{ fontSize: t.bodyLarge, fontWeight: typography.weights.semibold, color: colors.dark }}>
-          Pay now
-        </Text>
-        <Text
-          style={{
-            fontSize: t.px(22),
-            fontWeight: typography.weights.extrabold,
-            color: DRIVER_ACCENT,
-          }}>
-          {formatRupee(advance)}
-        </Text>
-      </View>
-
-      {booking.fareBreakdown ? (
-        <View style={{ marginBottom: t.px(20) }}>
-          <DriverFareBreakdownCard breakdown={booking.fareBreakdown} accentColor={DRIVER_ACCENT} compact />
-        </View>
-      ) : null}
-
-      <Text
-        style={{
-          fontSize: t.sectionTitle,
-          fontWeight: typography.weights.bold,
-          color: colors.dark,
-          marginBottom: t.px(10),
-        }}>
-        Payment Method
-      </Text>
-
-      <View style={{ gap: t.px(10), marginBottom: t.px(24) }}>
-        {PAYMENT_METHODS.map(method => {
-          const selected = paymentMethod === method.id;
-          const Icon = method.Icon;
-          return (
-            <Pressable
-              key={method.id}
-              onPress={() => setPaymentMethod(method.id)}
-              style={[
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: t.px(12),
-                  borderRadius: t.inputRadius,
-                  borderWidth: selected ? 2 : 1,
-                  borderColor: selected ? DRIVER_ACCENT : colors.border,
-                  backgroundColor: selected ? DRIVER_LIGHT_BG : colors.background,
-                  paddingHorizontal: t.px(16),
-                  paddingVertical: t.px(14),
-                },
-                shadows.card,
-              ]}>
-              <Icon size={t.iconSm} color={selected ? DRIVER_ACCENT : colors.dark} strokeWidth={2} />
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: t.labelBold,
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {method.label}
-                </Text>
-                <Text style={{ fontSize: t.caption, color: colors.grey }}>{method.description}</Text>
-              </View>
-              <View
-                style={{
-                  width: t.px(20),
-                  height: t.px(20),
-                  borderRadius: t.px(10),
-                  borderWidth: selected ? 0 : 1.5,
-                  borderColor: colors.border,
-                  backgroundColor: selected ? DRIVER_ACCENT : colors.background,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                {selected ? <Check size={t.px(12)} color={colors.background} strokeWidth={3} /> : null}
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Text
-        style={{
-          fontSize: t.caption,
-          color: colors.grey,
-          textAlign: 'center',
-          marginBottom: t.px(10),
-        }}>
-        Secure advance payment for verified driver dispatch.
-      </Text>
-
-      <Pressable
-        onPress={() => void handleConfirm(paymentMethod)}
-        disabled={isConfirming || !readyToPay}
-        style={{
-          minHeight: t.buttonHeight,
-          borderRadius: t.cardRadius,
-          backgroundColor: isConfirming || !readyToPay ? colors.grey : DRIVER_ACCENT,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: t.px(12),
-          flexDirection: 'row',
-          gap: t.px(8),
-        }}>
-        {isConfirming ? <ActivityIndicator color={colors.dark} /> : null}
-        <Text
-          style={{
-            fontSize: t.buttonLabel,
-            fontWeight: typography.weights.bold,
-            color: colors.dark,
-          }}>
-          {isConfirming
-            ? 'Processing...'
-            : 'Confirm & Pay ' + formatRupee(advance)}
-        </Text>
-      </Pressable>
-
+      </WizardStepFade>
     </TowingBookingLayout>
   );
 }

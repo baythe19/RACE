@@ -1,8 +1,10 @@
-import { UI_PREVIEW_AUTH_FLOW } from '../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../config/uiPreviewMode';
 import type { TowingFareBreakdown } from '../types/fare';
 
 /** When true, towing booking screens prefill demo data so UI can be clicked through. */
-export const TOWING_WALKTHROUGH_ENABLED = UI_PREVIEW_AUTH_FLOW;
+export function isTowingWalkthroughEnabled(): boolean {
+  return isUiPreviewAuthFlow();
+}
 
 export const TOWING_DEMO_PICKUP = {
   address: 'Patia Square, Bhubaneswar',

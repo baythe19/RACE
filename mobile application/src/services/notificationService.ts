@@ -130,6 +130,19 @@ export async function deleteAllNotifications(): Promise<void> {
   }
 }
 
+export async function deleteNotification(id: string): Promise<void> {
+  try {
+    await unwrapApi(api.delete(`${API_ENDPOINTS.notifications}/${id}`));
+  } catch (error) {
+    if (UI_PREVIEW_MUTATIONS_ENABLED) {
+      const notifications = await readPreviewNotifications();
+      await writePreviewNotifications(notifications.filter(n => n.id !== id));
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function getNotificationPreferences(): Promise<NotificationPreferences> {
   if (UI_PREVIEW_MODE) return { ...mockNotificationPrefs };
   try {

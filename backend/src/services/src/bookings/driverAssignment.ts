@@ -8,9 +8,10 @@ import { DriverBookingModel } from '../../../models/src/driverBooking';
 import { VendorVehicleModel } from '../../../models/src/vendorVehicle';
 import { DriverVendorMembershipModel } from '../../../models/src/driverVendorMembership';
 import { canTransition } from '../bookingStatusConstants';
-import { emitBookingStatusUpdate, emitToDriver } from '../socket';
+import { emitBookingStatusUpdate, emitDriverOffersUpdated, emitToDriver, emitVendorOffersUpdated } from '../socket';
+import { notifyCustomerTripStatus, notifyDriverJobOffer } from '../bookingNotifications';
 import { mapPublicBookingStatus } from '../bookingDisplayStatus';
-import { generateTripStartOtp } from './tripOtp';
+import { encryptTripOtpForStorage, generateTripStartOtp, hashTripOtpForStorage } from './tripOtp';
 import type { ActiveBookingType } from '../../../models/src/user';
 
 const FALLBACK_DISTANCE_KM = 999;
@@ -176,11 +177,27 @@ async function releaseDriverReservationIfBookingUnclaimed(
   }
 }
 
+/**
+ * Offer feed matches Part-Time / Full-Time / Tow Driver.
+ * Older QA rows stored the label "Driver Service" and relied on selfDriverCategory.
+ */
+export function resolvedOfferDriverType(driver: IUser): string | undefined {
+  const raw = driver.driverProfile?.driverType?.trim();
+  if (raw === 'Tow Driver' || raw === 'Full-Time' || raw === 'Part-Time') {
+    return raw;
+  }
+  if (!raw || raw === 'Driver Service') {
+    if (driver.selfDriverCategory === 'PART_TIME') return 'Part-Time';
+    if (driver.selfDriverCategory === 'FULL_TIME') return 'Full-Time';
+  }
+  return raw || undefined;
+}
+
 export function isDriverEligibleForBooking(
   driver: IUser,
   bookingType: ActiveBookingType,
 ): boolean {
-  const driverType = driver.driverProfile?.driverType;
+  const driverType = resolvedOfferDriverType(driver);
   if (!driverType) return false;
   return driverTypesForBooking(bookingType).includes(driverType);
 }
@@ -268,17 +285,51 @@ export type OpenBookingOffer = {
   offerExpiresAt?: string;
   /** Server-computed: the decision window has already lapsed. */
   isExpired?: boolean;
+  /** Roadside on-site assist — vendor assigns a mechanic/driver only (no tow truck). */
+  onSiteAssist?: boolean;
 };
 
+export function isOnSiteAssistBooking(booking: {
+  assistLabel?: string | null;
+  distanceKm?: number | null;
+  pickup?: { latitude?: number; longitude?: number };
+  dropoff?: { latitude?: number; longitude?: number } | null;
+}): boolean {
+  if (!booking.assistLabel?.trim()) return false;
+  if (booking.distanceKm === 0) return true;
+  const pickup = booking.pickup;
+  const dropoff = booking.dropoff;
+  if (!pickup || !dropoff) return false;
+  return pickup.latitude === dropoff.latitude && pickup.longitude === dropoff.longitude;
+}
+
+/**
+ * Full-time jobs → full-time drivers only.
+ * Outstation and night → either independent category can accept.
+ */
+export function independentDriverMatchesHire(
+  selfCategory: 'FULL_TIME' | 'PART_TIME' | undefined,
+  driverServiceType?: string,
+): boolean {
+  if (driverServiceType === 'part_time') return selfCategory === 'PART_TIME';
+  if (driverServiceType === 'full_time') return selfCategory === 'FULL_TIME';
+  if (driverServiceType === 'outstation' || driverServiceType === 'night') {
+    return selfCategory === 'PART_TIME' || selfCategory === 'FULL_TIME';
+  }
+  return selfCategory === 'PART_TIME' || selfCategory === 'FULL_TIME';
+}
+
 /** Specific, bookable name for an offer — falls back to the broad category. */
-function offerServiceLabel(
+export function bookingServiceLabel(
   bookingType: 'towing' | 'driver',
   booking: {
     towingMode?: 'instant' | 'scheduled' | 'emergency';
+    assistLabel?: string;
     driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   },
 ): string {
   if (bookingType === 'towing') {
+    if (booking.assistLabel?.trim()) return booking.assistLabel.trim();
     if (booking.towingMode === 'emergency') return 'Emergency Towing';
     if (booking.towingMode === 'scheduled') return 'Scheduled Towing';
     if (booking.towingMode === 'instant') return 'Instant Towing';
@@ -312,6 +363,8 @@ function mapOffer(
     vendorId?: { toString(): string } | null;
     assignedFleetVehicleLabel?: string | null;
     towingMode?: 'instant' | 'scheduled' | 'emergency';
+    assistLabel?: string;
+    distanceKm?: number;
     driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
   },
   distanceKm?: number,
@@ -319,6 +372,14 @@ function mapOffer(
   includeDecisionWindow = false,
 ): OpenBookingOffer {
   const vendorId = booking.vendorId?.toString();
+  const onSiteAssist =
+    bookingType === 'towing' &&
+    isOnSiteAssistBooking({
+      assistLabel: 'assistLabel' in booking ? booking.assistLabel : undefined,
+      distanceKm: 'distanceKm' in booking ? booking.distanceKm : undefined,
+      pickup: booking.pickup,
+      dropoff: booking.dropoff ?? null,
+    });
   return {
     bookingType,
     id: booking.id ?? booking._id?.toString() ?? '',
@@ -329,10 +390,11 @@ function mapOffer(
     estimatedFare: booking.estimatedFare,
     createdAt: booking.createdAt.toISOString(),
     distanceKm,
-    serviceLabel: offerServiceLabel(bookingType, booking),
+    serviceLabel: bookingServiceLabel(bookingType, booking),
     vendorId,
     assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
     vendorApproved: Boolean(vendorId),
+    onSiteAssist: onSiteAssist || undefined,
     ...(includeDecisionWindow
       ? {
           offerExpiresAt: offerExpiresAt(booking.createdAt).toISOString(),
@@ -449,6 +511,14 @@ export async function listOpenBookingOffers(options?: {
       : Promise.resolve([]),
   ]);
 
+  const towingModeRank = (mode?: string) =>
+    mode === 'emergency' ? 0 : mode === 'instant' ? 1 : 2;
+  towing.sort((a, b) => {
+    const byMode = towingModeRank(a.towingMode) - towingModeRank(b.towingMode);
+    if (byMode !== 0) return byMode;
+    return b.createdAt.getTime() - a.createdAt.getTime();
+  });
+
   const offers: OpenBookingOffer[] = [];
 
   const consider = (
@@ -460,6 +530,7 @@ export async function listOpenBookingOffers(options?: {
       status: string;
       driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
       towingMode?: 'instant' | 'scheduled' | 'emergency';
+      assistLabel?: string;
       pickup?: { address?: string; latitude?: number; longitude?: number };
       dropoff?: { address?: string; latitude?: number; longitude?: number } | null;
       estimatedFare?: number;
@@ -472,12 +543,12 @@ export async function listOpenBookingOffers(options?: {
       if (options.forDriver.driverContext === 'INDEPENDENT' && bookingType !== 'driver') {
         return;
       }
-      const selfCategory = options.forDriver.selfDriverCategory;
-      const driverServiceType = booking.driverServiceType;
-      if (selfCategory === 'FULL_TIME' && driverServiceType === 'part_time') {
-        return;
-      }
-      if (selfCategory === 'PART_TIME' && driverServiceType === 'full_time') {
+      if (
+        !independentDriverMatchesHire(
+          options.forDriver.selfDriverCategory,
+          booking.driverServiceType,
+        )
+      ) {
         return;
       }
     }
@@ -656,8 +727,8 @@ export async function claimOpenBookingOffer(
 
   const existing =
     bookingType === 'towing'
-      ? await TowingBookingModel.findById(bookingId).exec()
-      : await DriverBookingModel.findById(bookingId).exec();
+      ? await TowingBookingModel.findById(bookingId).select('+tripStartOtpEncrypted').exec()
+      : await DriverBookingModel.findById(bookingId).select('+tripStartOtpEncrypted').exec();
   if (!existing) {
     throw new NotFoundError('Booking not found');
   }
@@ -739,7 +810,8 @@ export async function claimOpenBookingOffer(
   const $set: Record<string, unknown> = {
     driverId: driverObjectId,
     status: vendorDispatched ? 'DRIVER_ASSIGNED' : 'DRIVER_EN_ROUTE',
-    tripStartOtp,
+    tripStartOtp: hashTripOtpForStorage(tripStartOtp),
+    tripStartOtpEncrypted: encryptTripOtpForStorage(tripStartOtp),
     tripStartOtpVerified: false,
   };
   if (vendorId) {
@@ -820,6 +892,12 @@ export async function claimOpenBookingOffer(
     throw new ConflictError('This job was just taken by another partner');
   }
 
+  if (bookingType === 'towing') {
+    emitVendorOffersUpdated();
+  } else {
+    emitDriverOffersUpdated();
+  }
+
   if (vendorDispatched) {
     // Vendor-routed assignment waits for the driver's own acknowledgement. The
     // trip-start OTP is intentionally NOT emitted here — it goes out when the
@@ -836,6 +914,20 @@ export async function claimOpenBookingOffer(
       status: 'DRIVER_ASSIGNED',
       message: 'New job assigned by your vendor',
     });
+    void notifyDriverJobOffer({
+      driverId,
+      bookingNumber: claimed.bookingNumber,
+      bookingType,
+      bookingId,
+      message: `${claimed.bookingNumber} assigned by your vendor — accept to start`,
+    }).catch(() => undefined);
+    void notifyCustomerTripStatus({
+      customerId: claimed.customerId.toString(),
+      bookingNumber: claimed.bookingNumber,
+      bookingType,
+      bookingId: claimed.id,
+      status: 'DRIVER_ASSIGNED',
+    }).catch(() => undefined);
     return {
       id: claimed.id,
       status: claimed.status,
@@ -856,6 +948,13 @@ export async function claimOpenBookingOffer(
     message: 'Partner accepted your booking',
     assignedFleetVehicleLabel: fleetVehicleLabel,
   });
+  void notifyCustomerTripStatus({
+    customerId: claimed.customerId.toString(),
+    bookingNumber: claimed.bookingNumber,
+    bookingType,
+    bookingId: claimed.id,
+    status: 'DRIVER_EN_ROUTE',
+  }).catch(() => undefined);
   emitToDriver(driverId, 'trip:otp', {
     bookingId,
     bookingType,
@@ -982,8 +1081,9 @@ export async function assignDriverToBooking(
   };
 
   await reserveDriverForBooking(driverObjectId, bookingObjectId, bookingType, bookingVendorId);
+  let assigned;
   try {
-    const assigned =
+    assigned =
       bookingType === 'towing'
         ? await TowingBookingModel.findOneAndUpdate(filter, update, { new: true }).exec()
         : await DriverBookingModel.findOneAndUpdate(filter, update, { new: true }).exec();
@@ -997,11 +1097,32 @@ export async function assignDriverToBooking(
     throw error;
   }
 
+  // Assigned job is gone from the open pool — refresh every partner feed live.
+  if (bookingType === 'towing') {
+    emitVendorOffersUpdated();
+  } else {
+    emitDriverOffersUpdated();
+  }
+
   emitBookingStatusUpdate(bookingId, mapPublicBookingStatus('DRIVER_ASSIGNED'), {
     internalStatus: 'DRIVER_ASSIGNED',
     driverAccepted: false,
     message: 'Driver allotted - awaiting acceptance',
   });
+  void notifyCustomerTripStatus({
+    customerId: assigned.customerId.toString(),
+    bookingNumber: assigned.bookingNumber,
+    bookingType,
+    bookingId: assigned.id,
+    status: 'DRIVER_ASSIGNED',
+  }).catch(() => undefined);
+  void notifyDriverJobOffer({
+    driverId,
+    bookingNumber: assigned.bookingNumber,
+    bookingType,
+    bookingId: assigned.id,
+    message: `${assigned.bookingNumber} allotted — accept in the app to start`,
+  }).catch(() => undefined);
 }
 
 export async function releaseDriver(driverId: string, bookingId: string): Promise<void> {
@@ -1064,6 +1185,13 @@ export async function unassignDriverFromBooking(
   }
 
   await releaseDriver(driverId, bookingId);
+
+  // Booking is back in the open pool — repopulate partner feeds live.
+  if (bookingType === 'towing') {
+    emitVendorOffersUpdated();
+  } else {
+    emitDriverOffersUpdated();
+  }
 }
 
 export async function autoAssignDriver(

@@ -28,9 +28,10 @@ import {
   useVerifyOtpMutation,
 } from '../../services/auth/useAuthMutations';
 import { ensurePreviewAuthSession, previewAdvanceFromOtp } from '../../config/uiPreviewAuth';
-import { UI_PREVIEW_AUTH_FLOW } from '../../config/uiPreviewMode';
+import { isUiPreviewAuthFlow } from '../../config/uiPreviewMode';
 import { getRoleMismatchMessage, isRoleMismatchError } from '../../utils/roleMismatch';
 import type { AuthStackParamList } from '../../types/navigation';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'OtpVerification'>;
 
@@ -93,16 +94,18 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
     return () => clearInterval(timer);
   }, [secondsLeft]);
 
+  // Only show / use QA OTP when the API returned one (whitelist / mock).
+  const testingOtp = devOtp ?? extractOtpFromMessage(otpMessage) ?? null;
+
   useEffect(() => {
-    const code = devOtp ?? extractOtpFromMessage(otpMessage);
-    if (!code) return;
-    showBackendOtpToast(code);
+    if (!testingOtp) return;
+    showBackendOtpToast(testingOtp);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devOtp, otpMessage]);
+  }, [testingOtp]);
 
   const handleVerify = useCallback(
     async (codeOverride?: string) => {
-      if (UI_PREVIEW_AUTH_FLOW) {
+      if (isUiPreviewAuthFlow()) {
         previewAdvanceFromOtp(navigation, dispatch, isExistingUser);
         return;
       }
@@ -133,7 +136,9 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
           return;
         }
       } catch (err) {
-        if (code === '123456' || code === '000000' || UI_PREVIEW_AUTH_FLOW) {
+        // Preview-only soft login. Never accept magic OTPs when preview is off —
+        // that would ship into APKs and bypass real HanuSMS verification.
+        if (isUiPreviewAuthFlow()) {
           ensurePreviewAuthSession(dispatch, isExistingUser);
           if (!isExistingUser) {
             navigation.replace('ProfileWizard');
@@ -148,7 +153,12 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
             ),
           );
         } else {
-          setError(getApiErrorMessage(err, 'Invalid OTP'));
+          const message = getApiErrorMessage(err, 'Invalid OTP');
+          setError(message);
+          // Exhausted / stale codes → unlock Resend immediately so QA isn't stuck.
+          if (/expired|already used/i.test(message)) {
+            setSecondsLeft(0);
+          }
         }
         setOtp('');
         setActiveOtpIndex(0);
@@ -179,17 +189,19 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
       const result = await sendOtpMutation.mutateAsync({ mobileNumber });
       const nextOtp = result.devOtp ?? extractOtpFromMessage(result.message);
       if (nextOtp) showBackendOtpToast(nextOtp);
-      setSuccess('OTP resent successfully');
+      setSuccess(
+        nextOtp
+          ? `OTP resent — use ${nextOtp} (QA / whitelist)`
+          : 'OTP resent successfully. Check SMS.',
+      );
       setSecondsLeft(RESEND_SECONDS);
       setOtp('');
       setActiveOtpIndex(0);
-      if (result.isExistingUser !== undefined) {
-        navigation.setParams({
-          isExistingUser: result.isExistingUser,
-          devOtp: result.devOtp,
-          otpMessage: result.message,
-        });
-      }
+      navigation.setParams({
+        isExistingUser: result.isExistingUser ?? isExistingUser,
+        devOtp: result.devOtp,
+        otpMessage: result.message,
+      });
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to resend OTP'));
     }
@@ -207,13 +219,23 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
     }
   };
 
+  const fillTestingOtp = () => {
+    const code = testingOtp;
+    if (!code) return;
+    if (verifyLockRef.current || verified) return;
+    setError('');
+    setOtp(code);
+    setActiveOtpIndex(5);
+    void handleVerify(code);
+  };
+
   const px = (n: number) => Math.max(1, Math.round(n * scale));
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} translucent={false} />
       <KeyboardFormView style={styles.fill} contentContainerStyle={styles.scrollContent}>
-          <AuthHeader scale={scale} onBack={() => navigation.goBack()} />
+          <AuthHeader scale={scale} onBack={() => goBackWithinStack(navigation)} />
 
           <Text
             style={[
@@ -264,7 +286,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
               {formatPhone(mobileNumber)}
             </Text>
             <Pressable
-              onPress={() => navigation.goBack()}
+              onPress={() => goBackWithinStack(navigation)}
               hitSlop={8}
               style={{ marginLeft: 10 * scale }}
               accessibilityRole="button"
@@ -293,6 +315,48 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
             />
           </View>
 
+          {testingOtp ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Use testing OTP"
+              onPress={fillTestingOtp}
+              style={{
+                marginHorizontal: 24 * scale,
+                marginTop: 12 * scale,
+                paddingVertical: 10 * scale,
+                paddingHorizontal: 14 * scale,
+                borderRadius: 12 * scale,
+                borderWidth: 1,
+                borderColor: '#F5C518',
+                backgroundColor: '#FFF8E1',
+              }}>
+              <Text
+                style={[
+                  noFontPadding,
+                  {
+                    color: '#7A5A00',
+                    fontSize: 13 * scale,
+                    fontWeight: '700',
+                    textAlign: 'center',
+                  },
+                ]}>
+                QA OTP {testingOtp} — tap to fill & verify
+              </Text>
+              <Text
+                style={[
+                  noFontPadding,
+                  {
+                    marginTop: 4 * scale,
+                    color: '#9A7A20',
+                    fontSize: 11 * scale,
+                    textAlign: 'center',
+                  },
+                ]}>
+                Test numbers: 9876543210 or 9000000xxx → use code from API above
+              </Text>
+            </Pressable>
+          ) : null}
+
           <View style={{ marginHorizontal: 24 * scale, marginTop: 16 * scale }}>
             <AuthToast message={backendOtpToast} type="success" />
             <AuthToast message={error} type="error" />
@@ -305,7 +369,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
             gradientId="otpButtonGold"
             marginTop={28}
             label={
-              UI_PREVIEW_AUTH_FLOW
+              isUiPreviewAuthFlow()
                 ? 'Continue'
                 : loading && otp.length === 6
                   ? 'Verifying...'
@@ -315,7 +379,7 @@ export default function OtpVerificationScreen({ navigation, route }: Props) {
                       ? 'Verify & Login'
                       : 'Verify & Continue'
             }
-            disabled={UI_PREVIEW_AUTH_FLOW ? false : otp.length !== 6 || loading || verified}
+            disabled={isUiPreviewAuthFlow() ? false : otp.length !== 6 || loading || verified}
             onPress={() => void handleVerify()}
           />
 

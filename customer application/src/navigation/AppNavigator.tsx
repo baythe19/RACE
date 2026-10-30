@@ -3,13 +3,13 @@ import { StyleSheet, View } from 'react-native';
 import {
   NavigationContainer,
   DefaultTheme,
-  type NavigationContainerRef,
 } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import CustomerDropoffPrompt from '../components/booking/CustomerDropoffPrompt';
-import CustomTabBar from '../components/navigation/CustomTabBar';
+import { CustomerUiQaNavigator } from '../components/dev/CustomerUiQaNavigator';
+import { customerNavigationRef } from './customerNavigationRef';import CustomTabBar from '../components/navigation/CustomTabBar';
 import StackBackButton from '../components/navigation/StackBackButton';
 import { DriverBookingProvider } from '../context/DriverBookingContext';
 import { RoadsideBookingProvider } from '../context/RoadsideBookingContext';
@@ -19,7 +19,6 @@ import { useAppSelector } from '../redux/hooks';
 import { getCustomerOnboardingRouteFromStep } from '../store/customerOnboardingRoute';
 import { useAuthStore } from '../store/authStore';
 import CreateAccountScreen from '../screens/auth/CreateAccountScreen';
-import CreatePinAuthScreen from '../screens/auth/CreatePinScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import OnboardingScreen from '../screens/auth/OnboardingScreen';
 import OTPScreen from '../screens/auth/OTPScreen';
@@ -29,12 +28,10 @@ import TowingServiceScreen from '../screens/TowingServiceScreen';
 import TowingChooseVehicleScreen from '../screens/booking/towing/TowingChooseVehicleScreen';
 import TowingConfirmedScreen from '../screens/booking/towing/TowingConfirmedScreen';
 import TowingCompletedScreen from '../screens/booking/towing/TowingCompletedScreen';
-import TowingDateTimeScreen from '../screens/booking/towing/TowingDateTimeScreen';
 import TowingDriverOnWayScreen from '../screens/booking/towing/TowingDriverOnWayScreen';
 import TowingPickupDropScreen from '../screens/booking/towing/TowingPickupDropScreen';
 import TowingRateScreen from '../screens/booking/towing/TowingRateScreen';
 import TowingReviewScreen from '../screens/booking/towing/TowingReviewScreen';
-import TowingSelectTypeScreen from '../screens/booking/towing/TowingSelectTypeScreen';
 import TowingAdvancePaymentScreen from '../screens/booking/towing/TowingAdvancePaymentScreen';
 import TowingTrackScreen from '../screens/booking/towing/TowingTrackScreen';
 import DriverServiceScreen from '../screens/DriverServiceScreen';
@@ -68,16 +65,13 @@ import PersonalInformationScreen from '../screens/profile/PersonalInformationScr
 import MyVehiclesScreen from '../screens/vehicles/VehicleListScreen';
 import AddVehicleScreen from '../screens/vehicles/AddVehicleScreen';
 import VehicleDetailScreen from '../screens/vehicles/VehicleDetailScreen';
-import EditVehicleScreen from '../screens/vehicles/EditVehicleScreen';
 import SosDetailsScreen from '../screens/profile/SosDetailsScreen';
 import SavedLocationsScreen from '../screens/profile/SavedLocationsScreen';
 import PaymentMethodsScreen from '../screens/profile/PaymentMethodsScreen';
 import NotificationsScreen from '../screens/profile/NotificationsScreen';
 import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
-import SettingsScreen from '../screens/profile/SettingsScreen';
 import ChoosePlanScreen from '../screens/profile/ChoosePlanScreen';
-import CreatePinScreen from '../screens/profile/CreatePinScreen';
-import ChangePasswordScreen from '../screens/profile/ChangePasswordScreen';
+import SubscriptionPlansScreen from '../screens/profile/SubscriptionPlansScreen';
 import ChangeMobileNumberScreen from '../screens/profile/ChangeMobileNumberScreen';
 import BookingsScreen from '../screens/BookingsScreen';
 import BookingDetailScreen from '../screens/bookings/BookingDetailScreen';
@@ -115,7 +109,11 @@ const ProfileStack = createNativeStackNavigator<ProfileStackParamList>();
 const BookingsStack = createNativeStackNavigator<BookingsStackParamList>();
 const CallStack = createNativeStackNavigator<CallStackParamList>();
 
-const stackScreenOptions = {
+const stackScreenOptions = ({
+  navigation,
+}: {
+  navigation: { getState: () => { index: number } };
+}) => ({
   headerStyle: {
     backgroundColor: colors.background,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -135,9 +133,21 @@ const stackScreenOptions = {
   headerBackButtonDisplayMode: 'minimal' as const,
   headerLeft: (props: Parameters<typeof StackBackButton>[0]) => <StackBackButton {...props} />,
   contentStyle: { backgroundColor: colors.background },
-};
+  animation: 'slide_from_right' as const,
+  animationDuration: 280,
+  gestureDirection: 'horizontal' as const,
+  animationTypeForReplace: 'push' as const,
+  gestureEnabled: navigation.getState().index > 0,
+});
 
 const towingBookingScreenOptions = { headerShown: false as const };
+
+/** Wizard steps: stepper + Continue stay fixed; only body updates (no stack slide). */
+const bookingWizardScreenOptions = {
+  headerShown: false as const,
+  animation: 'none' as const,
+  animationDuration: 0,
+};
 
 const towingBookingScreens = (
   Stack: ReturnType<typeof createNativeStackNavigator<HomeStackParamList>>,
@@ -151,32 +161,22 @@ const towingBookingScreens = (
     <Stack.Screen
       name="TowingChooseVehicle"
       component={TowingChooseVehicleScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingPickupDrop"
       component={TowingPickupDropScreen}
-      options={towingBookingScreenOptions}
-    />
-    <Stack.Screen
-      name="TowingSelectType"
-      component={TowingSelectTypeScreen}
-      options={towingBookingScreenOptions}
-    />
-    <Stack.Screen
-      name="TowingDateTime"
-      component={TowingDateTimeScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingReview"
       component={TowingReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingAdvancePayment"
       component={TowingAdvancePaymentScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="TowingConfirmed"
@@ -235,12 +235,12 @@ const driverBookingScreens = (
     <Stack.Screen
       name="DriverBookingReview"
       component={DriverBookingReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverBookingPayment"
       component={DriverBookingPaymentScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverBookingConfirmed"
@@ -260,22 +260,22 @@ const driverBookingScreens = (
     <Stack.Screen
       name="DriverDateTime"
       component={DriverDateTimeScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverPickup"
       component={DriverPickupScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverChooseVehicleType"
       component={DriverChooseVehicleTypeScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverReview"
       component={DriverReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="DriverAssigned"
@@ -314,12 +314,12 @@ const roadsideBookingScreens = (
     <Stack.Screen
       name="RoadsideLocation"
       component={RoadsideLocationScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="RoadsideReview"
       component={RoadsideReviewScreen}
-      options={towingBookingScreenOptions}
+      options={bookingWizardScreenOptions}
     />
     <Stack.Screen
       name="RoadsideHelpOnWay"
@@ -440,7 +440,14 @@ function ServicesStackNavigator() {
 
 function BookingsStackNavigator() {
   return (
-    <BookingsStack.Navigator screenOptions={{ headerShown: false }}>
+    <BookingsStack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerShown: false,
+        animation: 'slide_from_right' as const,
+        animationDuration: 280,
+        gestureDirection: 'horizontal' as const,
+        gestureEnabled: navigation.getState().index > 0,
+      })}>
       <BookingsStack.Screen name="BookingsMain" component={BookingsScreen} />
       <BookingsStack.Screen name="BookingDetail" component={BookingDetailScreen} />
       <BookingsStack.Screen name="TowingTrack" component={TowingTrackScreen} />
@@ -453,10 +460,14 @@ function BookingsStackNavigator() {
 function CallStackNavigator() {
   return (
     <CallStack.Navigator
-      screenOptions={{
+      screenOptions={({ navigation }) => ({
         headerShown: false,
         contentStyle: { backgroundColor: '#000000' },
-      }}>
+        animation: 'slide_from_right' as const,
+        animationDuration: 280,
+        gestureDirection: 'horizontal' as const,
+        gestureEnabled: navigation.getState().index > 0,
+      })}>
       <CallStack.Screen name="CallMain" component={CallScreen} />
       <CallStack.Screen name="QRScan" component={QRScanScreen} />
       <CallStack.Screen name="SOSEmergency" component={SOSEmergencyScreen} />
@@ -467,22 +478,29 @@ function CallStackNavigator() {
 
 function ProfileStackNavigator() {
   return (
-    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+    <ProfileStack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerShown: false,
+        animation: 'slide_from_right' as const,
+        animationDuration: 280,
+        gestureDirection: 'horizontal' as const,
+        contentStyle: { backgroundColor: colors.background },
+        animationTypeForReplace: 'push' as const,
+        gestureEnabled: navigation.getState().index > 0,
+      })}>
       <ProfileStack.Screen name="ProfileMain" component={ProfileScreen} />
       <ProfileStack.Screen name="PersonalInformation" component={PersonalInformationScreen} />
       <ProfileStack.Screen name="MyVehicles" component={MyVehiclesScreen} />
       <ProfileStack.Screen name="AddVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="VehicleDetail" component={VehicleDetailScreen} />
-      <ProfileStack.Screen name="EditVehicle" component={EditVehicleScreen} />
+      <ProfileStack.Screen name="EditVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="SosDetails" component={SosDetailsScreen} />
       <ProfileStack.Screen name="SavedLocations" component={SavedLocationsScreen} />
       <ProfileStack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
       <ProfileStack.Screen name="Notifications" component={NotificationsScreen} />
       <ProfileStack.Screen name="HelpSupport" component={HelpSupportScreen} />
-      <ProfileStack.Screen name="Settings" component={SettingsScreen} />
       <ProfileStack.Screen name="ChoosePlan" component={ChoosePlanScreen} />
-      <ProfileStack.Screen name="CreatePin" component={CreatePinScreen} />
-      <ProfileStack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+      <ProfileStack.Screen name="SubscriptionPlans" component={SubscriptionPlansScreen} />
       <ProfileStack.Screen name="ChangeMobileNumber" component={ChangeMobileNumberScreen} />
     </ProfileStack.Navigator>
   );
@@ -495,6 +513,7 @@ export function MainTabNavigator() {
         <RoadsideBookingProvider>
         <Tab.Navigator
         tabBar={props => <CustomTabBar {...props} />}
+        backBehavior="none"
         screenOptions={{ headerShown: false }}>
         <Tab.Screen name="Home" component={HomeStackNavigator} />
         <Tab.Screen name="Bookings" component={BookingsStackNavigator} />
@@ -531,7 +550,6 @@ function AuthStackNavigator() {
         component={VehicleRegistrationScreen}
       />
       <AuthStack.Screen name="QRCode" component={QRCodeScreen} />
-      <AuthStack.Screen name="CreatePin" component={CreatePinAuthScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -561,15 +579,13 @@ export default function AppNavigator() {
     : showMainApp
       ? 'Main'
       : 'Auth';
-  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   const lastRootRoute = useRef<'Auth' | 'Main' | 'WrongApp' | null>(null);
   const lastAuthenticated = useRef<boolean | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
 
-    const navigation = navigationRef.current;
-    if (!navigation?.isReady()) {
+    if (!customerNavigationRef.isReady()) {
       return;
     }
 
@@ -587,7 +603,7 @@ export default function AppNavigator() {
     }
 
     lastRootRoute.current = nextRootRoute;
-    navigation.reset({
+    customerNavigationRef.reset({
       index: 0,
       routes: [{ name: nextRootRoute }],
     });
@@ -599,22 +615,24 @@ export default function AppNavigator() {
 
   return (
     <View style={{ flex: 1 }}>
-    <NavigationContainer
-      ref={navigationRef}
-      theme={navigationTheme}
-      onReady={() => {
-        lastRootRoute.current = nextRootRoute;
-        lastAuthenticated.current = isAuthenticated;
-      }}>
-      <RootStack.Navigator
-        initialRouteName={nextRootRoute}
-        screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Auth" component={AuthStackNavigator} />
-        <RootStack.Screen name="Main" component={MainTabNavigator} />
-        <RootStack.Screen name="WrongApp" component={WrongAppRoleScreen} />
-      </RootStack.Navigator>
-    </NavigationContainer>
-    {showMainApp ? <CustomerDropoffPrompt /> : null}
+      <NavigationContainer
+        ref={customerNavigationRef}
+        theme={navigationTheme}
+        onReady={() => {
+          lastRootRoute.current = nextRootRoute;
+          lastAuthenticated.current = isAuthenticated;
+        }}>
+        {/* Inside NavigationContainer like partner UiTestNavigator — keeps FAB in the same RN tree. */}
+        <CustomerUiQaNavigator />
+        <RootStack.Navigator
+          initialRouteName={nextRootRoute}
+          screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Auth" component={AuthStackNavigator} />
+          <RootStack.Screen name="Main" component={MainTabNavigator} />
+          <RootStack.Screen name="WrongApp" component={WrongAppRoleScreen} />
+        </RootStack.Navigator>
+      </NavigationContainer>
+      {showMainApp ? <CustomerDropoffPrompt /> : null}
     </View>
   );
 }

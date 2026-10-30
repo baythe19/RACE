@@ -1,42 +1,71 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, Text, View } from 'react-native';
-import { Building2, ChevronRight, Clock, Home, MapPin, PlusCircle } from 'lucide-react-native';
-import MapView, { PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
+import { Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
+import RideLocationBoard, { type RideSuggestion } from '../../../components/booking/RideLocationBoard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
-import { DRIVER_ACCENT, DRIVER_LIGHT_BG } from '../../../constants/driverBooking';
+import WizardStepFade from '../../../components/booking/WizardStepFade';
+import {
+  DRIVER_ACCENT,
+} from '../../../constants/driverBooking';
 import { useDriverBooking } from '../../../context/DriverBookingContext';
+import { getDriverServiceFlow } from '../../../utils/driverServiceFlow';
 import { useBookingsQuery } from '../../../services/bookings/useBookingQueries';
 import { useSavedLocationsQuery } from '../../../services/profile/useProfileQueries';
 import { useLocationStore } from '../../../store/locationStore';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { getRecentDriverPickups } from '../../../utils/recentDriverPickups';
+import {
+  distanceKm as haversineKm,
+  isSameSpot,
+  locationFromPlaceId,
+  searchPlaceSuggestions,
+  type PlaceSuggestion,
+} from '../../../utils/googlePlaces';
+import { getAppDialog } from '../../../utils/alertBus';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import {
+  formatBookingStopAddress,
+  formatLocationDisplay,
+  resolveBookingStopField,
+} from '../../../utils/readableAddress';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
-import { colors, shadows, typography } from '../../../theme';
+import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverPickup'>;
 
-const MAP_PROVIDER = Platform.OS === 'android' ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
-const PLACEHOLDER = 'Select pickup location';
+const PLACEHOLDER = 'Search or pick on map';
+const DROP_PLACEHOLDER = 'Destination on map';
 
-const LOCATION_ICONS = {
-  home: Home,
-  office: Building2,
-} as const;
+type PickerTarget = 'pickup' | 'dropoff' | null;
 
 export default function DriverPickupScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
   const { booking, updateBooking } = useDriverBooking();
+  const flow = getDriverServiceFlow(booking.driverType);
   const selectedLocation = useLocationStore(state => state.selectedLocation);
   const [pickup, setPickup] = useState(booking.pickup || PLACEHOLDER);
   const [pickupLabel, setPickupLabel] = useState(booking.pickupLabel ?? '');
   const [pickupLat, setPickupLat] = useState(booking.pickupLat);
   const [pickupLng, setPickupLng] = useState(booking.pickupLng);
-  const [showPicker, setShowPicker] = useState(false);
+  const [dropoff, setDropoff] = useState(booking.dropoff || DROP_PLACEHOLDER);
+  const [dropoffLabel, setDropoffLabel] = useState(booking.dropoffLabel ?? '');
+  const [dropoffLat, setDropoffLat] = useState(booking.dropoffLat);
+  const [dropoffLng, setDropoffLng] = useState(booking.dropoffLng);
+  const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
+  const [activeStop, setActiveStop] = useState<'pickup' | 'dropoff' | null>(() => {
+    if (booking.pickupLat != null && (!flow.requiresDropoff || booking.dropoffLat != null)) {
+      return null;
+    }
+    if (booking.pickupLat != null && flow.requiresDropoff) return 'dropoff';
+    return 'pickup';
+  });
+  const [query, setQuery] = useState('');
+  const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
+  const showPicker = pickerTarget !== null;
   const { data: savedLocations = [] } = useSavedLocationsQuery();
   const { data: bookings = [] } = useBookingsQuery();
 
@@ -82,8 +111,52 @@ export default function DriverPickupScreen({ navigation }: Props) {
     });
   }, [booking.pickupLat, pickupLat, selectedLocation, updateBooking]);
 
+  useEffect(() => {
+    const text = query.trim();
+    if (text.length < 2) {
+      setPlaceHits([]);
+      setSearchingPlaces(false);
+      return;
+    }
+    const bias =
+      activeStop === 'dropoff' && pickupLat != null && pickupLng != null
+        ? { latitude: pickupLat, longitude: pickupLng }
+        : selectedLocation
+          ? { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }
+          : null;
+    let cancelled = false;
+    setSearchingPlaces(true);
+    const timer = setTimeout(() => {
+      void searchPlaceSuggestions(text, bias).then(hits => {
+        if (cancelled) return;
+        setPlaceHits(hits);
+        setSearchingPlaces(false);
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [activeStop, pickupLat, pickupLng, query, selectedLocation]);
+
   const applyPickup = (address: string, latitude: number, longitude: number, label?: string) => {
-    if (!assertServiceableBookingLocation(latitude, longitude)) return;
+    if (
+      flow.requiresDropoff &&
+      isSameSpot(
+        dropoffLat != null && dropoffLng != null ? { latitude: dropoffLat, longitude: dropoffLng } : null,
+        latitude,
+        longitude,
+      )
+    ) {
+      getAppDialog().showDialog({
+        tone: 'warning',
+        title: 'Same spot',
+        message: 'Pickup and drop need to be two different places.',
+        primaryLabel: 'OK',
+      });
+      return false;
+    }
+    if (!assertServiceableBookingLocation(latitude, longitude)) return false;
     const displayLabel = label || formatLocationDisplay(address);
     setPickup(address);
     setPickupLabel(displayLabel);
@@ -95,6 +168,52 @@ export default function DriverPickupScreen({ navigation }: Props) {
       pickupLat: latitude,
       pickupLng: longitude,
     });
+    setQuery('');
+    setPlaceHits([]);
+    if (flow.requiresDropoff && dropoffLat == null && dropoffLng == null) {
+      setActiveStop('dropoff');
+    } else {
+      setActiveStop(null);
+    }
+    return true;
+  };
+
+  const applyDropoff = (address: string, latitude: number, longitude: number, label?: string) => {
+    if (
+      isSameSpot(
+        pickupLat != null && pickupLng != null ? { latitude: pickupLat, longitude: pickupLng } : null,
+        latitude,
+        longitude,
+      )
+    ) {
+      getAppDialog().showDialog({
+        tone: 'warning',
+        title: 'Same spot',
+        message: 'Pickup and drop need to be two different places.',
+        primaryLabel: 'OK',
+      });
+      return false;
+    }
+    if (!assertServiceableBookingLocation(latitude, longitude)) return false;
+    const displayLabel = label || formatLocationDisplay(address);
+    setDropoff(address);
+    setDropoffLabel(displayLabel);
+    setDropoffLat(latitude);
+    setDropoffLng(longitude);
+    updateBooking({
+      dropoff: address,
+      dropoffLabel: displayLabel,
+      dropoffLat: latitude,
+      dropoffLng: longitude,
+    });
+    setQuery('');
+    setPlaceHits([]);
+    if (pickupLat == null) {
+      setActiveStop('pickup');
+    } else {
+      setActiveStop(null);
+    }
+    return true;
   };
 
   const hasPickup =
@@ -102,307 +221,209 @@ export default function DriverPickupScreen({ navigation }: Props) {
     pickup !== PLACEHOLDER &&
     pickupLat != null &&
     pickupLng != null;
-  const showMapPreview = hasPickup;
+
+  const hasDropoff =
+    dropoff.trim().length > 0 &&
+    dropoff !== DROP_PLACEHOLDER &&
+    dropoffLat != null &&
+    dropoffLng != null;
+
+  const canContinue = hasPickup && (!flow.requiresDropoff || hasDropoff);
+
+  const pickupStop = resolveBookingStopField({
+    address: pickup,
+    placeholder: PLACEHOLDER,
+    label: pickupLabel,
+    hasCoordinates: pickupLat != null && pickupLng != null,
+  });
+  const dropoffStop = resolveBookingStopField({
+    address: dropoff,
+    placeholder: DROP_PLACEHOLDER,
+    label: dropoffLabel,
+    hasCoordinates: dropoffLat != null && dropoffLng != null,
+  });
+
+  const origin =
+    pickupLat != null && pickupLng != null
+      ? { latitude: pickupLat, longitude: pickupLng }
+      : null;
+
+  const suggestions: RideSuggestion[] = useMemo(() => {
+    const target = activeStop;
+    const choose = (address: string, latitude: number, longitude: number, label?: string) => {
+      const ok =
+        target === 'dropoff'
+          ? applyDropoff(address, latitude, longitude, label)
+          : applyPickup(address, latitude, longitude, label);
+      if (ok) {
+        setQuery('');
+        setPlaceHits([]);
+      }
+    };
+
+    if (query.trim().length >= 2) {
+      return placeHits.map(hit => ({
+        id: hit.placeId,
+        title: hit.title,
+        subtitle: hit.subtitle,
+        distanceLabel: hit.distanceLabel,
+        kind: 'search' as const,
+        onPress: () => {
+          void locationFromPlaceId(hit.placeId, hit.title).then(location => {
+            if (!location) return;
+            choose(location.address, location.latitude, location.longitude, location.displayLabel);
+          });
+        },
+      }));
+    }
+
+    const saved: RideSuggestion[] = savedLocations
+      .filter(loc => loc.latitude != null && loc.longitude != null)
+      .map(loc => ({
+        id: `saved-${loc.id}`,
+        title: loc.label,
+        subtitle: loc.address,
+        distanceLabel:
+          haversineKm(origin, loc.latitude as number, loc.longitude as number) != null
+            ? `${haversineKm(origin, loc.latitude as number, loc.longitude as number)} km`
+            : undefined,
+        kind: 'saved' as const,
+        savedType: loc.type,
+        onPress: () => choose(loc.address, loc.latitude as number, loc.longitude as number, loc.label),
+      }));
+
+    const recent: RideSuggestion[] = recentPickups.map(loc => ({
+      id: loc.id,
+      title: loc.title,
+      subtitle: loc.address,
+      distanceLabel:
+        haversineKm(origin, loc.latitude, loc.longitude) != null
+          ? `${haversineKm(origin, loc.latitude, loc.longitude)} km`
+          : undefined,
+      kind: 'recent' as const,
+      onPress: () => choose(loc.address, loc.latitude, loc.longitude, loc.title),
+    }));
+
+    return [...saved, ...recent];
+  }, [activeStop, origin, placeHits, query, recentPickups, savedLocations]);
 
   return (
     <TowingBookingLayout
-      title="Where to pick you up?"
+      title={flow.pickupTitle}
       step={2}
+      stepLabels={flow.wizardStepLabels}
       accentColor={DRIVER_ACCENT}
-      onBack={() => navigation.goBack()}
-      continueDisabled={!hasPickup}
+      scrollable={recentPickups.length > 2}
+      onBack={() => goBackWithinStack(navigation)}
+      continueDisabled={!canContinue}
+      buttonLabel="Continue"
       onContinue={() => {
         updateBooking({
           pickup,
           pickupLabel: pickupLabel || formatLocationDisplay(pickup),
           pickupLat,
           pickupLng,
+          ...(flow.requiresDropoff
+            ? {
+                dropoff,
+                dropoffLabel: dropoffLabel || formatLocationDisplay(dropoff),
+                dropoffLat,
+                dropoffLng,
+              }
+            : {}),
         });
         navigation.navigate('DriverChooseVehicleType');
       }}>
-      <View style={{ gap: t.px(16) }}>
-        <Pressable onPress={() => setShowPicker(true)}>
-          <Text
-            style={{
-              fontSize: t.caption,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-              marginBottom: t.px(8),
-            }}>
-            Pickup Location
-          </Text>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: t.px(10),
-              borderRadius: t.inputRadius,
-              borderWidth: 1.5,
-              borderColor: DRIVER_ACCENT,
-              backgroundColor: colors.background,
-              paddingHorizontal: t.px(14),
-              paddingVertical: t.px(14),
-            }}>
-            <MapPin size={t.iconSm} color={DRIVER_ACCENT} fill={DRIVER_ACCENT} />
-            <Text
-              style={{
-                flex: 1,
-                fontSize: t.bodyLarge,
-                fontWeight: hasPickup ? typography.weights.semibold : typography.weights.regular,
-                color: hasPickup ? colors.dark : colors.grey,
-                lineHeight: t.px(22),
-              }}
-              numberOfLines={2}>
-              {hasPickup ? pickupLabel || formatLocationDisplay(pickup) : PLACEHOLDER}
-            </Text>
-            <ChevronRight size={t.iconSm} color={colors.grey} />
-          </View>
-        </Pressable>
-
-        <View>
-          <Text
-            style={{
-              fontSize: t.caption,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-              marginBottom: t.px(10),
-            }}>
-            Saved Locations
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(10) }}>
-            {savedLocations.map(location => {
-              const iconKey = location.label.toLowerCase() as keyof typeof LOCATION_ICONS;
-              const Icon = LOCATION_ICONS[iconKey] ?? Home;
-              const isSelected = pickup === location.address;
-
-              return (
-                <Pressable
-                  key={location.id}
-                  onPress={() => {
-                    if (location.latitude == null || location.longitude == null) {
-                      setShowPicker(true);
-                      return;
-                    }
-                    applyPickup(location.address, location.latitude, location.longitude, location.label);
-                  }}
-                  style={[
-                    {
-                      minWidth: '30%',
-                      flexGrow: 1,
-                      alignItems: 'center',
-                      gap: t.px(8),
-                      borderRadius: t.inputRadius,
-                      borderWidth: isSelected ? 2 : 1,
-                      borderColor: isSelected ? DRIVER_ACCENT : colors.border,
-                      backgroundColor: isSelected ? DRIVER_LIGHT_BG : colors.background,
-                      paddingVertical: t.px(14),
-                      paddingHorizontal: t.px(8),
-                    },
-                    shadows.card,
-                  ]}>
-                  <Icon size={t.iconSm} color={colors.dark} strokeWidth={2} />
-                  <Text
-                    style={{
-                      fontSize: t.caption,
-                      fontWeight: typography.weights.bold,
-                      color: colors.dark,
-                      textAlign: 'center',
-                    }}>
-                    {location.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            <Pressable
-              onPress={() => setShowPicker(true)}
-              style={[
-                {
-                  minWidth: '30%',
-                  flexGrow: 1,
-                  alignItems: 'center',
-                  gap: t.px(8),
-                  borderRadius: t.inputRadius,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.background,
-                  paddingVertical: t.px(14),
-                  paddingHorizontal: t.px(8),
-                },
-                shadows.card,
-              ]}>
-              <PlusCircle size={t.iconSm} color={DRIVER_ACCENT} strokeWidth={2} />
-              <Text
-                style={{
-                  fontSize: t.caption,
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                }}>
-                Add New
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {recentPickups.length > 0 ? (
-          <View>
-            <Text
-              style={{
-                fontSize: t.caption,
-                fontWeight: typography.weights.semibold,
-                color: colors.dark,
-                marginBottom: t.px(10),
-              }}>
-              Recent
-            </Text>
-            <View style={{ gap: t.px(8) }}>
-              {recentPickups.map(location => (
-                <Pressable
-                  key={location.id}
-                  onPress={() => applyPickup(location.address, location.latitude, location.longitude, location.title)}
-                  style={[
-                    {
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: t.px(12),
-                      borderRadius: t.inputRadius,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      backgroundColor: colors.background,
-                      paddingHorizontal: t.px(12),
-                      paddingVertical: t.px(12),
-                    },
-                    shadows.card,
-                  ]}>
-                  <View
-                    style={{
-                      width: t.px(36),
-                      height: t.px(36),
-                      borderRadius: t.px(18),
-                      backgroundColor: colors.lightGrey,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}>
-                    <Clock size={t.px(18)} color={colors.grey} strokeWidth={2} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: t.body,
-                        fontWeight: typography.weights.bold,
-                        color: colors.dark,
-                      }}
-                      numberOfLines={1}>
-                      {location.title}
-                    </Text>
-                    <Text
-                      style={{
-                        marginTop: t.px(2),
-                        fontSize: t.caption,
-                        color: colors.grey,
-                        lineHeight: t.px(16),
-                      }}
-                      numberOfLines={2}>
-                      {formatLocationDisplay(location.address)}
-                    </Text>
-                  </View>
-                  <ChevronRight size={t.iconSm} color={colors.grey} />
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        <Pressable onPress={() => setShowPicker(true)}>
-          <View
-            style={{
-              height: t.px(175),
-              borderRadius: t.cardRadius,
-              overflow: 'hidden',
-              borderWidth: 1,
-              borderColor: colors.border,
-            }}>
-            {showMapPreview ? (
-              <MapView
-                key={`${pickupLat}-${pickupLng}`}
-                provider={MAP_PROVIDER}
-                style={{ width: '100%', height: '100%' }}
-                scrollEnabled={false}
-                zoomEnabled={false}
-                pitchEnabled={false}
-                rotateEnabled={false}
-                pointerEvents="none"
-                initialRegion={{
-                  latitude: pickupLat!,
-                  longitude: pickupLng!,
-                  latitudeDelta: 0.012,
-                  longitudeDelta: 0.012,
-                }}
-              />
-            ) : (
-              <View
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  backgroundColor: '#E5E7EB',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                <MapPin size={t.px(36)} color={colors.grey} />
-              </View>
-            )}
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-              <MapPin size={t.px(36)} color={DRIVER_ACCENT} fill={DRIVER_ACCENT} />
-            </View>
-            {!showMapPreview ? (
-              <View
-                pointerEvents="none"
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  backgroundColor: 'rgba(0,0,0,0.45)',
-                  paddingVertical: t.px(8),
-                }}>
-                <Text
-                  style={{
-                    fontSize: t.caption,
-                    fontWeight: typography.weights.semibold,
-                    color: colors.background,
-                    textAlign: 'center',
-                  }}>
-                  Tap to select on map
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </Pressable>
-      </View>
+      <WizardStepFade>
+      <RideLocationBoard
+        px={t.px}
+        activeId={activeStop}
+        query={query}
+        searching={searchingPlaces}
+        suggestions={suggestions}
+        suppressIdleHint={pickupStop.filled && (!flow.requiresDropoff || dropoffStop.filled)}
+        onActivate={id => {
+          const next = id === 'dropoff' ? 'dropoff' : 'pickup';
+          setActiveStop(next);
+          setQuery('');
+        }}
+        onQueryChange={setQuery}
+        onClearActive={stopId => {
+          const target = stopId ?? activeStop;
+          setQuery('');
+          setPlaceHits([]);
+          if (target === 'dropoff') {
+            setDropoff(DROP_PLACEHOLDER);
+            setDropoffLabel('');
+            setDropoffLat(undefined);
+            setDropoffLng(undefined);
+            setActiveStop('dropoff');
+            return;
+          }
+          setPickup(PLACEHOLDER);
+          setPickupLabel('');
+          setPickupLat(undefined);
+          setPickupLng(undefined);
+          setActiveStop('pickup');
+        }}
+        onSelectOnMap={() => setPickerTarget(activeStop)}
+        stops={[
+          {
+            id: 'pickup',
+            label: 'Pickup',
+            value: pickupStop.value,
+            placeholder: flow.pickupFieldLabel,
+            filled: pickupStop.filled,
+            dot: 'pickup',
+          },
+          ...(flow.requiresDropoff
+            ? [{
+                id: 'dropoff',
+                label: 'Drop',
+                value: dropoffStop.value,
+                placeholder: flow.dropFieldLabel,
+                filled: dropoffStop.filled,
+                dot: 'drop' as const,
+              }]
+            : []),
+        ]}
+      />
+      </WizardStepFade>
 
       <LocationPickerModal
         visible={showPicker}
-        title="Confirm pickup spot"
-        confirmLabel="Confirm pickup"
+        title={pickerTarget === 'dropoff' ? 'Confirm destination' : 'Confirm pickup spot'}
+        confirmLabel={pickerTarget === 'dropoff' ? 'Confirm destination' : 'Confirm pickup'}
         accentColor={DRIVER_ACCENT}
+        initialMode="map"
         initialLocation={
-          pickupLat && pickupLng
-            ? { latitude: pickupLat, longitude: pickupLng, address: pickup }
-            : undefined
+          pickerTarget === 'dropoff'
+            ? dropoffLat && dropoffLng
+              ? { latitude: dropoffLat, longitude: dropoffLng, address: dropoff }
+              : undefined
+            : pickupLat && pickupLng
+              ? { latitude: pickupLat, longitude: pickupLng, address: pickup }
+              : undefined
         }
-        onClose={() => setShowPicker(false)}
+        onClose={() => setPickerTarget(null)}
         onLocationSelected={location => {
           const resolved = resolveLocationSelection(location);
-          applyPickup(resolved.address, location.latitude, location.longitude, resolved.displayLabel);
+          if (pickerTarget === 'dropoff') {
+            applyDropoff(
+              resolved.address,
+              location.latitude,
+              location.longitude,
+              resolved.displayLabel,
+            );
+          } else {
+            applyPickup(
+              resolved.address,
+              location.latitude,
+              location.longitude,
+              resolved.displayLabel,
+            );
+          }
+          setPickerTarget(null);
         }}
       />
     </TowingBookingLayout>

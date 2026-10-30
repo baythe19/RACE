@@ -14,6 +14,10 @@ export interface DriverBookingState {
   pickupLabel?: string;
   pickupLat?: number;
   pickupLng?: number;
+  dropoff: string;
+  dropoffLabel?: string;
+  dropoffLat?: number;
+  dropoffLng?: number;
   dateId: string;
   timeId: DriverTimeId;
   packageHours: DriverPackageHours;
@@ -34,6 +38,7 @@ export const DEFAULT_DRIVER_BOOKING: DriverBookingState = {
   vehicleId: '',
   vehicleLabel: '',
   pickup: '',
+  dropoff: '',
   dateId: 'today',
   timeId: '30-60',
   packageHours: 2,

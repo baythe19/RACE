@@ -12,6 +12,7 @@ import { startVendorWizard } from '../../redux/vendor/vendorOnboardingSlice';
 import type { AuthStackParamList } from '../../types/navigation';
 import type { VendorType } from '../../types/vendor';
 import { colors, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'SignupVendorType'>;
 
@@ -60,7 +61,7 @@ export default function SignupVendorTypeScreen({ navigation, route }: Props) {
           </TouchableOpacity>
         ))}
 
-        <PrimaryButton label="Back" variant="outline" onPress={() => navigation.goBack()} />
+        <PrimaryButton label="Back" variant="outline" onPress={() => goBackWithinStack(navigation)} />
       </ScrollView>
     </SafeAreaView>
   );

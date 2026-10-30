@@ -12,7 +12,9 @@ import { DriverVendorMembershipModel } from '../../models/src/driverVendorMember
 import {
   claimOpenBookingOffer,
   isDriverEligibleForBooking,
+  isOnSiteAssistBooking,
   listOpenBookingOffers,
+  bookingServiceLabel,
   type OpenBookingOffer,
 } from './bookings/driverAssignment';
 import { resolveAssignedDriver } from './bookings/assignedDriver';
@@ -38,6 +40,7 @@ export type VendorBookingListItem = {
   createdAt: string;
   scheduledAt?: string;
   serviceLabel: string;
+  onSiteAssist?: boolean;
   assignedFleetVehicleLabel?: string;
   driver?: { id: string; name: string; phone: string; rating: number };
 };
@@ -95,8 +98,9 @@ export class VendorBookingsService {
       : await DriverBookingModel.findOne({ _id: bookingId, vendorId: vendorUserId }).exec();
     if (!booking) throw new NotFoundError('Vendor booking not found');
 
-    const towingMode = (booking as { towingMode?: string }).towingMode;
-    const driverServiceType = (booking as { driverServiceType?: string }).driverServiceType;
+    const towingMode = (booking as { towingMode?: 'instant' | 'scheduled' | 'emergency' }).towingMode;
+    const assistLabel = (booking as { assistLabel?: string }).assistLabel;
+    const driverServiceType = (booking as { driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night' }).driverServiceType;
     const driver = booking.driverId
       ? await UserModel.findById(booking.driverId).select('fullName mobileNumber').lean().exec()
       : null;
@@ -116,11 +120,11 @@ export class VendorBookingsService {
       id: booking.id,
       bookingNumber: booking.bookingNumber,
       status: booking.status,
-      serviceLabel: bookingType === 'towing'
-        ? towingMode === 'emergency' ? 'Emergency Towing'
-          : towingMode === 'scheduled' ? 'Scheduled Towing' : 'Towing'
-        : driverServiceType === 'full_time' ? 'Full-Time Driver'
-          : driverServiceType === 'part_time' ? 'Part-Time Driver' : 'Driver hire',
+      serviceLabel: bookingServiceLabel(bookingType, {
+        towingMode,
+        assistLabel,
+        driverServiceType,
+      }),
       pickup: booking.pickup,
       dropoff: booking.dropoff ?? null,
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
@@ -214,6 +218,7 @@ export class VendorBookingsService {
       createdAt: Date;
       scheduledAt?: Date | null;
       towingMode?: 'instant' | 'scheduled' | 'emergency';
+      assistLabel?: string;
       driverServiceType?: 'part_time' | 'full_time' | 'outstation' | 'night';
       driverId?: { toString(): string } | null;
       assignedFleetVehicleLabel?: string | null;
@@ -234,24 +239,22 @@ export class VendorBookingsService {
       estimatedFare: booking.estimatedFare,
       finalFare: booking.finalFare,
       distanceKm: booking.distanceKm,
+      onSiteAssist:
+        bookingType === 'towing'
+          ? isOnSiteAssistBooking({
+              assistLabel: booking.assistLabel,
+              distanceKm: booking.distanceKm,
+              pickup: booking.pickup,
+              dropoff: booking.dropoff ?? null,
+            }) || undefined
+          : undefined,
       createdAt: booking.createdAt.toISOString(),
       scheduledAt: booking.scheduledAt?.toISOString(),
-      serviceLabel:
-        bookingType === 'towing'
-          ? booking.towingMode === 'emergency'
-            ? 'Emergency Towing'
-            : booking.towingMode === 'scheduled'
-              ? 'Scheduled Towing'
-              : 'Towing'
-          : booking.driverServiceType === 'full_time'
-            ? 'Full-Time Driver'
-            : booking.driverServiceType === 'part_time'
-              ? 'Part-Time Driver'
-              : booking.driverServiceType === 'outstation'
-                ? 'Outstation Driver'
-                : booking.driverServiceType === 'night'
-                  ? 'Night Driver'
-                  : 'Driver hire',
+      serviceLabel: bookingServiceLabel(bookingType, {
+        towingMode: booking.towingMode,
+        assistLabel: booking.assistLabel,
+        driverServiceType: booking.driverServiceType,
+      }),
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel ?? undefined,
       driver,
     };
@@ -270,12 +273,24 @@ export class VendorBookingsService {
     if (dto.bookingType !== 'towing') {
       throw new BadRequestError('Vendors can only assign vehicle towing jobs');
     }
-    const activeVehicles = await VendorVehicleModel.countDocuments({
-      vendorId: vendorUserId,
-      status: 'ACTIVE',
-    }).exec();
-    if (activeVehicles === 0) {
-      throw new BadRequestError('Add an active towing vehicle before assigning this job');
+
+    const towingBooking = await TowingBookingModel.findById(bookingId).exec();
+    if (!towingBooking) {
+      throw new NotFoundError('Booking not found');
+    }
+    const onSiteAssist = isOnSiteAssistBooking(towingBooking);
+
+    if (!onSiteAssist) {
+      const activeVehicles = await VendorVehicleModel.countDocuments({
+        vendorId: vendorUserId,
+        status: 'ACTIVE',
+      }).exec();
+      if (activeVehicles === 0) {
+        throw new BadRequestError('Add an active towing vehicle before assigning this job');
+      }
+      if (!dto.vehicleId) {
+        throw new BadRequestError('Select an active fleet vehicle for towing jobs');
+      }
     }
 
     const driver = await UserModel.findOne({ _id: dto.driverId, role: 'driver' }).exec();
@@ -309,10 +324,6 @@ export class VendorBookingsService {
     let fleetVehicleLabel: string | undefined;
     let fleetVehicleId: string | undefined;
 
-    if (dto.bookingType === 'towing' && !dto.vehicleId) {
-      throw new BadRequestError('Select an active fleet vehicle for towing jobs');
-    }
-
     if (dto.vehicleId) {
       const vehicle = await VendorVehicleModel.findById(dto.vehicleId).exec();
       if (!vehicle) throw new NotFoundError('Fleet vehicle not found');
@@ -338,8 +349,9 @@ export class VendorBookingsService {
       ...result,
       driver: assignedDriver,
       assignedFleetVehicleLabel: fleetVehicleLabel,
-      message:
-        dto.bookingType === 'towing'
+      message: onSiteAssist
+        ? 'Mechanic assigned — waiting for them to accept the job'
+        : dto.bookingType === 'towing'
           ? 'Driver and fleet vehicle assigned — waiting for the driver to accept'
           : 'Driver assigned — waiting for the driver to accept',
     };

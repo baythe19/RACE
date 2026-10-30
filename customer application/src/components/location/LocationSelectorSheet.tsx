@@ -1,7 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -14,11 +13,18 @@ import * as Location from 'expo-location';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Crosshair, Map as MapIcon, MapPin, Search } from 'lucide-react-native';
 
-import LocationPickerMap from '../booking/LocationPickerMap';
+import { getAppDialog } from '../../utils/alertBus';
+
+import LocationPickerModal, {
+  type LocationPickerInitialMode,
+} from '../common/LocationPickerModal';
 import { SERVICEABLE_AREAS } from '../../config/serviceableAreas';
 import { useLocationStore } from '../../store/locationStore';
+import type { LocationResult } from '../../types/location';
 import { reverseGeocode } from '../../utils/googleMaps';
-import { colors, shadows, typography } from '../../theme';
+import { ensureForegroundLocation } from '../../utils/locationPermission';
+import { LOCATION_ACCENT } from '../../utils/googlePlaces';
+import { colors, radius, typography } from '../../theme';
 
 const REF_W = 390;
 
@@ -29,6 +35,12 @@ interface LocationSelectorSheetProps {
   onRequestClose?: () => void;
 }
 
+/**
+ * Home “Set your location” sheet.
+ * Two clear paths (kept separate on purpose):
+ * 1) Search address → Places autocomplete, then confirm pin on map
+ * 2) Pick on map → drag pin / GPS, optional search edit
+ */
 export default function LocationSelectorSheet({
   visible,
   onLocationSelected,
@@ -42,29 +54,34 @@ export default function LocationSelectorSheet({
   const setLocation = useLocationStore(state => state.setLocation);
   const selectedLocation = useLocationStore(state => state.selectedLocation);
 
-  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<LocationPickerInitialMode | null>(null);
   const [isLocating, setIsLocating] = useState(false);
 
   const applyLocation = useCallback(
     (location: { address: string; latitude: number; longitude: number }) => {
       setLocation(location);
-      setShowMapPicker(false);
+      setPickerMode(null);
       onLocationSelected();
     },
     [onLocationSelected, setLocation],
   );
 
+  const handlePickerSelected = useCallback(
+    (location: LocationResult) => {
+      applyLocation({
+        address: location.displayLabel?.trim() || location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
+    },
+    [applyLocation],
+  );
+
   const handleUseCurrentLocation = useCallback(async () => {
     setIsLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission needed',
-          'Allow location access to use your current location, or search on the map.',
-        );
-        return;
-      }
+      const allowed = await ensureForegroundLocation();
+      if (!allowed) return;
 
       const position = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -73,7 +90,12 @@ export default function LocationSelectorSheet({
       const address = await reverseGeocode(latitude, longitude);
       applyLocation({ address, latitude, longitude });
     } catch {
-      Alert.alert('Location error', 'Unable to get your current location. Try the map picker.');
+      getAppDialog().showDialog({
+        tone: 'error',
+        title: 'Location error',
+        message: 'Unable to get your current location. Try search or the map.',
+        primaryLabel: 'OK',
+      });
     } finally {
       setIsLocating(false);
     }
@@ -85,10 +107,12 @@ export default function LocationSelectorSheet({
       if (!city) return;
 
       if (city.comingSoon) {
-        Alert.alert(
-          'Coming soon',
-          `${city.displayName} is coming soon! We'll notify you when we launch there.`,
-        );
+        getAppDialog().showDialog({
+          tone: 'info',
+          title: 'Coming soon',
+          message: `${city.displayName} is coming soon! We'll notify you when we launch there.`,
+          primaryLabel: 'Got it',
+        });
         return;
       }
 
@@ -101,12 +125,17 @@ export default function LocationSelectorSheet({
     [applyLocation],
   );
 
-  const currentCityName = selectedLocation?.address?.split(',')[0]?.trim().toLowerCase() || 'bhubaneswar';
+  const currentCityName =
+    selectedLocation?.address?.split(',')[0]?.trim().toLowerCase() || 'bhubaneswar';
+
+  const closeSheet = () => {
+    if (dismissible) onRequestClose?.();
+  };
 
   return (
     <>
       <Modal
-        visible={visible && !showMapPicker}
+        visible={visible && pickerMode === null}
         animationType="slide"
         transparent
         onRequestClose={() => {
@@ -116,152 +145,211 @@ export default function LocationSelectorSheet({
           {dismissible ? (
             <Pressable style={StyleSheet.absoluteFill} onPress={onRequestClose} />
           ) : null}
-          <SafeAreaView edges={['bottom']} style={[styles.sheet, { paddingHorizontal: px(20), paddingTop: px(12), paddingBottom: px(24) }]}>
-            {/* Grab handle */}
+          <SafeAreaView
+            edges={['bottom']}
+            style={[
+              styles.sheet,
+              {
+                paddingHorizontal: px(20),
+                paddingTop: px(12),
+                paddingBottom: px(24),
+              },
+            ]}>
             <View style={styles.handle} />
 
-            {/* Back button row */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: px(12) }}>
-              <Pressable
-                onPress={() => {
-                  if (dismissible) onRequestClose?.();
-                }}
-                hitSlop={12}
-                style={{ width: px(36), height: px(36), justifyContent: 'center' }}>
-                <ArrowLeft size={px(22)} color={colors.dark} strokeWidth={2.4} />
-              </Pressable>
+            <View style={[styles.headerRow, { minHeight: px(44), marginBottom: px(14) }]}>
+              {dismissible ? (
+                <Pressable
+                  onPress={closeSheet}
+                  hitSlop={12}
+                  style={{
+                    width: px(40),
+                    height: px(40),
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Go back">
+                  <ArrowLeft size={px(22)} color={colors.dark} strokeWidth={2.4} />
+                </Pressable>
+              ) : (
+                <View style={{ width: px(8) }} />
+              )}
+              <View style={{ flex: 1, paddingHorizontal: px(4) }}>
+                <Text
+                  style={{
+                    fontSize: px(18),
+                    fontWeight: typography.weights.extrabold,
+                    color: colors.dark,
+                    lineHeight: px(22),
+                    textDecorationLine: 'none',
+                  }}>
+                  Set your location
+                </Text>
+                <Text
+                  style={{
+                    marginTop: px(2),
+                    fontSize: px(12),
+                    color: colors.grey,
+                    lineHeight: px(17),
+                    textDecorationLine: 'none',
+                  }}>
+                  Choose where you need help for nearby services
+                </Text>
+              </View>
+              <View style={{ width: dismissible ? px(40) : px(8) }} />
             </View>
 
-            {/* Title & Subtitle */}
             <Text
               style={{
-                fontSize: px(22),
-                fontWeight: typography.weights.extrabold,
-                color: colors.dark,
-                marginBottom: px(4),
-              }}>
-              Set your location
-            </Text>
-            <Text
-              style={{
-                fontSize: px(13),
+                fontSize: px(12),
+                fontWeight: typography.weights.bold,
                 color: colors.grey,
-                lineHeight: px(18),
-                marginBottom: px(18),
+                marginBottom: px(8),
+                textDecorationLine: 'none',
               }}>
-              Choose where you need help so we can show nearby services
+              Search address
             </Text>
-
-            {/* Search Input Bar */}
             <Pressable
-              onPress={() => setShowMapPicker(true)}
+              onPress={() => setPickerMode('search')}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 backgroundColor: colors.background,
-                borderWidth: 1,
+                borderWidth: 1.5,
                 borderColor: '#E5E7EB',
-                borderRadius: px(14),
+                borderRadius: radius.md,
                 paddingHorizontal: px(14),
                 height: px(48),
                 gap: px(10),
-                marginBottom: px(16),
-              }}>
+                marginBottom: px(12),
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Search location">
               <Search size={px(18)} color={colors.grey} strokeWidth={2} />
-              <Text style={{ fontSize: px(14), color: colors.grey }}>
-                Search location, area or landmark...
+              <Text
+                style={{
+                  flex: 1,
+                  fontSize: px(14),
+                  color: colors.grey,
+                  textDecorationLine: 'none',
+                }}>
+                Search area, landmark or address...
               </Text>
             </Pressable>
 
-            {/* Divider: or */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: px(8) }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
-              <Text style={{ marginHorizontal: px(12), fontSize: px(12), color: colors.grey }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: px(12) }}>
+              <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' }} />
+              <Text
+                style={{
+                  marginHorizontal: px(12),
+                  fontSize: px(12),
+                  color: colors.grey,
+                  textDecorationLine: 'none',
+                }}>
                 or
               </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
+              <View style={{ flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: '#E5E7EB' }} />
             </View>
 
-            {/* Use my current location */}
             <Pressable
               onPress={() => void handleUseCurrentLocation()}
               disabled={isLocating}
-              style={[
-                shadows.card,
-                {
-                  flexDirection: 'row',
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.background,
+                borderWidth: 1.5,
+                borderColor: '#E5E7EB',
+                borderRadius: radius.md,
+                minHeight: px(50),
+                paddingHorizontal: px(14),
+                gap: px(12),
+                marginBottom: px(10),
+              }}>
+              <View
+                style={{
+                  width: px(36),
+                  height: px(36),
+                  borderRadius: px(10),
+                  backgroundColor: 'rgba(245,158,11,0.12)',
                   alignItems: 'center',
-                  backgroundColor: colors.background,
-                  borderWidth: 1,
-                  borderColor: '#F0EFEA',
-                  borderRadius: px(14),
-                  height: px(48),
-                  paddingHorizontal: px(16),
-                  gap: px(12),
-                  marginVertical: px(6),
-                },
-              ]}>
-              {isLocating ? (
-                <ActivityIndicator size="small" color={colors.dark} />
-              ) : (
-                <Crosshair size={px(20)} color={colors.dark} strokeWidth={2.2} />
-              )}
+                  justifyContent: 'center',
+                }}>
+                {isLocating ? (
+                  <ActivityIndicator size="small" color={LOCATION_ACCENT} />
+                ) : (
+                  <Crosshair size={px(18)} color={LOCATION_ACCENT} strokeWidth={2.4} />
+                )}
+              </View>
               <Text
                 style={{
+                  flex: 1,
                   fontSize: px(14),
                   fontWeight: typography.weights.bold,
                   color: colors.dark,
+                  textDecorationLine: 'none',
                 }}>
                 {isLocating ? 'Getting your location...' : 'Use my current location'}
               </Text>
             </Pressable>
 
-            {/* Divider: Select on map */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginVertical: px(10) }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
-              <Text style={{ marginHorizontal: px(12), fontSize: px(12), color: colors.grey }}>
-                Select on map
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E5E7EB' }} />
-            </View>
-
-            {/* Open Map Picker */}
             <Pressable
-              onPress={() => setShowMapPicker(true)}
-              style={[
-                shadows.card,
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: colors.background,
-                  borderWidth: 1,
-                  borderColor: '#F0EFEA',
-                  borderRadius: px(14),
-                  height: px(48),
-                  paddingHorizontal: px(16),
-                  gap: px(12),
-                  marginVertical: px(6),
-                  marginBottom: px(18),
-                },
-              ]}>
-              <MapIcon size={px(20)} color={colors.dark} strokeWidth={2} />
-              <Text
+              onPress={() => setPickerMode('map')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: colors.background,
+                borderWidth: 1.5,
+                borderColor: '#E5E7EB',
+                borderRadius: radius.md,
+                minHeight: px(56),
+                paddingHorizontal: px(14),
+                gap: px(12),
+                marginBottom: px(18),
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Open map picker">
+              <View
                 style={{
-                  fontSize: px(14),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
+                  width: px(36),
+                  height: px(36),
+                  borderRadius: px(10),
+                  backgroundColor: 'rgba(245,158,11,0.12)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}>
-                Open Map Picker
-              </Text>
+                <MapIcon size={px(18)} color={LOCATION_ACCENT} strokeWidth={2.2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: px(14),
+                    fontWeight: typography.weights.bold,
+                    color: colors.dark,
+                    textDecorationLine: 'none',
+                  }}>
+                  Pick on map
+                </Text>
+                <Text
+                  style={{
+                    fontSize: px(11),
+                    color: colors.grey,
+                    marginTop: 2,
+                    textDecorationLine: 'none',
+                  }}>
+                  Drag map or long-press to set
+                </Text>
+              </View>
             </Pressable>
 
-            {/* Popular cities */}
             <Text
               style={{
                 fontSize: px(13),
                 fontWeight: typography.weights.bold,
                 color: colors.dark,
                 marginBottom: px(10),
+                textDecorationLine: 'none',
               }}>
               Popular cities
             </Text>
@@ -281,19 +369,22 @@ export default function LocationSelectorSheet({
                       gap: px(6),
                       paddingHorizontal: px(14),
                       paddingVertical: px(8),
-                      borderRadius: px(20),
+                      borderRadius: radius.md,
                       borderWidth: 1.5,
                       borderColor: isSelected ? colors.dark : '#E5E7EB',
-                      backgroundColor: isSelected ? '#FFFFFF' : '#FAFAFA',
+                      backgroundColor: colors.background,
                     }}>
                     {isSelected ? (
-                      <MapPin size={px(14)} color={colors.dark} strokeWidth={2.4} />
+                      <MapPin size={px(14)} color={LOCATION_ACCENT} strokeWidth={2.4} />
                     ) : null}
                     <Text
                       style={{
                         fontSize: px(13),
-                        fontWeight: isSelected ? typography.weights.bold : typography.weights.regular,
+                        fontWeight: isSelected
+                          ? typography.weights.bold
+                          : typography.weights.regular,
                         color: colors.dark,
+                        textDecorationLine: 'none',
                       }}>
                       {city.displayName}
                     </Text>
@@ -305,19 +396,22 @@ export default function LocationSelectorSheet({
         </View>
       </Modal>
 
-      <LocationPickerMap
-        visible={showMapPicker}
-        title="Select Your Location"
+      <LocationPickerModal
+        visible={pickerMode !== null}
+        initialMode={pickerMode ?? 'map'}
+        title={pickerMode === 'search' ? 'Search location' : 'Pick on map'}
+        confirmLabel="Use this location"
         initialLocation={
           selectedLocation
             ? {
                 latitude: selectedLocation.latitude,
                 longitude: selectedLocation.longitude,
+                address: selectedLocation.address,
               }
             : undefined
         }
-        onClose={() => setShowMapPicker(false)}
-        onLocationSelected={location => applyLocation(location)}
+        onClose={() => setPickerMode(null)}
+        onLocationSelected={handlePickerSelected}
       />
     </>
   );
@@ -340,6 +434,10 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#D1D5DB',
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });

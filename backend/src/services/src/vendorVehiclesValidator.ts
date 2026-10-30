@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** RACE policy: vehicles older than 15 years are not allowed on the platform. */
+const OLDEST_VEHICLE_YEAR = new Date().getFullYear() - 15;
+
 const optionalDateString = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}/, 'Use YYYY-MM-DD date')
@@ -9,7 +12,12 @@ export const createVendorVehicleSchema = z.object({
   registrationNo: z.string().min(4).max(20),
   type: z.string().min(2).max(80),
   model: z.string().min(1).max(80),
-  year: z.coerce.number().int().min(1980).max(2100).optional(),
+  year: z.coerce
+    .number()
+    .int()
+    .min(OLDEST_VEHICLE_YEAR, `Vehicle must be ${OLDEST_VEHICLE_YEAR} or newer (15-year limit)`)
+    .max(new Date().getFullYear(), `Year cannot be in the future`)
+    .optional(),
   status: z.enum(['ACTIVE', 'UNDER_MAINTENANCE', 'INACTIVE']).optional(),
   insuranceExpiry: optionalDateString,
   insuranceProvider: z.string().min(2).max(80).optional(),
@@ -20,7 +28,13 @@ export const createVendorVehicleSchema = z.object({
 export const updateVendorVehicleSchema = z.object({
   type: z.string().min(2).max(80).optional(),
   model: z.string().min(1).max(80).optional(),
-  year: z.coerce.number().int().min(1980).max(2100).nullable().optional(),
+  year: z.coerce
+    .number()
+    .int()
+    .min(OLDEST_VEHICLE_YEAR, `Vehicle must be ${OLDEST_VEHICLE_YEAR} or newer (15-year limit)`)
+    .max(new Date().getFullYear(), `Year cannot be in the future`)
+    .nullable()
+    .optional(),
   status: z.enum(['ACTIVE', 'UNDER_MAINTENANCE', 'INACTIVE']).optional(),
   insuranceExpiry: optionalDateString.nullable(),
   maintenanceNote: z.string().max(500).optional(),

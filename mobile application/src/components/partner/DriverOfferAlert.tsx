@@ -30,6 +30,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useScreenPx } from '../../hooks/useScreenPx';
 import { useAppSelector } from '../../redux/hooks';
 import { getApiErrorMessage } from '../../services/auth/useAuthMutations';
+import { getDriverAcceptLocationGate, pickupCoordsFromJob } from '../../utils/driverLocationGuide';
+import { useDriverPresenceStore } from '../../store/driverPresenceStore';
 import {
   useAcceptDriverJobMutation,
   useDriverActiveJobQuery,
@@ -41,7 +43,7 @@ import { useDriverRealtimeSync } from '../../services/driver/useDriverRealtimeSy
 import { useVendorRealtimeSync } from '../../services/vendor/useVendorRealtimeSync';
 import { useNotificationsQuery } from '../../services/useNotificationQueries';
 import type { DriverJobBooking } from '../../services/driver/driverApi';
-import { useDriverPresenceStore } from '../../store/driverPresenceStore';
+import { assertDriverCanAcceptJobs } from '../../utils/driverVerification';
 import { openDriverActiveJob } from '../../navigation/partnerNavigationRef';
 import { formatReadableAddress } from '../../utils/readableAddress';
 import { buildDriverVerification } from '../../utils/driverVerification';
@@ -168,6 +170,37 @@ export default function DriverOfferAlert() {
 
   const onAccept = useCallback(async () => {
     if (!offer || !offerKey || accepting || declining || isExpired) return;
+
+    // Profile gate: rejected/suspended/unsubmitted accounts never accept.
+    const profileVerdict = assertDriverCanAcceptJobs(profile ?? undefined);
+    if (!profileVerdict.ok) {
+      setOutcome({
+        key: offerKey,
+        kind: 'failed',
+        message: profileVerdict.message ?? 'You cannot accept jobs right now.',
+      });
+      return;
+    }
+
+    // Distance + location gate: refuse accepts the driver can never serve in time.
+    if (!UI_PREVIEW_MODE) {
+      const gate = getDriverAcceptLocationGate({
+        manualLocation: useDriverPresenceStore.getState().manualLocation,
+        gpsLocation: useDriverPresenceStore.getState().driverLocation,
+        pickup: pickupCoordsFromJob(offer),
+        mobileNumber: user?.mobileNumber,
+        previewMode: false,
+      });
+      if (!gate.ok) {
+        setOutcome({
+          key: offerKey,
+          kind: 'failed',
+          message: gate.message,
+        });
+        return;
+      }
+    }
+
     setAccepting(true);
     try {
       await acceptMutation.mutateAsync({ bookingId: offer.id, bookingType: offer.bookingType });
@@ -194,7 +227,7 @@ export default function DriverOfferAlert() {
     } finally {
       setAccepting(false);
     }
-  }, [acceptMutation, accepting, declining, dismiss, isExpired, offer, offerKey]);
+  }, [acceptMutation, accepting, declining, dismiss, isExpired, offer, offerKey, profile, user?.mobileNumber]);
 
   const onDecline = useCallback(async () => {
     if (!offer || accepting || declining) return;

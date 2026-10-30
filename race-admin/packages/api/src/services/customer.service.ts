@@ -25,11 +25,11 @@ export async function exportCustomersCsv(filters: CustomerListFilters = {}) {
   return apiGet<CustomerListItem[]>('/customers/export/csv', filters as Record<string, unknown>);
 }
 
-export async function createCustomer(input: Record<string, string>) {
+export async function createCustomer(input: Record<string, string | undefined>) {
   return apiPost<CustomerListItem>('/customers', input);
 }
 
-export async function updateCustomer(id: string, input: Record<string, string>) {
+export async function updateCustomer(id: string, input: Record<string, string | undefined>) {
   return apiPatch<CustomerListItem>(`/customers/${id}`, input);
 }
 

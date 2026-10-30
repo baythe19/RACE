@@ -51,6 +51,11 @@ export class OtpService {
     if (process.env.FORCE_MOCK_OTP === 'true') {
       return true;
     }
+    const tenDigit = mobileNumber.replace(/\D/g, '').replace(/^91/, '').slice(-10);
+    // Local/APK QA: 900000xxxx fake numbers never receive SMS.
+    if (env.NODE_ENV !== 'production' && /^9000000\d{3}$/.test(tenDigit)) {
+      return true;
+    }
     const whitelist = (process.env.TEST_OTP_WHITELIST ?? '')
       .split(',')
       .map((n) => n.replace(/\D/g, '').slice(-10))
@@ -58,7 +63,6 @@ export class OtpService {
     if (!whitelist.length) {
       return false;
     }
-    const tenDigit = mobileNumber.replace(/\D/g, '').replace(/^91/, '').slice(-10);
     return whitelist.includes(tenDigit);
   }
 
@@ -159,9 +163,18 @@ export class OtpService {
       const alreadyUsed = await authRepository.findRecentlyVerifiedOtpLog(
         mobileNumber,
         otp,
+        hashOtp(otp),
         env.OTP_EXPIRY_SECONDS * 1000,
       );
       if (alreadyUsed) {
+        return;
+      }
+      // QA numbers: tap "fill & verify" again after a successful verify (no fresh send).
+      if (
+        env.NODE_ENV !== 'production' &&
+        this.isTestWhitelistedNumber(mobileNumber) &&
+        otp === env.MOCK_UNIVERSAL_OTP
+      ) {
         return;
       }
       throw new AppError('OTP expired or already used. Tap Resend OTP for a new code.', 400);
@@ -177,7 +190,12 @@ export class OtpService {
 
     // ─── HanuOTP route: OTP digits verified against peppered hash ──────────
     if (log.provider === 'hanu') {
-      if (!log.otpHash || hashOtp(otp) !== log.otpHash) {
+      const qaUniversalOk =
+        env.NODE_ENV !== 'production' &&
+        this.isTestWhitelistedNumber(mobileNumber) &&
+        otp === env.MOCK_UNIVERSAL_OTP;
+
+      if (!qaUniversalOk && (!log.otpHash || hashOtp(otp) !== log.otpHash)) {
         log.mobileAttempts += 1;
         await log.save();
         throw new AppError('Incorrect code. Check the SMS and try again.', 400);

@@ -33,11 +33,17 @@ export type TowingFareBreakdown = {
   extraKm: number;
   extraKmCharge: number;
   nightSurcharge: number;
+  /** Added when towingMode is emergency (priority dispatch). */
+  prioritySurcharge?: number;
+  /** Subtracted when towingMode is scheduled (advance booking). */
+  scheduledDiscount?: number;
   totalFare: number;
   advanceAmount: number;
   remainingAmount: number;
   isFallback?: boolean;
 };
+
+export type TowingPricingMode = 'instant' | 'scheduled' | 'emergency';
 
 export type DriverFareBreakdown = {
   packageHours: number;
@@ -59,6 +65,10 @@ const TOWING_INCLUDED_KM = 5;
 const TOWING_PER_KM_AFTER_INCLUDED = 25;
 const TOWING_MINIMUM_FARE = 299;
 const TOWING_FALLBACK_FARE = 499;
+const TOWING_FALLBACK_FARE_SCHEDULED = 399;
+const TOWING_FALLBACK_FARE_EMERGENCY = 699;
+const TOWING_EMERGENCY_SURCHARGE = 200;
+const TOWING_SCHEDULED_DISCOUNT = 100;
 const NIGHT_SURCHARGE_RATE = 0.2;
 
 /**
@@ -157,6 +167,28 @@ function isNightSurchargeTime(date: Date): boolean {
   return hour >= 22 || hour < 6;
 }
 
+/** Fixed on-site roadside assist (no distance matrix). */
+export function calculateRoadsideFlatFare(totalFare: number): {
+  fare: number;
+  breakdown: TowingFareBreakdown;
+} {
+  const { advanceAmount, remainingAmount } = splitAdvance(totalFare);
+  return {
+    fare: totalFare,
+    breakdown: {
+      baseFare: totalFare,
+      distanceKm: 0,
+      extraKm: 0,
+      extraKmCharge: 0,
+      nightSurcharge: 0,
+      totalFare,
+      advanceAmount,
+      remainingAmount,
+      isFallback: false,
+    },
+  };
+}
+
 export function getVehicleCategory(
   vehicleType: string,
   vehicleSubtype?: string,
@@ -214,19 +246,30 @@ export function resolvePackageHours(
 export function calculateTowingFare(
   distanceKm: number,
   scheduledAt?: Date,
+  towingMode: TowingPricingMode = 'instant',
 ): { fare: number; breakdown: TowingFareBreakdown } {
+  const mode: TowingPricingMode =
+    towingMode === 'scheduled' || towingMode === 'emergency' ? towingMode : 'instant';
+
   if (distanceKm <= 0) {
-    // FALLBACK: Google Maps API unavailable
-    const { advanceAmount, remainingAmount } = splitAdvance(TOWING_FALLBACK_FARE);
+    const fallbackFare =
+      mode === 'emergency'
+        ? TOWING_FALLBACK_FARE_EMERGENCY
+        : mode === 'scheduled'
+          ? TOWING_FALLBACK_FARE_SCHEDULED
+          : TOWING_FALLBACK_FARE;
+    const { advanceAmount, remainingAmount } = splitAdvance(fallbackFare);
     return {
-      fare: TOWING_FALLBACK_FARE,
+      fare: fallbackFare,
       breakdown: {
         baseFare: TOWING_FALLBACK_FARE,
         distanceKm: 0,
         extraKm: 0,
         extraKmCharge: 0,
         nightSurcharge: 0,
-        totalFare: TOWING_FALLBACK_FARE,
+        prioritySurcharge: mode === 'emergency' ? TOWING_EMERGENCY_SURCHARGE : undefined,
+        scheduledDiscount: mode === 'scheduled' ? TOWING_SCHEDULED_DISCOUNT : undefined,
+        totalFare: fallbackFare,
         advanceAmount,
         remainingAmount,
         isFallback: true,
@@ -240,9 +283,12 @@ export function calculateTowingFare(
   const nightSurcharge = isNightSurchargeTime(scheduledAt ?? new Date())
     ? Math.round(subtotal * NIGHT_SURCHARGE_RATE)
     : 0;
+  const prioritySurcharge = mode === 'emergency' ? TOWING_EMERGENCY_SURCHARGE : 0;
+  const scheduledDiscount = mode === 'scheduled' ? TOWING_SCHEDULED_DISCOUNT : 0;
+  const rawTotal = subtotal + nightSurcharge + prioritySurcharge - scheduledDiscount;
   const totalFare = Math.max(
     TOWING_MINIMUM_FARE,
-    roundToNearestTen(subtotal + nightSurcharge),
+    roundToNearestTen(rawTotal),
   );
   const { advanceAmount, remainingAmount } = splitAdvance(totalFare);
 
@@ -254,6 +300,8 @@ export function calculateTowingFare(
       extraKm: Math.round(extraKm * 10) / 10,
       extraKmCharge,
       nightSurcharge,
+      prioritySurcharge: prioritySurcharge > 0 ? prioritySurcharge : undefined,
+      scheduledDiscount: scheduledDiscount > 0 ? scheduledDiscount : undefined,
       totalFare,
       advanceAmount,
       remainingAmount,

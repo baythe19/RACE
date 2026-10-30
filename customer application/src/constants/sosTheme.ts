@@ -16,14 +16,7 @@ export const SOS_COLORS = {
   contactsBg: 'rgba(230,81,0,0.12)',
 };
 
-export const SOS_EMERGENCY_CONTACT = {
-  name: 'Priya Kumari',
-  relation: 'Wife',
-  phone: '+91 98765 43210',
-};
-
-export const SOS_LOCATION = 'Patia Square, Bhubaneswar, Odisha';
-
+/** Quick helpers only — Call Emergency is the big red strip, not a grid tile. */
 export const SOS_GRID_ACTIONS = [
   {
     id: 'towing',
@@ -31,13 +24,6 @@ export const SOS_GRID_ACTIONS = [
     icon: 'Truck' as const,
     borderColor: SOS_COLORS.goldMuted,
     backgroundColor: SOS_COLORS.towingBg,
-  },
-  {
-    id: 'ambulance',
-    label: 'Ambulance',
-    icon: 'Ambulance' as const,
-    borderColor: SOS_COLORS.redDark,
-    backgroundColor: SOS_COLORS.ambulanceBg,
   },
   {
     id: 'location',
@@ -48,7 +34,7 @@ export const SOS_GRID_ACTIONS = [
   },
   {
     id: 'contacts',
-    label: 'Emergency Contacts',
+    label: 'Notify Contacts',
     icon: 'SOS' as const,
     borderColor: SOS_COLORS.orange,
     backgroundColor: SOS_COLORS.contactsBg,

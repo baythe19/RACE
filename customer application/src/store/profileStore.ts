@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 import * as profileService from '../services/profileService';
-import { getApiErrorMessage } from '../services/api';
+import { getApiErrorMessage, readAccessToken } from '../services/api';
 import { syncOnboardingRequiredFromProfile } from './authState';
 import type { Profile } from '../types/models';
 import type { UpdateProfileRequest } from '../utils/profilePayload';
@@ -18,26 +18,44 @@ interface ProfileState {
   clearProfile: () => void;
 }
 
+/** Shared in-flight promise so remount / focus cannot stack duplicate GETs. */
+let profileFetchInFlight: Promise<void> | null = null;
+let profileUpdateInFlight = false;
+
 export const useProfileStore = create<ProfileState>((set) => ({
   profile: null,
   isLoading: false,
   error: null,
 
   fetchProfile: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const profile = await profileService.getProfile();
-      set({ profile, isLoading: false });
-    } catch (error) {
-      set({
-        isLoading: false,
-        error: getApiErrorMessage(error, 'Unable to load profile'),
-      });
-      throw error;
-    }
+    if (profileFetchInFlight) return profileFetchInFlight;
+    profileFetchInFlight = (async () => {
+      set({ isLoading: true, error: null });
+      try {
+        const token = await readAccessToken();
+        if (!token) {
+          set({ isLoading: false, error: null });
+          return;
+        }
+        const profile = await profileService.getProfile();
+        set({ profile, isLoading: false });
+      } catch (error) {
+        set({
+          isLoading: false,
+          error: getApiErrorMessage(error, 'Unable to load profile'),
+        });
+      } finally {
+        profileFetchInFlight = null;
+      }
+    })();
+    return profileFetchInFlight;
   },
 
   updateProfile: async (data, options) => {
+    if (profileUpdateInFlight) {
+      throw new Error('Profile update already in progress');
+    }
+    profileUpdateInFlight = true;
     set({ isLoading: true, error: null });
     try {
       const profile = await profileService.updateProfile(data);
@@ -52,6 +70,8 @@ export const useProfileStore = create<ProfileState>((set) => ({
         error: getApiErrorMessage(error, 'Unable to update profile'),
       });
       throw error;
+    } finally {
+      profileUpdateInFlight = false;
     }
   },
 

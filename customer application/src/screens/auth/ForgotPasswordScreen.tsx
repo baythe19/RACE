@@ -7,6 +7,7 @@ import AuthFormLayout from '../../components/auth/AuthFormLayout';
 import GoldButton from '../../components/auth/GoldButton';
 import type { AuthStackParamList } from '../../types/navigation';
 import { colors, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -18,7 +19,7 @@ export default function ForgotPasswordScreen({ navigation }: Props) {
   const px = (n: number) => Math.round(n * s);
 
   return (
-    <AuthFormLayout onBack={() => navigation.goBack()}>
+    <AuthFormLayout onBack={() => goBackWithinStack(navigation)}>
       <View
         style={{
           alignSelf: 'center',

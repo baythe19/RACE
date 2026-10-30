@@ -232,8 +232,7 @@ export interface FallbackDriverRegistrationData {
 export function buildDriverVerification(
   profile?: Profile | null,
   fallback?: FallbackDriverRegistrationData | null,
-): DriverVerificationSummary {
-  const driver = profile?.driverProfile;
+): DriverVerificationSummary {  const driver = profile?.driverProfile;
   let state = resolveState(driver);
   if (state === 'unknown' && fallback?.driverVehicle?.vehicleNumber) {
     state = 'pending';
@@ -281,3 +280,48 @@ export function buildDriverVerification(
     },
   };
 }
+
+/**
+ * Accept-time profile gate.
+ *
+ * In-review (PENDING) accounts may accept — this is the documented product
+ * behaviour ("You can accept jobs in the meantime"). Rejected, suspended,
+ * disabled, or never-submitted profiles are blocked with a clear message so a
+ * driver without a valid profile never locks a customer's booking.
+ */
+export function assertDriverCanAcceptJobs(profile?: {
+  operationalStatus?: string | null;
+  reviewStatus?: string | null;
+  driverProfile?: { status?: string | null } | null;
+} | null): { ok: boolean; title?: string; message?: string } {
+  if (!profile || !profile.driverProfile) {
+    return {
+      ok: false,
+      title: 'Profile incomplete',
+      message: 'Your driver profile has not been submitted yet. Complete your application before accepting jobs.',
+    };
+  }
+  if (profile.operationalStatus === 'SUSPENDED' || profile.driverProfile.status === 'SUSPENDED') {
+    return {
+      ok: false,
+      title: 'Account suspended',
+      message: 'Your account is on hold, so you cannot accept jobs right now. Contact RACE support.',
+    };
+  }
+  if (profile.operationalStatus === 'DISABLED') {
+    return {
+      ok: false,
+      title: 'Account disabled',
+      message: 'Your account has been disabled. You cannot accept jobs at the moment.',
+    };
+  }
+  if (profile.reviewStatus === 'REJECTED' || profile.driverProfile.status === 'REJECTED') {
+    return {
+      ok: false,
+      title: 'Verification rejected',
+      message: 'Some details in your application were not approved. Update them and resubmit before accepting jobs.',
+    };
+  }
+  return { ok: true };
+}
+

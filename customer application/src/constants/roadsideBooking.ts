@@ -4,6 +4,8 @@ import type { RoadsideServiceId } from '../types/roadsideBooking';
 export const ROADSIDE_ACCENT = '#F4A115';
 export const ROADSIDE_ACCENT_LIGHT = '#FFF4E5';
 
+export const ROADSIDE_BOOKING_STEP_LABELS = ['Where to help', 'Confirm'] as const;
+
 export const ROADSIDE_SERVICES: Array<{
   id: RoadsideServiceId;
   label: string;
@@ -42,18 +44,12 @@ export const ROADSIDE_SERVICES: Array<{
 ];
 
 export const ROADSIDE_ETA_MINUTES = 25;
-export const ROADSIDE_TRACK_ETA_MINUTES = 18;
 
 export const ROADSIDE_VALUE_PROPS = [
   { id: 'response', highlight: '25 min', label: 'Avg. Response' },
   { id: 'verified', highlight: 'Verified Pros', label: 'Trusted & Trained' },
   { id: 'location', highlight: 'At Your Location', label: 'We come to you' },
 ] as const;
-
-export const ROADSIDE_MECHANIC = {
-  name: 'Ramesh S.',
-  rating: 4.8,
-};
 
 export function getRoadsideServiceLabel(id: RoadsideServiceId): string {
   return ROADSIDE_SERVICES.find(service => service.id === id)?.label ?? id;

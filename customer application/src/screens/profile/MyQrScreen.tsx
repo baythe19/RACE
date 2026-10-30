@@ -1,74 +1,41 @@
 import React from 'react';
-import { Alert, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import QRCard from '../../components/qr/QRCard';
-import Screen, { ScreenContent } from '../../components/ui/Screen';
+import ProfileSubScreenLayout, { useProfilePx } from '../../components/profile/ProfileSubScreenLayout';
+import DataSkeleton from '../../components/ui/DataSkeleton';
+import VehicleEmergencyQrPanel from '../../components/vehicles/VehicleEmergencyQrPanel';
 import { useVehicleQuery } from '../../services/vehicles/useVehicleQueries';
 import type { ProfileStackParamList } from '../../types/navigation';
-import { colors, spacing, typography } from '../../theme';
+import { colors } from '../../theme';
 
 type Props = NativeStackScreenProps<ProfileStackParamList, 'MyQr'>;
 
 export default function MyQrScreen({ route }: Props) {
-  const { data: vehicle, isLoading } = useVehicleQuery(route.params.vehicleId);
-
-  const handleShare = async () => {
-    if (!vehicle) return;
-    try {
-      await Share.share({
-        message: `RACE Emergency QR for ${vehicle.vehicleNumber}`,
-        url: vehicle.qrCode,
-      });
-    } catch {
-      Alert.alert('Share failed');
-    }
-  };
-
-  const handleDownload = () => {
-    Alert.alert('Download', 'QR saved to your device gallery.');
-  };
+  const px = useProfilePx();
+  const { data: vehicle, isLoading, error } = useVehicleQuery(route.params.vehicleId);
 
   if (isLoading || !vehicle) {
     return (
-      <Screen>
-        <SafeAreaView style={styles.safe}>
-          <Text style={styles.loading}>Loading QR...</Text>
-        </SafeAreaView>
-      </Screen>
+      <ProfileSubScreenLayout title="My QR">
+        <DataSkeleton variant="detail" />
+      </ProfileSubScreenLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <ProfileSubScreenLayout title="My QR">
+        <Text style={{ color: colors.error, textAlign: 'center', marginTop: 24 }}>
+          Unable to load QR
+        </Text>
+      </ProfileSubScreenLayout>
     );
   }
 
   return (
-    <Screen>
-      <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <ScreenContent>
-            <Text style={styles.title}>My QR Code</Text>
-            <Text style={styles.subtitle}>Scan for emergency roadside assistance</Text>
-            <QRCard
-              qrUri={vehicle.qrCode}
-              vehicleNumber={vehicle.vehicleNumber}
-              vehicleLabel={`${vehicle.brand} ${vehicle.model} · ${vehicle.color}`}
-              onDownload={handleDownload}
-              onShare={handleShare}
-            />
-            <Text style={styles.hint}>
-              When scanned, anyone can contact the owner, request towing, or send an emergency alert.
-            </Text>
-          </ScreenContent>
-        </ScrollView>
-      </SafeAreaView>
-    </Screen>
+    <ProfileSubScreenLayout title="My QR">
+      <VehicleEmergencyQrPanel vehicle={vehicle} px={px} showMeta />
+    </ProfileSubScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  scroll: { flexGrow: 1 },
-  loading: { textAlign: 'center', marginTop: 40, color: colors.textMuted },
-  title: { fontSize: typography.sizes.xxl, fontWeight: typography.weights.bold, color: colors.textDark, textAlign: 'center' },
-  subtitle: { color: colors.textMuted, textAlign: 'center', marginBottom: spacing.xl },
-  hint: { marginTop: spacing.xl, color: colors.textMuted, textAlign: 'center', lineHeight: 22 },
-});

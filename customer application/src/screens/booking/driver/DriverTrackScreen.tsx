@@ -1,24 +1,29 @@
 import React, { useEffect, useMemo } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
-import { Clock, MapPin, Navigation, Radio } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import LiveTripMap from '../../../components/booking/LiveTripMap';
-import DriverAvatar from '../../../components/bookings/DriverAvatar';
-import TripOtpCard from '../../../components/booking/TripOtpCard';
 import DropoffPaymentModal from '../../../components/booking/DropoffPaymentModal';
-import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
+import LiveTrackingContent, {
+  mergeLiveStatus,
+} from '../../../components/booking/LiveTrackingContent';
 import { useBookingTracking } from '../../../hooks/useBookingTracking';
+import { isCustomerMockDataEnabled } from '../../../config/customerQa';
 import { claimDropoffPrompt } from '../../../services/dropoffPromptGate';
 import { useBookingQuery } from '../../../services/bookings/useBookingQueries';
 import type { BookingsStackParamList, HomeStackParamList } from '../../../types/navigation';
 import {
   formatBookingDisplayId,
-  formatUnifiedStatusLabel,
+  formatLiveTrackingSummary,
+  getCustomerBookingPresentation,
   isCompletedUnifiedStatus,
+  isOngoingUnifiedStatus,
 } from '../../../utils/bookingDisplay';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
-import { colors, shadows, typography } from '../../../theme';
+import {
+  trackEtaForStage,
+  trackLocationHint,
+  trackPartnerDisplayName,
+} from '../../../utils/bookingFlowCopy';
+import { formatLocationCard, formatLocationDisplay } from '../../../utils/readableAddress';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList & BookingsStackParamList, 'DriverTrack'>;
 
@@ -44,40 +49,58 @@ function stepIndexForStatus(status: string): number {
 }
 
 export default function DriverTrackScreen({ navigation, route }: Props) {
-  const { t } = useBookingTheme();
   const bookingId = route.params?.bookingId;
   const fromBookings = route.params?.fromBookings;
   const booking = useBookingQuery(bookingId ?? '', 'driver');
   const {
     etaLabel,
-    status,
+    etaMinutes,
+    status: trackedStatus,
     driverLocation,
     driverName,
-    driverRating,
+    driverPhone,
     tripStartOtp: trackedOtp,
     arrivedAtDropoffAt,
     completionOtp,
     paymentCollectionMode,
     paymentConfirmedByCustomer,
     fare: trackedFare,
+    driverUpiId,
   } = useBookingTracking(bookingId, 'driver');
+
+  const status = mergeLiveStatus(trackedStatus, booking?.unifiedStatus);
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
-  const displayDriverName =
-    driverName ?? booking?.driver?.name ?? 'Assigning driver';
-  const hasAssignedDriver = Boolean(driverName ?? booking?.driver?.name);
+  const kind = booking ? getCustomerBookingPresentation(booking).kind : 'driver';
+  const partnerPending = !driverName && !booking?.driver;
+  const displayDriverName = trackPartnerDisplayName(
+    kind,
+    status,
+    partnerPending,
+    driverName ?? booking?.driver?.name,
+  );
+  const phone = driverPhone ?? booking?.driver?.phone;
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
   const isCompleted = isCompletedUnifiedStatus(status);
+  const isLive = isOngoingUnifiedStatus(status);
 
+  const etaForStage = trackEtaForStage(kind, status, etaMinutes ?? booking?.etaMinutes ?? null);
+  const trackingUi = formatLiveTrackingSummary({
+    kind,
+    status,
+    partnerPending,
+    etaDisplay: etaForStage,
+  });
+  const pickupCard = formatLocationCard(booking?.pickup);
+  const dropCard = booking?.dropoff ? formatLocationCard(booking.dropoff) : null;
   const resolvedFare =
     trackedFare ??
     (booking?.fareBreakdown && 'totalFare' in booking.fareBreakdown
       ? (booking.fareBreakdown as { totalFare?: number }).totalFare
       : booking?.estimatedFare) ??
     0;
-
   const isArrivedDropoff = Boolean(
-    arrivedAtDropoffAt || (booking as any)?.arrivedAtDropoffAt,
+    arrivedAtDropoffAt || (booking as { arrivedAtDropoffAt?: string } | null)?.arrivedAtDropoffAt,
   );
   const showDropoffPayment = isArrivedDropoff && !isCompleted;
 
@@ -89,7 +112,7 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
 
   const handleContinue = () => {
     if (fromBookings) {
-      navigation.goBack();
+      goBackWithinStack(navigation);
       return;
     }
     if (isCompleted && bookingId) {
@@ -101,227 +124,118 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
     }
   };
 
-  if (bookingId && !booking) {
-    return (
-      <TowingBookingLayout title="Live Tracking" step={6} headerVariant="inline" hideFooter>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={colors.primary} />
-        </View>
-      </TowingBookingLayout>
-    );
-  }
+  const mockDriverPoint =
+    !driverLocation &&
+    isCustomerMockDataEnabled() &&
+    (status === 'DRIVER_EN_ROUTE' ||
+      status === 'DRIVER_ARRIVED' ||
+      status === 'IN_PROGRESS') &&
+    booking?.pickup?.latitude != null &&
+    booking?.pickup?.longitude != null
+      ? {
+          latitude: booking.pickup.latitude + 0.008,
+          longitude: booking.pickup.longitude - 0.006,
+          label: displayDriverName,
+        }
+      : null;
+
+  const locationHint = trackLocationHint(
+    kind,
+    status,
+    Boolean(driverLocation),
+    Boolean(mockDriverPoint),
+  );
 
   return (
-    <TowingBookingLayout
-      title="Live Tracking"
-      step={6}
-      headerVariant="inline"
-      onBack={() => navigation.goBack()}
-      buttonLabel={fromBookings ? 'Back to Bookings' : isCompleted ? 'Rate Experience' : 'Continue'}
-      onContinue={handleContinue}>
-      <View style={{ flex: 1 }}>
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: t.px(8),
-            marginBottom: t.px(10),
-          }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: t.px(5),
-              paddingHorizontal: t.px(10),
-              paddingVertical: t.px(4),
-              borderRadius: t.px(20),
-              backgroundColor: '#FEE2E2',
-            }}>
-            <Radio size={t.px(12)} color={colors.error} />
-            <Text
-              style={{
-                fontSize: t.caption,
-                fontWeight: typography.weights.bold,
-                color: colors.error,
-              }}>
-              LIVE
-            </Text>
-          </View>
-          <Text style={{ fontSize: t.caption, color: colors.grey }}>
-            {booking ? formatBookingDisplayId(booking.bookingNumber) : 'Driver'} ·{' '}
-            {formatUnifiedStatusLabel(status)}
-          </Text>
-        </View>
-
-        <View style={{ flex: 1, marginBottom: t.px(12), minHeight: t.px(200) }}>
-          <LiveTripMap
-            borderRadius={t.px(16)}
-            style={{ flex: 1 }}
-            pickup={
-              booking?.pickup?.latitude != null && booking?.pickup?.longitude != null
-                ? {
-                    latitude: booking.pickup.latitude,
-                    longitude: booking.pickup.longitude,
-                    label: formatLocationDisplay(booking.pickup),
-                  }
-                : null
+    <LiveTrackingContent
+      bookingNumberLabel={
+        booking ? formatBookingDisplayId(booking.bookingNumber) : 'Driver trip'
+      }
+      statusLabel={trackingUi.chipLabel}
+      statusCode={status}
+      isLive={isLive}
+      steps={TRACK_STEPS}
+      activeStep={activeStep}
+      etaLabel={trackingUi.cardValue}
+      summaryLabel={trackingUi.cardLabel}
+      summaryChipLabel={trackingUi.chipLabel}
+      serviceLabel="Driver hire"
+      pickupLabel={
+        dropCard
+          ? `${pickupCard.primary}${pickupCard.secondary ? ` · ${pickupCard.secondary}` : ''}`
+          : formatLocationDisplay(booking?.pickup) || 'Pickup'
+      }
+      dropLabel={
+        dropCard
+          ? `${dropCard.primary}${dropCard.secondary ? ` · ${dropCard.secondary}` : ''}`
+          : undefined
+      }
+      driverName={displayDriverName}
+      driverPhone={phone}
+      fleetVehicleLabel={fleetVehicleLabel}
+      locationHint={locationHint}
+      tripOtp={tripOtp}
+      loading={Boolean(bookingId && !booking)}
+      pickup={
+        booking?.pickup?.latitude != null && booking?.pickup?.longitude != null
+          ? {
+              latitude: booking.pickup.latitude,
+              longitude: booking.pickup.longitude,
+              label: formatLocationDisplay(booking.pickup),
             }
-            dropoff={
-              booking?.dropoff?.latitude != null && booking?.dropoff?.longitude != null
-                ? {
-                    latitude: booking.dropoff.latitude,
-                    longitude: booking.dropoff.longitude,
-                    label: formatLocationDisplay(booking.dropoff),
-                  }
-                : null
+          : null
+      }
+      dropoff={
+        booking?.dropoff?.latitude != null && booking?.dropoff?.longitude != null
+          ? {
+              latitude: booking.dropoff.latitude,
+              longitude: booking.dropoff.longitude,
+              label: formatLocationDisplay(booking.dropoff),
             }
-            driver={
-              driverLocation
-                ? {
-                    latitude: driverLocation.latitude,
-                    longitude: driverLocation.longitude,
-                    label: displayDriverName,
-                  }
-                : null
+          : null
+      }
+      driver={
+        driverLocation
+          ? {
+              latitude: driverLocation.latitude,
+              longitude: driverLocation.longitude,
+              label: displayDriverName,
             }
-          />
-        </View>
-
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            marginBottom: t.px(14),
-            paddingHorizontal: t.px(4),
-          }}>
-          {TRACK_STEPS.map((step, index) => {
-            const active = index <= activeStep;
-            return (
-              <View key={step} style={{ alignItems: 'center', flex: 1 }}>
-                <View
-                  style={{
-                    width: t.px(10),
-                    height: t.px(10),
-                    borderRadius: t.px(5),
-                    backgroundColor: active ? colors.primary : colors.border,
-                    marginBottom: t.px(4),
-                  }}
-                />
-                <Text
-                  style={{
-                    fontSize: t.px(9),
-                    fontWeight: active ? typography.weights.bold : typography.weights.semibold,
-                    color: active ? colors.dark : colors.grey,
-                    textAlign: 'center',
-                  }}>
-                  {step}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-
-        <View
-          style={[
-            {
-              borderRadius: t.cardRadius,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.background,
-              padding: t.rowPadding,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: t.px(10),
-              marginBottom: t.px(10),
-            },
-            shadows.card,
-          ]}>
-          <Clock size={t.iconSm} color={colors.primary} />
-          <Text
-            style={{
-              fontSize: t.bodyLarge,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-            }}>
-            ETA: <Text style={{ color: colors.primary }}>{etaLabel}</Text>
-          </Text>
-          <Navigation size={t.iconSm} color={colors.grey} style={{ marginLeft: 'auto' }} />
-        </View>
-
-        <View
-          style={[
-            {
-              borderRadius: t.cardRadius,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.background,
-              padding: t.rowPadding,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: t.px(12),
-            },
-            shadows.card,
-          ]}>
-          <DriverAvatar size={t.px(44)} />
-          <View style={{ flex: 1 }}>
-            <Text
-              style={{
-                fontSize: t.bodyLarge,
-                fontWeight: typography.weights.bold,
-                color: colors.dark,
-              }}>
-              {displayDriverName}
-            </Text>
-            {hasAssignedDriver && driverRating != null ? (
-              <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>
-                ★ {driverRating.toFixed(1)} · Assigned driver
-              </Text>
-            ) : null}
-            {fleetVehicleLabel ? (
-              <Text style={{ fontSize: t.caption, color: colors.grey, marginBottom: t.px(2) }}>
-                Vehicle: {fleetVehicleLabel}
-              </Text>
-            ) : null}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.px(4) }}>
-              <MapPin size={t.px(12)} color={colors.grey} />
-              <Text style={{ fontSize: t.caption, color: colors.grey }}>
-                Driver hire · {formatLocationDisplay(booking?.pickup) || 'Pickup en route'}
-              </Text>
-            </View>
-            {driverLocation ? (
-              <Text style={{ fontSize: t.caption, color: colors.success, marginTop: t.px(2) }}>
-                Partner location updating live
-              </Text>
-            ) : status === 'DRIVER_ASSIGNED' ? (
-              <Text style={{ fontSize: t.caption, color: colors.warning, marginTop: t.px(2) }}>
-                Driver allotted · Awaiting confirmation & start
-              </Text>
-            ) : null}
-          </View>
-        </View>
-
-        {tripOtp ? (
-          <View style={{ marginTop: t.px(12) }}>
-            <TripOtpCard
-              otp={tripOtp}
-              subtitle="Share this code with your driver when they arrive to start the trip."
-            />
-          </View>
-        ) : null}
-
-        {bookingId ? (
+          : mockDriverPoint
+      }
+      primaryLabel={
+        fromBookings ? 'Back to Bookings' : isCompleted ? 'Rate Experience' : 'Continue'
+      }
+      onPrimary={handleContinue}
+      onBack={() => goBackWithinStack(navigation)}
+      footerExtra={
+        bookingId ? (
           <DropoffPaymentModal
             visible={showDropoffPayment}
             bookingId={bookingId}
             bookingType="driver"
             fare={resolvedFare}
-            completionOtp={completionOtp ?? (booking as any)?.completionOtp}
-            paymentCollectionMode={paymentCollectionMode ?? (booking as any)?.paymentCollectionMode}
-            paymentConfirmedByCustomer={paymentConfirmedByCustomer ?? (booking as any)?.paymentConfirmedByCustomer}
+            completionOtp={
+              completionOtp ??
+              (booking as { completionOtp?: string } | null)?.completionOtp
+            }
+            paymentCollectionMode={
+              paymentCollectionMode ??
+              (booking as { paymentCollectionMode?: 'CASH' | 'UPI' | 'ONLINE' } | null)
+                ?.paymentCollectionMode
+            }
+            paymentConfirmedByCustomer={
+              paymentConfirmedByCustomer ??
+              (booking as { paymentConfirmedByCustomer?: boolean } | null)
+                ?.paymentConfirmedByCustomer
+            }
+            driverUpiId={
+              driverUpiId ?? (booking as { driverUpiId?: string } | null)?.driverUpiId
+            }
+            driverName={driverName ?? booking?.driver?.name}
           />
-        ) : null}
-      </View>
-    </TowingBookingLayout>
+        ) : null
+      }
+    />
   );
 }

@@ -1,9 +1,10 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import ServiceItemCard from '../components/ServiceItemCard';
 import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
 import ServiceIcon from '../components/ui/ServiceIcon';
 import { useCategoryById } from '../services/catalog/useCatalogQueries';
 import type { HomeStackParamList } from '../types/navigation';
@@ -20,7 +21,7 @@ export default function ServiceListScreen({ route, navigation }: Props) {
     return (
       <AppScreenLayout backgroundColor={colors.pageBg} scrollable={false}>
         <View style={styles.loader}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <DataSkeleton variant="services" />
         </View>
       </AppScreenLayout>
     );

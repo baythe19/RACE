@@ -7,7 +7,7 @@ export function createBookingTheme(scale: number) {
     px,
     stepCircle: px(44),
     stepNumber: px(18),
-    screenTitle: px(22),
+    screenTitle: px(18),
     sectionTitle: px(16),
     body: px(15),
     bodyLarge: px(16),
@@ -25,7 +25,7 @@ export function createBookingTheme(scale: number) {
     checkSize: px(22),
     gridGap: px(14),
     contentTop: px(6),
-    headerBottom: px(18),
+    headerBottom: px(12),
     footerTop: px(16),
     footerBottom: px(20),
   };

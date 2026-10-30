@@ -6,6 +6,12 @@ const googleMapsApiKey =
 const productionApiUrl =
   process.env.EXPO_PUBLIC_API_URL ?? 'https://race-api-w361.onrender.com';
 
+// Peach (peachsim.com) serves the iOS/Android simulator from its own origin.
+// Expo CLI's dev-server CORS middleware blocks bundle requests from unknown
+// origins ("Unauthorized request from ...runtime.localhost:7668"). Allowing it
+// via router.headOrigin is local-dev-only: EAS builds never set the env var.
+const peachRuntimeOrigin = process.env.EXPO_PUBLIC_PEACH_ORIGIN ?? '';
+
 module.exports = {
   expo: {
     name: 'RACE',
@@ -30,7 +36,7 @@ module.exports = {
     },
     android: {
       package: 'com.racecar.customer',
-      versionCode: 5,
+      versionCode: 6,
       softwareKeyboardLayoutMode: 'resize',
       adaptiveIcon: {
         foregroundImage: './src/assets/images/icon-1024.png',
@@ -62,6 +68,7 @@ module.exports = {
             'Allow RACE to use your location to set pickup and dropoff.',
         },
       ],
+      'expo-sharing',
     ],
     extra: {
       apiUrl: productionApiUrl,
@@ -69,6 +76,9 @@ module.exports = {
       eas: {
         projectId: '277981d5-5046-4288-8c91-672aab158419',
       },
+      router: peachRuntimeOrigin
+        ? { headOrigin: peachRuntimeOrigin, origin: peachRuntimeOrigin }
+        : undefined,
     },
   },
 };

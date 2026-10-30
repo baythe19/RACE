@@ -25,21 +25,25 @@ export interface WalletBalance {
   currency: string;
 }
 
+export type NotificationCategory = 'booking' | 'payment' | 'offers' | 'subscription' | 'general';
+
 export interface NotificationPreference {
   id: string;
   title: string;
   description: string;
   enabled: boolean;
-  category: 'booking' | 'offers' | 'subscription' | 'general';
+  category: NotificationCategory;
 }
 
 export interface AppNotification {
   id: string;
   title: string;
   body: string;
-  category: NotificationPreference['category'];
+  category: NotificationCategory;
   read: boolean;
   createdAt: string;
+  /** Raw backend metadata — booking rows carry bookingId/bookingType for deep links. */
+  metadata?: Record<string, string>;
 }
 
 export interface AppSettings {

@@ -53,13 +53,19 @@ export interface IDriverBooking extends Document {
   driverId?: Types.ObjectId;
   assignedFleetVehicleId?: Types.ObjectId;
   assignedFleetVehicleLabel?: string;
+  /** One-way SHA-256 verifier; raw OTP is never persisted here. */
   tripStartOtp?: string;
+  /** AES-GCM encrypted OTP for authorized response/delivery paths. */
+  tripStartOtpEncrypted?: string;
   tripStartOtpVerified?: boolean;
   tripStartOtpAttempts?: number;
   /** Timestamp when partner marks arrival at dropoff */
   arrivedAtDropoffAt?: Date;
   /** 4-digit code customer shares with partner to complete trip after payment confirmation */
+  /** One-way SHA-256 verifier; raw OTP is never persisted here. */
   completionOtp?: string;
+  /** AES-GCM encrypted OTP for authorized response/delivery paths. */
+  completionOtpEncrypted?: string;
   completionOtpVerified?: boolean;
   completionOtpAttempts?: number;
   /** Mode selected by customer: CASH, UPI, or ONLINE */
@@ -141,11 +147,13 @@ const DriverBookingSchema = new Schema<IDriverBooking>(
     vendorId: { type: Schema.Types.ObjectId, ref: 'Vendor', index: true },
     assignedFleetVehicleId: { type: Schema.Types.ObjectId, ref: 'VendorVehicle' },
     assignedFleetVehicleLabel: { type: String, trim: true },
-    tripStartOtp: { type: String, trim: true },
+    tripStartOtp: { type: String, trim: true, select: false },
+    tripStartOtpEncrypted: { type: String, select: false },
     tripStartOtpVerified: { type: Boolean, default: false },
     tripStartOtpAttempts: { type: Number, default: 0 },
     arrivedAtDropoffAt: { type: Date },
-    completionOtp: { type: String, trim: true },
+    completionOtp: { type: String, trim: true, select: false },
+    completionOtpEncrypted: { type: String, select: false },
     completionOtpVerified: { type: Boolean, default: false },
     completionOtpAttempts: { type: Number, default: 0 },
     paymentCollectionMode: { type: String, enum: ['CASH', 'UPI', 'ONLINE'] },

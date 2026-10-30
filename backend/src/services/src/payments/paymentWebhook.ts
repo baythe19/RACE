@@ -55,13 +55,26 @@ export const paymentWebhookService = {
     payload: PaymentWebhookPayload,
     options?: { signature?: string; rawBody?: string | Buffer },
   ) {
-    const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+    const webhookSecret = process.env.PAYMENT_WEBHOOK_SECRET?.trim() ?? '';
 
-    // In production with a configured secret, require cryptographic HMAC verification
-    if (env.NODE_ENV === 'production' && webhookSecret && options?.signature && options?.rawBody) {
+    if (env.NODE_ENV === 'production') {
+      if (webhookSecret.length < 32) {
+        logger.error('Payment webhook rejected: PAYMENT_WEBHOOK_SECRET is not configured');
+        throw new BadRequestError('Payment webhooks are not configured');
+      }
+      if (!options?.signature || !options?.rawBody) {
+        logger.warn('Payment webhook rejected: missing signature or raw body');
+        throw new BadRequestError('Missing webhook signature');
+      }
       const isValid = verifyWebhookSignature(options.rawBody, options.signature, webhookSecret);
       if (!isValid) {
         logger.warn('Payment webhook rejected: invalid HMAC signature', { gateway: payload.gateway });
+        throw new BadRequestError('Invalid webhook signature');
+      }
+    } else if (webhookSecret.length >= 32 && options?.signature && options?.rawBody) {
+      const isValid = verifyWebhookSignature(options.rawBody, options.signature, webhookSecret);
+      if (!isValid) {
+        logger.warn('Payment webhook rejected: invalid HMAC signature (dev)', { gateway: payload.gateway });
         throw new BadRequestError('Invalid webhook signature');
       }
     }

@@ -86,6 +86,15 @@ export default function FormField({
         autoCorrect={false}
         editable={editable && !onPress}
         pointerEvents={onPress ? 'none' : 'auto'}
+        {...(onPress
+          ? {
+              showSoftInputOnFocus: false,
+              focusable: false,
+              importantForAutofill: 'no' as const,
+            }
+          : {
+              showSoftInputOnFocus: true,
+            })}
         {...inputProps}
       />
       {rightElement}

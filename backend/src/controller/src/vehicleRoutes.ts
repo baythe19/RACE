@@ -9,6 +9,7 @@ import {
 import { validate } from '../../middleware/src/validation';
 import { authMiddleware } from '../../middleware/src/auth';
 import { qrRateLimiter } from '../../middleware/src/rateLimiter';
+import { vendorDocumentUpload } from '../../middleware/src/upload';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.get('/:id/verify', qrRateLimiter, validate(vehicleIdSchema, 'params'), ve
 router.use(authMiddleware);
 
 router.post('/', validate(createVehicleSchema), vehicleController.create);
+router.post('/:id/photo', vendorDocumentUpload.single('file'), validate(vehicleIdSchema, 'params'), vehicleController.uploadPhoto);
 router.get('/', vehicleController.list);
 router.get('/:id', validate(vehicleIdSchema, 'params'), vehicleController.getById);
 router.put(

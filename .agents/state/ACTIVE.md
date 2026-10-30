@@ -1,11 +1,54 @@
 # RACE — Active State
 
-> **Updated:** 2026-10-26
+> **Updated:** 2026-10-29 (customer UI recheck)
 > **Read this first in every new session.**
 
 ---
 
-## Latest session — Universal HanuSMS Routing, Outer-App Lockscreen Notifications, Pre-Trip Vehicle Damage Inspection & Production Runbooks (2026-10-26, branch v7.0.0-major-update)
+## Latest session — Local driver-hire offer match (2026-10-29)
+
+- Offer feed treats legacy `Driver Service` via `selfDriverCategory`, and loads that field on the driver. QA part-time type is `Part-Time`, full-time independent type is `Full-Time`. Fleet driver stays `Tow Driver`.
+- Local `ensure:test-accounts` refreshed 9000000001–4 (trucks + fleet membership). Backend `tsc` 0. Live local check 18/18: part-time/full-time offers split, vendor sees paid towing only, online fleet assign → driver active job, customer tracking stays PENDING until accept. Test bookings cancelled. Drivers set offline.
+
+## Latest session — Customer Metro bundle errors (2026-10-29)
+
+- Peach/sootsim parse errors (DriverPickup JSX, goBackWithinStack return, Zap/Bike, MAP_PROVIDER dup, sanitizeFilePart dup, unterminated DateTime JSX, Info undefined) were stale HMR + dead Metro :8081.
+- Real fixes: `Motorbike as Bike` / `PlugZap as Zap`; `fetchProfile` no longer rethrows; skip authed fetches when logged out. Metro `--clear` + API :3000 up. Index bundle HTTP 200. Reload the sim.
+- Customer `tsc --noEmit` 0.
+
+## Latest session — Customer Bookings/location UI recheck (2026-10-29)
+
+- Honest reaudit of prior Bookings + location + card asks on `v8.0.0---custumer-app`.
+- Fixed: Call→driver phone, Copy clipboard, Track OTP short copy, Detail `advancePaid`, Cancelled badge color.
+- Still open: mock Track vs live tracking APIs; Peach visual pass not re-run. Customer `tsc` 0.
+
+---
+
+## Latest session — Full stack restart + Peach CLI live (2026-10-28)
+
+- Mongo/Redis recreated after corrupt RWLayer; data volume kept (25 collections).
+- Backend `:3000` health 200; customer Metro `:8081`; partner Metro `:8082`.
+- Peach bridge `:7668`. CLI sims paint both apps (customer create-account, partner login). Cursor Browser Peach canvas may stay black — use Peach CLI.
+- API URL for both Expo apps: `http://localhost:3000`. Whitelist OTP `123456` for QA numbers.
+
+---
+
+# RACE — Active State
+
+> **Updated:** 2026-10-28
+> **Read this first in every new session.**
+
+---
+
+## Latest session — Master Production Readiness Audit, All-Surface Read-Only (2026-10-28, branch v7.0.0-major-update)
+
+- **Read-only full-platform audit; NO code changes.** Output: `docs/reviews/race-platform-production-readiness-audit-2026-10-28.md`.
+  - Verifications [live/compile today]: customer app `tsc --noEmit` exit 0; backend `npm run lint` exit 0; CastError→400 fix verified live (`GET /bookings/towing/GO` → 400 "Invalid identifier"); roadside availability: `bookableCount 3`, battery/tyre/fuel/repairs still `false`; auth/devOtp 123456 dev-mode confirmed; collection+index census via mongosh (no TTL on otplogs/activitylogs; DB local name `race`, contradicts AGENTS.md `race-service`).
+  - Completion-OTP gating re-verified in source (`tripOtp.ts` `customerCompletionOtp` gated on `arrivedAtDropoffAt && paymentConfirmedByCustomer`).
+  - Payments: client stub auto-verify unchanged (`serviceBookingApi.ts`); backend fails closed in prod (`assertStubPaymentsEnabled`), webhook HMAC engine exists but **fail-open if `PAYMENT_WEBHOOK_SECRET` missing in prod** — new D-01 finding.
+  - Doc consolidates: C-01..C-13 (customer), S-1..S-16 (security status register), D-01..D-11 (new defects), 10-step launch gates. Placebo profile screens, stub payments, missing gateway keys => payments are launch blocker #1.
+
+## Previous session — Universal HanuSMS Routing, Outer-App Lockscreen Notifications, Pre-Trip Vehicle Damage Inspection & Production Runbooks (2026-10-26, branch v7.0.0-major-update)
 
 - **Complete Purge of MessageCentral & Legacy SMS Services (Solely HanuSMS):**
   - Completely removed all MessageCentral code (`mcSendOtp`, `mcValidateOtp`, `isMcConfigured`, `getMcConfig`, `isMcExpiredSignal`) from `backend/src/utils/src/sms.ts`.

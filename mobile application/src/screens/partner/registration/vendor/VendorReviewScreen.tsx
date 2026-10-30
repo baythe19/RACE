@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import {
   Building2,
   Check,
@@ -203,7 +203,7 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
         email: vendorBusiness.email || undefined,
         address: address || undefined,
         bankDetails,
-        acceptTerms: true as const,
+        acceptTerms: termsAccepted,
       });
 
       try {
@@ -378,7 +378,13 @@ export default function VendorReviewScreen({ navigation, route }: Props) {
           {termsAccepted ? <Check size={14} color="#FFFFFF" strokeWidth={3} /> : null}
         </View>
         <PartnerText style={styles.termsText}>
-          I confirm that these details and documents are accurate and agree to the RACE Partner Terms and Verification Policy.
+          I confirm that these details and documents are accurate and agree to the RACE Partner{' '}
+          <PartnerText
+            style={styles.termsLink}
+            onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+            Terms and Verification Policy
+          </PartnerText>
+          .
         </PartnerText>
       </Pressable>
     </DriverRegistrationLayout>
@@ -469,4 +475,5 @@ const styles = StyleSheet.create({
   },
   termsCheckboxChecked: { borderColor: '#F59E0B', backgroundColor: '#F59E0B' },
   termsText: { flex: 1, color: '#374151', fontSize: 11.5, lineHeight: 16 },
+  termsLink: { color: '#D97706', fontWeight: '700', textDecorationLine: 'underline' },
 });

@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { ChevronRight, MapPin } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, MapPinned } from 'lucide-react-native';
 
 import FormField from '../auth/FormField';
+import SelectOptionModal from '../auth/SelectOptionModal';
 import LocationPickerModal from '../common/LocationPickerModal';
+import { INDIAN_STATE_OPTIONS } from '../../constants/indianStates';
 import { FORM_PLACEHOLDER_COLOR } from '../../constants/profileForm';
 import type { LocationResult } from '../../types/location';
 import { toAddressFormValues } from '../../utils/googlePlaces';
 import { getPhoneDigits } from '../../utils/phone';
-import { colors, typography } from '../../theme';
+import { colors, shadows, typography } from '../../theme';
 
 export interface AddressFormValues {
   line1: string;
@@ -35,6 +37,7 @@ export default function ProfileAddressFields({
 }: ProfileAddressFieldsProps) {
   const px = (n: number) => Math.round(n * scale);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
+  const [statePickerOpen, setStatePickerOpen] = useState(false);
 
   const searchDisplayValue = [values.line1, values.line2, values.city, values.state, values.pincode]
     .filter(Boolean)
@@ -62,32 +65,57 @@ export default function ProfileAddressFields({
         Select Address
       </Text>
 
-      <Pressable onPress={() => setShowLocationPicker(true)} style={{ marginBottom: px(12) }}>
-        <View
-          style={{
+      <Pressable
+        onPress={() => setShowLocationPicker(true)}
+        style={({ pressed }) => [
+          {
             flexDirection: 'row',
             alignItems: 'center',
             borderWidth: 1.5,
-            borderColor: colors.border,
-            borderRadius: px(12),
-            backgroundColor: colors.background,
+            borderColor: searchDisplayValue ? 'rgba(245,166,35,0.45)' : colors.border,
+            borderRadius: px(14),
+            backgroundColor: pressed ? colors.goldLight : colors.background,
             paddingHorizontal: px(12),
-            minHeight: px(52),
-            gap: px(10),
+            minHeight: px(56),
+            gap: px(12),
+            marginBottom: px(14),
+          },
+          shadows.card,
+        ]}>
+        <View
+          style={{
+            width: px(40),
+            height: px(40),
+            borderRadius: px(20),
+            backgroundColor: colors.goldLight,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
           }}>
-          <MapPin size={px(18)} color={colors.primary} />
+          <MapPinned size={px(20)} color={colors.primary} strokeWidth={2.2} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             style={{
-              flex: 1,
-              fontSize: px(15),
+              fontSize: px(12),
+              fontWeight: typography.weights.bold,
+              color: colors.primary,
+              marginBottom: px(2),
+            }}>
+            Pick on map or search
+          </Text>
+          <Text
+            style={{
+              fontSize: px(14),
               color: searchDisplayValue ? colors.dark : colors.grey,
               fontWeight: searchDisplayValue ? typography.weights.semibold : typography.weights.regular,
+              lineHeight: px(18),
             }}
             numberOfLines={2}>
             {searchDisplayValue || 'Select your address'}
           </Text>
-          <ChevronRight size={px(18)} color={colors.grey} />
         </View>
+        <ChevronRight size={px(18)} color={colors.primary} strokeWidth={2.4} />
       </Pressable>
 
       <FormField
@@ -96,7 +124,7 @@ export default function ProfileAddressFields({
         scale={scale}
         label="Line 1 / House No."
         required
-        Icon={MapPin}
+        Icon={MapPinned}
         value={values.line1}
         placeholder="e.g. Flat 4B, Rose Apartments"
         placeholderTextColor={FORM_PLACEHOLDER_COLOR}
@@ -143,12 +171,11 @@ export default function ProfileAddressFields({
         label="State"
         required
         value={values.state}
-        placeholder="e.g. Odisha"
+        placeholder="Select state"
         placeholderTextColor={FORM_PLACEHOLDER_COLOR}
-        onChangeText={text => {
-          onChange({ state: text });
-          onClearError?.('state');
-        }}
+        editable={false}
+        onPress={() => setStatePickerOpen(true)}
+        rightElement={<ChevronDown size={px(16)} color={colors.grey} />}
         error={errors.state}
       />
       <FormField
@@ -175,6 +202,20 @@ export default function ProfileAddressFields({
         confirmLabel="Confirm address"
         onClose={() => setShowLocationPicker(false)}
         onLocationSelected={handleLocationSelect}
+      />
+
+      <SelectOptionModal
+        visible={statePickerOpen}
+        title="Select state"
+        options={INDIAN_STATE_OPTIONS}
+        selectedValue={values.state}
+        searchable
+        searchPlaceholder="Type state name…"
+        onSelect={value => {
+          onChange({ state: value });
+          onClearError?.('state');
+        }}
+        onClose={() => setStatePickerOpen(false)}
       />
     </View>
   );

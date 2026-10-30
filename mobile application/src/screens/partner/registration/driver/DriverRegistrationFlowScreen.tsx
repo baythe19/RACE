@@ -61,7 +61,7 @@ import {
 } from '../../../../services/vendor/vendorDriversApi';
 import { vendorMembershipKeys } from '../../../../services/vendor/useVendorMembershipQueries';
 import { useAppDispatch, useAppSelector } from '../../../../redux/hooks';
-import { completeOnboarding } from '../../../../redux/auth/authSlice';
+import { completeOnboarding, updateTokens, updateUser } from '../../../../redux/auth/authSlice';
 import { finishPartnerSignup } from '../../../../redux/onboarding/onboardingSlice';
 import { API_ENDPOINTS } from '../../../../config/api';
 import {
@@ -71,6 +71,7 @@ import {
 } from '../../../../constants/preview';
 import { api, saveTokens } from '../../../../services/api';
 import { getApiErrorMessage } from '../../../../services/auth/useAuthMutations';
+import { refreshAuthSession } from '../../../../services/authService';
 import type {
   PartnerRegistrationStackParamList,
   PartnerRootStackParamList,
@@ -917,8 +918,19 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
       dispatch(finishPartnerSignup());
 
       if (!authUser) {
+        if (!UI_PREVIEW_MUTATIONS_ENABLED) {
+          throw new Error('Your session expired. Log in with OTP and submit again.');
+        }
         const token = 'mock-driver-token';
         await saveTokens(token, token);
+      } else {
+        try {
+          const session = await refreshAuthSession();
+          dispatch(updateTokens({ accessToken: session.accessToken, refreshToken: session.refreshToken }));
+          dispatch(updateUser(session.user));
+        } catch {
+          // Registration succeeded; verification screen can poll status with existing tokens.
+        }
       }
 
       dispatch(
@@ -1402,10 +1414,6 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
 
         <View style={[styles.cardDivider, { marginTop: px(4), marginBottom: px(12) }]} />
 
-        <PartnerText style={[styles.inputLabel, { fontSize: px(12), marginBottom: px(8) }]}>
-          {vendorStaffOnboarding ? 'Driving licence' : 'Licence & work preference'}
-        </PartnerText>
-
         {/* Work type is a choice only for a driver who registers themselves.
             A vendor-added driver is always full-time fleet staff. */}
         {vendorStaffOnboarding ? null : (
@@ -1542,11 +1550,14 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
                   textAlignVertical: 'center',
                 },
               ]}
-              placeholder="DL number (e.g. OD-0220190012345)"
+              placeholder="DL number e.g. OD-0220190012"
               placeholderTextColor="#9CA3AF"
               autoCapitalize="characters"
               autoCorrect={false}
               maxLength={18}
+              numberOfLines={1}
+              scrollEnabled={false}
+              allowFontScaling={false}
               value={driverPersonal.licenseNumber || driverVehicle.licenseNumber}
               onFocus={() => setLicenceFocused(true)}
               onBlur={() => setLicenceFocused(false)}
@@ -2168,7 +2179,18 @@ export default function DriverRegistrationFlowScreen({ navigation, route }: Prop
         </View>
         <PartnerText style={[styles.checkboxLabel, { fontSize: px(11) }]}>
           I confirm all details are genuine and agree to RACE{' '}
-          <PartnerText style={styles.linkText}>Terms</PartnerText> & <PartnerText style={styles.linkText}>Privacy</PartnerText>.
+          <PartnerText
+            style={styles.linkText}
+            onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+            Terms
+          </PartnerText>{' '}
+          &{' '}
+          <PartnerText
+            style={styles.linkText}
+            onPress={() => void Linking.openURL('https://www.raceservice.in/terms.html')}>
+            Privacy
+          </PartnerText>
+          .
         </PartnerText>
       </Pressable>
     </View>
@@ -3334,6 +3356,7 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#2563EB',
     fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   saveLaterLink: {
     alignItems: 'center',
@@ -3554,11 +3577,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     borderRadius: 6,
-    height: 32,
+    height: 36,
     textAlign: 'center',
     fontSize: 12,
     fontWeight: '700',
     color: '#111827',
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   manualDivider: {
     fontSize: 14,

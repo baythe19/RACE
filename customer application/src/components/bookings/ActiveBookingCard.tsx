@@ -1,15 +1,14 @@
 import React from 'react';
-import { Image, Linking, Pressable, Text, View } from 'react-native';
-import { Copy, MapPin, Phone, Star } from 'lucide-react-native';
+import { Clipboard, Linking, Pressable, Text, View } from 'react-native';
+import { Copy, MapPin, Phone } from 'lucide-react-native';
 
-import { images } from '../../assets';
 import DriverAvatar from './DriverAvatar';
 import TripOtpCard from '../booking/TripOtpCard';
 import { getBookingServiceIcon } from '../../constants/bookingsScreen';
 import { brand } from '../../theme/brand';
-import type { ActiveBooking } from '../../types/models';
-import { formatLocationDisplay } from '../../utils/readableAddress';
-import { colors, typography } from '../../theme';
+import type { ActiveBooking, ActiveBookingLocation } from '../../types/models';
+import { getAppDialog } from '../../utils/alertBus';
+import { colors, shadows, typography } from '../../theme';
 
 type Props = {
   booking: ActiveBooking;
@@ -18,280 +17,300 @@ type Props = {
   onPress?: () => void;
 };
 
+function LocationLine({
+  px,
+  tag,
+  loc,
+}: {
+  px: (n: number) => number;
+  tag: string;
+  loc: ActiveBookingLocation;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: px(6), flex: 1, minWidth: 0 }}>
+      <Text
+        style={{
+          width: px(34),
+          fontSize: px(10),
+          fontWeight: typography.weights.semibold,
+          color: colors.grey,
+          paddingTop: px(1),
+        }}>
+        {tag}
+      </Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={2}
+          style={{
+            fontSize: px(11.5),
+            fontWeight: typography.weights.bold,
+            color: colors.dark,
+            lineHeight: px(15),
+          }}>
+          {loc.primary}
+        </Text>
+        {loc.secondary ? (
+          <Text
+            numberOfLines={1}
+            style={{
+              fontSize: px(10),
+              color: colors.grey,
+              marginTop: px(2),
+            }}>
+            {loc.secondary}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Props) {
   const ServiceIcon = getBookingServiceIcon(booking.service);
-  const mapW = px(86);
-  const mapH = px(64);
+  const callPhone = booking.driver.phone?.trim() || brand.phoneRaw;
+  const showDrop = booking.drop != null;
+  const searching =
+    /finding|matching|confirmed · finding|awaiting/i.test(booking.status) ||
+    /matching|must accept|pending/i.test(booking.driver.name);
+
+  const statusBg = searching ? '#FFF7ED' : '#E8F8EE';
+  const statusFg = searching ? '#C2410C' : colors.success;
+  const statusDot = searching ? '#F97316' : colors.success;
+
+  const copyBookingId = () => {
+    const raw = booking.displayId.replace(/^#/, '');
+    Clipboard.setString(raw);
+    getAppDialog().showDialog({
+      tone: 'success',
+      title: 'Copied',
+      message: raw,
+      primaryLabel: 'OK',
+    });
+  };
 
   return (
-    <Pressable onPress={onPress} style={{ marginBottom: px(12) }}>
-    <View
-      style={{
-        borderRadius: px(16),
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderLeftWidth: px(4),
-        borderLeftColor: colors.primary,
-        backgroundColor: colors.background,
-        padding: px(12),
-        overflow: 'hidden',
-      }}>
+    <Pressable onPress={onPress} style={{ marginBottom: px(8) }}>
       <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          marginBottom: px(8),
-        }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(5) }}>
-          <Text
-            style={{
-              fontSize: px(12),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            {booking.displayId}
-          </Text>
-          <Copy size={px(13)} color={colors.grey} strokeWidth={2} />
-        </View>
+        style={[
+          shadows.cardSoft,
+          {
+            borderRadius: px(12),
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.background,
+            paddingHorizontal: px(10),
+            paddingVertical: px(10),
+          },
+        ]}>
+        {/* Service + status — one row */}
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: px(4),
-            paddingHorizontal: px(8),
-            paddingVertical: px(3),
-            borderRadius: px(20),
-            backgroundColor: '#E8F8EE',
+            gap: px(8),
+            marginBottom: px(6),
           }}>
           <View
             style={{
-              width: px(5),
-              height: px(5),
-              borderRadius: px(3),
-              backgroundColor: colors.success,
-            }}
-          />
-          <Text
-            style={{
-              fontSize: px(10),
-              fontWeight: typography.weights.bold,
-              color: colors.success,
+              width: px(26),
+              height: px(26),
+              borderRadius: px(8),
+              backgroundColor: '#F3F4F6',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
             }}>
-            {booking.status}
+            <ServiceIcon size={px(13)} color={colors.dark} strokeWidth={2.2} />
+          </View>
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              fontSize: px(13.5),
+              fontWeight: typography.weights.bold,
+              color: colors.dark,
+            }}>
+            {booking.service}
           </Text>
-        </View>
-      </View>
-
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: px(8) }}>
-        <View style={{ flex: 1, minWidth: 0 }}>
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: px(7),
-              marginBottom: px(6),
+              gap: px(4),
+              paddingHorizontal: px(7),
+              paddingVertical: px(3),
+              borderRadius: px(8),
+              backgroundColor: statusBg,
+              flexShrink: 0,
+              maxWidth: '46%',
             }}>
             <View
               style={{
-                width: px(28),
-                height: px(28),
-                borderRadius: px(14),
-                backgroundColor: colors.goldLight,
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}>
-              <ServiceIcon size={px(14)} color={colors.primary} strokeWidth={2.5} />
-            </View>
+                width: px(5),
+                height: px(5),
+                borderRadius: px(3),
+                backgroundColor: statusDot,
+              }}
+            />
             <Text
               numberOfLines={1}
               style={{
-                flex: 1,
-                fontSize: px(13),
+                fontSize: px(9),
                 fontWeight: typography.weights.bold,
-                color: colors.dark,
+                color: statusFg,
               }}>
-              {booking.service}
+              {booking.status}
             </Text>
           </View>
+        </View>
 
-          <View style={{ gap: px(4) }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(7) }}>
-              <View
-                style={{
-                  width: px(6),
-                  height: px(6),
-                  borderRadius: px(3),
-                  backgroundColor: colors.primary,
-                  flexShrink: 0,
-                }}
-              />
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  fontSize: px(11),
-                  color: colors.dark,
-                  lineHeight: px(15),
-                }}>
-                {formatLocationDisplay(booking.pickup)}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(7) }}>
-              <MapPin size={px(12)} color={colors.error} style={{ flexShrink: 0 }} />
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  fontSize: px(11),
-                  color: colors.dark,
-                  lineHeight: px(15),
-                }}>
-                {formatLocationDisplay(booking.drop)}
-              </Text>
-            </View>
+        {/* Booking ID + ETA — one row */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: px(8),
+            gap: px(6),
+          }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4), flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                fontSize: px(10),
+                fontWeight: typography.weights.semibold,
+                color: colors.grey,
+              }}>
+              {booking.displayId}
+            </Text>
+            <Pressable
+              onPress={copyBookingId}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Copy booking ID">
+              <Copy size={px(11)} color={colors.grey} strokeWidth={2} />
+            </Pressable>
           </View>
+          {booking.eta && booking.eta !== 'Updating' ? (
+            <Text
+              style={{
+                fontSize: px(10),
+                fontWeight: typography.weights.bold,
+                color: colors.primary,
+                flexShrink: 0,
+              }}>
+              {booking.eta}
+            </Text>
+          ) : null}
+        </View>
 
+        {/* Route — compact inline block */}
+        <View
+          style={{
+            borderRadius: px(10),
+            backgroundColor: colors.pageBg,
+            paddingHorizontal: px(10),
+            paddingVertical: px(8),
+            marginBottom: px(8),
+          }}>
+          {showDrop ? (
+            <View style={{ gap: px(8) }}>
+              <LocationLine px={px} tag="From" loc={booking.pickup} />
+              <LocationLine px={px} tag="To" loc={booking.drop!} />
+            </View>
+          ) : (
+            <LocationLine px={px} tag="At" loc={booking.pickup} />
+          )}
+        </View>
+
+        {/* Partner + dispatch hint */}
+        <View style={{ marginBottom: booking.tripStartOtp ? px(8) : 0 }}>
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               gap: px(8),
-              marginTop: px(8),
             }}>
-            <DriverAvatar size={px(34)} />
+            <DriverAvatar size={px(26)} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: px(4) }}>
-                {booking.driver.rating != null ? (
-                  <>
-                    <Star size={px(10)} color={colors.primary} fill={colors.primary} />
-                    <Text
-                      style={{
-                        fontSize: px(11),
-                        fontWeight: typography.weights.bold,
-                        color: colors.dark,
-                      }}>
-                      {booking.driver.rating.toFixed(1)}
-                    </Text>
-                  </>
-                ) : null}
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    fontSize: px(12),
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {booking.driver.name}
-                </Text>
-              </View>
-              <Text style={{ fontSize: px(10), color: colors.grey, marginTop: px(1) }}>
-                {booking.driver.name === 'Finding a driver'
-                  ? 'Driver assignment in progress'
-                  : 'Your Driver'}
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: px(11.5),
+                  fontWeight: typography.weights.semibold,
+                  color: colors.dark,
+                }}>
+                {booking.driver.name}
               </Text>
+              {booking.dispatchHint ? (
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontSize: px(10),
+                    color: colors.grey,
+                    marginTop: px(2),
+                    lineHeight: px(14),
+                  }}>
+                  {booking.dispatchHint}
+                </Text>
+              ) : null}
             </View>
           </View>
         </View>
 
-        <View style={{ width: mapW, flexShrink: 0 }}>
-          <View
+        {booking.tripStartOtp ? (
+          <TripOtpCard otp={booking.tripStartOtp} compact subtitle="Share at pickup to start." />
+        ) : null}
+
+        <View style={{ flexDirection: 'row', gap: px(8), marginTop: px(8) }}>
+          <Pressable
+            onPress={() => void Linking.openURL(`tel:${callPhone}`)}
             style={{
-              width: mapW,
-              height: mapH,
-              borderRadius: px(8),
-              overflow: 'hidden',
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: px(5),
+              borderRadius: px(10),
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.background,
+              paddingVertical: px(8),
             }}>
-            <Image
-              source={images.booking.driverPickupMap}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-            <Image
-              source={images.homePopularTowing}
+            <Phone size={px(14)} color={colors.dark} strokeWidth={2.2} />
+            <Text
               style={{
-                position: 'absolute',
-                right: px(-4),
-                bottom: px(-6),
-                width: px(52),
-                height: px(32),
-              }}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={{ fontSize: px(9), color: colors.grey, marginTop: px(3) }}>
-            Est. Arrival
-          </Text>
-          <Text
+                fontSize: px(12),
+                fontWeight: typography.weights.bold,
+                color: colors.dark,
+              }}>
+              Call
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onTrack}
             style={{
-              fontSize: px(15),
-              fontWeight: typography.weights.extrabold,
-              color: colors.dark,
-              lineHeight: px(18),
+              flex: 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: px(5),
+              borderRadius: px(10),
+              backgroundColor: colors.primary,
+              paddingVertical: px(8),
             }}>
-            {booking.eta}
-          </Text>
+            <MapPin size={px(14)} color={colors.dark} strokeWidth={2.2} />
+            <Text
+              style={{
+                fontSize: px(12),
+                fontWeight: typography.weights.bold,
+                color: colors.dark,
+              }}>
+              Track
+            </Text>
+          </Pressable>
         </View>
       </View>
-
-      {booking.tripStartOtp ? (
-        <View style={{ marginBottom: px(10) }}>
-          <TripOtpCard
-            otp={booking.tripStartOtp}
-            subtitle="Share this code with your driver when they arrive to start the trip."
-          />
-        </View>
-      ) : null}
-
-      <View style={{ flexDirection: 'row', gap: px(8), marginTop: px(10) }}>
-        <Pressable
-          onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: px(5),
-            borderRadius: px(10),
-            borderWidth: 1.5,
-            borderColor: colors.primary,
-            paddingVertical: px(10),
-          }}>
-          <Phone size={px(14)} color={colors.primary} strokeWidth={2.5} />
-          <Text
-            style={{
-              fontSize: px(12),
-              fontWeight: typography.weights.bold,
-              color: colors.primary,
-            }}>
-            Call Driver
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={onTrack}
-          style={{
-            flex: 1,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: px(5),
-            borderRadius: px(10),
-            backgroundColor: colors.primary,
-            paddingVertical: px(10),
-          }}>
-          <MapPin size={px(14)} color={colors.dark} strokeWidth={2.5} />
-          <Text
-            style={{
-              fontSize: px(12),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            Track Live
-          </Text>
-        </Pressable>
-      </View>
-    </View>
     </Pressable>
   );
 }

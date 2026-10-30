@@ -47,18 +47,50 @@ export function buildFutureScheduledAt(daysAhead = 1, hour = 10): string {
   return date.toISOString();
 }
 
-export function towingDateIdToScheduledAt(dateId: string): string | undefined {
-  if (dateId === 'today') {
-    const date = new Date();
-    date.setHours(date.getHours() + 2, 0, 0, 0);
-    return date.toISOString();
+import type { TowingTimeId } from '../types/towingBooking';
+import { isSameDay, parseISODate, parseStoredDate } from './driverCalendar';
+
+export function towingDateIdToScheduledAt(
+  dateId: string,
+  timeId: TowingTimeId = '30-60',
+): string | undefined {
+  const iso = parseStoredDate(dateId);
+  const date = parseISODate(iso);
+  const now = new Date();
+
+  if (isSameDay(date, now)) {
+    const hoursAhead = timeId === '60-90' ? 1.5 : timeId === 'custom' ? 3 : 1;
+    date.setHours(now.getHours() + Math.ceil(hoursAhead), 0, 0, 0);
+  } else {
+    date.setHours(10, 0, 0, 0);
   }
-  return buildFutureScheduledAt(1);
+
+  if (date.getTime() <= now.getTime()) {
+    date.setTime(now.getTime() + 60 * 60 * 1000);
+  }
+
+  return date.toISOString();
 }
 
-export function driverDateIdToScheduledAt(dateId: string): string | undefined {
-  if (dateId === 'today') {
-    return undefined;
+/** Combine wizard date (ISO or legacy id) + HH:mm start into scheduledAt. */
+export function driverDateIdToScheduledAt(
+  dateId: string,
+  startTime24 = '09:00',
+): string | undefined {
+  const iso = parseStoredDate(dateId);
+  const date = parseISODate(iso);
+  const match = startTime24.match(/^(\d{1,2}):(\d{2})$/);
+  const hours = match ? Number(match[1]) : 9;
+  const minutes = match ? Number(match[2]) : 0;
+  date.setHours(hours, minutes, 0, 0);
+
+  const now = new Date();
+  if (date.getTime() <= now.getTime()) {
+    if (isSameDay(date, now)) {
+      return undefined;
+    }
+    date.setTime(now.getTime() + 60 * 60 * 1000);
   }
-  return buildFutureScheduledAt(1, 9);
+
+  return date.toISOString();
 }

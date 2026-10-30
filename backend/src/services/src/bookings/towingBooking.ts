@@ -3,13 +3,14 @@ import { getDistanceAndDuration } from '../googleMaps';
 import { emitBookingStatusUpdate } from '../socket';
 import { TowingBookingModel } from '../../../models/src/towingBooking';
 import { vehicleRepository } from '../vehicleRepository';
-import { UserModel } from '../../../models/src/user';
 import { PaymentTransactionModel } from '../../../models/src/paymentTransaction';
 import {
   assertValidStatusTransition,
   calculateTowingFare,
+  calculateRoadsideFlatFare,
   createInitialStatusHistory,
   generatePrefixedBookingNumber,
+  type TowingPricingMode,
 } from './booking';
 import { assertActorMayTransition, canTransition, type UnifiedBookingStatus } from '../bookingStatusConstants';
 import { towingBookingRepository } from '../towingBookingRepository';
@@ -25,10 +26,20 @@ import { getCancellationPolicy, type CancellationResult } from './cancellation';
 import { releaseDriver, releaseFleetVehicleFromBooking } from './driverAssignment';
 import { resolveAssignedDriver } from './assignedDriver';
 import {
+  applyCustomerBookingView,
   isDriverVisibleToCustomer,
+  isAwaitingPartnerAccept,
   mapPublicBookingStatus,
 } from '../bookingDisplayStatus';
 import { customerTripOtp, customerCompletionOtp } from './tripOtp';
+import { resolveCustomerTrackingExtras } from './customerTrackingLocation';
+import { ensureBookingServiceable } from './serviceability';
+import {
+  notifyAdminCustomerBookingCreated,
+  notifyCustomerBookingCreated,
+  notifyCustomerBookingCancelled,
+  notifyVendorsOpenTowingJob,
+} from '../bookingNotifications';
 
 function mapTowingBooking(
   booking: ITowingBooking,
@@ -42,6 +53,7 @@ function mapTowingBooking(
     pickup: booking.pickup,
     dropoff: booking.dropoff,
     towingMode: booking.towingMode,
+    assistLabel: booking.assistLabel,
     distanceKm: booking.distanceKm,
     estimatedFare: booking.estimatedFare,
     fareBreakdown: booking.fareBreakdown,
@@ -90,6 +102,19 @@ async function mapTowingBookingWithDriver(booking: ITowingBooking): Promise<Towi
   return mapTowingBooking(booking, driver);
 }
 
+function resolveTowingMode(
+  dto: CreateTowingBookingDto,
+  scheduledAt?: Date,
+): TowingPricingMode {
+  if (dto.towingMode === 'emergency' || dto.towingMode === 'scheduled' || dto.towingMode === 'instant') {
+    return dto.towingMode;
+  }
+  if (scheduledAt) {
+    return 'scheduled';
+  }
+  return 'instant';
+}
+
 export class TowingBookingService {
   async createBooking(
     customerId: string,
@@ -100,10 +125,17 @@ export class TowingBookingService {
       throw new NotFoundError('Vehicle not found');
     }
 
+    ensureBookingServiceable(dto.pickup);
+
     const scheduledAt = dto.scheduledAt ? new Date(dto.scheduledAt) : undefined;
+    const towingMode = resolveTowingMode(dto, scheduledAt);
     const matrix = await getDistanceAndDuration(dto.pickup, dto.dropoff);
     const distanceKm = matrix?.distanceKm;
-    const fareResult = calculateTowingFare(matrix?.distanceKm ?? 0, scheduledAt);
+    const fareResult = calculateTowingFare(
+      matrix?.distanceKm ?? 0,
+      scheduledAt,
+      towingMode,
+    );
     const { fare, breakdown } = fareResult;
     const bookingNumber = await generatePrefixedBookingNumber('TOW', () =>
       towingBookingRepository.countAll(),
@@ -115,7 +147,7 @@ export class TowingBookingService {
       vehicleId: vehicle.id as unknown as ITowingBooking['vehicleId'],
       pickup: dto.pickup,
       dropoff: dto.dropoff,
-      towingMode: dto.towingMode ?? (scheduledAt ? 'scheduled' : 'instant'),
+      towingMode,
       distanceKm,
       estimatedFare: fare,
       fareBreakdown: breakdown,
@@ -127,6 +159,85 @@ export class TowingBookingService {
       statusHistory: createInitialStatusHistory('PENDING'),
     });
 
+    void notifyAdminCustomerBookingCreated({
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+    }).catch(() => undefined);
+    void notifyCustomerBookingCreated({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+      advanceAmount: breakdown.advanceAmount,
+    }).catch(() => undefined);
+
+    return mapTowingBookingWithDriver(booking);
+  }
+
+  /** On-spot roadside assist — flat fare, uses towing dispatch pipeline. */
+  async createRoadsideOnSiteBooking(
+    customerId: string,
+    input: {
+      vehicleId: string;
+      pickup: CreateTowingBookingDto['pickup'];
+      serviceType: string;
+      serviceLabel: string;
+      flatFare: number;
+      scheduledAt?: string;
+    },
+  ): Promise<TowingBookingResponseDto> {
+    const vehicle = await vehicleRepository.findByIdForCustomer(input.vehicleId, customerId);
+    if (!vehicle) {
+      throw new NotFoundError('Vehicle not found');
+    }
+
+    ensureBookingServiceable(input.pickup);
+
+    const scheduledAt = input.scheduledAt ? new Date(input.scheduledAt) : undefined;
+    const { fare, breakdown } = calculateRoadsideFlatFare(input.flatFare);
+    const bookingNumber = await generatePrefixedBookingNumber('RSV', () =>
+      towingBookingRepository.countAll(),
+    );
+
+    const onSiteLocation = input.pickup;
+
+    const booking = await towingBookingRepository.create({
+      customerId: customerId as unknown as ITowingBooking['customerId'],
+      bookingNumber,
+      vehicleId: vehicle.id as unknown as ITowingBooking['vehicleId'],
+      pickup: onSiteLocation,
+      dropoff: onSiteLocation,
+      towingMode: 'instant',
+      assistLabel: input.serviceLabel,
+      distanceKm: 0,
+      estimatedFare: fare,
+      fareBreakdown: breakdown,
+      advanceAmount: breakdown.advanceAmount,
+      remainingAmount: breakdown.remainingAmount,
+      paymentStatus: 'PENDING_ADVANCE',
+      status: 'PENDING',
+      scheduledAt,
+      statusHistory: createInitialStatusHistory('PENDING').map((entry, index) =>
+        index === 0
+          ? { ...entry, note: `${input.serviceLabel} · on-site assist` }
+          : entry,
+      ),
+    });
+
+    void notifyAdminCustomerBookingCreated({
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+    }).catch(() => undefined);
+    void notifyCustomerBookingCreated({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+      advanceAmount: breakdown.advanceAmount,
+    }).catch(() => undefined);
+
     return mapTowingBookingWithDriver(booking);
   }
 
@@ -134,10 +245,13 @@ export class TowingBookingService {
     customerId: string,
     status?: UnifiedBookingStatus,
   ): Promise<TowingBookingResponseDto[]> {
-    const bookings = await towingBookingRepository.findByCustomer(customerId, { status });
+    const bookings = await towingBookingRepository.findByCustomerWithOtp(customerId, { status });
     return Promise.all(
       bookings.map(async (booking) => {
-        const mapped = await mapTowingBookingWithDriver(booking);
+        const mapped = applyCustomerBookingView(
+          await mapTowingBookingWithDriver(booking),
+          booking.status,
+        );
         mapped.tripStartOtp = customerTripOtp(booking);
         return mapped;
       }),
@@ -148,7 +262,7 @@ export class TowingBookingService {
     bookingId: string,
     requestingUser: { id: string; role: string },
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -157,9 +271,14 @@ export class TowingBookingService {
       throw new ForbiddenError('You do not have access to this booking');
     }
 
-    const mapped = await mapTowingBookingWithDriver(booking);
+    let mapped = await mapTowingBookingWithDriver(booking);
     if (requestingUser.role === 'customer') {
+      mapped = applyCustomerBookingView(mapped, booking.status);
       mapped.tripStartOtp = customerTripOtp(booking);
+      mapped.completionOtp = customerCompletionOtp(booking);
+    } else {
+      mapped.tripStartOtp = undefined;
+      mapped.completionOtp = undefined;
     }
     return mapped;
   }
@@ -169,7 +288,7 @@ export class TowingBookingService {
     newStatus: UnifiedBookingStatus,
     actor: { id: string; role: string },
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -220,7 +339,7 @@ export class TowingBookingService {
     bookingId: string,
     requestingUser: { id: string; role: string },
   ): Promise<TowingTrackingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -234,34 +353,22 @@ export class TowingBookingService {
       ? await resolveAssignedDriver(booking.driverId?.toString())
       : undefined;
 
-    let driverLocation: TowingTrackingResponseDto['driverLocation'];
-    if (driverVisible && booking.driverId) {
-      const driverUser = await UserModel.findById(booking.driverId)
-        .select('currentLocation fullName mobileNumber')
-        .exec();
-      if (
-        driverUser?.currentLocation?.latitude !== undefined &&
-        driverUser.currentLocation.longitude !== undefined
-      ) {
-        driverLocation = {
-          latitude: driverUser.currentLocation.latitude,
-          longitude: driverUser.currentLocation.longitude,
-          updatedAt: driverUser.currentLocation.updatedAt?.toISOString(),
-          driverName: driverUser.fullName ?? driver?.name,
-          driverPhone: driverUser.mobileNumber ?? driver?.phone,
-        };
-      }
-    }
+    // P-TRACK-01: prefer the fresh booking-scoped fix written by the active
+    // trip reporter; fall back to User.currentLocation for older flows.
+    // P-UPI-01: also surface the driver's saved UPI VPA for dropoff settlement.
+    const { driverLocation, driverUpiId } = await resolveCustomerTrackingExtras(booking);
 
     return {
       bookingId: booking.id,
       status: mapPublicBookingStatus(booking.status),
+      awaitingPartnerAccept: isAwaitingPartnerAccept(booking.status),
       statusHistory: booking.statusHistory.map((entry) => ({
         status: mapPublicBookingStatus(entry.status),
         timestamp: entry.timestamp.toISOString(),
       })),
       driver,
       driverLocation,
+      driverUpiId,
       pickup: booking.pickup,
       dropoff: booking.dropoff,
       assignedFleetVehicleLabel: booking.assignedFleetVehicleLabel,
@@ -280,7 +387,7 @@ export class TowingBookingService {
     bookingId: string,
     customerId: string,
   ): Promise<CancellationResult> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -305,7 +412,7 @@ export class TowingBookingService {
     refundStatus: string;
     policy: CancellationResult;
   }> {
-    let booking = await towingBookingRepository.findById(bookingId);
+    let booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -387,6 +494,14 @@ export class TowingBookingService {
       })),
     });
 
+    void notifyCustomerBookingCancelled({
+      customerId,
+      bookingNumber: booking.bookingNumber,
+      bookingType: 'towing',
+      bookingId: booking.id,
+      refundAmount: policy.refundAmount,
+    }).catch(() => undefined);
+
     const mapped = await mapTowingBookingWithDriver(booking);
     return {
       booking: mapped,
@@ -401,7 +516,7 @@ export class TowingBookingService {
     bookingId: string,
     update: Partial<ITowingBooking>,
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }
@@ -444,6 +559,15 @@ export class TowingBookingService {
       })),
     });
 
+    if (update.status === 'CONFIRMED' && booking.status !== 'CONFIRMED') {
+      void notifyVendorsOpenTowingJob({
+        bookingNumber: updated.bookingNumber,
+        bookingId: updated.id,
+        serviceLabel: updated.assistLabel?.trim() || 'Towing',
+        pickupAddress: updated.pickup?.address,
+      }).catch(() => undefined);
+    }
+
     return mapTowingBookingWithDriver(updated);
   }
 
@@ -452,7 +576,7 @@ export class TowingBookingService {
     requestingUser: { id: string; role: string },
     dto: SubmitServiceBookingRatingDto,
   ): Promise<TowingBookingResponseDto> {
-    const booking = await towingBookingRepository.findById(bookingId);
+    const booking = await towingBookingRepository.findByIdWithOtp(bookingId);
     if (!booking) {
       throw new NotFoundError('Towing booking not found');
     }

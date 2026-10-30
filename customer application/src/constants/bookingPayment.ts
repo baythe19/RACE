@@ -16,5 +16,11 @@ export type PaymentMethodOption = {
 export const BOOKING_PAYMENT_METHODS: PaymentMethodOption[] = [
   { id: 'wallet', label: 'RACE Wallet', subtitle: '₹1,250 available', Icon: Wallet },
   { id: 'upi', label: 'UPI', subtitle: 'PhonePe / GPay / Paytm', Icon: Smartphone },
-  { id: 'gpay', label: 'Google Pay', subtitle: 'Pay instantly', Icon: Smartphone },
+  {
+    id: 'gpay',
+    label: 'Google Pay',
+    subtitle: 'Coming soon · launches after MVP',
+    Icon: Smartphone,
+  },
 ];
+

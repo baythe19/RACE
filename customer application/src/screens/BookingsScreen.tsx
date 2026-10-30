@@ -1,26 +1,25 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Linking,
   Pressable,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Headphones, Phone } from 'lucide-react-native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import ActiveBookingCard from '../components/bookings/ActiveBookingCard';
 import BookingHistoryRow from '../components/bookings/BookingHistoryRow';
 import AppScreenLayout from '../components/ui/AppScreenLayout';
+import DataSkeleton from '../components/ui/DataSkeleton';
+import EmptyState from '../components/ui/EmptyState';
 import TabRootHeader from '../components/ui/TabRootHeader';
 import { BOOKING_TABS, type BookingTabId } from '../constants/bookingsScreen';
 import { useBookingsQuery } from '../services/bookings/useBookingQueries';
-import { brand } from '../theme/brand';
+import { useNotificationsQuery } from '../services/profile/useProfileQueries';
 import type { BookingsStackParamList, RootTabParamList } from '../types/navigation';
 import {
   isBookingCompleted,
@@ -28,7 +27,7 @@ import {
   mapBookingToActiveCard,
   mapBookingToHistoryRow,
 } from '../utils/bookingDisplay';
-import { colors, shadows, typography } from '../theme';
+import { colors, typography } from '../theme';
 
 const REF_W = 390;
 
@@ -43,16 +42,9 @@ export default function BookingsScreen() {
   const s = width / REF_W;
   const px = (n: number) => Math.round(n * s);
   const [activeTab, setActiveTab] = useState<BookingTabId>('all');
-  const { data: bookings = [], isLoading, refetch, isRefetching } = useBookingsQuery();
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      void refetch().then(result => {
-        setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
-      });
-    }, [refetch]),
-  );
+  const { data: bookings = [], isPending, isLoading, refetch, isRefetching } = useBookingsQuery();
+  const { data: notificationsData } = useNotificationsQuery();
+  const unreadCount = notificationsData?.unreadCount ?? 0;
 
   const typeFiltered = useMemo(() => {
     if (activeTab === 'towing') {
@@ -83,16 +75,22 @@ export default function BookingsScreen() {
     [typeFiltered],
   );
 
-  const showOngoing =
-    activeTab === 'all' ||
-    activeTab === 'ongoing' ||
-    activeTab === 'towing' ||
-    activeTab === 'driver';
-  const showHistory =
-    activeTab === 'all' ||
-    activeTab === 'completed' ||
-    activeTab === 'towing' ||
-    activeTab === 'driver';
+  const historyItems = useMemo(() => [...otherList, ...historyList], [otherList, historyList]);
+
+  /** Filters already say Ongoing / Done / Towing / Driver — no redundant section titles. */
+  const showOngoingCards =
+    (activeTab === 'all' ||
+      activeTab === 'ongoing' ||
+      activeTab === 'towing' ||
+      activeTab === 'driver') &&
+    ongoingList.length > 0;
+
+  const showHistoryCards =
+    (activeTab === 'all' ||
+      activeTab === 'completed' ||
+      activeTab === 'towing' ||
+      activeTab === 'driver') &&
+    historyItems.length > 0;
 
   const openTrack = (bookingId: string, bookingType: 'towing' | 'driver') => {
     if (bookingType === 'driver') {
@@ -106,34 +104,98 @@ export default function BookingsScreen() {
     navigation.navigate('BookingDetail', { bookingId, bookingType });
   };
 
-  const isEmpty =
+  const hasVisibleBookings = showOngoingCards || showHistoryCards;
+  const showBookingsSkeleton = isPending && bookings.length === 0;
+  const showEmptyScene = !showBookingsSkeleton && !isRefetching && !hasVisibleBookings;
+
+  /** On All: active trips exist but no past jobs — soft hint under the list. */
+  const showPastEmptyHint =
+    activeTab === 'all' &&
+    showOngoingCards &&
+    !showHistoryCards &&
     !isLoading &&
-    !isRefetching &&
-    !loadError && // UX fix: with a load error, show only the error card — the "No bookings yet" empty state must not appear alongside it.
-    ongoingList.length === 0 &&
-    historyList.length === 0 &&
-    otherList.length === 0;
+    !isPending &&
+    !isRefetching;
+
+  const emptyCopy = (() => {
+    if (bookings.length === 0) {
+      return {
+        title: 'No bookings yet',
+        subtitle: 'Book towing or a driver from Home. Active and past jobs will show up here.',
+        actionLabel: 'Browse services',
+      };
+    }
+    if (activeTab === 'ongoing') {
+      return {
+        title: 'No ongoing bookings',
+        subtitle: 'Nothing in progress right now. Check All or Done for other requests.',
+        actionLabel: undefined,
+      };
+    }
+    if (activeTab === 'completed') {
+      return {
+        title: 'No completed bookings',
+        subtitle: 'Finished jobs will appear here once a trip is done.',
+        actionLabel: undefined,
+      };
+    }
+    if (activeTab === 'towing' || activeTab === 'driver') {
+      return {
+        title: `No ${activeTab} bookings`,
+        subtitle: 'Try All, or book this service from Home.',
+        actionLabel: 'Browse services',
+      };
+    }
+    return {
+      title: 'No bookings to show',
+      subtitle: 'Pull down to refresh, or book a service from Home.',
+      actionLabel: 'Browse services',
+    };
+  })();
+
+  const goHomeServices = () => {
+    const tabNav = navigation.getParent();
+    tabNav?.navigate('Home' as never);
+  };
 
   return (
     <AppScreenLayout
       backgroundColor={colors.pageBg}
+      horizontalPadding={px(14)}
       refreshing={isRefetching}
       onRefresh={() => {
-        void refetch().then(result => {
-          setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
-        });
+        void refetch();
       }}
+      contentStyle={
+        showEmptyScene || showBookingsSkeleton ? styles.fillContent : undefined
+      }
       header={
         <TabRootHeader
           title="Bookings"
-          subtitle="Track and manage your service requests"
+          notificationCount={unreadCount}
+          onBellPress={() => {
+            const tabNav = navigation.getParent();
+            if (tabNav) {
+              (tabNav as { navigate: (name: string, params?: object) => void }).navigate('Profile', {
+                screen: 'Notifications',
+              });
+            }
+          }}
           onAvatarPress={() => {
             const tabNav = navigation.getParent();
             tabNav?.navigate('Profile' as never);
           }}
         />
       }>
-      <View style={[styles.tabsWrap, { marginTop: px(16), marginBottom: px(16), gap: px(8) }]}>
+      <View
+        style={[
+          styles.tabsRow,
+          {
+            marginTop: px(12),
+            marginBottom: px(12),
+            gap: px(6),
+          },
+        ]}>
         {BOOKING_TABS.map(tab => {
           const isActive = activeTab === tab.id;
           return (
@@ -143,16 +205,16 @@ export default function BookingsScreen() {
               style={[
                 styles.tab,
                 {
-                  paddingVertical: px(8),
-                  paddingHorizontal: px(14),
-                  borderRadius: px(20),
+                  paddingVertical: px(5),
+                  paddingHorizontal: px(12),
+                  borderRadius: px(6),
                   borderColor: isActive ? colors.primary : colors.border,
-                  backgroundColor: isActive ? colors.primary : colors.background,
+                  backgroundColor: isActive ? colors.primary : '#FFFFFF',
                 },
               ]}>
               <Text
                 style={{
-                  fontSize: px(12),
+                  fontSize: px(11),
                   fontWeight: typography.weights.bold,
                   color: isActive ? colors.dark : colors.grey,
                 }}>
@@ -163,306 +225,84 @@ export default function BookingsScreen() {
         })}
       </View>
 
-      {isLoading && bookings.length === 0 ? (
-        <View style={{ marginBottom: px(12) }}>
-          {[0, 1].map(rowIndex => (
-            <View
-              key={rowIndex}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: px(12),
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1,
-                borderColor: '#ECEEF1',
-                borderRadius: px(14),
-                padding: px(12),
-                marginBottom: px(10),
-                opacity: 0.75,
-              }}>
-              <View
-                style={{
-                  width: px(46),
-                  height: px(46),
-                  borderRadius: px(23),
-                  backgroundColor: '#EEF0F3',
-                }}
-              />
-              <View style={{ flex: 1, gap: px(8) }}>
-                <View
-                  style={{
-                    width: '62%',
-                    height: px(13),
-                    borderRadius: px(7),
-                    backgroundColor: '#EEF0F3',
-                  }}
-                />
-                <View
-                  style={{
-                    width: '42%',
-                    height: px(11),
-                    borderRadius: px(6),
-                    backgroundColor: '#EEF0F3',
-                  }}
-                />
-              </View>
-            </View>
-          ))}
-          <Text
-            style={{
-              textAlign: 'center',
-              marginTop: px(4),
-              fontSize: px(12),
-              color: colors.grey,
-            }}>
-            Loading bookings…
-          </Text>
+      {showBookingsSkeleton ? (
+        <View style={styles.centeredFill}>
+          <DataSkeleton variant="bookings" testID="bookingsSkeleton" />
         </View>
       ) : null}
 
-      {loadError ? (
-        <View
+      {showEmptyScene ? (
+        <EmptyState
+          fill
+          icon="file-tray-outline"
+          title={emptyCopy.title}
+          subtitle={emptyCopy.subtitle}
+          actionLabel={emptyCopy.actionLabel}
+          onAction={emptyCopy.actionLabel ? goHomeServices : undefined}
+        />
+      ) : null}
+
+      {showOngoingCards
+        ? ongoingList.map(booking => (
+            <ActiveBookingCard
+              key={booking.id}
+              booking={booking}
+              px={px}
+              onTrack={() => openTrack(booking.id, booking.bookingType)}
+              onPress={() => openDetail(booking.id, booking.bookingType)}
+            />
+          ))
+        : null}
+
+      {showHistoryCards
+        ? historyItems.map(item => (
+            <BookingHistoryRow
+              key={item.id}
+              item={item}
+              px={px}
+              onPress={() => openDetail(item.id, item.bookingType)}
+            />
+          ))
+        : null}
+
+      {showPastEmptyHint ? (
+        <Text
           style={{
-            borderRadius: px(12),
-            borderWidth: 1,
-            borderColor: colors.error,
-            backgroundColor: '#FEE2E2',
-            padding: px(14),
-            marginBottom: px(12),
+            marginTop: px(8),
+            marginBottom: px(4),
+            fontSize: px(12),
+            color: colors.grey,
+            textAlign: 'center',
           }}>
-          <Text
-            style={{
-              color: colors.error,
-              fontSize: px(12.5),
-              fontWeight: typography.weights.semibold,
-              lineHeight: px(18),
-            }}>
-            {loadError}
-          </Text>
-          <Text
-            style={{
-              marginTop: px(4),
-              color: colors.grey,
-              fontSize: px(11),
-            }}>
-            Tip: the first request after a while can timeout while the server wakes up. Retrying
-            usually fixes it.
-          </Text>
-          <Pressable
-            onPress={() => {
-              setLoadError(null);
-              void refetch().then(result => {
-                setLoadError(result.error ? 'Failed to load bookings. Pull to refresh.' : null);
-              });
-            }}
-            style={({ pressed }) => ({
-              marginTop: px(10),
-              alignSelf: 'flex-start',
-              backgroundColor: colors.error,
-              borderRadius: px(10),
-              paddingHorizontal: px(16),
-              paddingVertical: px(8),
-              opacity: pressed ? 0.85 : 1,
-            })}
-            accessibilityRole="button"
-            accessibilityLabel="Retry loading bookings">
-            <Text style={{ color: '#FFFFFF', fontWeight: typography.weights.bold, fontSize: px(12.5) }}>
-              Retry now
-            </Text>
-          </Pressable>
-        </View>
+          No past bookings yet
+        </Text>
       ) : null}
-
-      {isEmpty ? (
-        <View
-          style={[
-            styles.emptyCard,
-            shadows.card,
-            { borderRadius: px(16), padding: px(24), marginBottom: px(16) },
-          ]}>
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              textAlign: 'center',
-            }}>
-            No bookings yet
-          </Text>
-          <Text
-            style={{
-              marginTop: px(8),
-              fontSize: px(13),
-              color: colors.grey,
-              textAlign: 'center',
-              lineHeight: px(18),
-            }}>
-            Book a towing or driver service from Home. Once a vendor assigns a partner, it will
-            show here as active.
-          </Text>
-          <Pressable
-            onPress={() => {
-              const tabNav = navigation.getParent();
-              tabNav?.navigate('Home' as never);
-            }}
-            style={{
-              marginTop: px(16),
-              alignSelf: 'center',
-              backgroundColor: colors.primary,
-              borderRadius: px(12),
-              paddingHorizontal: px(18),
-              paddingVertical: px(12),
-            }}>
-            <Text style={{ fontWeight: typography.weights.bold, color: colors.dark }}>
-              Browse services
-            </Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      {showOngoing && !isEmpty ? (
-        <View style={{ marginBottom: px(8) }}>
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(10),
-            }}>
-            {activeTab === 'ongoing' ? 'Ongoing bookings' : 'Active bookings'}
-            {ongoingList.length > 0 ? ` (${ongoingList.length})` : ''}
-          </Text>
-          {ongoingList.length === 0 ? (
-            <Text style={{ fontSize: px(13), color: colors.grey, marginBottom: px(12) }}>
-              No ongoing bookings right now.
-            </Text>
-          ) : (
-            ongoingList.map(booking => (
-              <ActiveBookingCard
-                key={booking.id}
-                booking={booking}
-                px={px}
-                onTrack={() => openTrack(booking.id, booking.bookingType)}
-                onPress={() => openDetail(booking.id, booking.bookingType)}
-              />
-            ))
-          )}
-        </View>
-      ) : null}
-
-      {showHistory && !isEmpty ? (
-        <View>
-          <Text
-            style={{
-              fontSize: px(16),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(10),
-            }}>
-            Booking history
-          </Text>
-
-          {historyList.length === 0 && otherList.length === 0 ? (
-            <Text style={{ fontSize: px(13), color: colors.grey, marginBottom: px(12) }}>
-              Completed bookings will appear here.
-            </Text>
-          ) : (
-            [...otherList, ...historyList].map(item => (
-              <BookingHistoryRow
-                key={item.id}
-                item={item}
-                px={px}
-                onPress={() => openDetail(item.id, item.bookingType)}
-              />
-            ))
-          )}
-        </View>
-      ) : null}
-
-      <View
-        style={[
-          styles.supportCard,
-          {
-            marginTop: px(12),
-            borderRadius: px(14),
-            padding: px(14),
-            gap: px(12),
-          },
-        ]}>
-        <View
-          style={{
-            width: px(44),
-            height: px(44),
-            borderRadius: px(22),
-            backgroundColor: colors.goldLight,
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-          <Headphones size={px(20)} color={colors.primary} strokeWidth={2} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            style={{
-              fontSize: px(14),
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-              marginBottom: px(2),
-            }}>
-            Need help with a booking?
-          </Text>
-          <Text style={{ fontSize: px(12), color: colors.grey }}>Support team available 24/7.</Text>
-        </View>
-        <Pressable
-          onPress={() => void Linking.openURL(`tel:${brand.phoneRaw}`)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: px(6),
-            paddingHorizontal: px(12),
-            paddingVertical: px(10),
-            borderRadius: px(10),
-            borderWidth: 1.5,
-            borderColor: colors.primary,
-            backgroundColor: colors.background,
-            flexShrink: 0,
-          }}>
-          <Phone size={px(14)} color={colors.primary} strokeWidth={2.5} />
-          <Text
-            style={{
-              fontSize: px(12),
-              fontWeight: typography.weights.bold,
-              color: colors.primaryDark,
-            }}>
-            Call
-          </Text>
-        </Pressable>
-      </View>
     </AppScreenLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  tabsWrap: {
+  fillContent: {
+    flexGrow: 1,
+  },
+  centeredFill: {
+    flexGrow: 1,
+    alignSelf: 'stretch',
+    minHeight: 320,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   tab: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-  },
-  emptyCard: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  supportCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    backgroundColor: colors.background,
+    flexShrink: 0,
   },
 });

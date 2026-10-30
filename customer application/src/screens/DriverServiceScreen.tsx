@@ -19,6 +19,9 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceOptionInfoIcon, {
+  showServiceHeaderInfo,
+} from '../components/services/ServiceOptionInfoIcon';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import { useDriverBooking } from '../context/DriverBookingContext';
@@ -27,6 +30,8 @@ import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import type { DriverTypeId } from '../types/driverBooking';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
+import { getDriverTypeBookingDefaults, getDriverServiceFlow } from '../utils/driverServiceFlow';
 
 const REF_W = 390;
 
@@ -36,24 +41,28 @@ const DRIVER_OPTIONS = [
   {
     id: 'part_time' as DriverTypeId,
     title: 'Part-Time Driver',
+    subtitle: 'Hourly · your vehicle',
     price: 'From ₹199 / hr',
     Icon: User,
   },
   {
     id: 'full_time' as DriverTypeId,
     title: 'Full-Time Driver',
-    price: 'From ₹999 / day · Enquiry',
+    subtitle: 'Full day hire',
+    price: 'From ₹999 / day',
     Icon: Calendar,
   },
   {
     id: 'outstation' as DriverTypeId,
     title: 'Outstation Driver',
+    subtitle: 'Pickup to destination',
     price: 'From ₹1,499 / trip',
     Icon: Car,
   },
   {
     id: 'night' as DriverTypeId,
     title: 'Night Driver',
+    subtitle: 'Evening & overnight',
     price: 'From ₹299 / night',
     Icon: Moon,
   },
@@ -71,13 +80,10 @@ export default function DriverServiceScreen({ navigation }: Props) {
 
   const handleBook = (driverType: DriverTypeId) => {
     resetBooking();
-    updateBooking({ driverType });
-
-    if (driverType === 'full_time') {
-      navigation.navigate('DriverEnquiry');
-      return;
-    }
-
+    updateBooking({
+      driverType,
+      ...getDriverTypeBookingDefaults(driverType),
+    });
     navigation.navigate('DriverDateTime');
   };
 
@@ -88,7 +94,16 @@ export default function DriverServiceScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="Driver Service" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader
+        title="Driver Service"
+        onBack={() => goBackWithinStack(navigation)}
+        onInfoPress={() =>
+          showServiceHeaderInfo(
+            'How driver booking works',
+            getDriverServiceFlow('part_time').headerInfoBody,
+          )
+        }
+      />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}
@@ -100,19 +115,7 @@ export default function DriverServiceScreen({ navigation }: Props) {
         }}
         showsVerticalScrollIndicator={false}>
         <ServiceCategoryArtCard card={heroCard} />
-        <Text
-          style={{
-            marginTop: -px(4),
-            fontSize: px(12),
-            lineHeight: px(17),
-            color: colors.grey,
-            textAlign: 'center',
-            fontWeight: typography.weights.medium,
-          }}>
-          Verified drivers · GPS on trip
-        </Text>
 
-        {/* Driver Options List */}
         <View style={{ gap: px(10) }}>
           {DRIVER_OPTIONS.map(opt => (
             <View
@@ -142,14 +145,30 @@ export default function DriverServiceScreen({ navigation }: Props) {
                 <opt.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
               </View>
 
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text
+                    style={{
+                      flexShrink: 1,
+                      fontSize: px(14),
+                      lineHeight: px(18),
+                      fontWeight: typography.weights.bold,
+                      color: colors.dark,
+                    }}>
+                    {opt.title}
+                  </Text>
+                  <ServiceOptionInfoIcon
+                    alertTitle={opt.title}
+                    alertBody={getDriverServiceFlow(opt.id).tierInfoBody}
+                  />
+                </View>
                 <Text
                   style={{
-                    fontSize: px(14),
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
+                    fontSize: px(11),
+                    color: colors.grey,
+                    marginTop: px(2),
                   }}>
-                  {opt.title}
+                  {opt.subtitle}
                 </Text>
                 <Text
                   style={{
@@ -186,7 +205,6 @@ export default function DriverServiceScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      {/* Bottom Sticky Action Bar */}
       <View
         style={{
           position: 'absolute',

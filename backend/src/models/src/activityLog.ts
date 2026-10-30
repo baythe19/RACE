@@ -32,4 +32,8 @@ const ActivityLogSchema = new Schema<IActivityLog>(
 
 ActivityLogSchema.index({ createdAt: -1 });
 
+// TTL (D-05, audit 2026-10-28): audit trail retention window — 90 days.
+// TTL requires an ascending single-field index; the -1 index above stays for list sorting.
+ActivityLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 60 * 60 * 24 * 90 });
+
 export const ActivityLogModel = model<IActivityLog>('ActivityLog', ActivityLogSchema);

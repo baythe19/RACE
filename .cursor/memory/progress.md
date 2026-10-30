@@ -86,3 +86,5 @@
 ## Blocked
 
 Nothing. Waiting on the next product task from the user.
+
+- 2026-10-28: Customer UI QA FAB live at App root; OTP whitelist 9876543210→123456 API-verified; tsc 0.

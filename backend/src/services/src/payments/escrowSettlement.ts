@@ -2,6 +2,10 @@ import { Types } from 'mongoose';
 import { TransactionModel } from '../../../models/src/transaction';
 import { PlatformSettingsModel } from '../../../models/src/platformSettings';
 import { logger } from '../../../utils/src/logger';
+import {
+  DEFAULT_PLATFORM_COMMISSION_RATE,
+  platformCommissionShare,
+} from './platformCommission';
 
 export interface EscrowSettlementResult {
   settled: boolean;
@@ -57,12 +61,13 @@ export async function processBookingCompletionEscrowSettlement(params: {
     };
   }
 
-  // Fetch commission rate from platform settings (default 15% platform commission)
+  // Fetch commission rate from platform settings (fallback = shared constant, D-13)
   const settings = await PlatformSettingsModel.findOne().lean();
-  const commissionRate = settings?.commissionRate ?? 15;
+  const commissionRate = settings?.commissionRate ?? DEFAULT_PLATFORM_COMMISSION_RATE;
 
-  const commission = Math.round(finalFare * (commissionRate / 100));
-  const vendorShare = finalFare - commission; // 85% vendor payout
+  const shares = platformCommissionShare(finalFare, commissionRate);
+  const commission = shares.commission;
+  const vendorShare = shares.partnerShare;
 
   const now = new Date();
   const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');

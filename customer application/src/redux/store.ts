@@ -20,6 +20,7 @@ import {
   savePersistedAuthState,
 } from './secureAuthStorage';
 import { clearTokens, saveTokens } from '../services/api';
+import { readStoredAccessToken, readStoredRefreshToken } from '../services/sessionTokens';
 import {
   getCustomerOnboardingStep,
   setCustomerOnboardingStep,
@@ -77,23 +78,32 @@ export const store = configureStore({
 
 export async function hydrateAuthStore(): Promise<void> {
   const persisted = await loadPersistedAuthState();
-  if (!persisted?.accessToken) return;
+  const secureAccess = await readStoredAccessToken();
+  const secureRefresh = await readStoredRefreshToken();
+
+  const accessToken = secureAccess ?? persisted?.accessToken ?? null;
+  const refreshToken = secureRefresh ?? persisted?.refreshToken ?? null;
+
+  if (!accessToken) return;
 
   const storedStep = await getCustomerOnboardingStep();
-  const completed = storedStep === 'done' || persisted.onboardingRequired === false;
+  const completed = storedStep === 'done' || persisted?.onboardingRequired === false;
   if (completed && storedStep !== 'done') {
     await setCustomerOnboardingStep('done');
   }
 
   store.dispatch(
     rehydrateAuth({
-      ...persisted,
-      onboardingRequired: !completed,
+      user: persisted?.user ?? null,
+      accessToken,
+      refreshToken,
+      isAuthenticated: true,
+      onboardingRequired: persisted ? !completed : false,
     }),
   );
 
-  if (persisted.accessToken && persisted.refreshToken) {
-    await saveTokens(persisted.accessToken, persisted.refreshToken);
+  if (refreshToken) {
+    await saveTokens(accessToken, refreshToken);
   }
 }
 

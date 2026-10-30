@@ -5,11 +5,13 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import { ROADSIDE_ACCENT, ROADSIDE_ACCENT_LIGHT, ROADSIDE_SERVICES } from '../../../constants/roadsideBooking';
 import { useRoadsideBooking } from '../../../context/RoadsideBookingContext';
+import { useAppDialog } from '../../../hooks/useAppDialog';
 import { useRoadsideAvailabilityQuery } from '../../../services/bookings/useServiceBookingMutations';
 import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
 import type { HomeStackParamList } from '../../../types/navigation';
 import type { RoadsideServiceId } from '../../../types/roadsideBooking';
 import { colors, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'RoadsideSelectService'>;
 
@@ -33,6 +35,7 @@ function ServiceCard({
   return (
     <Pressable
       onPress={onPress}
+      disabled={comingSoon}
       style={{
         flex: 1,
         borderRadius: t.cardRadius,
@@ -43,7 +46,7 @@ function ServiceCard({
         justifyContent: 'center',
         paddingVertical: t.px(18),
         paddingHorizontal: t.px(8),
-        gap: t.px(8),
+        opacity: comingSoon ? 0.65 : 1,
       }}>
       <Image
         source={image}
@@ -74,6 +77,7 @@ function ServiceCard({
 
 export default function RoadsideSelectServiceScreen({ navigation }: Props) {
   const { t } = useBookingTheme();
+  const { dialog, showDialog } = useAppDialog();
   const { booking, updateBooking } = useRoadsideBooking();
   const { data: availability } = useRoadsideAvailabilityQuery();
   const [selected, setSelected] = useState<RoadsideServiceId>(booking.serviceId);
@@ -88,16 +92,31 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
 
   const rows = [ROADSIDE_SERVICES.slice(0, 2), ROADSIDE_SERVICES.slice(2, 4)];
 
+  const isSelectedComingSoon =
+    availabilityBySlug.get(roadsideServiceIdToSlug(selected)) === false;
+
   return (
     <TowingBookingLayout
       title="Select Service"
-      step={1}
+      step={0}
+      showStep={false}
       accentColor={ROADSIDE_ACCENT}
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
+        if (isSelectedComingSoon) {
+          showDialog({
+            tone: 'info',
+            title: 'Coming soon',
+            message:
+              'This roadside service is not available yet. Choose another option or use Towing from Home.',
+            primaryLabel: 'Got it',
+          });
+          return;
+        }
         updateBooking({ serviceId: selected });
         navigation.navigate('RoadsideLocation');
-      }}>
+      }}
+      continueDisabled={isSelectedComingSoon}>
       <View style={{ flex: 1, gap: t.gridGap }}>
         {rows.map((row, rowIndex) => (
           <View key={rowIndex} style={{ flex: 1, flexDirection: 'row', gap: t.gridGap }}>
@@ -109,7 +128,19 @@ export default function RoadsideSelectServiceScreen({ navigation }: Props) {
                 image={service.image}
                 isSelected={selected === service.id}
                 comingSoon={availabilityBySlug.get(roadsideServiceIdToSlug(service.id)) === false}
-                onPress={() => setSelected(service.id)}
+                onPress={() => {
+                  const slug = roadsideServiceIdToSlug(service.id);
+                  if (availabilityBySlug.get(slug) === false) {
+                    showDialog({
+                      tone: 'info',
+                      title: 'Coming soon',
+                      message: `${service.label} is not bookable yet.`,
+                      primaryLabel: 'Got it',
+                    });
+                    return;
+                  }
+                  setSelected(service.id);
+                }}
                 t={t}
               />
             ))}

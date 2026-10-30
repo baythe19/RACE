@@ -89,8 +89,13 @@ import {
   useDriverArrivedAtDropoffMutation,
   useDriverCompleteBookingMutation,
   useRefreshDriverDataOnFocus,
+  useAcceptDriverJobMutation,
+  useDriverProfileQuery,
 } from '../../../services/driver/useDriverQueries';
 import { getApiErrorMessage } from '../../../services/auth/useAuthMutations';
+import { useAppSelector } from '../../../redux/hooks';
+import { assertDriverCanAcceptJobs } from '../../../utils/driverVerification';
+import { getDriverAcceptLocationGate, pickupCoordsFromJob } from '../../../utils/driverLocationGuide';
 import { PREVIEW_TRIP_OTP, type DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
@@ -185,6 +190,9 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const rejectMutation = useRejectDriverJobMutation();
   const dropoffArrivalMutation = useDriverArrivedAtDropoffMutation();
   const completeBookingMutation = useDriverCompleteBookingMutation();
+  const acceptMutation = useAcceptDriverJobMutation();
+  const { data: profile } = useDriverProfileQuery(true);
+  const user = useAppSelector(state => state.auth.user);
   useRefreshDriverDataOnFocus(true);
 
   const [acting, setActing] = useState(false);
@@ -207,6 +215,7 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
   const [weakDismissedAt, setWeakDismissedAt] = useState(0);
 
   const driverLocation = useDriverPresenceStore(state => state.driverLocation);
+  const manualLocation = useDriverPresenceStore(state => state.manualLocation);
   const navSyncKey = useRef('');
 
   /**
@@ -469,13 +478,75 @@ export default function DriverActiveJobScreen({ navigation, route }: Props) {
     return () => sub.remove();
   }, [onTripBack]);
 
-  /** "Start navigation": the driver is now moving. First tap also moves ASSIGNED → EN_ROUTE. */
-  const startNavigation = useCallback(() => {
-    if (acting) return;
+  /** "Start navigation": the driver is now moving. First tap also accepts ASSIGNED jobs. */
+  const startNavigation = useCallback(async () => {
+    if (acting || !job) return;
+
+    if (job.status === 'DRIVER_ASSIGNED' && !UI_PREVIEW_MODE) {
+      const profileVerdict = assertDriverCanAcceptJobs(profile ?? undefined);
+      if (!profileVerdict.ok) {
+        showAlert({
+          tone: 'warning',
+          title: profileVerdict.title ?? 'Profile check failed',
+          message: profileVerdict.message ?? 'You cannot accept jobs right now.',
+        });
+        return;
+      }
+      const gate = getDriverAcceptLocationGate({
+        manualLocation,
+        gpsLocation: driverLocation,
+        pickup: pickupCoordsFromJob(job),
+        mobileNumber: user?.mobileNumber,
+        previewMode: UI_PREVIEW_MODE,
+      });
+      if (!gate.ok) {
+        showAlert({
+          tone: 'warning',
+          title: gate.title,
+          message: gate.message,
+        });
+        return;
+      }
+      setActing(true);
+      try {
+        await acceptMutation.mutateAsync({
+          bookingId: job.id,
+          bookingType: job.bookingType,
+        });
+        await refetch();
+      } catch (error) {
+        showAlert({
+          tone: 'error',
+          title: 'Accept failed',
+          message: getApiErrorMessage(error, 'Could not accept this assignment'),
+        });
+        return;
+      } finally {
+        setActing(false);
+      }
+    } else if (job.status === 'DRIVER_ASSIGNED') {
+      setActing(true);
+      try {
+        await runStatusUpdate('DRIVER_EN_ROUTE');
+      } finally {
+        setActing(false);
+      }
+    }
+
     setFollowUser(true);
     setNavMode('turn_by_turn');
-    if (job?.status === 'DRIVER_ASSIGNED') void runStatusUpdate('DRIVER_EN_ROUTE');
-  }, [acting, job?.status, runStatusUpdate]);
+  }, [
+    acceptMutation,
+    acting,
+    driverLocation,
+    job,
+    manualLocation,
+    profile,
+    refetch,
+    runStatusUpdate,
+    showAlert,
+    user?.mobileNumber,
+  ]);
 
   const confirmFarAction = useCallback(
     (title: string, message: string, confirmLabel: string, onConfirm: () => void) => {

@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import AuthFormLayout from '../../components/auth/AuthFormLayout';
 import AuthToast from '../../components/auth/AuthToast';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { useAuthActions } from '../../hooks/useAuth';
 import { sendOtp } from '../../services/authService';
 import { getApiErrorMessage } from '../../services/api';
@@ -24,6 +24,7 @@ import type { AuthStackParamList } from '../../types/navigation';
 import { getPhoneDigits } from '../../utils/phone';
 import { maskMobile } from '../../utils/mask';
 import { colors, radius, shadows, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -32,6 +33,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'OTP'>;
 export default function OTPScreen({ navigation, route }: Props) {
   const { phone, isExistingUser, devOtp, otpMessage } = route.params;
   const { verifyOtp: verifyOtpAction, error: authError, isLoading, clearError } = useAuthActions();
+  const { dialog, showDialog } = useAppDialog();
   const { width } = useWindowDimensions();
   const px = (n: number) => Math.max(1, Math.round(n * (width / REF_W)));
 
@@ -203,7 +205,12 @@ export default function OTPScreen({ navigation, route }: Props) {
       setDigits(['', '', '', '', '', '']);
       setActiveIndex(0);
       inputRefs.current[0]?.focus();
-      Alert.alert('OTP Sent', `A new OTP has been sent to ${destinationLabel}`);
+      showDialog({
+        tone: 'success',
+        title: 'OTP Sent',
+        message: `A new OTP has been sent to ${destinationLabel}`,
+        primaryLabel: 'OK',
+      });
     } catch (err) {
       setError(getApiErrorMessage(err, 'Unable to resend OTP'));
     } finally {
@@ -215,7 +222,8 @@ export default function OTPScreen({ navigation, route }: Props) {
   const isVerifying = isLoading && otpValue.length === 6;
 
   return (
-    <AuthFormLayout onBack={() => navigation.goBack()}>
+    <AuthFormLayout onBack={() => goBackWithinStack(navigation)}>
+      {dialog}
       <View style={[styles.card, shadows.card, { borderRadius: px(18), padding: px(spacing.xl) }]}>
         <View style={[styles.iconWrap, { width: px(64), height: px(64), borderRadius: px(32) }]}>
           <MessageCircle size={px(28)} color={colors.primary} strokeWidth={2.2} />
@@ -228,7 +236,7 @@ export default function OTPScreen({ navigation, route }: Props) {
 
         <View style={[styles.phoneRow, { marginTop: px(10), marginBottom: px(24), gap: px(6) }]}>
           <Text style={[styles.phoneText, { fontSize: px(14) }]}>{destinationLabel}</Text>
-          <Pressable onPress={() => navigation.goBack()} hitSlop={8} style={styles.editBtn}>
+          <Pressable onPress={() => goBackWithinStack(navigation)} hitSlop={8} style={styles.editBtn}>
             <Pencil size={15} color={colors.primary} strokeWidth={2.2} />
           </Pressable>
         </View>

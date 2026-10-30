@@ -20,6 +20,12 @@ export function errorHandler(
     return sendError(res, message, 400);
   }
 
+  // Malformed Mongo ObjectId (e.g. corrupt deep link / stale cache) — a client
+  // input problem, not a server fault.
+  if (error.name === 'CastError') {
+    return sendError(res, 'Invalid identifier', 400);
+  }
+
   if (isMongoDuplicateKeyError(error)) {
     const fields = Object.keys(error.keyPattern ?? {}).join(' and ') || 'field';
     return sendError(res, `A record with this ${fields} already exists`, 409);

@@ -12,16 +12,20 @@ import {
   ArrowRight,
   Calendar,
   Car,
-  Clock,
   Phone,
-  Shield,
-  ShieldCheck,
 } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import ServiceCategoryArtCard from '../components/services/ServiceCategoryArtCard';
+import ServiceOptionInfoIcon, {
+  showServiceHeaderInfo,
+} from '../components/services/ServiceOptionInfoIcon';
 import ServiceNavHeader from '../components/services/ServiceNavHeader';
+import {
+  TOWING_SERVICE_HEADER_INFO,
+  TOWING_TIER_INFO,
+} from '../constants/serviceLandingInfo';
 import { getServiceCategoryCard } from '../constants/serviceCategoryCards';
 import { useTowingBooking } from '../context/TowingBookingContext';
 import { useCatalogStore } from '../store/catalogStore';
@@ -29,6 +33,7 @@ import { brand } from '../theme/brand';
 import type { HomeStackParamList } from '../types/navigation';
 import type { TowingServiceModeId } from '../types/towingBooking';
 import { colors, shadows, typography } from '../theme';
+import { goBackWithinStack } from '../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
@@ -80,7 +85,13 @@ export default function TowingServiceScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-      <ServiceNavHeader title="Towing Service" onBack={() => navigation.goBack()} />
+      <ServiceNavHeader
+        title="Towing Service"
+        onBack={() => goBackWithinStack(navigation)}
+        onInfoPress={() =>
+          showServiceHeaderInfo('How towing booking works', TOWING_SERVICE_HEADER_INFO)
+        }
+      />
 
       <ScrollView
         style={{ backgroundColor: colors.pageBg }}
@@ -91,80 +102,8 @@ export default function TowingServiceScreen({ navigation }: Props) {
           gap: px(12),
         }}
         showsVerticalScrollIndicator={false}>
-        <View style={{ marginBottom: px(4) }}>
-          <ServiceCategoryArtCard card={heroCard} />
+        <ServiceCategoryArtCard card={heroCard} />
 
-          {/* Quick Trust Bar — attached to the bottom of the hero card */}
-          <View
-            style={[
-              shadows.cardSoft,
-              {
-                marginHorizontal: px(10),
-                marginTop: -px(24),
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                backgroundColor: colors.background,
-                borderRadius: px(16),
-                paddingVertical: px(14),
-                paddingHorizontal: px(10),
-                borderWidth: 1,
-                borderColor: '#F0EFEA',
-              },
-            ]}>
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Clock size={px(18)} color={colors.primary} strokeWidth={2.5} />
-              <Text
-                style={{
-                  marginTop: px(4),
-                  fontSize: px(11),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                  textAlign: 'center',
-                }}>
-                30 min{'\n'}
-                <Text style={{ fontWeight: typography.weights.regular, color: colors.grey }}>
-                  arrival
-                </Text>
-              </Text>
-            </View>
-            <View style={{ width: 1, backgroundColor: '#EEEEEE', marginVertical: px(4) }} />
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <ShieldCheck size={px(18)} color={colors.primary} strokeWidth={2.5} />
-              <Text
-                style={{
-                  marginTop: px(4),
-                  fontSize: px(11),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                  textAlign: 'center',
-                }}>
-                Verified{'\n'}
-                <Text style={{ fontWeight: typography.weights.regular, color: colors.grey }}>
-                  drivers
-                </Text>
-              </Text>
-            </View>
-            <View style={{ width: 1, backgroundColor: '#EEEEEE', marginVertical: px(4) }} />
-            <View style={{ flex: 1, alignItems: 'center' }}>
-              <Shield size={px(18)} color={colors.primary} strokeWidth={2.5} />
-              <Text
-                style={{
-                  marginTop: px(4),
-                  fontSize: px(11),
-                  fontWeight: typography.weights.bold,
-                  color: colors.dark,
-                  textAlign: 'center',
-                }}>
-                Safe &{'\n'}
-                <Text style={{ fontWeight: typography.weights.regular, color: colors.grey }}>
-                  insured
-                </Text>
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Towing Options List */}
         <View style={{ gap: px(10) }}>
           {TOWING_OPTIONS.map(opt => (
             <View
@@ -194,15 +133,23 @@ export default function TowingServiceScreen({ navigation }: Props) {
                 <opt.Icon size={px(20)} color={colors.primary} strokeWidth={2.6} />
               </View>
 
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={{
-                    fontSize: px(14),
-                    fontWeight: typography.weights.bold,
-                    color: colors.dark,
-                  }}>
-                  {opt.title}
-                </Text>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <Text
+                    style={{
+                      flexShrink: 1,
+                      fontSize: px(14),
+                      lineHeight: px(18),
+                      fontWeight: typography.weights.bold,
+                      color: colors.dark,
+                    }}>
+                    {opt.title}
+                  </Text>
+                  <ServiceOptionInfoIcon
+                    alertTitle={opt.title}
+                    alertBody={TOWING_TIER_INFO[opt.id]}
+                  />
+                </View>
                 <Text
                   style={{
                     fontSize: px(11),
@@ -246,7 +193,6 @@ export default function TowingServiceScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      {/* Bottom Sticky Action Bar */}
       <View
         style={{
           position: 'absolute',

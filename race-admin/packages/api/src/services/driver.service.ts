@@ -18,11 +18,11 @@ export async function getDriverById(id: string): Promise<DriverDetail> {
   return apiGet<DriverDetail>(`/drivers/${id}`);
 }
 
-export async function createDriver(input: Record<string, string>): Promise<DriverListItem> {
+export async function createDriver(input: Record<string, string | undefined>): Promise<DriverListItem> {
   return apiPost<DriverListItem>('/drivers', input);
 }
 
-export async function updateDriver(id: string, input: Record<string, string>): Promise<DriverListItem> {
+export async function updateDriver(id: string, input: Record<string, string | undefined>): Promise<DriverListItem> {
   return apiPatch<DriverListItem>(`/drivers/${id}`, input);
 }
 

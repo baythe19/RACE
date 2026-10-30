@@ -15,7 +15,8 @@ const DEV_API_HOST = Platform.select({
 
 export const API_CONFIG = {
   baseUrl: extraApiUrl ?? `http://${DEV_API_HOST}:3000`,
-  timeoutMs: 12000,
+  // 30s: Render free tier cold-start can exceed 12s on first request.
+  timeoutMs: 30000,
 } as const;
 
 export const API_ENDPOINTS = {

@@ -1,19 +1,21 @@
 import React from 'react';
 import { Image, type ImageSourcePropType, Text, View } from 'react-native';
-import Svg, { Rect } from 'react-native-svg';
+
+import { API_BASE_URL } from '../../config/env';
+import InlineQrCode from '../qr/InlineQrCode';
+import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import {
-  Bike,
-  Bus,
+  BusFront,
   Car,
-  CarTaxiFront,
-  CircleEllipsis,
+  CircleDashed,
   Droplet,
   Flame,
   Fuel,
   Leaf,
+  Motorbike as Bike,
+  PlugZap as Zap,
   Truck,
-  Zap,
-  type LucideIcon,
+  type LucideProps,
 } from 'lucide-react-native';
 
 import { images } from '../../assets';
@@ -35,33 +37,59 @@ export const VEHICLE_COLOR_OPTIONS = [
 
 export type UiVehicleType = VehicleType;
 
+function AutoIcon({ size = 24, color = '#6B7280', strokeWidth = 2 }: LucideProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M3 15h12.5a3.5 3.5 0 0 0 3.5-3.5V9H8.2L6.2 5.5H3"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M8 9h8.2"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+      />
+      <Circle cx="7.2" cy="17.2" r="1.7" stroke={color} strokeWidth={strokeWidth} />
+      <Circle cx="15.8" cy="17.2" r="1.7" stroke={color} strokeWidth={strokeWidth} />
+      <Path d="M8.9 17.2h5.2" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 export const VEHICLE_TYPE_OPTIONS: Array<{
   id: VehicleType;
   label: string;
-  Icon: LucideIcon;
+  Icon: React.ComponentType<LucideProps>;
 }> = [
   { id: 'car', label: 'Car', Icon: Car },
   { id: 'bike', label: 'Bike', Icon: Bike },
   { id: 'ev', label: 'EV', Icon: Zap },
   { id: 'truck', label: 'Truck', Icon: Truck },
-  { id: 'auto', label: 'Auto', Icon: CarTaxiFront },
-  { id: 'bus', label: 'Bus', Icon: Bus },
-  { id: 'other', label: 'Other', Icon: CircleEllipsis },
+  { id: 'auto', label: 'Auto', Icon: AutoIcon },
+  { id: 'bus', label: 'Bus', Icon: BusFront },
+  { id: 'other', label: 'Other', Icon: CircleDashed },
 ];
 
 export const VEHICLE_TYPE_IDS: VehicleType[] = VEHICLE_TYPE_OPTIONS.map(option => option.id);
 
+/** Self-serve add vehicle — omit auto-rickshaw; bus and other fleet types stay. */
+export const ADD_VEHICLE_TYPE_OPTIONS = VEHICLE_TYPE_OPTIONS.filter(option => option.id !== 'auto');
+
 export const FUEL_TYPE_OPTIONS: Array<{
   id: FuelType;
   label: string;
-  Icon: LucideIcon;
+  Icon: React.ComponentType<LucideProps>;
 }> = [
   { id: 'petrol', label: 'Petrol', Icon: Fuel },
   { id: 'diesel', label: 'Diesel', Icon: Droplet },
   { id: 'cng', label: 'CNG', Icon: Flame },
   { id: 'electric', label: 'EV', Icon: Zap },
   { id: 'hybrid', label: 'Hybrid', Icon: Leaf },
-  { id: 'other', label: 'Other', Icon: CircleEllipsis },
+  { id: 'other', label: 'Other', Icon: CircleDashed },
 ];
 
 export const FUEL_TYPE_IDS: FuelType[] = FUEL_TYPE_OPTIONS.map(option => option.id);
@@ -71,9 +99,14 @@ export function getVehicleImageSource(type: VehicleType): ImageSourcePropType {
     case 'bike':
       return images.booking.vehicleBike;
     case 'truck':
+      return images.booking.vehicleTruck;
     case 'bus':
+      return images.booking.vehicleBus;
     case 'ev':
-      return images.booking.vehicleSuv;
+      return images.booking.vehicleEv;
+    case 'other':
+    case 'auto':
+      return images.booking.vehicleHatchback;
     default:
       return images.booking.vehicleSedan;
   }
@@ -160,6 +193,39 @@ export function FuelTypeIcon({
   const iconColor = selected ? VEHICLE_YELLOW : color;
 
   return <Icon size={size} color={iconColor} strokeWidth={2} />;
+}
+
+/** Same URL encoded in backend `getVehicleQrPayload` — scan opens emergency verify flow. */
+export function getVehicleQrScanUrl(vehicleId: string): string {
+  return `${API_BASE_URL}/api/v1/qr/${vehicleId}`;
+}
+
+/** List/detail thumbnail: real data-URL from API, or inline encode of the scan URL. */
+export function VehicleEmergencyQrThumb({
+  vehicleId,
+  qrCodeDataUrl,
+  size,
+}: {
+  vehicleId: string;
+  qrCodeDataUrl?: string;
+  size: number;
+}) {
+  if (qrCodeDataUrl?.startsWith('data:image')) {
+    return (
+      <Image
+        source={{ uri: qrCodeDataUrl }}
+        style={{ width: size, height: size, borderRadius: size * 0.12 }}
+        resizeMode="contain"
+      />
+    );
+  }
+  return (
+    <InlineQrCode
+      value={getVehicleQrScanUrl(vehicleId)}
+      size={size}
+      backgroundColor="#FFFFFF"
+    />
+  );
 }
 
 export function MiniQrCode({ size }: { size: number }) {

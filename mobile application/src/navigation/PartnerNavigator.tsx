@@ -283,18 +283,19 @@ export default function PartnerNavigator() {
           options={{ title: 'Jobs' }}
         />
       ) : null}
-      {!isDriver ? (
-        <Tab.Screen
-          name="PartnerDrivers"
-          component={PartnerDriversStackNavigator}
-          options={{ title: 'Drivers' }}
-        />
-      ) : null}
+      {/* Tab order: Home → Jobs → Vehicles → Drivers → (My Vendor) → Account */}
       {!isDriver ? (
         <Tab.Screen
           name="PartnerVehicles"
           component={PartnerVehiclesStackNavigator}
           options={{ title: 'Vehicles' }}
+        />
+      ) : null}
+      {!isDriver ? (
+        <Tab.Screen
+          name="PartnerDrivers"
+          component={PartnerDriversStackNavigator}
+          options={{ title: 'Drivers' }}
         />
       ) : null}
       {showVendorTab ? (

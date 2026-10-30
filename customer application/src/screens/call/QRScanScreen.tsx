@@ -16,14 +16,15 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SOS_COLORS } from '../../constants/sosTheme';
 import type { CallStackParamList } from '../../types/navigation';
 import { typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 const REF_W = 390;
 
 type Props = NativeStackScreenProps<CallStackParamList, 'QRScan'>;
 
 /** Extract clean vehicleId from plain IDs, deep link URLs, or JSON payloads */
-function extractVehicleId(raw: string): string {
-  if (!raw) return 'demo_veh_101';
+function extractVehicleId(raw: string): string | null {
+  if (!raw?.trim()) return null;
   const trimmed = raw.trim();
 
   // Case 1: JSON payload (e.g. {"vehicleId":"veh_123"} or {"id":"veh_123"})
@@ -46,6 +47,18 @@ function extractVehicleId(raw: string): string {
   if (trimmed.includes('/verify/')) {
     const parts = trimmed.split('/verify/');
     const candidate = parts[1]?.split('/')[0]?.split('?')[0];
+    if (candidate) return candidate;
+  }
+
+  // Backend QR payload: {APP_BASE_URL}/api/v1/qr/{vehicleId}
+  if (trimmed.includes('/api/v1/qr/')) {
+    const parts = trimmed.split('/api/v1/qr/');
+    const candidate = parts[1]?.split('/')[0]?.split('?')[0];
+    if (candidate) return candidate;
+  }
+  if (trimmed.includes('/qr/')) {
+    const parts = trimmed.split('/qr/');
+    const candidate = parts[parts.length - 1]?.split('/')[0]?.split('?')[0];
     if (candidate) return candidate;
   }
 
@@ -80,11 +93,11 @@ export default function QRScanScreen({ navigation }: Props) {
     if (scanned) return;
     setScanned(true);
     const vehicleId = extractVehicleId(data);
+    if (!vehicleId) {
+      setScanned(false);
+      return;
+    }
     navigation.navigate('VehicleQrEmergency', { vehicleId });
-  };
-
-  const handleDemoScan = () => {
-    navigation.navigate('VehicleQrEmergency', { vehicleId: 'demo_veh_101' });
   };
 
   const handleSos = () => {
@@ -98,7 +111,7 @@ export default function QRScanScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <View style={{ paddingHorizontal: px(20), flex: 1 }}>
         <Pressable
-          onPress={() => navigation.goBack()}
+          onPress={() => goBackWithinStack(navigation)}
           hitSlop={12}
           style={{ alignSelf: 'flex-start', marginBottom: px(8), paddingVertical: px(4) }}>
           <ChevronLeft size={px(24)} color={SOS_COLORS.white} strokeWidth={2.5} />
@@ -257,22 +270,6 @@ export default function QRScanScreen({ navigation }: Props) {
 
         {/* Action buttons */}
         <Pressable
-          onPress={handleDemoScan}
-          style={{
-            width: '100%',
-            height: px(50),
-            borderRadius: px(14),
-            backgroundColor: SOS_COLORS.gold,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: px(10),
-          }}>
-          <Text style={{ fontSize: px(15), fontWeight: typography.weights.bold, color: '#000000' }}>
-            🔍 Test Demo Vehicle QR
-          </Text>
-        </Pressable>
-
-        <Pressable
           onPress={handleSos}
           style={{
             width: '100%',
@@ -288,7 +285,7 @@ export default function QRScanScreen({ navigation }: Props) {
           </Text>
         </Pressable>
 
-        <Pressable onPress={() => navigation.goBack()} style={{ alignItems: 'center', paddingVertical: px(6) }}>
+        <Pressable onPress={() => goBackWithinStack(navigation)} style={{ alignItems: 'center', paddingVertical: px(6) }}>
           <Text style={{ fontSize: px(14), fontWeight: typography.weights.semibold, color: SOS_COLORS.grey }}>
             Cancel
           </Text>

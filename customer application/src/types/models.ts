@@ -104,6 +104,13 @@ export interface BookingDriver {
   rating?: number;
   photo: string | null;
   experience?: string;
+  /** Driver mobile for Call on active cards; falls back to support if missing. */
+  phone?: string;
+}
+
+export interface ActiveBookingLocation {
+  primary: string;
+  secondary?: string;
 }
 
 export interface ActiveBooking {
@@ -111,11 +118,14 @@ export interface ActiveBooking {
   displayId: string;
   service: string;
   status: string;
-  pickup: string;
-  drop: string;
+  pickup: ActiveBookingLocation;
+  /** Omitted when service is on-site at pickup only. */
+  drop?: ActiveBookingLocation | null;
   eta: string;
   driver: BookingDriver;
   bookingType: 'towing' | 'driver';
+  bookingKind?: 'towing' | 'driver' | 'roadside';
+  dispatchHint?: string;
   tripStartOtp?: string;
 }
 

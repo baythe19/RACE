@@ -59,7 +59,13 @@ import { useNotificationsQuery } from '../../../services/useNotificationQueries'
 import type { DriverJobBooking } from '../../../services/driver/driverApi';
 import type { PartnerJobsStackParamList } from '../../../types/partnerNavigation';
 import { formatReadableAddress } from '../../../utils/readableAddress';
-import { buildDriverVerification } from '../../../utils/driverVerification';
+import { assertDriverCanAcceptJobs, buildDriverVerification } from '../../../utils/driverVerification';
+import { getDriverAcceptLocationGate, pickupCoordsFromJob } from '../../../utils/driverLocationGuide';
+import { UI_PREVIEW_MODE } from '../../../constants/preview';
+import { useAppSelector } from '../../../redux/hooks';
+import {
+  useDriverPresenceStore,
+} from '../../../store/driverPresenceStore';
 import {
   isActiveBookingStatus,
   isClosedBookingStatus,
@@ -433,12 +439,14 @@ function ActiveJobRow({
           paddingBottom: px(10),
           borderBottomWidth: 1,
           borderBottomColor: '#F1F5F9',
+          gap: px(8),
         }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center' }}>
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
+              flexShrink: 1,
               backgroundColor: '#ECFDF5',
               paddingHorizontal: px(8),
               paddingVertical: px(3),
@@ -453,9 +461,11 @@ function ActiveJobRow({
                 borderRadius: px(3),
                 backgroundColor: '#10B981',
                 marginRight: px(5),
+                flexShrink: 0,
               }}
             />
             <PartnerText
+              numberOfLines={1}
               style={{
                 fontSize: px(10.5),
                 fontWeight: '800',
@@ -467,8 +477,11 @@ function ActiveJobRow({
           </View>
 
           <PartnerText
+            numberOfLines={1}
+            ellipsizeMode="middle"
             style={{
-              fontSize: px(13),
+              flexShrink: 1,
+              fontSize: px(12),
               fontWeight: '700',
               color: '#475569',
               marginLeft: px(8),
@@ -478,7 +491,7 @@ function ActiveJobRow({
         </View>
 
         {fare != null ? (
-          <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ alignItems: 'flex-end', flexShrink: 0 }}>
             <PartnerText
               style={{
                 fontSize: px(17),
@@ -526,9 +539,17 @@ function ActiveJobRow({
             {serviceTitle(job)}
           </PartnerText>
           {job.distanceKm != null ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: px(2) }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                marginTop: px(2),
+                minWidth: 0,
+                flexShrink: 1,
+              }}>
               <MapPin size={px(11)} color="#059669" strokeWidth={2.4} />
               <PartnerText
+                numberOfLines={1}
                 style={{
                   fontSize: px(11.5),
                   fontWeight: '600',
@@ -538,7 +559,15 @@ function ActiveJobRow({
                 {job.distanceKm} km trip
               </PartnerText>
               {job.assignedFleetVehicleLabel ? (
-                <PartnerText style={{ fontSize: px(11.5), color: '#94A3B8', marginLeft: px(4) }}>
+                <PartnerText
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  style={{
+                    flexShrink: 1,
+                    fontSize: px(11.5),
+                    color: '#94A3B8',
+                    marginLeft: px(4),
+                  }}>
                   • {job.assignedFleetVehicleLabel}
                 </PartnerText>
               ) : null}
@@ -1036,10 +1065,11 @@ function JobsCount({
     <View
       style={{
         flex: 1,
+        minWidth: 0,
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: px(10),
-        paddingVertical: px(6),
+        paddingVertical: px(8),
       }}>
       <View
         style={{
@@ -1049,19 +1079,21 @@ function JobsCount({
           backgroundColor: iconBg,
           alignItems: 'center',
           justifyContent: 'center',
+          flexShrink: 0,
         }}>
         <Icon size={px(17)} color={iconColor} strokeWidth={2.4} />
       </View>
-      <View style={{ marginLeft: px(10) }}>
+      <View style={{ flex: 1, minWidth: 0, marginLeft: px(10) }}>
         <PartnerText style={[T.metricValue, { fontSize: px(18), lineHeight: px(22), color: C.ink }]}>
           {count}
         </PartnerText>
         <PartnerText
+          numberOfLines={1}
           style={[
             T.small,
             {
-              fontSize: px(11),
-              lineHeight: px(14),
+              fontSize: px(10.5),
+              lineHeight: px(13.5),
               fontWeight: '600',
               color: C.grey,
               textTransform: 'uppercase',
@@ -1160,6 +1192,32 @@ export default function DriverJobsScreen({ navigation }: Props) {
     [offers],
   );
 
+  /* Pickup-radius gate: a driver without a usable position (or far outside the
+     pickup radius) cannot accept — they could never serve the job in time. */
+  const user = useAppSelector(state => state.auth.user);
+  const manualLocation = useDriverPresenceStore(state => state.manualLocation);
+  const gpsLocation = useDriverPresenceStore(state => state.driverLocation);
+
+  const checkAcceptLocation = useCallback(
+    (job: DriverJobBooking): boolean => {
+      const gate = getDriverAcceptLocationGate({
+        manualLocation,
+        gpsLocation,
+        pickup: pickupCoordsFromJob(job),
+        mobileNumber: user?.mobileNumber,
+        previewMode: UI_PREVIEW_MODE,
+      });
+      if (gate.ok) return true;
+      showAlert({
+        tone: 'warning',
+        title: gate.title,
+        message: gate.message,
+      });
+      return false;
+    },
+    [manualLocation, gpsLocation, user?.mobileNumber, showAlert],
+  );
+
   const doneJobs = useMemo(
     () =>
       jobs
@@ -1181,6 +1239,16 @@ export default function DriverJobsScreen({ navigation }: Props) {
   const onAccept = useCallback(
     async (job: DriverJobBooking) => {
       if (pendingAcceptId || pendingDeclineId) return;
+      // Profile gate first: rejected/suspended/unsubmitted accounts never accept.
+      const profileVerdict = assertDriverCanAcceptJobs(profile ?? undefined);
+      if (!profileVerdict.ok) {
+        showAlert({
+          tone: 'warning',
+          title: profileVerdict.title ?? 'Profile check failed',
+          message: profileVerdict.message ?? 'You cannot accept jobs right now.',
+        });
+        return;
+      }
       if (hasActiveJob) {
         showAlert({
           tone: 'warning',
@@ -1199,6 +1267,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         });
         return;
       }
+      if (!checkAcceptLocation(job)) return;
       setPendingAcceptId(job.id);
       try {
         // The active job opens only after the API confirms the accept.
@@ -1218,7 +1287,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
         setPendingAcceptId(null);
       }
     },
-    [acceptMutation, activeJob, activeJobs, hasActiveJob, navigation, openActiveJob, pendingAcceptId, pendingDeclineId, refetchJobs, showAlert],
+    [acceptMutation, activeJob, activeJobs, checkAcceptLocation, hasActiveJob, navigation, openActiveJob, pendingAcceptId, pendingDeclineId, profile, refetchJobs, showAlert],
   );
 
   const onDecline = useCallback(
@@ -1354,6 +1423,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           <View
             style={{
               flex: 1,
+              minWidth: 0,
               borderRadius: px(14),
               borderWidth: 1,
               borderColor: C.hairline,
@@ -1366,6 +1436,7 @@ export default function DriverJobsScreen({ navigation }: Props) {
           <View
             style={{
               flex: 1,
+              minWidth: 0,
               borderRadius: px(14),
               borderWidth: 1,
               borderColor: C.hairline,
@@ -1415,26 +1486,6 @@ export default function DriverJobsScreen({ navigation }: Props) {
                   }}>
                   {item.label}
                 </PartnerText>
-                <View
-                  style={{
-                    marginLeft: px(4),
-                    minWidth: px(17),
-                    paddingHorizontal: px(5),
-                    paddingVertical: px(1),
-                    borderRadius: px(R.pill),
-                    alignItems: 'center',
-                    backgroundColor: selected ? C.amberTile : 'rgba(100, 116, 139, 0.12)',
-                  }}>
-                  <PartnerText
-                    style={{
-                      fontSize: px(10),
-                      lineHeight: px(12),
-                      fontWeight: '700',
-                      color: selected ? C.amberText : '#64748B',
-                    }}>
-                    {item.count}
-                  </PartnerText>
-                </View>
               </Pressable>
             );
           })}
@@ -1486,11 +1537,16 @@ export default function DriverJobsScreen({ navigation }: Props) {
                       }}>
                       <Navigation size={px(18)} color="#0284C7" strokeWidth={2.4} />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <PartnerText style={{ fontSize: px(13), fontWeight: '700', color: '#0369A1' }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <PartnerText
+                        numberOfLines={1}
+                        ellipsizeMode="middle"
+                        style={{ fontSize: px(13), fontWeight: '700', color: '#0369A1' }}>
                         Active Trip in Progress (#{activeJob?.bookingNumber || activeJobs[0]?.bookingNumber})
                       </PartnerText>
-                      <PartnerText style={{ fontSize: px(11.5), color: '#475569', marginTop: px(2) }}>
+                      <PartnerText
+                        numberOfLines={2}
+                        style={{ fontSize: px(11.5), color: '#475569', marginTop: px(2) }}>
                         Complete your active trip before accepting new requests.
                       </PartnerText>
                     </View>
@@ -1526,7 +1582,13 @@ export default function DriverJobsScreen({ navigation }: Props) {
                   key={`${job.bookingType}-${job.id}`}
                   job={job}
                   px={px}
-                  onOpen={() => openActiveJob(job)}
+                  onOpen={() => {
+                    if (job.status === 'DRIVER_ASSIGNED') {
+                      void onAccept(job);
+                      return;
+                    }
+                    openActiveJob(job);
+                  }}
                 />
               ))
             )

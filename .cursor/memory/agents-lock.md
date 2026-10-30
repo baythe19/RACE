@@ -8,4 +8,4 @@ True isolation (optional, user must ask): git worktrees — one branch/worktree 
 
 | Claimed | Surface | Task | Session note |
 |---------|---------|------|--------------|
-| Claude (this session) | backend + mobile application | Render deploy prep + partner APK build | HanuSMS live-verified; audit 41/41; user approved build start |
+| 2026-10-30 | partner driver home + presence | active-trip card overlap fix, online tied to session | agent |

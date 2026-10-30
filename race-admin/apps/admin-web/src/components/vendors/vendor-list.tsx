@@ -19,9 +19,32 @@ import { useVendors } from '@/hooks/use-vendors';
 const VENDOR_FIELDS = [
   { name: 'businessName', label: 'Business Name', required: true, placeholder: 'Enter business name' },
   { name: 'ownerName', label: 'Owner Name', required: true, placeholder: 'Enter owner name' },
-  { name: 'email', label: 'Email', type: 'email' as const, required: true, placeholder: 'Enter email address' },
   { name: 'phone', label: 'Phone', type: 'tel' as const, required: true, placeholder: 'Enter 10-digit mobile number' },
+  { name: 'email', label: 'Email', type: 'email' as const, placeholder: 'Enter email address' },
+  {
+    name: 'vendorType',
+    label: 'Vendor Type',
+    type: 'select' as const,
+    required: true,
+    placeholder: 'Select vendor type',
+    options: [
+      { label: 'Towing Company', value: 'towing_company' },
+      { label: 'Tow Truck Driver', value: 'tow_truck_driver' },
+      { label: 'Full-Time Driver', value: 'full_time_driver' },
+      { label: 'Part-Time Driver', value: 'part_time_driver' },
+      { label: 'Mechanic', value: 'mechanic' },
+    ],
+  },
+];
+
+const VENDOR_ADDRESS_FIELDS = [
+  { name: 'addressLine', label: 'Business Address', placeholder: 'Shop / plot / street' },
   { name: 'city', label: 'City', required: true, placeholder: 'Enter city name' },
+  { name: 'pincode', label: 'PIN Code', placeholder: '6-digit PIN code' },
+  { name: 'state', label: 'State', placeholder: 'Odisha' },
+];
+
+const VENDOR_STATUS_FIELDS = [
   {
     name: 'status',
     label: 'Status',
@@ -233,7 +256,12 @@ export function VendorList() {
       onClose={() => { setFormOpen(false); setEditing(null); }}
       resetKey={editing?.id ?? 'create'}
       title={editing ? 'Edit Vendor' : 'Add Vendor'}
-      fields={VENDOR_FIELDS}
+      description={editing ? 'Update vendor details' : 'Create a vendor partner record'}
+      sections={[
+        { title: 'Business Details', fields: VENDOR_FIELDS },
+        { title: 'Business Address', fields: VENDOR_ADDRESS_FIELDS },
+        { title: 'Account', fields: VENDOR_STATUS_FIELDS },
+      ]}
       initialValues={
         editing
           ? {
@@ -244,15 +272,19 @@ export function VendorList() {
               city: editing.city,
               status: editing.status,
             }
-          : { status: 'PENDING' }
+          : { status: 'PENDING', state: 'Odisha', vendorType: 'towing_company' }
       }
       onSubmit={async (values) => {
         const payload = {
           businessName: values.businessName,
           ownerName: values.ownerName,
-          email: values.email,
+          email: values.email || undefined,
           phone: values.phone,
+          vendorType: values.vendorType || undefined,
           city: values.city,
+          state: values.state || undefined,
+          addressLine: values.addressLine || undefined,
+          pincode: values.pincode || undefined,
           status: values.status as VendorListItem['status'],
         };
         if (editing) {

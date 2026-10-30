@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import GlassCard from '../../components/ui/GlassCard';
 import PrimaryButton from '../../components/ui/PrimaryButton';
+import { useAppDialog } from '../../hooks/useAppDialog';
 import { getApiErrorMessage } from '../../services/api';
 import { verifyVehicle } from '../../services/vehicleService';
+import { getVehicleQrScanUrl } from '../../components/vehicles/vehicleUi';
 import type { HomeStackParamList } from '../../types/navigation';
 import type { VehicleVerifyValidResponse } from '../../types/vehicle';
 import { colors, spacing, typography } from '../../theme';
+import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<any, 'VehicleQrEmergency'>;
 
@@ -23,56 +26,36 @@ function formatTelUrl(number: string): string {
 }
 
 export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
-  const vehicleId = (route.params as { vehicleId?: string } | undefined)?.vehicleId ?? 'demo_veh_101';
+  const vehicleId = (route.params as { vehicleId?: string } | undefined)?.vehicleId?.trim();
+  const { dialog, showDialog } = useAppDialog();
   const [verified, setVerified] = useState<VehicleVerifyValidResponse | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(true);
 
   useEffect(() => {
+    if (!vehicleId) {
+      setVerifyError('No vehicle ID on this scan. Try scanning the sticker again.');
+      setIsVerifying(false);
+      return;
+    }
+
     let cancelled = false;
     setIsVerifying(true);
     setVerifyError(null);
+    setVerified(null);
 
     verifyVehicle(vehicleId)
       .then(result => {
         if (cancelled) return;
         if (!result.valid) {
-          // Provide demo vehicle fallback for smooth testing
-          setVerified({
-            valid: true,
-            vehicleId,
-            vehicleType: 'car',
-            vehicleNumber: 'OD 02 AB 1234',
-            brand: 'Hyundai',
-            model: 'Creta',
-            color: 'Polar White',
-            fuelType: 'Diesel',
-            ownerName: 'Rahul Sharma',
-            ownerMobile: '+919876543210',
-            emergencyName: 'Amit Verma (Brother)',
-            emergencyMobile: '+919876543211',
-          });
+          setVerifyError('This QR is not linked to an active RACE vehicle.');
           return;
         }
         setVerified(result);
       })
-      .catch(() => {
+      .catch(error => {
         if (!cancelled) {
-          // Fallback to demo vehicle data when offline or demo id
-          setVerified({
-            valid: true,
-            vehicleId,
-            vehicleType: 'car',
-            vehicleNumber: 'OD 02 AB 1234',
-            brand: 'Hyundai',
-            model: 'Creta',
-            color: 'Polar White',
-            fuelType: 'Diesel',
-            ownerName: 'Rahul Sharma',
-            ownerMobile: '+919876543210',
-            emergencyName: 'Amit Verma (Brother)',
-            emergencyMobile: '+919876543211',
-          });
+          setVerifyError(getApiErrorMessage(error, 'Unable to verify this QR right now.'));
         }
       })
       .finally(() => {
@@ -86,7 +69,12 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
 
   const callNumber = (number?: string) => {
     if (!number?.trim()) {
-      Alert.alert('Unavailable', 'No phone number on file for this contact.');
+      showDialog({
+        tone: 'error',
+        title: 'Unavailable',
+        message: 'No phone number on file for this contact.',
+        primaryLabel: 'OK',
+      });
       return;
     }
     void Linking.openURL(formatTelUrl(number));
@@ -111,6 +99,7 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {dialog}
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.badge}>
           <Ionicons name="warning" size={16} color={colors.textLight} />
@@ -120,11 +109,20 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
         {isVerifying ? (
           <View style={{ alignItems: 'center', paddingVertical: spacing.xl }}>
             <ActivityIndicator color={colors.primary} />
-            <Text style={styles.meta}>Verifying vehicle...</Text>
+            <Text style={styles.meta}>Verifying vehicle…</Text>
           </View>
         ) : verifyError ? (
-          <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
-            <Text style={styles.errorText}>{verifyError}</Text>
+          <View style={{ alignItems: 'stretch', paddingVertical: spacing.md }}>
+            <GlassCard>
+              <Text style={styles.errorTitle}>QR not recognised</Text>
+              <Text style={styles.meta}>{verifyError}</Text>
+            </GlassCard>
+            <PrimaryButton label="Call 112" onPress={() => void Linking.openURL('tel:112')} />
+            <Pressable
+              onPress={() => goBackWithinStack(navigation)}
+              style={{ alignItems: 'center', marginTop: spacing.md }}>
+              <Text style={styles.linkMuted}>Go back</Text>
+            </Pressable>
           </View>
         ) : verified ? (
           <>
@@ -134,7 +132,9 @@ export default function VehicleQrEmergencyScreen({ navigation, route }: Props) {
                 {verified.brand} {verified.model}
               </Text>
               {verified.color ? (
-                <Text style={styles.meta}>{verified.color} · {verified.fuelType}</Text>
+                <Text style={styles.meta}>
+                  {verified.color} · {verified.fuelType}
+                </Text>
               ) : null}
               {verified.ownerName ? (
                 <Text style={styles.owner}>Owner: {verified.ownerName}</Text>
@@ -188,12 +188,23 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     textAlign: 'center',
   },
-  meta: { color: colors.grey, textAlign: 'center', marginTop: spacing.xs, textTransform: 'capitalize' },
+  meta: { color: colors.grey, textAlign: 'center', marginTop: spacing.xs },
   owner: {
     color: colors.textLight,
     textAlign: 'center',
     marginTop: spacing.sm,
     fontWeight: typography.weights.semibold,
   },
-  errorText: { color: colors.error, textAlign: 'center' },
+  errorTitle: {
+    color: colors.textLight,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  linkMuted: {
+    color: colors.grey,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.sm,
+  },
 });

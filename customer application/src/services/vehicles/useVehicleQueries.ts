@@ -29,7 +29,8 @@ export function useVehiclesQuery() {
 }
 
 export function useVehicleQuery(id: string) {
-  const { selectedVehicle, isLoading, error, fetchVehicle } = useVehicleStore();
+  const { vehicles, selectedVehicle, isLoading, error, fetchVehicle } = useVehicleStore();
+  const fromList = vehicles.find(item => item.id === id);
 
   useEffect(() => {
     if (id) {
@@ -37,10 +38,13 @@ export function useVehicleQuery(id: string) {
     }
   }, [fetchVehicle, id]);
 
+  const data =
+    selectedVehicle?.id === id ? selectedVehicle : fromList ?? undefined;
+
   return {
-    data: selectedVehicle?.id === id ? selectedVehicle : undefined,
-    isLoading,
-    isError: Boolean(error),
+    data,
+    isLoading: isLoading && !data,
+    isError: Boolean(error) && !data,
     error,
     refetch: () => fetchVehicle(id),
     isRefetching: isLoading,

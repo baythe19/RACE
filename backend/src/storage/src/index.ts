@@ -85,7 +85,12 @@ function resolveVehicleFolder(vendorType: string, vendorId: string, vehicleId: s
 }
 
 function getLocalUploadsRoot(): string {
-  return path.join(process.cwd(), 'uploads');
+  // Local dev / Render without a disk: <cwd>/uploads (ephemeral).
+  // With UPLOADS_DIR set (Render persistent disk mounted), files survive
+  // deploys. Switching to GCS later is env-only: fill GCS_* vars and uploads
+  // flip to the bucket wholesale — no code change, no broken image URLs in
+  // the admin panel (the /admin/documents proxy handles both backends).
+  return process.env.UPLOADS_DIR || path.join(process.cwd(), 'uploads');
 }
 
 function ensureDir(dir: string): void {
@@ -189,6 +194,26 @@ export class StorageService {
       storagePath,
       fileName,
     );
+  }
+
+  async uploadCustomerVehiclePhoto(
+    input: UploadFileInput & { customerId: string; vehicleId: string },
+  ): Promise<UploadResult> {
+    this.validateFile(input.buffer, input.mimeType);
+    if (!input.mimeType.toLowerCase().startsWith('image/')) {
+      throw new AppError('Vehicle photo must be a JPG or PNG image', 400);
+    }
+    const storagePath = `customers/${input.customerId}/vehicles/${input.vehicleId}/photos`;
+    const fileName = buildFileName(input.originalName);
+
+    if (gcsConfig.isConfigured) {
+      try {
+        return await uploadToGcs(input, storagePath, fileName);
+      } catch (error) {
+        logger.warn('GCS customer vehicle photo upload failed, falling back to local storage', { error });
+      }
+    }
+    return uploadToLocal(input, storagePath, fileName);
   }
 
   async uploadVendorVehicleDocument(

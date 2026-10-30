@@ -5,6 +5,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { Provider as ReduxProvider } from 'react-redux';
 
 import { images } from './src/assets';
+import { CustomerUiQaNavigator } from './src/components/dev/CustomerUiQaNavigator';
+import AppDialogHost from './src/components/common/AppDialogHost';
 import RootNavigator from './src/navigation/RootNavigator';
 import { getCoverBackgroundFrame } from './src/screens/auth/splashBackground';
 import { AppKeyboardProvider } from './src/components/ui/AppKeyboard';
@@ -49,14 +51,18 @@ function AppRoot() {
   }
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor={colors.background}
         translucent={Platform.OS === 'android'}
       />
       <RootNavigator />
-    </>
+      {/* Branded dialogs raised from utils/hooks via getAppDialog(). */}
+      <AppDialogHost />
+      {/* Overlay at app root so Peach/RN always paint the FAB above auth stacks. */}
+      <CustomerUiQaNavigator />
+    </View>
   );
 }
 

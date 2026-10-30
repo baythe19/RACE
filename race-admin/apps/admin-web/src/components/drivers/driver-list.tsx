@@ -53,42 +53,75 @@ export function DriverList() {
   const [editing, setEditing] = useState<DriverListItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DriverListItem | null>(null);
 
-  const driverFields = useMemo(
+  const driverSections = useMemo(
     () => [
-      { name: 'name', label: 'Driver Name', required: true, placeholder: 'Enter driver full name' },
-      { name: 'phone', label: 'Phone', type: 'tel' as const, required: true, placeholder: 'Enter 10-digit mobile number' },
-      { name: 'licenseNo', label: 'License No.', required: true, placeholder: 'Enter license number' },
       {
-        name: 'driverType',
-        label: 'Driver Type',
-        type: 'select' as const,
-        placeholder: 'Select driver type',
-        options: [
-          { label: 'Tow Driver', value: 'Tow Driver' },
-          { label: 'Full-Time', value: 'Full-Time' },
-          { label: 'Part-Time', value: 'Part-Time' },
-          { label: 'Roadside Assist', value: 'Roadside Assist' },
+        title: 'Personal Details',
+        fields: [
+          { name: 'name', label: 'Driver Name', required: true, placeholder: 'Enter driver full name' },
+          { name: 'phone', label: 'Phone', type: 'tel' as const, required: true, placeholder: 'Enter 10-digit mobile number' },
+          { name: 'email', label: 'Email', type: 'email' as const, placeholder: 'Enter email address' },
+          {
+            name: 'experienceYears',
+            label: 'Driving Experience (years)',
+            type: 'number' as const,
+            placeholder: 'e.g. 5',
+          },
         ],
       },
       {
-        name: 'vendorId',
-        label: 'Vendor',
-        type: 'select' as const,
-        required: true,
-        placeholder: 'Select vendor',
-        options: vendors.map((v) => ({ label: v.name, value: v.id })),
+        title: 'Licence & Work',
+        fields: [
+          { name: 'licenseNo', label: 'Driving Licence No.', required: true, placeholder: 'e.g. OD-0220190012345' },
+          {
+            name: 'driverType',
+            label: 'Driver Type',
+            type: 'select' as const,
+            required: true,
+            placeholder: 'Select driver type',
+            options: [
+              { label: 'Tow Driver', value: 'Tow Driver' },
+              { label: 'Full-Time', value: 'Full-Time' },
+              { label: 'Part-Time', value: 'Part-Time' },
+              { label: 'Roadside Assist', value: 'Roadside Assist' },
+            ],
+          },
+          {
+            name: 'vendorId',
+            label: 'Vendor (Fleet)',
+            type: 'select' as const,
+            required: true,
+            placeholder: 'Select vendor',
+            options: vendors.map((v) => ({ label: v.name, value: v.id })),
+          },
+          { name: 'vehicleRegistration', label: 'Vehicle Registration No.', placeholder: 'e.g. OD-02-TOW-1001' },
+          { name: 'city', label: 'Operating City', required: true, placeholder: 'Enter city name' },
+        ],
       },
-      { name: 'city', label: 'City', required: true, placeholder: 'Enter city name' },
       {
-        name: 'status',
-        label: 'Status',
-        type: 'select' as const,
-        placeholder: 'Select status',
-        options: [
-          { label: 'Pending', value: 'PENDING' },
-          { label: 'Approved', value: 'APPROVED' },
-          { label: 'Rejected', value: 'REJECTED' },
-          { label: 'Suspended', value: 'SUSPENDED' },
+        title: 'Emergency Contact',
+        description: 'Optional — recommended for drivers on duty.',
+        fields: [
+          { name: 'emergencyContactName', label: 'Contact Name', placeholder: "Contact person's name" },
+          { name: 'emergencyContactPhone', label: 'Contact Phone', type: 'tel' as const, placeholder: '10-digit mobile number' },
+          { name: 'emergencyContactRelation', label: 'Relationship', placeholder: 'e.g. Father, Spouse' },
+        ],
+      },
+      {
+        title: 'Account',
+        fields: [
+          {
+            name: 'status',
+            label: 'Status',
+            type: 'select' as const,
+            placeholder: 'Select status',
+            options: [
+              { label: 'Pending', value: 'PENDING' },
+              { label: 'Approved', value: 'APPROVED (requires verified documents)' },
+              { label: 'Rejected', value: 'REJECTED' },
+              { label: 'Suspended', value: 'SUSPENDED' },
+            ],
+          },
         ],
       },
     ],
@@ -258,7 +291,8 @@ export function DriverList() {
         }}
         resetKey={editing?.id ?? 'create'}
         title={editing ? 'Edit Driver' : 'Add Driver'}
-        fields={driverFields}
+        description={editing ? 'Update driver details' : 'Create a driver under a vendor fleet'}
+        sections={driverSections}
         initialValues={
           editing
             ? {
@@ -281,10 +315,16 @@ export function DriverList() {
           const payload = {
             name: values.name,
             phone: values.phone,
+            email: values.email || undefined,
             licenseNo: values.licenseNo,
             driverType: values.driverType,
             vendorId: values.vendorId,
             city: values.city,
+            vehicleRegistration: values.vehicleRegistration || undefined,
+            experienceYears: values.experienceYears || undefined,
+            emergencyContactName: values.emergencyContactName || undefined,
+            emergencyContactPhone: values.emergencyContactPhone || undefined,
+            emergencyContactRelation: values.emergencyContactRelation || undefined,
             status: values.status as DriverListItem['status'],
           };
           if (editing) await update.mutateAsync({ id: editing.id, data: payload });

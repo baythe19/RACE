@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Alert } from 'react-native';
 
 import { getApiErrorMessage } from '../services/api';
 import { completeFinalPayment } from '../services/bookings/serviceBookingApi';
+import { getAppDialog } from '../utils/alertBus';
 import type { ServiceBookingType } from '../types/serviceBooking';
 
 export function useFinalPayment() {
@@ -17,7 +17,12 @@ export function useFinalPayment() {
       await queryClient.invalidateQueries({ queryKey: ['bookings'] });
       return true;
     } catch (err) {
-      Alert.alert('Payment failed', getApiErrorMessage(err, 'Unable to process final payment'));
+      getAppDialog().showDialog({
+        tone: 'error',
+        title: 'Payment failed',
+        message: getApiErrorMessage(err, 'Unable to process final payment'),
+        primaryLabel: 'OK',
+      });
       return false;
     } finally {
       setIsPaying(false);

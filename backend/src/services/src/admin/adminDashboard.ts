@@ -69,7 +69,6 @@ export const adminDashboardService = {
       driverBookingsByWeek,
       legacyServiceDistribution,
       recentActivities,
-      recentLegacyBookings,
       recentTowingBookings,
       recentDriverBookings,
       recentVendors,
@@ -162,7 +161,6 @@ export const adminDashboardService = {
         { $limit: 5 },
       ]),
       ActivityLogModel.find().sort({ createdAt: -1 }).limit(8).lean(),
-      BookingModel.find().sort({ createdAt: -1 }).limit(6).populate('customerId', 'fullName').lean(),
       TowingBookingModel.find().sort({ createdAt: -1 }).limit(6).populate('customerId', 'fullName').lean(),
       DriverBookingModel.find().sort({ createdAt: -1 }).limit(6).populate('customerId', 'fullName').lean(),
       UserModel.find({ role: 'vendor' }).sort({ createdAt: -1 }).limit(5).lean(),
@@ -492,22 +490,6 @@ export const adminDashboardService = {
         type: mapActivityType(log.entityType),
       })),
       recentBookings: [
-        ...recentLegacyBookings.map((b) => {
-          const customer = b.customerId as { fullName?: string } | Types.ObjectId;
-          const customerName =
-            customer && typeof customer === 'object' && 'fullName' in customer
-              ? customer.fullName ?? 'Customer'
-              : 'Customer';
-          return {
-            id: b._id.toString(),
-            bookingNumber: b.bookingNumber,
-            customerName,
-            service: b.serviceLabel ?? 'Roadside Service',
-            status: b.status,
-            amount: b.invoice?.total ?? 0,
-            createdAt: new Date(b.createdAt),
-          };
-        }),
         ...recentTowingBookings.map((b) => {
           const customer = b.customerId as { fullName?: string } | Types.ObjectId;
           const customerName =
@@ -520,8 +502,9 @@ export const adminDashboardService = {
             customerName,
             service: 'Towing Service',
             status: b.status,
-            amount: b.estimatedFare ?? 0,
+            amount: b.finalFare ?? b.estimatedFare ?? 0,
             createdAt: new Date(b.createdAt),
+            bookingType: 'towing' as const,
           };
         }),
         ...recentDriverBookings.map((b) => {
@@ -536,8 +519,9 @@ export const adminDashboardService = {
             customerName,
             service: 'Driver Service',
             status: b.status,
-            amount: b.estimatedFare ?? 0,
+            amount: b.finalFare ?? b.estimatedFare ?? 0,
             createdAt: new Date(b.createdAt),
+            bookingType: 'driver' as const,
           };
         }),
       ]

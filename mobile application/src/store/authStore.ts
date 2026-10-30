@@ -53,6 +53,25 @@ async function completeAuthSession(
     // Keep session even if profile fails to load.
   }
 
+  /**
+   * Presence is session-scoped: every fresh login starts OFFLINE unless the
+   * driver flips the toggle again. If the driver still has an active trip,
+   * the backend rejects the availability change and they stay online until
+   * the trip completes (product rule 2026-10-30).
+   */
+  if (result.user?.role === 'driver') {
+    try {
+      const { setDriverAvailability } = await import('../services/driver/driverApi');
+      await setDriverAvailability(false).catch(() => undefined);
+      const { useProfileStore: profileStore } = await import('./profileStore');
+      await profileStore.getState().fetchProfile().catch(() => undefined);
+    } catch {
+      // Availability reset is best-effort; never block login.
+    }
+    const { useDriverPresenceStore } = await import('./driverPresenceStore');
+    useDriverPresenceStore.getState().setOnline(false);
+  }
+
   return result.onboardingRequired ?? partnerOnboardingRequired(result.user);
 }
 
@@ -159,6 +178,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    // Session ended → driver presence goes offline (best-effort backend call).
+    // Next login starts offline unless the driver flips the toggle again.
+    // Active trip: backend blocks availability changes, so an in-progress trip
+    // keeps the driver reachable until it completes (per product rule).
+    try {
+      const { useDriverPresenceStore } = await import('./driverPresenceStore');
+      if (useDriverPresenceStore.getState().isOnline) {
+        const { setDriverAvailability } = await import('../services/driver/driverApi');
+        await setDriverAvailability(false).catch(() => undefined);
+      }
+      useDriverPresenceStore.getState().setOnline(false);
+    } catch {
+      // Presence cleanup is best-effort; logout must always proceed.
+    }
+
     const nextSessionVersion = get().authSessionVersion + 1;
     set({
       partnerAuthEntry: 'PartnerLogin',

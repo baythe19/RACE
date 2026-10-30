@@ -18,6 +18,7 @@ import type { DriverPackageHours } from '../../../types/fare';
 import type { DriverTimeId, DriverDurationId } from '../../../types/driverBooking';
 import { formatRupee } from '../../../utils/driverPricing';
 import { colors, shadows, typography } from '../../../theme';
+import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
 type Props = NativeStackScreenProps<HomeStackParamList, 'DriverBookingDateTime'>;
 
@@ -42,7 +43,7 @@ export default function DriverBookingDateTimeScreen({ navigation }: Props) {
       step={3}
       accentColor={DRIVER_ACCENT}
       scrollable
-      onBack={() => navigation.goBack()}
+      onBack={() => goBackWithinStack(navigation)}
       onContinue={() => {
         const pkg = DRIVER_PACKAGES.find(p => p.hours === packageHours);
         updateBooking({

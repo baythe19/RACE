@@ -6,7 +6,9 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import SplashScreen from '../screens/auth/SplashScreen';
 import AuthNavigator from './AuthNavigator';
 import { MainTabNavigator } from './AppNavigator';
+import { customerNavigationRef } from './customerNavigationRef';
 import { useAuthSessionSync } from '../hooks/useAuthSessionSync';
+import { useCustomerRealtimeSync } from '../hooks/useCustomerRealtimeSync';
 import { useAppSelector } from '../redux/hooks';
 import { useAuthStore } from '../store/authStore';
 import type { RootStackParamList } from '../types/navigation';
@@ -38,8 +40,10 @@ export default function RootNavigator() {
   const onboardingRequired = useAuthStore(state => state.onboardingRequired);
   const canEnterApp = isAuthenticated && !onboardingRequired;
 
+  useCustomerRealtimeSync(canEnterApp);
+
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={customerNavigationRef} theme={navigationTheme}>
       <Stack.Navigator
         screenOptions={{
           headerShown: false,

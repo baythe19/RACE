@@ -89,14 +89,34 @@ export default function PartnerAccountScreen({ navigation }: Props) {
   };
 
   const displayName = isVendor
-    ? vendor?.businessName || user?.fullName || 'Kalinga Towing'
-    : driverProfile?.fullName || user?.fullName || 'Om Singh';
+    ? vendor?.businessName || user?.fullName || 'Your business'
+    : driverProfile?.fullName || user?.fullName || 'Partner';
+
+  const isVendorStaffDriver =
+    isDriver &&
+    (driverProfile?.driverContext === 'VENDOR_MANAGED' ||
+      Boolean(driverProfile?.vendorUserId) ||
+      Boolean(driverProfile?.driverProfile?.vendorUserId) ||
+      driverProfile?.driverProfile?.fleetSource === 'vendor');
+
+  const roleLabel = isVendor
+    ? 'Vendor partner'
+    : isVendorStaffDriver
+      ? 'Vendor driver'
+      : 'Independent driver';
+
+  const profilePhotoUri =
+    avatarUri ||
+    driverProfile?.profilePhoto ||
+    null;
 
   const partnerCode = isVendor
-    ? `ID: ${vendor?.id?.slice(0, 8).toUpperCase() || 'VND-2001'}`
-    : `ID: ${driverProfile?.driverProfile?.driverCode || 'DRV-1024'}`;
-
-  const roleLabel = isVendor ? 'Vendor Partner' : 'Self Driver';
+    ? vendor?.id
+      ? `ID: ${vendor.id.slice(0, 8).toUpperCase()}`
+      : 'Vendor ID pending'
+    : driverProfile?.driverProfile?.driverCode
+      ? `ID: ${driverProfile.driverProfile.driverCode}`
+      : 'Driver ID pending';
 
   const handleAllowLocation = () => {
     setLocationSheetVisible(false);
@@ -128,8 +148,8 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           <View style={styles.profileTopRow}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarCircle}>
-                {avatarUri ? (
-                  <Image source={{ uri: avatarUri }} style={styles.avatarImage} />
+                {profilePhotoUri ? (
+                  <Image source={{ uri: profilePhotoUri }} style={styles.avatarImage} />
                 ) : (
                   <PartnerText style={styles.avatarInitials}>
                     {displayName
@@ -145,7 +165,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
             <View style={styles.profileInfoCol}>
               <View style={styles.nameRow}>
-                <PartnerText style={styles.profileName} numberOfLines={1}>
+                <PartnerText style={styles.profileName} numberOfLines={1} ellipsizeMode="tail">
                   {displayName}
                 </PartnerText>
                 <Pressable
@@ -173,7 +193,9 @@ export default function PartnerAccountScreen({ navigation }: Props) {
                 </View>
               </View>
 
-              <PartnerText style={styles.partnerId}>{partnerCode}</PartnerText>
+              <PartnerText style={styles.partnerId} numberOfLines={1} ellipsizeMode="middle">
+                {partnerCode}
+              </PartnerText>
             </View>
           </View>
 
@@ -181,7 +203,9 @@ export default function PartnerAccountScreen({ navigation }: Props) {
           {!isVendor ? (
             <View style={styles.metricRow}>
               <View style={styles.metricCol}>
-                <PartnerText style={styles.metricValue}>{accountStatusLabel}</PartnerText>
+                <PartnerText style={styles.metricValue} numberOfLines={1}>
+                  {accountStatusLabel}
+                </PartnerText>
                 <PartnerText style={styles.metricSubtitle}>Account</PartnerText>
               </View>
 
@@ -189,7 +213,7 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
               <View style={styles.metricCol}>
                 <PartnerText style={styles.metricValue} numberOfLines={1}>
-                  {driverProfile?.driverProfile?.driverType || 'Tow Truck'}
+                  {driverProfile?.driverProfile?.driverType || 'Tow driver'}
                 </PartnerText>
                 <PartnerText style={styles.metricSubtitle}>Driver type</PartnerText>
               </View>
@@ -198,7 +222,10 @@ export default function PartnerAccountScreen({ navigation }: Props) {
 
               <View style={styles.metricCol}>
                 <PartnerText style={styles.metricValue} numberOfLines={1}>
-                  {driverProfile?.driverProfile?.city || 'Bhubaneswar'}
+                  {driverProfile?.driverProfile?.city ||
+                    driverProfile?.address?.city ||
+                    driverVerification.application.city ||
+                    '—'}
                 </PartnerText>
                 <PartnerText style={styles.metricSubtitle}>City</PartnerText>
               </View>
@@ -492,9 +519,10 @@ const styles = StyleSheet.create({
     backgroundColor: driverColors.pageBg,
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
+    fontSize: 20,
+    fontWeight: '700',
     color: driverColors.ink,
+    letterSpacing: -0.2,
   },
   scroll: {
     flex: 1,
@@ -543,22 +571,25 @@ const styles = StyleSheet.create({
   },
   avatarInitials: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#92400E',
   },
   profileInfoCol: {
     flex: 1,
+    minWidth: 0,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    minWidth: 0,
   },
   profileName: {
     fontSize: 16.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: driverColors.ink,
     flex: 1,
+    minWidth: 0,
   },
   editBtnPill: {
     flexDirection: 'row',
@@ -570,6 +601,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FDE68A',
     marginLeft: 8,
+    flexShrink: 0,
   },
   editBtnText: {
     fontSize: 11,
@@ -580,6 +612,7 @@ const styles = StyleSheet.create({
   roleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
     marginTop: 3,
     marginBottom: 3,
@@ -641,7 +674,9 @@ const styles = StyleSheet.create({
   },
   metricCol: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
+    paddingHorizontal: 2,
   },
   metricLabelRow: {
     flexDirection: 'row',
@@ -649,9 +684,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   metricValue: {
-    fontSize: 13.5,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
     color: driverColors.ink,
+    textAlign: 'center',
   },
   metricSubtitle: {
     fontSize: 10.5,
@@ -665,7 +701,7 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: driverColors.grey,
     textTransform: 'uppercase',
     letterSpacing: 0.8,

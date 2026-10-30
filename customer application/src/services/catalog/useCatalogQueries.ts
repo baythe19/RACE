@@ -9,44 +9,49 @@ const FALLBACK_CATEGORIES = fallbackServices as ServiceCategory[];
 const FALLBACK_BRAND = fallbackBrand as Brand;
 
 export function useServicesQuery() {
-  const { services, isLoading, error, fetchServices } = useCatalogStore();
+  const { services, isLoading, error, fetchServices, servicesReady, hasHydrated } =
+    useCatalogStore();
 
   useEffect(() => {
-    if (!services?.length) {
+    if (hasHydrated && !servicesReady) {
       void fetchServices();
     }
-  }, [fetchServices, services?.length]);
+  }, [fetchServices, hasHydrated, servicesReady]);
 
-  const refetch = useCallback(() => fetchServices(), [fetchServices]);
+  const refetch = useCallback(() => fetchServices({ force: true }), [fetchServices]);
+
+  const loadingForUi = !servicesReady && isLoading;
 
   return {
     data: services?.length ? services : FALLBACK_CATEGORIES,
-    isLoading,
+    isLoading: loadingForUi,
     isError: Boolean(error),
     error,
     refetch,
-    isRefetching: isLoading,
+    isRefetching: loadingForUi,
   };
 }
 
 export function useBrandQuery() {
-  const { brand, isLoading, error, fetchBrand } = useCatalogStore();
+  const { brand, isLoading, error, fetchBrand, brandReady, hasHydrated } = useCatalogStore();
 
   useEffect(() => {
-    if (!brand) {
+    if (hasHydrated && !brandReady) {
       void fetchBrand();
     }
-  }, [brand, fetchBrand]);
+  }, [brand, brandReady, fetchBrand, hasHydrated]);
 
-  const refetch = useCallback(() => fetchBrand(), [fetchBrand]);
+  const refetch = useCallback(() => fetchBrand({ force: true }), [fetchBrand]);
+
+  const loadingForUi = !brandReady && isLoading;
 
   return {
     data: brand ?? FALLBACK_BRAND,
-    isLoading,
+    isLoading: loadingForUi,
     isError: Boolean(error),
     error,
     refetch,
-    isRefetching: isLoading,
+    isRefetching: loadingForUi,
   };
 }
 
