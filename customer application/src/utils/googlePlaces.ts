@@ -153,3 +153,81 @@ export async function reverseGeocodeToLocation(
     };
   }
 }
+
+export interface PlaceSuggestion {
+  placeId: string;
+  title: string;
+  subtitle: string;
+}
+
+export async function searchPlaceSuggestions(input: string): Promise<PlaceSuggestion[]> {
+  const key = getGoogleMapsApiKey();
+  const query = input.trim();
+  if (!key || query.length < 2) return [];
+
+  const params = new URLSearchParams({
+    input: query,
+    key,
+    components: 'country:in',
+    language: 'en',
+  });
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json?${params.toString()}`,
+    );
+    const data = (await response.json()) as {
+      predictions?: Array<{
+        place_id: string;
+        description: string;
+        structured_formatting?: { main_text?: string; secondary_text?: string };
+      }>;
+    };
+    return (data.predictions ?? []).slice(0, 8).map(item => ({
+      placeId: item.place_id,
+      title: item.structured_formatting?.main_text || item.description,
+      subtitle: item.structured_formatting?.secondary_text || '',
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function locationFromPlaceId(placeId: string, fallbackTitle: string): Promise<LocationResult | null> {
+  const key = getGoogleMapsApiKey();
+  if (!key || !placeId) return null;
+
+  const params = new URLSearchParams({
+    place_id: placeId,
+    fields: 'place_id,formatted_address,geometry,address_components',
+    key,
+    language: 'en',
+  });
+
+  try {
+    const response = await fetch(
+      `https://maps.googleapis.com/maps/api/place/details/json?${params.toString()}`,
+    );
+    const data = (await response.json()) as { result?: PlaceDetailsLike };
+    return parseLocationFromPlaceDetails({ place_id: placeId, description: fallbackTitle }, data.result ?? null);
+  } catch {
+    return null;
+  }
+}
+
+export function distanceKm(
+  from: { latitude: number; longitude: number } | null | undefined,
+  latitude: number,
+  longitude: number,
+): number | null {
+  if (!from) return null;
+  const toRad = (n: number) => (n * Math.PI) / 180;
+  const dLat = toRad(latitude - from.latitude);
+  const dLng = toRad(longitude - from.longitude);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(from.latitude)) * Math.cos(toRad(latitude)) * Math.sin(dLng / 2) ** 2;
+  const km = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  if (!Number.isFinite(km)) return null;
+  return Math.max(0, Math.round(km));
+}

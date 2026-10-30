@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   BackHandler,
   Pressable,
@@ -47,12 +47,34 @@ function nestedStackIndex(route: { state?: { index?: number } | undefined }): nu
   return nested.index;
 }
 
+const PROFILE_DOUBLE_TAP_MS = 400;
+
 export default function CustomTabBar({
   state,
   descriptors,
   navigation,
 }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const profileLastTapAt = useRef(0);
+
+  const popTabStackToRoot = (
+    route: (typeof state.routes)[number],
+    routeName: TabRouteName,
+  ) => {
+    const rootScreen = TAB_ROOT_SCREEN[routeName];
+    const nested = route.state;
+    if (nested?.key) {
+      navigation.dispatch({
+        ...CommonActions.reset({
+          index: 0,
+          routes: [{ name: rootScreen }],
+        }),
+        target: nested.key,
+      });
+      return;
+    }
+    navigation.navigate(routeName, { screen: rootScreen } as never);
+  };
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -121,15 +143,25 @@ export default function CustomTabBar({
             return;
           }
 
-          const rootScreen = TAB_ROOT_SCREEN[routeName];
           const deepInStack = nestedStackIndex(route) > 0;
 
+          if (routeName === 'Profile' && isFocused) {
+            const now = Date.now();
+            const isDoubleTap = now - profileLastTapAt.current < PROFILE_DOUBLE_TAP_MS;
+            profileLastTapAt.current = now;
+            if (isDoubleTap || deepInStack) {
+              popTabStackToRoot(route, routeName);
+            }
+            return;
+          }
+
           if (isFocused && deepInStack) {
-            navigation.navigate(route.name, { screen: rootScreen } as never);
+            popTabStackToRoot(route, routeName);
             return;
           }
 
           if (!isFocused) {
+            profileLastTapAt.current = 0;
             navigation.navigate(route.name, route.params);
             return;
           }

@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { Crosshair, Map as MapIcon, MapPin } from 'lucide-react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
+import RideLocationBoard, { type RideSuggestion } from '../../../components/booking/RideLocationBoard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import TowingServiceModeBanner from '../../../components/booking/TowingServiceModeBanner';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
@@ -17,9 +17,14 @@ import type { LocationResult } from '../../../types/location';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { findServiceableCity } from '../../../config/serviceableAreas';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
-import { ensureForegroundLocation } from '../../../utils/locationPermission';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatReadableLocation } from '../../../utils/readableAddress';
+import {
+  distanceKm as haversineKm,
+  locationFromPlaceId,
+  searchPlaceSuggestions,
+  type PlaceSuggestion,
+} from '../../../utils/googlePlaces';
 import {
   TOWING_DEMO_DROP,
   TOWING_DEMO_PICKUP,
@@ -34,157 +39,6 @@ type Props = NativeStackScreenProps<HomeStackParamList, 'TowingPickupDrop'>;
 const TOWING_ACCENT = '#F59E0B';
 const PICKUP_GREEN = '#10B981';
 const PLACEHOLDER = 'Select location';
-
-/**
- * Ride-hailing style search card (Uber/Rapido/Ola pattern):
- * one card, left rail with colored dots connected by a dotted line,
- * pickup pre-filled with the user's current location, drop prompts a search.
- */
-function LocationSearchCard({
-  pickupValue,
-  dropValue,
-  onPickupPress,
-  onDropPress,
-  t,
-}: {
-  pickupValue: string;
-  dropValue: string;
-  onPickupPress: () => void;
-  onDropPress: () => void;
-  t: ReturnType<typeof useBookingTheme>['t'];
-}) {
-  const pickupHasValue = pickupValue.trim().length > 0 && pickupValue !== PLACEHOLDER;
-  const dropHasValue = dropValue.trim().length > 0 && dropValue !== PLACEHOLDER;
-
-  const rowStyle = {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    minHeight: t.px(56),
-    paddingVertical: t.px(10),
-  };
-
-  return (
-    <View
-      style={[
-        {
-          borderRadius: t.cardRadius,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.background,
-          paddingHorizontal: t.px(14),
-          paddingVertical: t.px(4),
-        },
-      ]}>
-      {/* Pickup row — Rapido/Uber style */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={
-          pickupHasValue ? `Pickup ${pickupValue}` : 'Enter pickup location'
-        }
-        onPress={onPickupPress}
-        style={({ pressed }) => [rowStyle, { opacity: pressed ? 0.8 : 1 }]}>
-        <View
-          style={{
-            width: t.px(34),
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <View
-            style={{
-              width: t.px(12),
-              height: t.px(12),
-              borderRadius: t.px(6),
-              backgroundColor: PICKUP_GREEN,
-              borderWidth: 2,
-              borderColor: '#D1FAE5',
-            }}
-          />
-        </View>
-        <View style={{ flexGrow: 1, flexShrink: 1, marginLeft: t.px(12), minWidth: 0 }}>
-          <Text
-            style={{
-              fontSize: t.caption,
-              fontWeight: typography.weights.semibold,
-              color: colors.grey,
-              marginBottom: t.px(2),
-            }}>
-            Pickup
-          </Text>
-          <Text
-            style={{
-              fontSize: t.body,
-              fontWeight: typography.weights.semibold,
-              color: pickupHasValue ? colors.dark : colors.grey,
-              lineHeight: t.px(20),
-            }}
-            numberOfLines={1}>
-            {pickupHasValue ? pickupValue : 'Enter pickup location'}
-          </Text>
-        </View>
-        {!pickupHasValue ? (
-          <ActivityIndicator size="small" color={PICKUP_GREEN} style={{ marginLeft: t.px(6) }} />
-        ) : null}
-      </Pressable>
-
-      {/* Dotted connector between the two dots */}
-      <View
-        style={{
-          width: t.px(34),
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: t.px(10),
-          marginVertical: -t.px(2),
-        }}>
-        <View
-          style={{
-            width: 0,
-            height: t.px(14),
-            borderLeftWidth: 2,
-            borderLeftColor: colors.border,
-            borderStyle: 'dashed',
-          }}
-        />
-      </View>
-
-      {/* Drop row */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={dropHasValue ? `Drop ${dropValue}` : 'Search drop location'}
-        onPress={onDropPress}
-        style={({ pressed }) => [rowStyle, { opacity: pressed ? 0.8 : 1 }]}>
-        <View
-          style={{
-            width: t.px(34),
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
-          <MapPin size={t.px(17)} color={colors.error} fill={colors.error} strokeWidth={2} />
-        </View>
-        <View style={{ flexGrow: 1, flexShrink: 1, marginLeft: t.px(12), minWidth: 0 }}>
-          <Text
-            style={{
-              fontSize: t.caption,
-              fontWeight: typography.weights.semibold,
-              color: colors.grey,
-              marginBottom: t.px(2),
-            }}>
-            Drop
-          </Text>
-          <Text
-            style={{
-              fontSize: t.body,
-              fontWeight: dropHasValue ? typography.weights.semibold : typography.weights.regular,
-              color: dropHasValue ? colors.dark : colors.grey,
-              lineHeight: t.px(20),
-            }}
-            numberOfLines={1}>
-            {dropHasValue ? dropValue : 'Search drop location'}
-          </Text>
-        </View>
-      </Pressable>
-    </View>
-  );
-}
 
 function applyLocation(location: LocationResult) {
   return resolveLocationSelection(location);
@@ -207,11 +61,36 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
   const [showPickupPicker, setShowPickupPicker] = useState(false);
   const [showDropPicker, setShowDropPicker] = useState(false);
   const [pickerMode, setPickerMode] = useState<'search' | 'map'>('search');
-  const [isLocatingPickup, setIsLocatingPickup] = useState(false);
   const [distanceKm, setDistanceKm] = useState<number | null>(booking.distanceKm ?? null);
   const [farePreview, setFarePreview] = useState<number | null>(null);
   const [isLoadingFare, setIsLoadingFare] = useState(false);
+  const [activeStop, setActiveStop] = useState<'pickup' | 'drop'>('drop');
+  const [query, setQuery] = useState('');
+  const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
   const { data: savedLocations = [] } = useSavedLocationsQuery();
+
+  useEffect(() => {
+    const text = query.trim();
+    if (text.length < 2) {
+      setPlaceHits([]);
+      setSearchingPlaces(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchingPlaces(true);
+    const timer = setTimeout(() => {
+      void searchPlaceSuggestions(text).then(hits => {
+        if (cancelled) return;
+        setPlaceHits(hits);
+        setSearchingPlaces(false);
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   // Ride-hailing pattern: pickup defaults to the user's current location.
   useEffect(() => {
@@ -361,6 +240,74 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
     };
   }, [booking.dateId, booking.serviceMode, booking.timeId, dropLat, dropLng, pickupLat, pickupLng]);
 
+  const pickupFilled = pickup.trim().length > 0 && pickup !== PLACEHOLDER;
+  const dropFilled = drop.trim().length > 0 && drop !== PLACEHOLDER;
+  const origin =
+    pickupLat != null && pickupLng != null
+      ? { latitude: pickupLat, longitude: pickupLng }
+      : userLocation?.latitude != null && userLocation.longitude != null
+        ? { latitude: userLocation.latitude, longitude: userLocation.longitude }
+        : null;
+
+  const applyStop = (target: 'pickup' | 'drop', location: LocationResult) => {
+    if (!assertServiceableBookingLocation(location.latitude, location.longitude)) return;
+    const resolved = applyLocation(location);
+    if (target === 'pickup') {
+      setPickup(resolved.address);
+      setPickupLabel(resolved.displayLabel);
+      setPickupLat(location.latitude);
+      setPickupLng(location.longitude);
+    } else {
+      setDrop(resolved.address);
+      setDropLabel(resolved.displayLabel);
+      setDropLat(location.latitude);
+      setDropLng(location.longitude);
+    }
+    setQuery('');
+    setPlaceHits([]);
+  };
+
+  const suggestions: RideSuggestion[] = useMemo(() => {
+    if (query.trim().length >= 2) {
+      return placeHits.map(hit => ({
+        id: hit.placeId,
+        title: hit.title,
+        subtitle: hit.subtitle,
+        kind: 'search' as const,
+        onPress: () => {
+          void locationFromPlaceId(hit.placeId, hit.title).then(location => {
+            if (location) applyStop(activeStop, location);
+          });
+        },
+      }));
+    }
+
+    return savedLocations
+      .filter(loc => loc.latitude != null && loc.longitude != null)
+      .map(loc => {
+        const km = haversineKm(origin, loc.latitude as number, loc.longitude as number);
+        return {
+          id: loc.id,
+          title: loc.label,
+          subtitle: loc.address,
+          distanceLabel: km != null ? `${km} km` : undefined,
+          kind: 'saved' as const,
+          savedType: loc.type,
+          onPress: () =>
+            applyStop(activeStop, {
+              address: loc.address,
+              city: '',
+              state: '',
+              pincode: '',
+              latitude: loc.latitude as number,
+              longitude: loc.longitude as number,
+              placeId: '',
+              displayLabel: loc.label,
+            }),
+        };
+      });
+  }, [activeStop, origin, placeHits, query, savedLocations]);
+
   return (
     <TowingBookingLayout
       title="Pickup & drop"
@@ -384,109 +331,43 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
       }}>
       <WizardStepFade>
       <TowingServiceModeBanner mode={booking.serviceMode} t={t} />
-      <LocationSearchCard
-        pickupValue={pickup !== PLACEHOLDER ? pickupLabel || formatReadableLocation(pickup) : pickup}
-        dropValue={drop !== PLACEHOLDER ? dropLabel || formatReadableLocation(drop) : drop}
-        onPickupPress={() => {
-          setPickerMode('search');
-          setShowPickupPicker(true);
+      <RideLocationBoard
+        px={t.px}
+        activeId={activeStop}
+        query={query}
+        searching={searchingPlaces}
+        suggestions={suggestions}
+        onActivate={id => {
+          setActiveStop(id as 'pickup' | 'drop');
+          setQuery('');
         }}
-        onDropPress={() => {
-          setPickerMode('search');
-          setShowDropPicker(true);
+        onQueryChange={setQuery}
+        onClearActive={() => setQuery('')}
+        onSelectOnMap={() => {
+          setPickerMode('map');
+          if (activeStop === 'pickup') setShowPickupPicker(true);
+          else setShowDropPicker(true);
         }}
-        t={t}
+        stops={[
+          {
+            id: 'pickup',
+            label: 'Pickup',
+            value: pickupFilled ? pickupLabel || formatReadableLocation(pickup) : '',
+            placeholder: 'Pickup location',
+            filled: pickupFilled,
+            dot: 'pickup',
+          },
+          {
+            id: 'drop',
+            label: 'Drop',
+            value: dropFilled ? dropLabel || formatReadableLocation(drop) : '',
+            placeholder: 'Drop location',
+            filled: dropFilled,
+            dot: 'drop',
+          },
+        ]}
       />
 
-      {/* Rapido-style quick actions — always visible so the user knows what to do */}
-      <View
-        style={{
-          marginTop: t.px(12),
-          flexDirection: 'row',
-          flexWrap: 'wrap',
-          gap: t.px(8),
-        }}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Use current location for pickup"
-          disabled={isLocatingPickup}
-          onPress={() => {
-            void (async () => {
-              setIsLocatingPickup(true);
-              try {
-                const allowed = await ensureForegroundLocation();
-                if (!allowed) return;
-                const fetched = await fetchCurrentLocation();
-                if (!fetched?.latitude || !fetched?.longitude) return;
-                if (!assertServiceableBookingLocation(fetched.latitude, fetched.longitude)) return;
-                const resolved = resolveLocationSelection(fetched);
-                setPickup(resolved.address);
-                setPickupLabel(resolved.displayLabel);
-                setPickupLat(fetched.latitude);
-                setPickupLng(fetched.longitude);
-              } finally {
-                setIsLocatingPickup(false);
-              }
-            })();
-          }}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: t.px(6),
-            paddingHorizontal: t.px(12),
-            paddingVertical: t.px(9),
-            borderRadius: t.px(20),
-            borderWidth: 1,
-            borderColor: PICKUP_GREEN,
-            backgroundColor: pressed ? '#ECFDF5' : colors.background,
-            opacity: isLocatingPickup ? 0.6 : 1,
-          })}>
-          {isLocatingPickup ? (
-            <ActivityIndicator size="small" color={PICKUP_GREEN} />
-          ) : (
-            <Crosshair size={t.px(14)} color={PICKUP_GREEN} strokeWidth={2.2} />
-          )}
-          <Text
-            style={{
-              fontSize: t.caption,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-            }}>
-            Use current location
-          </Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Choose drop location on map"
-          onPress={() => {
-            setPickerMode('map');
-            setShowDropPicker(true);
-          }}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: t.px(6),
-            paddingHorizontal: t.px(12),
-            paddingVertical: t.px(9),
-            borderRadius: t.px(20),
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: pressed ? colors.lightGrey : colors.background,
-          })}>
-          <MapIcon size={t.px(14)} color={TOWING_ACCENT} strokeWidth={2.2} />
-          <Text
-            style={{
-              fontSize: t.caption,
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
-            }}>
-            Choose on map
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Distance / fare preview */}
       {pickupLat && pickupLng && dropLat && dropLng ? (
         <View
           style={{
@@ -529,61 +410,6 @@ export default function TowingPickupDropScreen({ navigation }: Props) {
               ) : null}
             </View>
           )}
-        </View>
-      ) : null}
-
-      {savedLocations.length > 0 ? (
-        <View style={{ marginTop: t.px(14), gap: t.px(8) }}>
-          <Text
-            style={{
-              fontSize: t.labelBold,
-              fontWeight: typography.weights.bold,
-              color: colors.dark,
-            }}>
-            Saved addresses
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: t.px(8) }}>
-            {savedLocations.map(loc => (
-              <Pressable
-                key={loc.id}
-                onPress={() => {
-                  const lat = loc.latitude ?? 0;
-                  const lng = loc.longitude ?? 0;
-                  if (!assertServiceableBookingLocation(lat, lng)) return;
-
-                  const mapped = applyLocation({
-                    address: loc.address,
-                    city: '',
-                    state: '',
-                    pincode: '',
-                    latitude: lat,
-                    longitude: lng,
-                    placeId: '',
-                    displayLabel: loc.label,
-                  });
-                  setDrop(mapped.address);
-                  setDropLabel(mapped.displayLabel);
-                  setDropLat(lat);
-                  setDropLng(lng);
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: t.px(6),
-                  paddingHorizontal: t.px(12),
-                  paddingVertical: t.px(8),
-                  borderRadius: t.px(20),
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.goldLight,
-                }}>
-                <MapPin size={t.px(13)} color={colors.primary} strokeWidth={2.2} />
-                <Text style={{ fontSize: t.caption, fontWeight: typography.weights.semibold, color: colors.dark }}>
-                  {loc.label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
         </View>
       ) : null}
       </WizardStepFade>

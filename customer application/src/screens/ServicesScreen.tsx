@@ -36,11 +36,10 @@ export default function ServicesScreen({ navigation }: Props) {
   return (
     <AppScreenLayout
       backgroundColor={colors.pageBg}
-      contentStyle={{ gap: px(12), paddingTop: px(4) }}
+      contentStyle={{ gap: px(12), paddingTop: px(12) }}
       header={
         <TabRootHeader
           title="Services"
-          subtitle="Choose a service category to get started"
           notificationCount={unreadCount}
           onBellPress={() => {
             const tabNav = navigation.getParent();

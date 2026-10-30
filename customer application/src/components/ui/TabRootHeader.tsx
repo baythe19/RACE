@@ -70,11 +70,12 @@ export default function TabRootHeader({
         styles.wrap,
         {
           paddingHorizontal: px(20),
+          paddingTop: px(8),
           paddingBottom: px(12),
           backgroundColor: colors.pageBg,
         },
       ]}>
-      <View style={styles.row}>
+      <View style={[styles.row, { minHeight: px(52) }]}>
         <View style={{ flex: 1, minWidth: 0, paddingRight: px(12) }}>
           {leading ?? (
             <>
@@ -84,6 +85,7 @@ export default function TabRootHeader({
                   fontWeight: typography.weights.extrabold,
                   color: colors.dark,
                   lineHeight: px(22),
+                  letterSpacing: -0.3,
                   textAlign: 'left',
                 }}
                 numberOfLines={1}>
@@ -194,7 +196,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 44,
   },
   iconTap: {
     width: 36,

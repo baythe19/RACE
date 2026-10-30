@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import {
   Bell,
   CheckCircle,
@@ -21,9 +21,7 @@ import {
   useDeleteAllNotificationsMutation,
   useDeleteNotificationMutation,
   useMarkNotificationReadMutation,
-  useNotificationPrefsQuery,
   useNotificationsQuery,
-  useUpdateNotificationPrefMutation,
 } from '../../services/profile/useProfileQueries';
 import type { AppNotification } from '../../types/profile';
 import type { ServiceBookingTypeParam } from '../../types/navigation';
@@ -218,72 +216,6 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
   const deleteAll = useDeleteAllNotificationsMutation();
   const deleteOne = useDeleteNotificationMutation();
   const [dismissingId, setDismissingId] = useState<string | null>(null);
-  const { data: serverPrefs } = useNotificationPrefsQuery();
-  const updatePref = useUpdateNotificationPrefMutation();
-  const [pushOn, setPushOn] = useState(true);
-  const [offersOn, setOffersOn] = useState(false);
-
-  useEffect(() => {
-    if (!serverPrefs) return;
-    let push = true;
-    let offers = false;
-    serverPrefs.forEach(pref => {
-      if (pref.id === 'push' || pref.id === 'booking_updates') push = pref.enabled;
-      if (pref.id === 'offers') offers = pref.enabled;
-    });
-    setPushOn(push);
-    setOffersOn(offers);
-  }, [serverPrefs]);
-
-  const setPref = (prefId: 'push' | 'offers', enabled: boolean) => {
-    if (updatePref.isPending) return;
-    const apply = prefId === 'push' ? setPushOn : setOffersOn;
-    apply(enabled);
-    updatePref.mutate(
-      { prefId, enabled },
-      { onError: () => apply(!enabled) },
-    );
-  };
-
-  const alertPrefs = !isLoading && !isError ? (
-    <View
-      style={{
-        borderRadius: px(14),
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.background,
-        marginBottom: px(16),
-        overflow: 'hidden',
-      }}>
-      {[
-        { id: 'push' as const, label: 'Push alerts', value: pushOn },
-        { id: 'offers' as const, label: 'Offers & tips', value: offersOn },
-      ].map((row, index) => (
-        <View
-          key={row.id}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: px(14),
-            paddingVertical: px(11),
-            borderBottomWidth: index === 0 ? 1 : 0,
-            borderBottomColor: colors.border,
-          }}>
-          <Text style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.dark }}>
-            {row.label}
-          </Text>
-          <Switch
-            value={row.value}
-            onValueChange={v => setPref(row.id, v)}
-            disabled={updatePref.isPending}
-            trackColor={{ false: colors.lightGrey, true: colors.primary }}
-            thumbColor={colors.background}
-          />
-        </View>
-      ))}
-    </View>
-  ) : null;
 
   const items = data?.notifications ?? [];
   const filtered = useMemo(() => items.filter(i => matchesFilter(i, activeFilter)), [items, activeFilter]);
@@ -559,7 +491,6 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
         ) : null
       }>
       {dialog}
-      {alertPrefs}
       {mainContent}
     </ProfileSubScreenLayout>
   );

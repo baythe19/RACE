@@ -187,11 +187,6 @@ export default function BookingFlowHeader({
           <ArrowLeft size={t.iconMd} color={colors.dark} strokeWidth={2.5} />
         </Pressable>
       ) : null}
-      {showStepper ? (
-        <View style={{ width: '100%', paddingHorizontal: t.px(8) }}>
-          <BookingStepper step={step} labels={stepLabels} theme={t} accentColor={accentColor} />
-        </View>
-      ) : null}
       <Text
         numberOfLines={1}
         style={[
@@ -199,11 +194,17 @@ export default function BookingFlowHeader({
           {
             fontSize: t.screenTitle,
             lineHeight: t.screenTitle + 4,
-            height: t.screenTitle + 6,
+            minHeight: t.screenTitle + 6,
+            paddingTop: onBack ? t.px(2) : 0,
           },
         ]}>
         {title}
       </Text>
+      {showStepper ? (
+        <View style={{ width: '100%', paddingHorizontal: t.px(8), marginTop: t.px(6) }}>
+          <BookingStepper step={step} labels={stepLabels} theme={t} accentColor={accentColor} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -270,6 +271,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.extrabold,
     color: colors.dark,
     paddingHorizontal: 8,
+    letterSpacing: -0.3,
   },
   centeredWrap: {
     alignItems: 'center',
@@ -352,6 +354,7 @@ const styles = StyleSheet.create({
     color: colors.dark,
     textAlign: 'center',
     paddingHorizontal: 12,
+    letterSpacing: -0.3,
   },
   shell: {
     flex: 1,

@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
-import { Building2, ChevronRight, Clock, Home, MapPin } from 'lucide-react-native';
+import { Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import LocationPickerModal from '../../../components/common/LocationPickerModal';
-import TileMapSurface from '../../../components/common/TileMapSurface';
+import RideLocationBoard, { type RideSuggestion } from '../../../components/booking/RideLocationBoard';
 import TowingBookingLayout, { useBookingTheme } from '../../../components/booking/TowingBookingLayout';
 import WizardStepFade from '../../../components/booking/WizardStepFade';
 import {
@@ -18,6 +17,12 @@ import { useSavedLocationsQuery } from '../../../services/profile/useProfileQuer
 import { useLocationStore } from '../../../store/locationStore';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { getRecentDriverPickups } from '../../../utils/recentDriverPickups';
+import {
+  distanceKm as haversineKm,
+  locationFromPlaceId,
+  searchPlaceSuggestions,
+  type PlaceSuggestion,
+} from '../../../utils/googlePlaces';
 import { resolveLocationSelection } from '../../../utils/locationSelection';
 import { formatLocationDisplay } from '../../../utils/readableAddress';
 import { assertServiceableBookingLocation } from '../../../utils/serviceableLocation';
@@ -50,6 +55,10 @@ export default function DriverPickupScreen({ navigation }: Props) {
   const [dropoffLat, setDropoffLat] = useState(booking.dropoffLat);
   const [dropoffLng, setDropoffLng] = useState(booking.dropoffLng);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>(null);
+  const [activeStop, setActiveStop] = useState<'pickup' | 'dropoff'>('pickup');
+  const [query, setQuery] = useState('');
+  const [placeHits, setPlaceHits] = useState<PlaceSuggestion[]>([]);
+  const [searchingPlaces, setSearchingPlaces] = useState(false);
   const showPicker = pickerTarget !== null;
   const { data: savedLocations = [] } = useSavedLocationsQuery();
   const { data: bookings = [] } = useBookingsQuery();
@@ -95,6 +104,28 @@ export default function DriverPickupScreen({ navigation }: Props) {
       pickupLng: selectedLocation.longitude,
     });
   }, [booking.pickupLat, pickupLat, selectedLocation, updateBooking]);
+
+  useEffect(() => {
+    const text = query.trim();
+    if (text.length < 2) {
+      setPlaceHits([]);
+      setSearchingPlaces(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchingPlaces(true);
+    const timer = setTimeout(() => {
+      void searchPlaceSuggestions(text).then(hits => {
+        if (cancelled) return;
+        setPlaceHits(hits);
+        setSearchingPlaces(false);
+      });
+    }, 280);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   const applyPickup = (address: string, latitude: number, longitude: number, label?: string) => {
     if (!assertServiceableBookingLocation(latitude, longitude)) return;
