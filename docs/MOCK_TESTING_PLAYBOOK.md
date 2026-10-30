@@ -110,3 +110,9 @@ npx expo start --tunnel
 - Opens Vendor Dashboard.
 - View Fleet Vehicles (`Tata 407 Recovery`, `Mahindra Bolero Maxi Truck`).
 - View and manage assigned drivers.
+
+---
+
+## Ecosystem QA (all surfaces + cloud APKs)
+
+For cross-app journeys (customer + partner + admin + Render API + MongoDB), preview tier strategy, monthly crash hunt, and QA account bootstrap on Atlas, use **[ECOSYSTEM_QA_PREVIEW_PLAYBOOK.md](ops/ECOSYSTEM_QA_PREVIEW_PLAYBOOK.md)**. This mock playbook remains the quick reference for `seed:mock` and universal OTP on a **local** backend only.

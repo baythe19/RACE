@@ -183,7 +183,9 @@ export function useDeleteNotificationMutation() {
         await deleteNotification(id);
         return { deletedOnServer: true as const };
       } catch (err) {
-        // Prod API may return 404 until DELETE /:id is deployed — UI still dismisses.
+        // Optimistic dismiss: row already removed in onMutate if DELETE fails with 404
+        // (already gone on server) or after a transient network error. Render serves
+        // DELETE /profile/notifications/:id for authed customers when deployed.
         if (isAxiosError(err) && err.response?.status === 404) {
           return { deletedOnServer: false as const };
         }

@@ -1,8 +1,11 @@
 ## Current focus
 
+**2026-10-31 (ecosystem QA doc):** Added `docs/ops/ECOSYSTEM_QA_PREVIEW_PLAYBOOK.md` — architecture map, 3-tier preview (local / Render+Vercel+EAS / prod-like), cross-surface matrix, monthly regression checklist, APK+admin YES/NO table, known gaps. Pointer in `docs/MOCK_TESTING_PLAYBOOK.md`.
+
 **2026-10-31 (customer assign/accept sync):** Backend `applyCustomerBookingView` masks status + hides driver until en route; `awaitingPartnerAccept` on list/detail/tracking. Customer socket `internalStatus` + tracking poll resolve UI to `DRIVER_ASSIGNED` for “Partner accepting” copy. Backend + customer tracking files `tsc` 0 (unrelated LocationPickerModal PROVIDER_* errors pre-existing).
 
-**2026-10-31 (towing step 1 cards):** Vehicle & tow — white selection cards (#E7E5E4 outline, dark border when selected), no goldLight; multi-vehicle vertical list + count in title; tow type + schedule chips match; instant/scheduled banner white. Customer `tsc` 0.
+**2026-10-31 (booking dispatch + cards UX):** Documented dispatch: TOW→vendors, DRV→drivers, RSV roadside→vendor pipeline (same as tow). `bookingFlowCopy.ts` service-specific status/partner lines; cards no misleading green "Confirmed" while searching; drop addresses use full `formatBookingStopAddress`; payment screen white method rows + flow footnotes. See `docs/client/BOOKING_DISPATCH_AND_UI.md`. Customer `tsc` 0.
+ Vehicle & tow — white selection cards (#E7E5E4 outline, dark border when selected), no goldLight; multi-vehicle vertical list + count in title; tow type + schedule chips match; instant/scheduled banner white. Customer `tsc` 0.
 
 **2026-10-31 (towing pickup fare card):** Distance/est. fare white card (not #FEF3C7). Customer `tsc` 0.
  Tighter layout — service + status + ID/copy on fewer rows; route block with **From/To** or single **At** using `formatLocationCard()` (primary + secondary lines); less card padding; `BookingsScreen` horizontal padding 14px. Customer `tsc` 0.

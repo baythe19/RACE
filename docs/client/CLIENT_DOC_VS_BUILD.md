@@ -78,14 +78,16 @@ Admin web     -- email + password -->  /api/v1/admin  (one hardcoded env admin)
 
 MongoDB (Atlas)   = users, vehicles, bookings, vendors, drivers, plans
 Redis             = OTP / rate-limit / cache
-Socket.IO         = intended live driver GPS + booking status
+Socket.IO         = booking status + driver offers refresh
 Twilio + Gmail    = OTP SMS / email (prod Twilio trial already failed once)
 ```
+
+**Booking routing (towing / driver / roadside):** [`BOOKING_DISPATCH_AND_UI.md`](BOOKING_DISPATCH_AND_UI.md) — dispatch, statuses, OTP, customer UI. Live mobile jobs: **TowingBooking** + **DriverBooking** (not legacy `Booking`).
 
 | Journey | Client intent | Happening now? |
 |---------|---------------|----------------|
 | Customer OTP → profile → vehicle → QR | Yes | **Partial.** OTP skip is `true` in both apps (dev bypass). QR image yes; scan no. |
-| Customer books towing → partner gets job → admin sees it | Yes | **Partial.** Booking creates `TowingBooking`. Assign mix of auto + vendor + admin. Admin also still has an old `Booking` list. |
+| Customer books towing → partner gets job → admin sees it | Yes | **Partial.** See [`BOOKING_DISPATCH_AND_UI.md`](BOOKING_DISPATCH_AND_UI.md): advance → CONFIRMED → vendor notify + driver offers. Admin may still list legacy `Booking` in some reports. |
 | Customer books driver (4 types) | Four products | **Partial.** Full-time = enquiry. Other three = same booking, type not saved. |
 | Roadside 4 jobs | Yes | **Mostly yes** (availability can mark some coming-soon). |
 | Vendor KYC → admin approve → jobs | Yes | **Partial.** Company docs upload. Driver self-register docs not posted. |
@@ -161,7 +163,7 @@ Equipment (flatbed / wheel lift) is an extra step the client doc did not name. F
 |--------------|--------|------:|-------|
 | Car wash, inspection, insurance, EV charging, ambulance, corporate fleet, pickup & drop, mechanic on demand | Later | — | Shown on More Services / seed `future`. Not bookable. Matches “future” in the client doc |
 
-**Module score 72** (A+B+C only). Strongest customer booking area: roadside. Weakest: driver types and emergency towing as real products.
+**Module score 72** (A+B+C only). Strongest customer booking area: roadside. Weakest: driver types and emergency towing as real products. **Routing & lifecycle detail:** [`BOOKING_DISPATCH_AND_UI.md`](BOOKING_DISPATCH_AND_UI.md).
 
 ---
 

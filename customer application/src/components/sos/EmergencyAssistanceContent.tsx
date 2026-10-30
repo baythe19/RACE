@@ -150,6 +150,24 @@ export default function EmergencyAssistanceContent({
     });
   };
 
+  const openSosDetails = useCallback(() => {
+    closeDialog();
+    if (onConfigure) onConfigure();
+    else tabNav.navigate('Profile', { screen: 'SosDetails' });
+  }, [closeDialog, onConfigure, tabNav]);
+
+  const showDetailsRequiredDialog = useCallback(() => {
+    openDialog({
+      variant: 'info',
+      title: 'Complete SOS details',
+      message:
+        'Add your vehicle, owner on record, and emergency contact in Profile or SOS Details before sending alerts or using More help actions.',
+      primaryLabel: 'Update SOS Details',
+      onPrimary: openSosDetails,
+      secondaryLabel: 'Not now',
+    });
+  }, [openDialog, openSosDetails]);
+
   const triggerAlert = useCallback(
     async (
       action: 'sos' | 'towing' | 'ambulance' | 'share_location' | 'notify_contacts',
@@ -164,6 +182,10 @@ export default function EmergencyAssistanceContent({
           onPrimary: () => jumpToAuthScreen('MobileNumber'),
           secondaryLabel: 'Cancel',
         });
+        return;
+      }
+      if (detailsIncomplete) {
+        showDetailsRequiredDialog();
         return;
       }
       if (sosAlert.isPending) return;
@@ -199,13 +221,28 @@ export default function EmergencyAssistanceContent({
         },
       );
     },
-    [contactName, isAuthenticated, openDialog, previewSos, resolveLocation, sosAlert, vehicleId, vehicleLabel],
+    [
+      contactName,
+      detailsIncomplete,
+      isAuthenticated,
+      openDialog,
+      previewSos,
+      resolveLocation,
+      showDetailsRequiredDialog,
+      sosAlert,
+      vehicleId,
+      vehicleLabel,
+    ],
   );
 
   const handleGridAction = (id: string) => {
     switch (id) {
       case 'towing':
         if (isAuthenticated) {
+          if (detailsIncomplete) {
+            showDetailsRequiredDialog();
+            return;
+          }
           void triggerAlert('towing', 'Towing Requested');
         } else {
           tabNav.navigate('Services', { screen: 'TowingService' });
@@ -213,6 +250,10 @@ export default function EmergencyAssistanceContent({
         break;
       case 'location':
         if (isAuthenticated) {
+          if (detailsIncomplete) {
+            showDetailsRequiredDialog();
+            return;
+          }
           void triggerAlert('share_location', 'Location Shared');
         } else {
           void Share.share({ message: `Vehicle ${vehicleNumber} — ${details.location}` });
@@ -220,6 +261,10 @@ export default function EmergencyAssistanceContent({
         break;
       case 'contacts':
         if (isAuthenticated) {
+          if (detailsIncomplete) {
+            showDetailsRequiredDialog();
+            return;
+          }
           void triggerAlert('notify_contacts', 'Contact Notified');
         } else {
           openDialog({

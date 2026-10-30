@@ -35,13 +35,17 @@ import { LOCATION_ACCENT } from '../../utils/googlePlaces';
 import type { BookingsStackParamList } from '../../types/navigation';
 import {
   formatBookingDisplayId,
-  formatUnifiedStatusLabel,
+  getCustomerBookingPresentation,
   isBookingCompleted,
   isBookingOngoing,
   resolveBookingType,
   shouldShowTripStartOtp,
 } from '../../utils/bookingDisplay';
-import { formatLocationDisplay } from '../../utils/readableAddress';
+import {
+  bookingHasNamedPartner,
+  partnerSectionTitle,
+} from '../../utils/bookingFlowCopy';
+import { formatLocationCard, formatLocationDisplay } from '../../utils/readableAddress';
 import { colors, shadows, typography } from '../../theme';
 import { goBackWithinStack } from '../../navigation/goBackWithinStack';
 
@@ -87,17 +91,17 @@ function DetailRow({
 
 const StyleSheetHairline = 1;
 
-function statusTone(statusLabel: string, isCompleted: boolean, isOngoing: boolean) {
-  if (statusLabel === 'Cancelled') {
+function statusToneForPill(statusPill: string, isCompleted: boolean, isOngoing: boolean) {
+  if (statusPill === 'Cancelled') {
     return { bg: '#F3F4F6', fg: colors.grey, border: '#E5E7EB' };
   }
-  if (statusLabel === 'Confirmed' || statusLabel === 'Driver Assigned') {
+  if (/finding|awaiting|confirmed ·/i.test(statusPill)) {
     return { bg: '#FFFBEB', fg: '#B45309', border: '#FDE68A' };
   }
   if (isOngoing) {
     return { bg: '#ECFDF5', fg: colors.success, border: '#A7F3D0' };
   }
-  if (isCompleted) {
+  if (isCompleted || statusPill === 'Completed') {
     return { bg: '#E8F8EE', fg: colors.success, border: '#BBF7D0' };
   }
   return { bg: '#F3F4F6', fg: colors.dark, border: '#E5E7EB' };
@@ -115,9 +119,6 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
   const isCompleted = booking ? isBookingCompleted(booking) : false;
   const isOngoing = booking ? isBookingOngoing(booking) : false;
   const bookingType = resolveBookingType(booking);
-  const statusLabel = booking?.unifiedStatus
-    ? formatUnifiedStatusLabel(booking.unifiedStatus)
-    : booking?.status ?? 'Loading';
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [policyLoading, setPolicyLoading] = useState(false);
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
@@ -163,6 +164,8 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
 
   const total = booking.invoice?.total ?? 0;
   const displayId = formatBookingDisplayId(booking.bookingNumber);
+  const presentation = getCustomerBookingPresentation(booking);
+  const statusLabel = presentation.statusPill;
   const cancellableStatuses = [
     'PENDING',
     'CONFIRMED',
@@ -171,9 +174,24 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
     'DRIVER_ARRIVED',
   ];
   const canCancelBooking = cancellableStatuses.includes(booking.unifiedStatus ?? '');
-  const tone = statusTone(statusLabel, isCompleted, isOngoing);
+  const tone = statusToneForPill(statusLabel, isCompleted, isOngoing);
   const callPhone = booking.driver?.phone?.trim() || brand.phoneRaw;
-  const serviceKind = bookingType === 'driver' ? 'Driver hire' : 'Towing';
+  const serviceKind =
+    presentation.kind === 'driver'
+      ? 'Driver hire'
+      : presentation.kind === 'roadside'
+        ? 'Roadside'
+        : 'Towing';
+  const partnerTitle = partnerSectionTitle(presentation.kind);
+  const partnerDisplayName = bookingHasNamedPartner(booking.driver)
+    ? booking.driver!.name
+    : presentation.partnerLine;
+  const pickupCard = formatLocationCard(booking.pickup);
+  const dropCard = booking.dropoff ? formatLocationCard(booking.dropoff) : null;
+  const onSiteOnly =
+    presentation.kind === 'roadside' ||
+    !booking.dropoff ||
+    formatLocationDisplay(booking.dropoff) === formatLocationDisplay(booking.pickup);
 
   const openCancelModal = async () => {
     if (policyLoading || cancelSubmitting) return;
@@ -295,6 +313,19 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
         </Text>
       </View>
 
+      {isOngoing && presentation.dispatchHint ? (
+        <Text
+          style={{
+            fontSize: px(12),
+            color: colors.grey,
+            lineHeight: px(17),
+            marginBottom: px(10),
+            paddingHorizontal: px(2),
+          }}>
+          {presentation.dispatchHint}
+        </Text>
+      ) : null}
+
       {booking.tripStartOtp && shouldShowTripStartOtp(booking.unifiedStatus) ? (
         <View style={{ marginBottom: px(10) }}>
           <TripOtpCard
@@ -375,6 +406,27 @@ export default function BookingDetailScreen({ navigation, route }: Props) {
           }}>
           Trip route
         </Text>
+        {onSiteOnly ? (
+          <View>
+            <Text style={{ fontSize: px(10), color: colors.grey, fontWeight: typography.weights.semibold }}>
+              Location
+            </Text>
+            <Text
+              style={{
+                marginTop: px(2),
+                fontSize: px(13),
+                fontWeight: typography.weights.semibold,
+                color: colors.dark,
+              }}>
+              {pickupCard.primary}
+            </Text>
+            {pickupCard.secondary ? (
+              <Text style={{ marginTop: px(4), fontSize: px(12), color: colors.grey }}>
+                {pickupCard.secondary}
+              </Text>
+            ) : null}
+          </View>
+        ) : (
         <View style={{ flexDirection: 'row', gap: px(12) }}>
           <View style={{ alignItems: 'center', width: px(28) }}>
             <View

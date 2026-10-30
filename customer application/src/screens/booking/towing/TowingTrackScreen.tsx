@@ -13,10 +13,15 @@ import type { BookingsStackParamList, HomeStackParamList } from '../../../types/
 import {
   formatBookingDisplayId,
   formatLiveTrackingSummary,
-  formatUnifiedStatusLabel,
+  getCustomerBookingPresentation,
   isCompletedUnifiedStatus,
   isOngoingUnifiedStatus,
 } from '../../../utils/bookingDisplay';
+import {
+  trackEtaForStage,
+  trackLocationHint,
+  trackPartnerDisplayName,
+} from '../../../utils/bookingFlowCopy';
 import { formatLocationCard, formatLocationDisplay } from '../../../utils/readableAddress';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
@@ -65,40 +70,23 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
 
   const status = mergeLiveStatus(trackedStatus, booking?.unifiedStatus);
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
-  /**
-   * Pre-accept honesty: backend hides partner identity until DRIVER_EN_ROUTE
-   * (privacy-by-design). "Assigning driver" on a PENDING/CONFIRMED job reads
-   * like a bug — tell the truth about what's happening instead.
-   */
+  const kind = booking ? getCustomerBookingPresentation(booking).kind : 'towing';
   const partnerPending = !driverName && !booking?.driver;
-  const displayDriverName = partnerPending
-    ? status === 'DRIVER_ASSIGNED'
-      ? 'Assigned partner — accepting…'
-      : 'Waiting for a partner to accept'
-    : (driverName ?? booking?.driver?.name ?? 'Partner');
+  const displayDriverName = trackPartnerDisplayName(
+    kind,
+    status,
+    partnerPending,
+    driverName ?? booking?.driver?.name,
+  );
   const phone = driverPhone ?? booking?.driver?.phone;
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
   const isCompleted = isCompletedUnifiedStatus(status);
   const isLive = isOngoingUnifiedStatus(status);
 
-  /**
-   * Screenshot bug: "Calculating… / Confirmed" forever. Before the partner is
-   * en route there is no arrival estimate — say so honestly instead of a spinner.
-   */
-  const etaForStage =
-    status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED' || status === 'IN_PROGRESS'
-      ? etaMinutes != null
-        ? `${etaMinutes} min`
-        : 'Updating…'
-      : status === 'DRIVER_ASSIGNED' || status === 'CONFIRMED'
-        ? 'Partner approval pending'
-        : status === 'PENDING'
-          ? 'Once a partner accepts'
-          : status === 'COMPLETED' || status === 'RATED'
-            ? 'Trip completed'
-            : '—';
+  const etaForStage = trackEtaForStage(kind, status, etaMinutes);
   const trackingUi = formatLiveTrackingSummary({
+    kind,
     status,
     partnerPending,
     etaDisplay: etaForStage,
@@ -152,22 +140,19 @@ export default function TowingTrackScreen({ navigation, route }: Props) {
         }
       : null;
 
-  const locationHint = driverLocation
-    ? 'Partner location updating live'
-    : mockDriverPoint
-      ? 'Preview mode · sample partner position on map'
-      : status === 'DRIVER_ASSIGNED'
-        ? 'Assigned — partner will accept shortly'
-        : status === 'CONFIRMED' || status === 'PENDING'
-          ? 'Sent to nearby partners — first to accept serves you'
-          : null;
+  const locationHint = trackLocationHint(
+    kind,
+    status,
+    Boolean(driverLocation),
+    Boolean(mockDriverPoint),
+  );
 
   return (
     <LiveTrackingContent
       bookingNumberLabel={
         booking ? formatBookingDisplayId(booking.bookingNumber) : 'Towing trip'
       }
-      statusLabel={formatUnifiedStatusLabel(status)}
+      statusLabel={trackingUi.chipLabel}
       statusCode={status}
       isLive={isLive}
       steps={TRACK_STEPS}

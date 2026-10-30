@@ -1,6 +1,12 @@
 import type { Booking } from '../types/booking';
 import type { ActiveBooking, BookingHistoryItem } from '../types/models';
 import type { ServiceBookingType } from '../types/serviceBooking';
+import {
+  bookingHasNamedPartner,
+  formatCustomerBookingStatus,
+  inferCustomerBookingKind,
+  type CustomerBookingKind,
+} from './bookingFlowCopy';
 import { formatLocationCard, formatLocationDisplay } from './readableAddress';
 
 export const ONGOING_UNIFIED_STATUSES = [
@@ -43,38 +49,26 @@ export function formatUnifiedStatusLabel(status: string): string {
 }
 
 /**
- * Live Tracking bottom sheet — avoid "Estimated arrival" + "Confirmed" before
- * any partner has accepted (backend CONFIRMED = booking placed, not driver OK).
+ * Live Tracking bottom sheet — service-specific copy; avoid bare "Confirmed"
+ * before any partner has accepted (backend CONFIRMED = advance paid, matching).
  */
 export function formatLiveTrackingSummary(input: {
+  kind: CustomerBookingKind;
   status: string;
   partnerPending: boolean;
   etaDisplay: string;
 }): { cardLabel: string; cardValue: string; chipLabel: string } {
-  const { status, partnerPending, etaDisplay } = input;
+  const { kind, status, partnerPending, etaDisplay } = input;
+  const copy = formatCustomerBookingStatus(kind, status, !partnerPending);
   const awaitingPartner =
     partnerPending &&
     (status === 'PENDING' || status === 'CONFIRMED' || status === 'DRIVER_ASSIGNED');
 
   if (awaitingPartner) {
-    if (status === 'DRIVER_ASSIGNED') {
-      return {
-        cardLabel: 'Partner',
-        cardValue: 'Assigned — waiting to accept',
-        chipLabel: 'Awaiting accept',
-      };
-    }
-    if (status === 'PENDING') {
-      return {
-        cardLabel: 'Status',
-        cardValue: 'Looking for a nearby partner',
-        chipLabel: 'Searching',
-      };
-    }
     return {
       cardLabel: 'Status',
-      cardValue: 'Sent to partners — not accepted yet',
-      chipLabel: 'Awaiting partner',
+      cardValue: copy.dispatchHint,
+      chipLabel: copy.statusPill,
     };
   }
 
@@ -82,7 +76,7 @@ export function formatLiveTrackingSummary(input: {
     return {
       cardLabel: 'Estimated arrival',
       cardValue: etaDisplay,
-      chipLabel: formatUnifiedStatusLabel(status),
+      chipLabel: copy.statusPill,
     };
   }
 
@@ -97,8 +91,16 @@ export function formatLiveTrackingSummary(input: {
   return {
     cardLabel: 'Status',
     cardValue: etaDisplay,
-    chipLabel: formatUnifiedStatusLabel(status),
+    chipLabel: copy.statusPill,
   };
+}
+
+export function getCustomerBookingPresentation(booking: Booking) {
+  const kind = inferCustomerBookingKind(booking);
+  const hasNamedPartner = bookingHasNamedPartner(booking.driver);
+  const unified = booking.unifiedStatus ?? booking.status;
+  const copy = formatCustomerBookingStatus(kind, unified, hasNamedPartner);
+  return { kind, unified, hasNamedPartner, ...copy };
 }
 
 export function isOngoingUnifiedStatus(status?: string): boolean {
@@ -143,37 +145,43 @@ export function formatBookingDisplayId(bookingNumber: string): string {
 }
 
 export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
+  const kind = inferCustomerBookingKind(booking);
   const pickup = formatLocationCard(booking.pickup);
-  const dropLine = formatLocationCard(booking.dropoff);
+  const dropLine = booking.dropoff ? formatLocationCard(booking.dropoff) : null;
   const pickupFlat = formatLocationDisplay(booking.pickup);
-  const dropFlat = formatLocationDisplay(booking.dropoff);
+  const dropFlat = booking.dropoff ? formatLocationDisplay(booking.dropoff) : '—';
   const onSiteOnly =
+    kind === 'roadside' ||
     dropFlat === '—' ||
     dropFlat === 'On-site help' ||
-    (dropFlat === pickupFlat && !/towing/i.test(booking.serviceLabel));
+    (dropFlat === pickupFlat && kind !== 'towing');
+
+  const hasNamedPartner = bookingHasNamedPartner(booking.driver);
+  const unified = booking.unifiedStatus ?? booking.status;
+  const copy = formatCustomerBookingStatus(kind, unified, hasNamedPartner);
 
   return {
     id: booking.id,
     displayId: formatBookingDisplayId(booking.bookingNumber),
     service: booking.serviceLabel,
-    status: booking.unifiedStatus
-      ? formatUnifiedStatusLabel(booking.unifiedStatus)
-      : formatUnifiedStatusLabel(booking.status),
+    status: copy.statusPill,
     pickup,
     drop: onSiteOnly ? null : dropLine,
     eta: booking.etaMinutes != null ? `${booking.etaMinutes} min` : 'Updating',
-    driver: booking.driver
+    driver: hasNamedPartner
       ? {
-          name: booking.driver.name,
-          photo: booking.driver.avatarUrl ?? null,
-          experience: booking.driver.experience,
-          phone: booking.driver.phone,
+          name: booking.driver!.name,
+          photo: booking.driver!.avatarUrl ?? null,
+          experience: booking.driver!.experience,
+          phone: booking.driver!.phone,
         }
       : {
-          name: 'Finding a partner',
+          name: copy.partnerLine,
           photo: null,
         },
     bookingType: booking.bookingType ?? 'towing',
+    bookingKind: kind,
+    dispatchHint: copy.dispatchHint,
     tripStartOtp: shouldShowTripStartOtp(booking.unifiedStatus)
       ? booking.tripStartOtp
       : undefined,
@@ -181,6 +189,10 @@ export function mapBookingToActiveCard(booking: Booking): ActiveBooking {
 }
 
 export function mapBookingToHistoryRow(booking: Booking): BookingHistoryItem {
+  const kind = inferCustomerBookingKind(booking);
+  const hasNamedPartner = bookingHasNamedPartner(booking.driver);
+  const unified = booking.unifiedStatus ?? booking.status;
+  const copy = formatCustomerBookingStatus(kind, unified, hasNamedPartner);
   return {
     id: booking.id,
     displayId: formatBookingDisplayId(booking.bookingNumber),
@@ -192,9 +204,7 @@ export function mapBookingToHistoryRow(booking: Booking): BookingHistoryItem {
     }),
     location: formatLocationDisplay(booking.pickup),
     amount: booking.invoice?.total ?? 0,
-    status: booking.unifiedStatus
-      ? formatUnifiedStatusLabel(booking.unifiedStatus)
-      : 'Completed',
+    status: booking.unifiedStatus ? copy.statusPill : 'Completed',
     bookingType: booking.bookingType ?? 'towing',
   };
 }

@@ -129,7 +129,11 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       continueDisabled={payMutation.isPending}
       footerNoteBelow={
         <Text style={{ fontSize: t.caption, color: colors.grey, textAlign: 'center' }}>
-          Secure payment confirmation for RACE services.
+          {flow === 'towing'
+            ? 'Advance unlocks vendor tow dispatch. Balance after drop in Track.'
+            : flow === 'driver'
+              ? 'Advance sends your job to drivers. Pay balance after the trip.'
+              : 'Advance sends help to roadside partners near you.'}
         </Text>
       }>
       {dialog}
@@ -185,8 +189,8 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
                     gap: t.px(12),
                     borderRadius: t.inputRadius,
                     borderWidth: isSelected ? 2 : 1,
-                    borderColor: isSelected ? accent : colors.border,
-                    backgroundColor: isSelected ? colors.goldLight : colors.background,
+                    borderColor: isSelected ? accent : '#E7E5E4',
+                    backgroundColor: colors.background,
                     padding: t.rowPadding,
                   },
                   shadows.card,

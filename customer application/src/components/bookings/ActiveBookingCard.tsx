@@ -69,6 +69,13 @@ export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Pro
   const ServiceIcon = getBookingServiceIcon(booking.service);
   const callPhone = booking.driver.phone?.trim() || brand.phoneRaw;
   const showDrop = booking.drop != null;
+  const searching =
+    /finding|matching|confirmed · finding|awaiting/i.test(booking.status) ||
+    /matching|must accept|pending/i.test(booking.driver.name);
+
+  const statusBg = searching ? '#FFF7ED' : '#E8F8EE';
+  const statusFg = searching ? '#C2410C' : colors.success;
+  const statusDot = searching ? '#F97316' : colors.success;
 
   const copyBookingId = () => {
     const raw = booking.displayId.replace(/^#/, '');
@@ -133,22 +140,24 @@ export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Pro
               paddingHorizontal: px(7),
               paddingVertical: px(3),
               borderRadius: px(8),
-              backgroundColor: '#E8F8EE',
+              backgroundColor: statusBg,
               flexShrink: 0,
+              maxWidth: '46%',
             }}>
             <View
               style={{
                 width: px(5),
                 height: px(5),
                 borderRadius: px(3),
-                backgroundColor: colors.success,
+                backgroundColor: statusDot,
               }}
             />
             <Text
+              numberOfLines={1}
               style={{
-                fontSize: px(9.5),
+                fontSize: px(9),
                 fontWeight: typography.weights.bold,
-                color: colors.success,
+                color: statusFg,
               }}>
               {booking.status}
             </Text>
@@ -214,25 +223,39 @@ export default function ActiveBookingCard({ booking, px, onTrack, onPress }: Pro
           )}
         </View>
 
-        {/* Partner */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: px(8),
-            marginBottom: booking.tripStartOtp ? px(8) : 0,
-          }}>
-          <DriverAvatar size={px(26)} />
-          <Text
-            numberOfLines={1}
+        {/* Partner + dispatch hint */}
+        <View style={{ marginBottom: booking.tripStartOtp ? px(8) : 0 }}>
+          <View
             style={{
-              flex: 1,
-              fontSize: px(11.5),
-              fontWeight: typography.weights.semibold,
-              color: colors.dark,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: px(8),
             }}>
-            {booking.driver.name}
-          </Text>
+            <DriverAvatar size={px(26)} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: px(11.5),
+                  fontWeight: typography.weights.semibold,
+                  color: colors.dark,
+                }}>
+                {booking.driver.name}
+              </Text>
+              {booking.dispatchHint ? (
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontSize: px(10),
+                    color: colors.grey,
+                    marginTop: px(2),
+                    lineHeight: px(14),
+                  }}>
+                  {booking.dispatchHint}
+                </Text>
+              ) : null}
+            </View>
+          </View>
         </View>
 
         {booking.tripStartOtp ? (

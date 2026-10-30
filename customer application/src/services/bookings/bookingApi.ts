@@ -3,7 +3,7 @@ import type { ApiSuccessResponse } from '../../types/auth';
 import type { Booking, BookingStatus, SubmitRatingRequest } from '../../types/booking';
 import type { CombinedBookingListItem, ServiceBooking, ServiceBookingType } from '../../types/serviceBooking';
 import { apiClient } from '../api/apiClient';
-import { formatReadableAddress } from '../../utils/readableAddress';
+import { formatBookingStopAddress, formatReadableAddress } from '../../utils/readableAddress';
 import { customerUnifiedStatusFromApi } from '../../utils/customerTrackStatus';
 import {
   getDriverBooking,
@@ -69,9 +69,9 @@ function toBookingLocation(point: {
   longitude?: number;
 }) {
   const address = point.address?.trim() ?? '';
-  const label = formatReadableAddress(address);
+  const display = formatBookingStopAddress(address) || formatReadableAddress(address);
   return {
-    label,
+    label: display,
     address,
     latitude: point.latitude,
     longitude: point.longitude,

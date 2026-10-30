@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import {
   Bell,
   CheckCircle,
@@ -22,6 +22,8 @@ import {
   useDeleteNotificationMutation,
   useMarkNotificationReadMutation,
   useNotificationsQuery,
+  useNotificationPrefsQuery,
+  useUpdateNotificationPrefMutation,
 } from '../../services/profile/useProfileQueries';
 import type { AppNotification } from '../../types/profile';
 import type { ServiceBookingTypeParam } from '../../types/navigation';
@@ -216,6 +218,80 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
   const deleteAll = useDeleteAllNotificationsMutation();
   const deleteOne = useDeleteNotificationMutation();
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const { data: notificationPrefs } = useNotificationPrefsQuery();
+  const updatePref = useUpdateNotificationPrefMutation();
+
+  const pushPref = notificationPrefs?.find(p => p.id === 'push');
+  const offersPref = notificationPrefs?.find(p => p.id === 'offers');
+
+  const handlePrefToggle = (prefId: string, enabled: boolean) => {
+    if (updatePref.isPending) return;
+    updatePref.mutate({ prefId, enabled });
+  };
+
+  const alertPrefsCard = (
+    <View
+      style={{
+        marginBottom: px(14),
+        borderRadius: px(14),
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: '#FFFFFF',
+        padding: px(14),
+      }}>
+      <Text
+        style={{
+          fontSize: px(13),
+          fontWeight: typography.weights.bold,
+          color: colors.dark,
+          marginBottom: px(10),
+        }}>
+        Alert preferences
+      </Text>
+      {[
+        {
+          pref: pushPref,
+          fallbackTitle: 'Push notifications',
+          fallbackDescription: 'Receive alerts on your device',
+        },
+        {
+          pref: offersPref,
+          fallbackTitle: 'Offers & promotions',
+          fallbackDescription: 'Discounts and seasonal deals',
+        },
+      ].map((row, index) => (
+        <View
+          key={row.pref?.id ?? row.fallbackTitle}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: px(10),
+            paddingTop: index === 0 ? 0 : px(10),
+            marginTop: index === 0 ? 0 : px(10),
+            borderTopWidth: index === 0 ? 0 : StyleSheet.hairlineWidth,
+            borderTopColor: colors.border,
+          }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              numberOfLines={1}
+              style={{ fontSize: px(13), fontWeight: typography.weights.bold, color: colors.dark }}>
+              {row.pref?.title ?? row.fallbackTitle}
+            </Text>
+            <Text numberOfLines={2} style={{ fontSize: px(11), color: colors.grey, marginTop: px(2) }}>
+              {row.pref?.description ?? row.fallbackDescription}
+            </Text>
+          </View>
+          <Switch
+            value={row.pref?.enabled ?? true}
+            onValueChange={value => handlePrefToggle(row.pref?.id ?? (index === 0 ? 'push' : 'offers'), value)}
+            disabled={updatePref.isPending}
+            trackColor={{ false: colors.border, true: colors.primary }}
+            thumbColor="#FFFFFF"
+          />
+        </View>
+      ))}
+    </View>
+  );
 
   const items = data?.notifications ?? [];
   const filtered = useMemo(() => items.filter(i => matchesFilter(i, activeFilter)), [items, activeFilter]);
@@ -491,6 +567,7 @@ export default function NotificationsScreen({ onPressNotification }: Notificatio
         ) : null
       }>
       {dialog}
+      {alertPrefsCard}
       {mainContent}
     </ProfileSubScreenLayout>
   );

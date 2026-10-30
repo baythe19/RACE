@@ -13,10 +13,15 @@ import type { BookingsStackParamList, HomeStackParamList } from '../../../types/
 import {
   formatBookingDisplayId,
   formatLiveTrackingSummary,
-  formatUnifiedStatusLabel,
+  getCustomerBookingPresentation,
   isCompletedUnifiedStatus,
   isOngoingUnifiedStatus,
 } from '../../../utils/bookingDisplay';
+import {
+  trackEtaForStage,
+  trackLocationHint,
+  trackPartnerDisplayName,
+} from '../../../utils/bookingFlowCopy';
 import { formatLocationCard, formatLocationDisplay } from '../../../utils/readableAddress';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
 
@@ -65,45 +70,23 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
 
   const status = mergeLiveStatus(trackedStatus, booking?.unifiedStatus);
   const tripOtp = booking?.tripStartOtp ?? trackedOtp;
-  /** Pre-accept honesty — see same logic in TowingTrackScreen. */
+  const kind = booking ? getCustomerBookingPresentation(booking).kind : 'driver';
   const partnerPending = !driverName && !booking?.driver;
-  const displayDriverName = partnerPending
-    ? status === 'DRIVER_ASSIGNED'
-      ? 'Assigned partner — accepting…'
-      : 'Waiting for a partner to accept'
-    : (driverName ?? booking?.driver?.name ?? 'Partner');
+  const displayDriverName = trackPartnerDisplayName(
+    kind,
+    status,
+    partnerPending,
+    driverName ?? booking?.driver?.name,
+  );
   const phone = driverPhone ?? booking?.driver?.phone;
   const fleetVehicleLabel = booking?.assignedFleetVehicleLabel;
   const activeStep = useMemo(() => stepIndexForStatus(status), [status]);
   const isCompleted = isCompletedUnifiedStatus(status);
   const isLive = isOngoingUnifiedStatus(status);
 
-  const resolvedEta =
-    etaMinutes != null
-      ? `${etaMinutes} min`
-      : booking?.etaMinutes != null
-        ? `${booking.etaMinutes} min`
-        : etaLabel;
-
-  /**
-   * Honest ETA states (screenshot bug: screen stuck on "Calculating… / Confirmed"):
-   * before a partner is en route there IS no arrival estimate — say so instead
-   * of a spinner; the tracker (ETA endpoint) only has data once the trip starts.
-   */
-  const etaForStage =
-    status === 'DRIVER_EN_ROUTE' || status === 'DRIVER_ARRIVED' || status === 'IN_PROGRESS'
-      ? etaMinutes != null
-        ? `${etaMinutes} min`
-        : 'Updating…'
-      : status === 'DRIVER_ASSIGNED' || status === 'CONFIRMED'
-        ? 'Partner approval pending'
-        : status === 'PENDING'
-          ? 'Available once a partner accepts'
-          : status === 'COMPLETED' || status === 'RATED'
-            ? 'Trip completed'
-            : '—';
-
+  const etaForStage = trackEtaForStage(kind, status, etaMinutes ?? booking?.etaMinutes ?? null);
   const trackingUi = formatLiveTrackingSummary({
+    kind,
     status,
     partnerPending,
     etaDisplay: etaForStage,
@@ -156,22 +139,19 @@ export default function DriverTrackScreen({ navigation, route }: Props) {
         }
       : null;
 
-  const locationHint = driverLocation
-    ? 'Partner location updating live'
-    : mockDriverPoint
-      ? 'Preview mode · sample partner position on map'
-      : status === 'DRIVER_ASSIGNED'
-        ? 'Assigned — partner will accept shortly'
-        : status === 'CONFIRMED' || status === 'PENDING'
-          ? 'Sent to nearby partners — first to accept serves you'
-          : null;
+  const locationHint = trackLocationHint(
+    kind,
+    status,
+    Boolean(driverLocation),
+    Boolean(mockDriverPoint),
+  );
 
   return (
     <LiveTrackingContent
       bookingNumberLabel={
         booking ? formatBookingDisplayId(booking.bookingNumber) : 'Driver trip'
       }
-      statusLabel={formatUnifiedStatusLabel(status)}
+      statusLabel={trackingUi.chipLabel}
       statusCode={status}
       isLive={isLive}
       steps={TRACK_STEPS}

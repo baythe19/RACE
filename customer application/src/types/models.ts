@@ -124,6 +124,8 @@ export interface ActiveBooking {
   eta: string;
   driver: BookingDriver;
   bookingType: 'towing' | 'driver';
+  bookingKind?: 'towing' | 'driver' | 'roadside';
+  dispatchHint?: string;
   tripStartOtp?: string;
 }
 

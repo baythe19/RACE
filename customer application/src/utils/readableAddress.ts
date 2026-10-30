@@ -266,8 +266,17 @@ export function formatLocationCard(
   if (!loc?.address?.trim() && !loc?.label?.trim()) {
     return { primary: '—' };
   }
-  const full = formatReadableLocation(loc.address, loc.label, 80);
+  const fromAddress = loc.address?.trim() ? formatBookingStopAddress(loc.address) : '';
+  const full =
+    fromAddress ||
+    formatReadableLocation(loc.address, loc.label, 140) ||
+    loc.label?.trim() ||
+    '—';
   if (/^pinned on map$/i.test(full) || /^on-site help$/i.test(full)) {
+    const retry = loc.address?.trim();
+    if (retry && retry.length > 4 && !/^selected location$/i.test(retry)) {
+      return { primary: formatBookingStopAddress(retry) || retry };
+    }
     return { primary: full };
   }
   const parts = full
