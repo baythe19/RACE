@@ -73,7 +73,7 @@ export type RoadsideBookingParamList = {
   RoadsideLocation: { serviceId?: import('./roadsideBooking').RoadsideServiceId } | undefined;
   RoadsideReview: undefined;
   BookingPayment: BookingPaymentParams;
-  RoadsideHelpOnWay: undefined;
+  RoadsideHelpOnWay: { bookingId?: string } | undefined;
 };
 
 export type MoreServicesParamList = {

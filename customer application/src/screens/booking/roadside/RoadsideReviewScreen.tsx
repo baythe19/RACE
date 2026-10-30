@@ -31,7 +31,7 @@ import {
   roadsidePickupKey,
 } from '../../../utils/roadsideBookingFlow';
 import { roadsideServiceIdToSlug } from '../../../utils/roadsideServiceMap';
-import { formatLocationDisplay } from '../../../utils/readableAddress';
+import { formatLocationCard } from '../../../utils/readableAddress';
 import type { HomeStackParamList } from '../../../types/navigation';
 import { colors, shadows, typography } from '../../../theme';
 import { goBackWithinStack } from '../../../navigation/goBackWithinStack';
@@ -135,7 +135,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
         });
         previewAdvancePayment(previewBooking.id, 'towing');
         resetBooking();
-        navigation.replace('RoadsideHelpOnWay');
+        navigation.replace('RoadsideHelpOnWay', { bookingId: previewBooking.id });
         return;
       }
 
@@ -148,7 +148,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
         }
         pendingCreateRef.current = null;
         resetBooking();
-        navigation.replace('RoadsideHelpOnWay');
+        navigation.replace('RoadsideHelpOnWay', { bookingId: pending.bookingId });
         return;
       }
 
@@ -174,7 +174,7 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
         }
         pendingCreateRef.current = null;
         resetBooking();
-        navigation.replace('RoadsideHelpOnWay');
+        navigation.replace('RoadsideHelpOnWay', { bookingId: response.booking.id });
         return;
       }
 
@@ -223,9 +223,6 @@ export default function RoadsideReviewScreen({ navigation }: Props) {
     address: booking.location,
     label: booking.locationLabel,
   });
-  const locationLine = locationCard.secondary
-    ? `${locationCard.primary}\n${locationCard.secondary}`
-    : locationCard.primary;
   const serviceLabel = getRoadsideServiceLabel(booking.serviceId);
   const price = getRoadsideServicePrice(booking.serviceId);
 

@@ -53,11 +53,11 @@ function mapUserSubscription(sub: BackendUserSubscription): UserSubscription {
 }
 
 export async function listSubscriptionPlans(
-  billingCycle?: 'monthly' | 'yearly',
+  _billingCycle?: 'monthly' | 'yearly',
 ): Promise<SubscriptionPlan[]> {
   const { data } = await apiClient.get<ApiSuccessResponse<BackendPlan[]>>(
     API_ENDPOINTS.subscriptionPlans,
-    { params: billingCycle ? { billingCycle } : undefined },
+    { params: { audience: 'customer' } },
   );
   return data.data.map(mapPlan);
 }

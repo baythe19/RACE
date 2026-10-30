@@ -59,7 +59,7 @@ export default function BookingPaymentScreen({ navigation, route }: Props) {
       navigation.navigate('DriverAssigned', { bookingId: bookingId!, bookingType: 'driver' });
       return;
     }
-    navigation.navigate(next as 'RoadsideHelpOnWay');
+    navigation.navigate('RoadsideHelpOnWay', { bookingId: bookingId! });
   };
 
   // MVP: UPI+Cash are the real rails. GPay option is a coming-soon showcase —

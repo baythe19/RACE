@@ -1,14 +1,19 @@
 import { Platform } from 'react-native';
-import { PROVIDER_DEFAULT, PROVIDER_GOOGLE } from 'react-native-maps';
 
 import { getGoogleMapsApiKey } from './googleMaps';
 
+/**
+ * MapView `provider` values (see react-native-maps `ProviderConstants`).
+ * Import only from this module — do not reference PROVIDER_GOOGLE / PROVIDER_DEFAULT in screens.
+ */
+export type NativeMapProvider = 'google' | undefined;
+
 /** Native map tiles: Google when a real API key is configured (iOS + Android). */
-export function getNativeMapProvider(): typeof PROVIDER_GOOGLE | typeof PROVIDER_DEFAULT {
+export function getNativeMapProvider(): NativeMapProvider {
   if (Platform.OS === 'web') {
-    return PROVIDER_DEFAULT;
+    return undefined;
   }
-  return getGoogleMapsApiKey() ? PROVIDER_GOOGLE : PROVIDER_DEFAULT;
+  return getGoogleMapsApiKey() ? 'google' : undefined;
 }
 
 export function isGoogleMapsConfigured(): boolean {
